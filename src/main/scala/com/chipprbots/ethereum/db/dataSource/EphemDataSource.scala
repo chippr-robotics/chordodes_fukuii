@@ -31,17 +31,17 @@ class EphemDataSource(var storage: Map[ByteBuffer, Array[Byte]]) extends DataSou
         val n = math.min(a.length, b.length)
         var i = 0
         var d = 0
-        while (i < n && d == 0) {
+        while i < n && d == 0 do {
           d = (a(i) & 0xff) - (b(i) & 0xff)
           i += 1
         }
-        if (d != 0) d else a.length - b.length
+        if d != 0 then d else a.length - b.length
       }
       val ns = namespace.toArray
       storage = storage.filter { case (k, _) =>
         val raw = k.array()
         val inNamespace = raw.length >= ns.length && raw.take(ns.length).sameElements(ns)
-        if (!inNamespace) true
+        if !inNamespace then true
         else {
           val suffix = raw.drop(ns.length)
           !(cmp(suffix, fromKey) >= 0 && cmp(suffix, toKeyExclusive) < 0)
@@ -58,11 +58,11 @@ class EphemDataSource(var storage: Map[ByteBuffer, Array[Byte]]) extends DataSou
       val n = math.min(a.length, b.length)
       var i = 0
       var d = 0
-      while (i < n && d == 0) {
+      while i < n && d == 0 do {
         d = (a(i) & 0xff) - (b(i) & 0xff)
         i += 1
       }
-      if (d != 0) d else a.length - b.length
+      if d != 0 then d else a.length - b.length
     }
     val ns = namespace.toArray
     // Emit in ascending unsigned-suffix order to match the RocksDB iterator (and the prior

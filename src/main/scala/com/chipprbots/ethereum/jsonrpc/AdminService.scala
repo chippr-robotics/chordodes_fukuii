@@ -303,7 +303,7 @@ class AdminService(
     * runtime behaviour (dynamic per-logger level changes via SLF4J) is equivalent.
     */
   def changeLogLevel(req: AdminChangeLogLevelRequest): ServiceResponse[AdminChangeLogLevelResponse] = IO {
-    if (!ValidLogLevels.contains(req.level)) {
+    if !ValidLogLevels.contains(req.level) then {
       Left(JsonRpcError.InvalidParams(s"Invalid log level: ${req.level}"))
     } else {
       try {
@@ -311,7 +311,7 @@ class AdminService(
         val level = Level.toLevel(req.level)
         val logFilters = req.logFilters.getOrElse(List(""))
         logFilters.foreach { filter =>
-          val loggerName = if (filter.isEmpty) org.slf4j.Logger.ROOT_LOGGER_NAME else filter
+          val loggerName = if filter.isEmpty then org.slf4j.Logger.ROOT_LOGGER_NAME else filter
           val logger = ctx.getLogger(loggerName)
           log.debug(s"Setting $loggerName logging level to ${req.level}")
           logger.setLevel(level)
@@ -335,7 +335,7 @@ class AdminService(
       val out = new BufferedOutputStream(new FileOutputStream(req.file))
       try {
         var i = first
-        while (i <= last) {
+        while i <= last do {
           blockchainReader.getBlockHeaderByNumber(i).foreach { header =>
             blockchainReader.getBlockByHash(header.hash).foreach { block =>
               val bytes: Array[Byte] = block.toBytes
@@ -363,13 +363,13 @@ class AdminService(
       try {
         var count = 0
         val lenBuf = new Array[Byte](4)
-        while (in.read(lenBuf) == 4) {
+        while in.read(lenBuf) == 4 do {
           val len = ByteBuffer.wrap(lenBuf).getInt
           val blockBytes = new Array[Byte](len)
           var read = 0
-          while (read < len) {
+          while read < len do {
             val n = in.read(blockBytes, read, len - read)
-            if (n == -1) throw new java.io.EOFException("Unexpected end of file")
+            if n == -1 then throw new java.io.EOFException("Unexpected end of file")
             read += n
           }
           val block = blockBytes.toBlock
@@ -388,13 +388,13 @@ class AdminService(
 
   def blockIP(req: AdminBlockIPRequest): ServiceResponse[AdminBlockIPResponse] = IO {
     val added = blockedIPRegistry.block(req.ip)
-    if (added) log.info(s"Blocked IP: ${req.ip}")
+    if added then log.info(s"Blocked IP: ${req.ip}")
     Right(AdminBlockIPResponse(added))
   }
 
   def unblockIP(req: AdminUnblockIPRequest): ServiceResponse[AdminUnblockIPResponse] = IO {
     val removed = blockedIPRegistry.unblock(req.ip)
-    if (removed) log.info(s"Unblocked IP: ${req.ip}")
+    if removed then log.info(s"Unblocked IP: ${req.ip}")
     Right(AdminUnblockIPResponse(removed))
   }
 

@@ -153,7 +153,7 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
     def testDecode: Assertion = RLPDecoder.decode[T](e) should equal(p)
   }
 
-  val examples: List[RLPFixture[_ <: Payload]] = List(
+  val examples: List[RLPFixture[? <: Payload]] = List(
     new RLPFixture[Payload.Ping] {
       override val p: Ping = Payload.Ping(
         version = 4,

@@ -30,26 +30,26 @@ object PostMergeBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
   private def validatePostMergeDifficulty(
       blockHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if (blockHeader.difficulty == 0) Right(BlockHeaderValid)
+    if blockHeader.difficulty == 0 then Right(BlockHeaderValid)
     else Left(HeaderDifficultyError)
 
   private def validatePostMergeNonce(
       blockHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if (blockHeader.nonce == EmptyNonce) Right(BlockHeaderValid)
+    if blockHeader.nonce == EmptyNonce then Right(BlockHeaderValid)
     else Left(PostMergeNonceError(blockHeader.nonce))
 
   private def validatePostMergeOmmers(
       blockHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if (blockHeader.ommersHash == BlockHeader.EmptyOmmers) Right(BlockHeaderValid)
+    if blockHeader.ommersHash == BlockHeader.EmptyOmmers then Right(BlockHeaderValid)
     else Left(PostMergeOmmersError)
 
   private def validateWithdrawalsRoot(
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
     val isShanghaiActive = blockchainConfig.isShanghaiTimestamp(blockHeader.unixTimestamp)
-    if (isShanghaiActive) {
+    if isShanghaiActive then {
       blockHeader.withdrawalsRoot match {
         case Some(_) => Right(BlockHeaderValid)
         case None    => Left(MissingWithdrawalsRootError)
@@ -63,7 +63,7 @@ object PostMergeBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
     val isCancunActive = blockchainConfig.isCancunTimestamp(blockHeader.unixTimestamp)
-    if (isCancunActive) {
+    if isCancunActive then {
       (blockHeader.blobGasUsed, blockHeader.excessBlobGas, blockHeader.parentBeaconBlockRoot) match {
         case (Some(_), Some(_), Some(_)) => Right(BlockHeaderValid)
         case _                           => Left(MissingBlobGasFieldsError)

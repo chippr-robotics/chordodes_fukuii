@@ -66,7 +66,7 @@ class ForkChoiceManager(
     // is fire-and-forget; the rest of this method's behavior is unchanged.
     publishBeaconHead(newState.headBlockHash, maybeHeader)
 
-    if (maybeHeader.isEmpty) {
+    if maybeHeader.isEmpty then {
       log.info(s"Fork choice head ${newState.headBlockHash} not known yet (SYNCING)")
       Left("SYNCING")
     } else {

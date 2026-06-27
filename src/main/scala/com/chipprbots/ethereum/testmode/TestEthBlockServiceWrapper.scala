@@ -94,7 +94,7 @@ class TestEthBlockServiceWrapper(
     response.number,
     response.hash,
     response.parentHash,
-    if (block.header.nonce.isEmpty) None else Some(block.header.nonce),
+    if block.header.nonce.isEmpty then None else Some(block.header.nonce),
     response.sha3Uncles,
     response.logsBloom,
     response.transactionsRoot,

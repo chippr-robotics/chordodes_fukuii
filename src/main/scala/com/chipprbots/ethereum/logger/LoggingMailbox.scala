@@ -38,7 +38,7 @@ class LoggingMailbox(owner: ActorRef, system: ActorSystem, sizeLimit: Int) exten
 
   override def dequeue(): Envelope = {
     val x = super.dequeue()
-    if (x ne null) {
+    if x ne null then {
       val size = queueSize.decrementAndGet()
       dequeueCount.incrementAndGet()
       logSize(size)
@@ -53,9 +53,9 @@ class LoggingMailbox(owner: ActorRef, system: ActorSystem, sizeLimit: Int) exten
   }
 
   def logSize(size: Int): Unit =
-    if (size >= sizeLimit) {
+    if size >= sizeLimit then {
       val now = System.nanoTime()
-      if (now - logTime > interval) {
+      if now - logTime > interval then {
         val msgPerSecond = dequeueCount.get.toDouble / ((now - logTime).toDouble / interval)
         owner.path.name
         logTime = now

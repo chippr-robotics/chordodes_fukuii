@@ -107,7 +107,7 @@ class EthFilterService(
     import req.filter.*
 
     // Validate: blockHash cannot be combined with fromBlock/toBlock
-    if (blockHash.isDefined && (fromBlock.isDefined || toBlock.isDefined)) {
+    if blockHash.isDefined && (fromBlock.isDefined || toBlock.isDefined) then {
       return IO.pure(
         Left(JsonRpcError.InvalidParams("cannot specify both blockHash and fromBlock/toBlock"))
       )
@@ -119,17 +119,17 @@ class EthFilterService(
     val toNum = toBlock.collect { case BlockParam.WithNumber(n) => n }.getOrElse(bestBlockNum)
 
     // Validate: block range must not exceed current head
-    if (fromNum > bestBlockNum || toNum > bestBlockNum) {
+    if fromNum > bestBlockNum || toNum > bestBlockNum then {
       return IO.pure(Left(JsonRpcError.InvalidParams("block range extends beyond current head block")))
     }
 
     // Validate: fromBlock must be <= toBlock
-    if (fromNum > toNum) {
+    if fromNum > toNum then {
       return IO.pure(Left(JsonRpcError.InvalidParams("invalid block range params")))
     }
 
     // If blockHash specified, resolve to block number and use as from=to
-    val (resolvedFrom, resolvedTo) = if (blockHash.isDefined) {
+    val (resolvedFrom, resolvedTo) = if blockHash.isDefined then {
       val blockNum = blockHash.flatMap(h => blockchainReader.getBlockByHash(h).map(_.header.number))
       blockNum match {
         case Some(n) =>

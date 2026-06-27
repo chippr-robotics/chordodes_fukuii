@@ -136,8 +136,8 @@ case class ForkBlockNumbers(
     * falls back to miningConfig.gasLimitTarget.
     */
   def gasLimitAdjustmentStartAt(blockNumber: BigInt): Option[BigInt] =
-    if (blockNumber >= olympiaBlockNumber) olympiaGasTarget
-    else if (blockNumber >= spiralBlockNumber) spiralGasTarget
+    if blockNumber >= olympiaBlockNumber then olympiaGasTarget
+    else if blockNumber >= spiralBlockNumber then spiralGasTarget
     else None
 }
 

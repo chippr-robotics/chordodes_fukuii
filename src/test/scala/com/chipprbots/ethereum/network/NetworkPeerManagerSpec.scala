@@ -653,7 +653,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       peerProbe.expectNoMessage(100.millis)
       val nonGenesis = peerInfo.remoteStatus.bestHash != peerInfo.remoteStatus.genesisHash
       val notEth69 = peerInfo.remoteStatus.capability != Capability.ETH69
-      if (nonGenesis && notEth69) {
+      if nonGenesis && notEth69 then {
         val probe = peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessage])
         probe.peerId shouldBe peer.id
         probe.message.code shouldBe Codes.GetBlockHeadersCode

@@ -142,8 +142,8 @@ object AccountRangeWorker {
                 // Complete the request in tracker (cancel timeout) regardless of validation outcome.
                 // A proof-only empty range is still a served response, not a timeout/failure.
                 val responseItemsForRate =
-                  if (accountCount > 0) accountCount
-                  else if (response.proof.nonEmpty) 1
+                  if accountCount > 0 then accountCount
+                  else if response.proof.nonEmpty then 1
                   else 0
                 requestTracker.completeRequest(reqId, responseItemsForRate)
 
@@ -182,7 +182,7 @@ object AccountRangeWorker {
                     // Root mismatch during a pivot transition is expected — the peer is serving the new
                     // root while this worker was dispatched against the old one. Demote to debug since
                     // TaskFailed is still sent and the coordinator re-queues normally.
-                    if (errorStr.contains("root mismatch") || errorStr.contains("Proof root"))
+                    if errorStr.contains("root mismatch") || errorStr.contains("Proof root") then
                       context.log.debug(
                         s"AccountRange proof skipped (pivot transition) reqId=$reqId range=${task.rangeString}: $error"
                       )

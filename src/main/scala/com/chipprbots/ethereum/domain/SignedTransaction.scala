@@ -143,7 +143,7 @@ object SignedTransaction {
       chainIdOpt: Option[BigInt]
   ): ECDSASignature = {
     // Normalize v to handle negative values (e.g., -98 byte -> 158 unsigned)
-    val normalizedV = if (ethereumSignature.v < 0) ethereumSignature.v + 256 else ethereumSignature.v
+    val normalizedV = if ethereumSignature.v < 0 then ethereumSignature.v + 256 else ethereumSignature.v
 
     chainIdOpt match {
       // ignore chainId for unprotected negative y-parity in pre-eip155 signature
@@ -382,15 +382,15 @@ object SignedTransaction {
         // EIP-155: Extract chainId from v value
         // v = chainId * 2 + 35 (for negative y-parity) or chainId * 2 + 36 (for positive y-parity)
         // Handle negative v values by converting to unsigned (e.g., -98 byte -> 158 unsigned)
-        val normalizedV = if (stx.signature.v < 0) stx.signature.v + 256 else stx.signature.v
+        val normalizedV = if stx.signature.v < 0 then stx.signature.v + 256 else stx.signature.v
 
         // Only extract chainId if v is >= 35 (valid EIP-155 range)
         // Values < 35 that aren't 27 or 28 are invalid
-        if (normalizedV >= EIP155NegativePointSign) {
+        if normalizedV >= EIP155NegativePointSign then {
           val chainId = (normalizedV - EIP155NegativePointSign) / 2
           // Validate that extracted chainId matches the blockchain's configured chainId
           // This ensures EIP-155 replay protection works correctly
-          if (chainId == blockchainConfig.chainId) {
+          if chainId == blockchainConfig.chainId then {
             Some(chainId)
           } else {
             // ChainId present but does not match local config - reject for replay protection
@@ -586,7 +586,7 @@ object SignedTransactionWithSender {
     // Cheap stateless pre-filters before expensive ECDSA recovery
     val validated = getStatelessValidTransactions(stxs)
 
-    if (validated.size < 16) {
+    if validated.size < 16 then {
       // Small batch: sequential to avoid overhead
       recoverSenders(validated)
     } else {
@@ -619,7 +619,7 @@ object SignedTransactionWithSender {
         case sct: SetCodeTransaction         => sct.chainId == blockchainConfig.chainId
         case _: LegacyTransaction            => true // validated in getSender
       }
-      if (!chainIdValid) false
+      if !chainIdValid then false
       else {
         // 2. Intrinsic gas validation — reject txs with gas below minimum
         val authListSize = tx match {

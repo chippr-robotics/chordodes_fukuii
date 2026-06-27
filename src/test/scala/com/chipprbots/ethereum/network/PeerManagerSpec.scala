@@ -708,7 +708,7 @@ class PeerManagerSpec
     forAll { (connectedPeers: ConnectedPeers) =>
       val demand = PeerManagerActor.outgoingConnectionDemand(connectedPeers, peerConfiguration)
       demand shouldBe >=(0)
-      if (connectedPeers.outgoingHandshakedPeersCount >= peerConfiguration.minOutgoingPeers) {
+      if connectedPeers.outgoingHandshakedPeersCount >= peerConfiguration.minOutgoingPeers then {
         demand shouldBe 0
       } else {
         connectedPeers.outgoingPeersCount + demand shouldBe peerConfiguration.maxOutgoingPeers
@@ -780,7 +780,7 @@ class PeerManagerSpec
       val minIncomingPeers = peerConfiguration.maxIncomingPeers - peerConfiguration.pruneIncomingPeers
       minIncomingPeers shouldBe >=(0)
 
-      if (connectedPeers.incomingHandshakedPeersCount <= minIncomingPeers) {
+      if connectedPeers.incomingHandshakedPeersCount <= minIncomingPeers then {
         numPeersToPrune shouldBe 0
       } else {
         connectedPeers.incomingHandshakedPeersCount - numPeersToPrune shouldBe minIncomingPeers

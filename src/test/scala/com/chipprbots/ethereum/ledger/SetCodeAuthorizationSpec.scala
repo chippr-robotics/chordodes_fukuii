@@ -68,7 +68,7 @@ class SetCodeAuthorizationSpec extends AnyFlatSpec with Matchers {
       )
     )
     val sig = ECDSASignature.sign(sigHash, keyPair)
-    val yParity = if (sig.v == ECDSASignature.negativePointSign) BigInt(0) else BigInt(1)
+    val yParity = if sig.v == ECDSASignature.negativePointSign then BigInt(0) else BigInt(1)
     SetCodeAuthorization(chainId, target, nonce, yParity, sig.r, sig.s)
   }
 

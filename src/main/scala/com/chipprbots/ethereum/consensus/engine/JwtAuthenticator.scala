@@ -41,13 +41,13 @@ class JwtAuthenticator(secretHex: String) extends Logger {
 
   private def validateToken(token: String): Either[String, Unit] = {
     val parts = token.split('.')
-    if (parts.length != 3) return Left("Invalid JWT format")
+    if parts.length != 3 then return Left("Invalid JWT format")
 
     val headerPayload = s"${parts(0)}.${parts(1)}"
     val expectedSig = hmacSha256(headerPayload)
     val actualSig = parts(2)
 
-    if (!constantTimeEquals(base64UrlDecode(expectedSig), base64UrlDecode(actualSig))) {
+    if !constantTimeEquals(base64UrlDecode(expectedSig), base64UrlDecode(actualSig)) then {
       return Left("Invalid JWT signature")
     }
 
@@ -58,7 +58,7 @@ class JwtAuthenticator(secretHex: String) extends Logger {
       case Some(m) =>
         val iat = m.group(1).toLong
         val now = Instant.now().getEpochSecond
-        if (Math.abs(now - iat) > MaxClockSkewSeconds) {
+        if Math.abs(now - iat) > MaxClockSkewSeconds then {
           Left(s"JWT expired: iat=$iat, now=$now, skew=${Math.abs(now - iat)}s")
         } else {
           Right(())
@@ -78,10 +78,10 @@ class JwtAuthenticator(secretHex: String) extends Logger {
     java.util.Base64.getUrlDecoder.decode(s)
 
   private def constantTimeEquals(a: Array[Byte], b: Array[Byte]): Boolean = {
-    if (a.length != b.length) return false
+    if a.length != b.length then return false
     var result = 0
     var i = 0
-    while (i < a.length) {
+    while i < a.length do {
       result |= a(i) ^ b(i)
       i += 1
     }
@@ -89,7 +89,7 @@ class JwtAuthenticator(secretHex: String) extends Logger {
   }
 
   private def hexToBytes(hex: String): Array[Byte] = {
-    val clean = if (hex.startsWith("0x")) hex.substring(2) else hex
+    val clean = if hex.startsWith("0x") then hex.substring(2) else hex
     clean.grouped(2).map(Integer.parseInt(_, 16).toByte).toArray
   }
 }
@@ -99,7 +99,7 @@ object JwtAuthenticator extends Logger {
   /** Load JWT secret from a file path. The file should contain a 32-byte hex-encoded secret. */
   def fromFile(path: String): JwtAuthenticator = {
     val secretHex = new String(Files.readAllBytes(Paths.get(path))).trim
-    if (secretHex.replaceAll("^0x", "").length < 64) {
+    if secretHex.replaceAll("^0x", "").length < 64 then {
       throw new IllegalArgumentException(
         s"JWT secret must be at least 32 bytes (64 hex chars), got: ${secretHex.length}"
       )

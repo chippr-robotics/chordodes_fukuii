@@ -18,7 +18,7 @@ object TryWithResources {
   }
 
   private def closeAndAddSuppressed(e: Throwable, resource: AutoCloseable): Unit =
-    if (e != null) {
+    if e != null then {
       try resource.close()
       catch {
         case NonFatal(suppressed) =>

@@ -313,18 +313,18 @@ class TraceService(
     val callTracer = new CallTracer(onlyTopCall = false)
     stxLedger.simulateTransactionWithTracer(stx, block.header, world, callTracer)
 
-    val traceField: JValue = if (options.trace) {
+    val traceField: JValue = if options.trace then {
       JArray(flattenCallTree(callTracer.getResult, txHash, txIndex, block.header.hash, block.header.number).toList)
     } else JNull
 
-    val vmTraceField: JValue = if (options.vmTrace) {
+    val vmTraceField: JValue = if options.vmTrace then {
       val vmTracer = new VmTracer()
       stxLedger.simulateTransactionWithTracer(stx, block.header, world, vmTracer)
       vmTracer.getResult
     } else JNull
 
     // stateDiff not yet implemented (deferred to P1-G)
-    val txHashField: JValue = if (txHash.nonEmpty) JString(s"0x${txHash.toHex}") else JNull
+    val txHashField: JValue = if txHash.nonEmpty then JString(s"0x${txHash.toHex}") else JNull
     ("trace" -> traceField) ~
       ("vmTrace" -> vmTraceField) ~
       ("stateDiff" -> (JNull: JValue)) ~
@@ -370,7 +370,7 @@ class TraceService(
           case JString(s) if s.toUpperCase.startsWith("CREATE") => "create"
           case _                                                => "call"
         }
-        val action: JValue = if (traceType == "create") {
+        val action: JValue = if traceType == "create" then {
           ("from" -> (obj \ "from")) ~
             ("gas" -> (obj \ "gas")) ~
             ("value" -> (obj \ "value")) ~
@@ -386,12 +386,11 @@ class TraceService(
         val resultField: JValue = (obj \ "error") match {
           case JString(_) | JNull => JNull
           case _ =>
-            if (traceType == "create")
+            if traceType == "create" then
               ("gasUsed" -> (obj \ "gasUsed")) ~ ("address" -> (obj \ "to")) ~ ("code" -> (obj \ "output"))
-            else
-              ("gasUsed" -> (obj \ "gasUsed")) ~ ("output" -> (obj \ "output"))
+            else ("gasUsed" -> (obj \ "gasUsed")) ~ ("output" -> (obj \ "output"))
         }
-        val txHashField: JValue = if (txHash.nonEmpty) JString(s"0x${txHash.toHex}") else JNull
+        val txHashField: JValue = if txHash.nonEmpty then JString(s"0x${txHash.toHex}") else JNull
         val traceAddrField: JValue = JArray(addr.map(i => JInt(i)))
         val entry: JObject =
           ("type" -> traceType) ~
@@ -439,7 +438,7 @@ class TraceService(
           JsonRpcError.InvalidParams(s"Requested range exceeds max of $MaxTraceFilterRange blocks")
         )
         allTraces = (fromNum to toNum).flatMap { blockNum =>
-          if (blockNum == 0) Nil // skip genesis — no parent state
+          if blockNum == 0 then Nil // skip genesis — no parent state
           else {
             val branch = blockchainReader.getBestBranch
             blockchainReader
@@ -473,7 +472,7 @@ class TraceService(
       fromAddrs: Seq[Address],
       toAddrs: Seq[Address]
   ): Seq[JValue] =
-    if (fromAddrs.isEmpty && toAddrs.isEmpty) traces
+    if fromAddrs.isEmpty && toAddrs.isEmpty then traces
     else
       traces.filter { trace =>
         val action = trace \ "action"

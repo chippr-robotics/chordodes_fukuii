@@ -30,8 +30,8 @@ class CheckpointDownloaderSpec extends AnyWordSpec with Matchers with EitherValu
   }
 
   override def afterEach(): Unit = {
-    if (server != null) server.stop(0)
-    if (tmpDir != null) {
+    if server != null then server.stop(0)
+    if tmpDir != null then {
       import scala.jdk.CollectionConverters.*
       val walk = Files.walk(tmpDir)
       try
@@ -49,7 +49,7 @@ class CheckpointDownloaderSpec extends AnyWordSpec with Matchers with EitherValu
     override def handle(exchange: HttpExchange): Unit =
       try {
         lastRangeHeader = Option(exchange.getRequestHeaders.getFirst("Range"))
-        val range = if (ignoreRange) None else lastRangeHeader
+        val range = if ignoreRange then None else lastRangeHeader
         range match {
           case Some(r) if r.startsWith("bytes=") =>
             val spec = r.stripPrefix("bytes=")

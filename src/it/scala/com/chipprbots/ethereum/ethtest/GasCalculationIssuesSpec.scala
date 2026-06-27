@@ -115,7 +115,7 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
       }
     }
 
-    if (totalGasDiscrepancies > 0) {
+    if totalGasDiscrepancies > 0 then {
       info(s"Found $totalGasDiscrepancies gas calculation discrepancies:")
       discrepancyDetails.foreach(d => info(d))
 

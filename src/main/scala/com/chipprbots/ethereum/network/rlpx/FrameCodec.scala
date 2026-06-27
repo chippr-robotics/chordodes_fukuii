@@ -59,7 +59,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
 
     @tailrec
     def readRecursive(framesSoFar: Seq[Frame] = Nil): Seq[Frame] = {
-      if (headerOpt.isEmpty) tryReadHeader()
+      if headerOpt.isEmpty then tryReadHeader()
 
       headerOpt match {
         case Some(header) =>
@@ -74,7 +74,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
             unprocessedData.length
           )
 
-          if (unprocessedData.length >= totalSizeToRead) {
+          if unprocessedData.length >= totalSizeToRead then {
             val buffer = unprocessedData.take(totalSizeToRead).toArray
 
             val frameSize = totalSizeToRead - MacSize
@@ -98,7 +98,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
             )
 
             // Log payload hex for protocol debugging
-            if (payload.nonEmpty) {
+            if payload.nonEmpty then {
               log.debug("FRAME_READ: Frame payload hex: {}", MessageCodec.truncateHex(payload))
             }
 
@@ -122,7 +122,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
   }
 
   private def tryReadHeader(): Unit =
-    if (unprocessedData.size >= HeaderLength) {
+    if unprocessedData.size >= HeaderLength then {
       val headBuffer = unprocessedData.take(HeaderLength).toArray
 
       updateMac(secrets.ingressMac, headBuffer, 0, headBuffer, 16, egress = false)
@@ -137,7 +137,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
       // Security: defense-in-depth frame body size limit (CVE-2026-26313)
       // Frame headers are MAC-protected so only authenticated peers can reach this,
       // but enforce an explicit upper bound matching MaxDecompressedLength
-      if (bodySize <= 0 || bodySize > MessageCodec.MaxDecompressedLength) {
+      if bodySize <= 0 || bodySize > MessageCodec.MaxDecompressedLength then {
         throw new IOException(
           s"Invalid frame body size: $bodySize (max=${MessageCodec.MaxDecompressedLength})"
         )
@@ -175,7 +175,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
       val ptype = rlp.encode(frame.`type`)
 
       val totalSize =
-        if (firstFrame) frame.payload.length + ptype.length
+        if firstFrame then frame.payload.length + ptype.length
         else frame.payload.length
 
       headBuffer(0) = (totalSize >> 16).toByte
@@ -208,7 +208,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
       val buff: Array[Byte] = new Array[Byte](256)
       out ++= ByteString(headBuffer)
 
-      if (firstFrame) {
+      if firstFrame then {
         // packet-type only in first frame
         enc.processBytes(ptype, 0, ptype.length, buff, 0)
         out ++= ByteString(buff.take(ptype.length))
@@ -218,7 +218,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
 
       out ++= processFramePayload(frame.payload)
 
-      if (lastFrame) {
+      if lastFrame then {
         // padding and mac only in last frame
         out ++= processFramePadding(totalSize)
         out ++= processFrameMac()
@@ -237,7 +237,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
     import com.chipprbots.ethereum.utils.ByteStringUtils.*
     var i = 0
     val elements = new ArrayBuffer[ByteStringElement]()
-    while (i < payload.length) {
+    while i < payload.length do {
       val bytes = payload.drop(i).take(256).toArray
       enc.processBytes(bytes, 0, bytes.length, bytes, 0)
       secrets.egressMac.update(bytes, 0, bytes.length)
@@ -249,7 +249,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
 
   private def processFramePadding(totalSize: Int): ByteString = {
     val padding = 16 - (totalSize % 16)
-    if (padding < 16) {
+    if padding < 16 then {
       val pad = new Array[Byte](16)
       val buff = new Array[Byte](16)
       enc.processBytes(pad, 0, padding, buff, 0)
@@ -293,10 +293,10 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
     val result = new Array[Byte](mac.getDigestSize)
     doSum(mac, result)
 
-    if (egress) System.arraycopy(result, 0, out, outOffset, length)
+    if egress then System.arraycopy(result, 0, out, outOffset, length)
     else
       (0 until length).foreach { i =>
-        if (out(i + outOffset) != result(i)) throw new IOException("MAC mismatch")
+        if out(i + outOffset) != result(i) then throw new IOException("MAC mismatch")
       }
 
     result

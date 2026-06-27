@@ -154,8 +154,8 @@ object SubscriptionManager {
       }
 
     def hexToBytes(hex: String): Array[Byte] = {
-      val h = if (hex.startsWith("0x") || hex.startsWith("0X")) hex.drop(2) else hex
-      val padded = if (h.length % 2 != 0) "0" + h else h
+      val h = if hex.startsWith("0x") || hex.startsWith("0X") then hex.drop(2) else hex
+      val padded = if h.length % 2 != 0 then "0" + h else h
       padded.grouped(2).map(b => Integer.parseInt(b, 16).toByte).toArray
     }
 
@@ -201,7 +201,7 @@ object SubscriptionManager {
         "timestamp" -> JString("0x" + h.unixTimestamp.toHexString),
         "nonce" -> JString("0x" + h.nonce.toHex)
       )
-      if (includeTransactions)
+      if includeTransactions then
         base.merge(
           JObject(
             "transactions" -> JArray(
@@ -216,7 +216,7 @@ object SubscriptionManager {
 
     def notifyLogs(block: Block): Unit = {
       val logSubs = subscriptions.values.collect { case s: LogsSubscription => s }
-      if (logSubs.isEmpty) return
+      if logSubs.isEmpty then return
 
       val receipts = blockchainReader.getReceiptsByHash(block.header.hash).getOrElse(Seq.empty)
       var blockLogIndex = 0
@@ -224,7 +224,7 @@ object SubscriptionManager {
         receipt.logs.zipWithIndex.foreach { case (log, localIdx) =>
           val globalIdx = blockLogIndex + localIdx
           logSubs.foreach { sub =>
-            if (logMatchesSubscription(log, sub)) {
+            if logMatchesSubscription(log, sub) then {
               val tx = block.body.transactionList(txIndex)
               val logJson = JObject(
                 "removed" -> JBool(false),
@@ -259,7 +259,7 @@ object SubscriptionManager {
     def notifyPendingTxs(stx: SignedTransactionWithSender): Unit =
       subscriptions.values.collect { case s: NewPendingTxsSubscription => s }.foreach { sub =>
         val result: JValue =
-          if (sub.includeTransactions) pendingTxJson(stx)
+          if sub.includeTransactions then pendingTxJson(stx)
           else JString("0x" + stx.tx.hash.toHex)
         push(sub.connectionId, subscriptionEnvelope(sub.subscriptionId, result))
       }
@@ -304,7 +304,7 @@ object SubscriptionManager {
 
         case Unsubscribe(connId, subId, replyTo) =>
           val found = subscriptions.get(subId).exists(_.connectionId == connId)
-          if (found) subscriptions -= subId
+          if found then subscriptions -= subId
           replyTo ! UnsubscribeResponse(found)
           Behaviors.same
 

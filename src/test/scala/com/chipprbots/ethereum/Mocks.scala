@@ -180,12 +180,12 @@ object Mocks {
           blockHeader: BlockHeader,
           blockBody: BlockBody
       ): Either[BlockError, BlockValid] =
-        if (blockHeader.number == number) Left(BlockTransactionsHashError) else Right(BlockValid)
+        if blockHeader.number == number then Left(BlockTransactionsHashError) else Right(BlockValid)
       override def validateBlockAndReceipts(
           blockHeader: BlockHeader,
           receipts: Seq[Receipt]
       ): Either[BlockError, BlockValid] =
-        if (blockHeader.number == number) Left(BlockTransactionsHashError) else Right(BlockValid)
+        if blockHeader.number == number then Left(BlockTransactionsHashError) else Right(BlockValid)
     }
 
     override def validateBlockAfterExecution(
@@ -194,7 +194,7 @@ object Mocks {
         receipts: Seq[Receipt],
         gasUsed: BigInt
     )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockExecutionSuccess] =
-      if (block.header.number == number) Left(ValidationAfterExecError("")) else Right(BlockExecutionSuccess)
+      if block.header.number == number then Left(ValidationAfterExecError("")) else Right(BlockExecutionSuccess)
   }
 
   case class MockHandshakerAlwaysSucceeds(

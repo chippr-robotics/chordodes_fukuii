@@ -25,9 +25,9 @@ class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
 
   val specialCases: TableFor2[BigInt, BigInt] = Table(("n1", "n2"), pairs*)
 
-  def toSignedBigInt(n: BigInt): BigInt = if (n > MaxSignedValue) n - Modulus else n
+  def toSignedBigInt(n: BigInt): BigInt = if n > MaxSignedValue then n - Modulus else n
 
-  def toUnsignedBigInt(n: BigInt): BigInt = if (n < 0) n + Modulus else n
+  def toUnsignedBigInt(n: BigInt): BigInt = if n < 0 then n + Modulus else n
 
   /** For each operation (op) tests check a following property: For two BigInts (n1, n2): UInt256(n1) op UInt256(n2) ==
     * UInt256(n1 op n2)

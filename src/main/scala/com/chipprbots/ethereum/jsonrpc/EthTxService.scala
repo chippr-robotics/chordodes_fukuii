@@ -141,7 +141,7 @@ class EthTxService(
       } yield {
 
         val gasUsed =
-          if (txIndex == 0) receipt.cumulativeGasUsed
+          if txIndex == 0 then receipt.cumulativeGasUsed
           else receipt.cumulativeGasUsed - receipts(txIndex - 1).cumulativeGasUsed
 
         // Compute cumulative log index from prior receipts in the block
@@ -228,7 +228,7 @@ class EthTxService(
           .map(_.tx.gasPrice)
       }
 
-    if (gasPrices.nonEmpty) {
+    if gasPrices.nonEmpty then {
       val sorted = gasPrices.sorted
       // 60th percentile — matches go-ethereum/core-geth default (configurable there, fixed here).
       // Biases slightly above the median to reduce stuck-transaction risk during fee spikes.
@@ -247,7 +247,7 @@ class EthTxService(
 
     Try(req.data.toArray.toSignedTransactionWithSidecar) match {
       case Success((signedTransaction, rawBytesOpt)) =>
-        if (SignedTransaction.getSender(signedTransaction).isEmpty) {
+        if SignedTransaction.getSender(signedTransaction).isEmpty then {
           IO.pure(Left(JsonRpcError.InvalidRequest))
         } else {
           // EIP-3860 (Shanghai+): reject contract-creation txs whose initcode exceeds the
@@ -263,7 +263,7 @@ class EthTxService(
             tx.isContractInit &&
               evmConfig.eip3860Enabled &&
               evmConfig.maxInitCodeSize.exists(max => tx.payload.size > max)
-          if (initCodeTooLarge) {
+          if initCodeTooLarge then {
             IO.pure(
               Left(
                 JsonRpcError.InvalidParams(
@@ -321,7 +321,7 @@ class EthTxService(
     resolveBlock(block)
       .map { blockWithTx =>
         val blockTxs = blockWithTx.block.body.transactionList
-        if (transactionIndex >= 0 && transactionIndex < blockTxs.size)
+        if transactionIndex >= 0 && transactionIndex < blockTxs.size then
           Some(
             TransactionData(
               blockTxs(transactionIndex.toInt),

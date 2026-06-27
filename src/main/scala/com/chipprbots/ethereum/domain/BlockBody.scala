@@ -84,7 +84,7 @@ object BlockBody {
       case rlpList: RLPList if rlpList.items.length >= 2 =>
         val transactions = rlpList.items(0).asInstanceOf[RLPList]
         val uncles = rlpList.items(1).asInstanceOf[RLPList]
-        val withdrawals = if (rlpList.items.length >= 3) {
+        val withdrawals = if rlpList.items.length >= 3 then {
           Some(rlpList.items(2).asInstanceOf[RLPList].items.map(_.toWithdrawal))
         } else {
           None

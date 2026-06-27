@@ -62,7 +62,7 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
         changes.foldLeft((List.empty[(NodeHash, NodeEncoded)], List.empty[StoredNodeSnapshot])) {
           case ((upsertAcc, snapshotAcc), (key, (storedNode, theSnapshot))) =>
             // if after update number references drop to zero mark node as possible for deletion after x blocks
-            if (storedNode.references == 0) {
+            if storedNode.references == 0 then {
               currentDeathRow = currentDeathRow ++ key
             }
 
@@ -74,10 +74,8 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
     val snapshotToSave: Seq[(NodeHash, Array[Byte])] = getSnapshotsToSave(bn, snapshots)
 
     val deathRow =
-      if (currentDeathRow.nonEmpty)
-        Seq(deathRowKey -> currentDeathRow.toArray[Byte])
-      else
-        Seq()
+      if currentDeathRow.nonEmpty then Seq(deathRowKey -> currentDeathRow.toArray[Byte])
+      else Seq()
 
     nodeStorage.updateCond(Nil, deathRow ++ toUpsertUpdated ++ snapshotToSave, inMemory = true)
     this
@@ -113,7 +111,7 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
       blockNumber: BigInt,
       snapshots: Seq[StoredNodeSnapshot]
   ): Seq[(NodeHash, Array[Byte])] =
-    if (snapshots.nonEmpty) {
+    if snapshots.nonEmpty then {
       // If not empty, snapshots will be stored indexed by block number and index
       val snapshotCountKey = getSnapshotsCountKey(blockNumber)
       val getSnapshotKeyFn = getSnapshotKey(blockNumber)(_)

@@ -17,7 +17,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
   private[ethereum] var messConfig: Option[MESSConfig] = None
 
   def resolveBranch(headers: NonEmptyList[BlockHeader]): BranchResolutionResult =
-    if (!doHeadersFormChain(headers)) {
+    if !doHeadersFormChain(headers) then {
       InvalidBranch
     } else {
       val knownParentOrGenesis = blockchainReader
@@ -26,10 +26,8 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
           headers.head.parentHash
         ) || headers.head.hash == blockchainReader.genesisHeader.hash
 
-      if (!knownParentOrGenesis)
-        UnknownBranch
-      else
-        compareBranch(headers)
+      if !knownParentOrGenesis then UnknownBranch
+      else compareBranch(headers)
     }
 
   private[ledger] def doHeadersFormChain(headers: NonEmptyList[BlockHeader]): Boolean =
@@ -68,14 +66,14 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
           w.increase(h)
         }
 
-        if (newWeight > oldWeight) {
+        if newWeight > oldWeight then {
           // New branch has higher TD — check MESS anti-reorg protection
-          if (shouldMessReject(oldBlocks, newHeaders)) {
+          if shouldMessReject(oldBlocks, newHeaders) then {
             NoChainSwitch
           } else {
             NewBetterBranch(oldBlocks)
           }
-        } else if (newWeight == oldWeight && newHeaders.nonEmpty && oldBlocks.isEmpty) {
+        } else if newWeight == oldWeight && newHeaders.nonEmpty && oldBlocks.isEmpty then {
           // Post-merge: all blocks have difficulty=0, so weight never increases.
           // If the new branch extends the chain without conflicting (no old blocks to replace),
           // accept it. This is the normal case for regular sync importing new blocks.
@@ -107,7 +105,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
     messConfig match {
       case Some(config) if oldBlocks.nonEmpty =>
         val currentHeadNumber = oldBlocks.last.header.number
-        if (!config.isActiveAtBlock(currentHeadNumber)) return false
+        if !config.isActiveAtBlock(currentHeadNumber) then return false
 
         val commonAncestorTimestamp = blockchainReader
           .getBlockHeaderByHash(oldBlocks.head.header.parentHash)
@@ -126,7 +124,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
         val polyVal = ArtificialFinality.polynomialV(BigInt(timeDeltaSeconds))
         val want = polyVal * localSubchainTD
         val got = proposedSubchainTD * BigInt(128)
-        val tdrRatio = if (want > 0) got.toDouble / want.toDouble else 0.0
+        val tdrRatio = if want > 0 then got.toDouble / want.toDouble else 0.0
 
         val commonAncestorNumber = oldBlocks.head.header.number - 1
         val commonAncestorHash = oldBlocks.head.header.parentHash
@@ -135,7 +133,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
         val proposedSpanSeconds = math.max(0L, proposedTip.unixTimestamp - commonAncestorTimestamp)
 
         BlockMetrics.setMessGravity(tdrRatio)
-        if (shouldReject) {
+        if shouldReject then {
           BlockMetrics.incrementMessRejected()
           log.warn(
             s"ECBP1100-MESS status=rejected age=${timeDeltaSeconds}s span.proposed=${proposedSpanSeconds}s " +
@@ -144,7 +142,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
               s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash).take(8)} " +
               s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash).take(8)}"
           )
-        } else if (currentHead.number - commonAncestorNumber > 2) {
+        } else if currentHead.number - commonAncestorNumber > 2 then {
           // Log MESS acceptance only for non-trivial reorgs (> 2 blocks), matching core-geth forkchoice.go:177
           BlockMetrics.incrementMessAccepted()
           log.info(

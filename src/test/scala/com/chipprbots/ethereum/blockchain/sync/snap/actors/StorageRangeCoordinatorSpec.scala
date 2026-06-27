@@ -602,7 +602,7 @@ class StorageRangeCoordinatorSpec
     val accountHash = kec256(ByteString(s"acct-$seed"))
     val slots = mutable.ArrayBuffer.empty[(ByteString, ByteString)]
     var i = 0
-    while (i < slotsPerAccount) {
+    while i < slotsPerAccount do {
       val slotHash = kec256(ByteString(s"slot-$seed-$i"))
       val slotValue = ByteString(s"value-$seed-$i".getBytes)
       slots += ((slotHash, slotValue))
@@ -614,7 +614,7 @@ class StorageRangeCoordinatorSpec
   // Drain all self-sent Commands sitting in the BehaviorTestKit's self-inbox (e.g. FlatBatchFlushComplete
   // produced by the parasitic flush, plus chained StorageCheckCompletion ticks), processing each on the Impl.
   private def drainSelf(kit: BehaviorTestKit[StorageRangeCoordinator.Command]): Unit =
-    while (kit.selfInbox().hasMessages) kit.runOne()
+    while kit.selfInbox().hasMessages do kit.runOne()
 
   it should "buffer small-contract slots in the accumulator without immediate commit" taggedAs UnitTest in {
     val flatSlots = new FlatSlotStorage(EphemDataSource())
@@ -861,7 +861,7 @@ class StorageRangeCoordinatorSpec
 
     // Drain the underlying queue to 2 entries (≤ low-water mark) and trigger a check.
     val q = impl.tasks
-    while (q.size > 2) q.dequeue()
+    while q.size > 2 do q.dequeue()
 
     kit.run(Messages.StorageCheckCompletion)
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageBackpressureChanged(paused = false))

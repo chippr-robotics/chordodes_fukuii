@@ -67,7 +67,7 @@ case class EthNodeStatus68ExchangeState(
     val localBestBlock = blockchainReader.getBestBlockNumber
     val localGenesisHash = blockchainReader.genesisHeader.hash
     val storedTimestamp = blockchainReader.getBlockHeaderByNumber(localBestBlock).map(_.unixTimestamp).getOrElse(0L)
-    val localBestTimestamp = if (storedTimestamp == 0L) System.currentTimeMillis() / 1000 else storedTimestamp
+    val localBestTimestamp = if storedTimestamp == 0L then System.currentTimeMillis() / 1000 else storedTimestamp
     val localForkId = ForkId.create(localGenesisHash, blockchainConfig)(localBestBlock, localBestTimestamp)
 
     log.debug(
@@ -78,7 +78,7 @@ case class EthNodeStatus68ExchangeState(
       localForkId
     )
 
-    if (networkId != peerConfiguration.networkId) {
+    if networkId != peerConfiguration.networkId then {
       log.debug(
         "ETH{}_STATUS: NetworkId mismatch - local={}, remote={} - disconnecting",
         protocolVersion,
@@ -86,7 +86,7 @@ case class EthNodeStatus68ExchangeState(
         networkId
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else if (genesisHash != localGenesisHash) {
+    } else if genesisHash != localGenesisHash then {
       log.debug(
         "ETH{}_STATUS: Genesis mismatch - local={}, remote={} - disconnecting",
         protocolVersion,
@@ -175,7 +175,7 @@ case class EthNodeStatus68ExchangeState(
     // Core-geth uses head.Number.Uint64() and head.Time for forkID — not checkpoints.
     val forkIdBlockNumber = bestBlockNumber
     val forkIdTimestamp =
-      if (bestBlockHeader.unixTimestamp == 0L) System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
+      if bestBlockHeader.unixTimestamp == 0L then System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
     val forkId = ForkId.create(genesisHash, blockchainConfig)(forkIdBlockNumber, forkIdTimestamp)
 
     val status = ETHPackets.Status68.Status68(
@@ -198,13 +198,13 @@ case class EthNodeStatus68ExchangeState(
       forkId
     )
 
-    if (log.underlying.isDebugEnabled()) {
+    if log.underlying.isDebugEnabled() then {
       val encodedBytes = status.toBytes
       val hexBytes = org.bouncycastle.util.encoders.Hex.toHexString(encodedBytes)
       log.debug(
         "STATUS_EXCHANGE: Raw RLP bytes (len={}): {}",
         encodedBytes.length,
-        if (hexBytes.length > 200) hexBytes.take(200) + "..." else hexBytes
+        if hexBytes.length > 200 then hexBytes.take(200) + "..." else hexBytes
       )
     }
 

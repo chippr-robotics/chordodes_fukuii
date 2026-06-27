@@ -38,7 +38,7 @@ class SnapSyncProgressStorageSpec extends AnyFlatSpec with Matchers {
     finally {
       dataSource.destroy()
       val dir = new File(dbPath)
-      if (dir.exists()) dir.delete()
+      if dir.exists() then dir.delete()
     }
   }
 

@@ -33,15 +33,14 @@ trait NodeStatusExchangeState[T <: Message] extends InProgressState[PeerInfo] wi
     val validNetworkID = status.networkId == handshakerConfiguration.peerConfiguration.networkId
     val validGenesisHash = status.genesisHash == blockchainReader.genesisHeader.hash
 
-    if (validNetworkID && validGenesisHash) {
+    if validNetworkID && validGenesisHash then {
       forkResolverOpt match {
         case Some(forkResolver) =>
           IrregularStateChangeDaoForkBlockExchangeState(handshakerConfiguration, forkResolver, status)
         case None =>
           ConnectedState(PeerInfo.withForkAccepted(status))
       }
-    } else
-      DisconnectedState(Reasons.DisconnectRequested)
+    } else DisconnectedState(Reasons.DisconnectRequested)
   }
 
   protected def getBestBlockHeader(): BlockHeader = {

@@ -33,6 +33,6 @@ object DebugTrace {
     traceBlockNumber.contains(blockNumber)
 
   def enabledForTx(blockNumber: BigInt, txHashHex: String): Boolean =
-    if (!enabledForBlock(blockNumber)) false
+    if !enabledForBlock(blockNumber) then false
     else traceTxHashLower.forall(_ == txHashHex.stripPrefix("0x").toLowerCase)
 }

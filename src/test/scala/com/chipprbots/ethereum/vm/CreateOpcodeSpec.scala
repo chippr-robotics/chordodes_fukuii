@@ -157,7 +157,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
     val storeGas = G_sset
     def gasRequiredForInit(withHashCost: Boolean): BigInt = initPart(contractCode.code.size).linearConstGas(
       config
-    ) + copyCodeGas + storeGas + (if (withHashCost) G_sha3word * wordsForBytes(contractCode.code.size) else 0)
+    ) + copyCodeGas + storeGas + (if withHashCost then G_sha3word * wordsForBytes(contractCode.code.size) else 0)
     val depositGas: BigInt = config.calcCodeDepositCost(contractCode.code)
     def gasRequiredForCreation(withHashCost: Boolean): BigInt = gasRequiredForInit(withHashCost) + depositGas + G_create
 
@@ -332,7 +332,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       }
 
       "consume correct gas" in {
-        result.stateOut.gasUsed shouldEqual G_create + (if (withHashCost)
+        result.stateOut.gasUsed shouldEqual G_create + (if withHashCost then
                                                           G_sha3word * wordsForBytes(fxt.contractCode.code.size)
                                                         else 0)
       }
@@ -350,7 +350,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       }
 
       "consume correct gas" in {
-        result.stateOut.gasUsed shouldEqual G_create + (if (withHashCost)
+        result.stateOut.gasUsed shouldEqual G_create + (if withHashCost then
                                                           G_sha3word * wordsForBytes(fxt.contractCode.code.size)
                                                         else 0)
       }
@@ -380,7 +380,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       val expectedGas = 61261
       val gasRequiredForInit = fxt.initWithSelfDestruct.linearConstGas(config) + G_newaccount
       val gasRequiredForCreation =
-        gasRequiredForInit + G_create + (if (withHashCost) G_sha3word * wordsForBytes(fxt.contractCode.code.size)
+        gasRequiredForInit + G_create + (if withHashCost then G_sha3word * wordsForBytes(fxt.contractCode.code.size)
                                          else 0)
 
       val context: PC = fxt.context.copy(startGas = 2 * gasRequiredForCreation, world = fxt.worldWithRevertProgram)

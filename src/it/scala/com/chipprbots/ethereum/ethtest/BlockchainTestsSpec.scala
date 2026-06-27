@@ -51,7 +51,7 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     val basePath = "/home/runner/work/fukuii/fukuii/ets/tests/BlockchainTests"
     val categoryPath = new File(s"$basePath/$testCategory")
 
-    if (!categoryPath.exists() || !categoryPath.isDirectory) {
+    if !categoryPath.exists() || !categoryPath.isDirectory then {
       Seq.empty
     } else {
       categoryPath
@@ -73,7 +73,7 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     val fullPath = s"/home/runner/work/fukuii/fukuii/ets/tests$resourcePath"
     val file = new File(fullPath)
 
-    if (!file.exists()) {
+    if !file.exists() then {
       BlockchainTestSuite(Map.empty)
     } else {
       val suite = EthereumTestsAdapter.loadTestSuite(resourcePath).unsafeRunSync()
@@ -145,7 +145,7 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     val basePath = "/home/runner/work/fukuii/fukuii/ets/tests/BlockchainTests"
     val baseDir = new File(basePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $basePath")
       info("Run 'git submodule init && git submodule update' to initialize")
       pending
@@ -160,7 +160,7 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     val basePath = "/home/runner/work/fukuii/fukuii/ets/tests/BlockchainTests"
     val baseDir = new File(basePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $basePath")
       info("Run 'git submodule init && git submodule update' to initialize")
       pending

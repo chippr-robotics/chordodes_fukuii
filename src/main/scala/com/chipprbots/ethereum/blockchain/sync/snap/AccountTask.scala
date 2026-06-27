@@ -49,15 +49,16 @@ case class AccountTask(
 
   /** Get the range as a human-readable string */
   def rangeString: String = {
-    val nextStr = if (next.isEmpty) "0x00..." else next.take(4).toArray.map("%02x".format(_)).mkString
-    val lastStr = if (last == AccountTask.MaxHash32) "0xFF..." else last.take(4).toArray.map("%02x".format(_)).mkString
+    val nextStr = if next.isEmpty then "0x00..." else next.take(4).toArray.map("%02x".format(_)).mkString
+    val lastStr =
+      if last == AccountTask.MaxHash32 then "0xFF..." else last.take(4).toArray.map("%02x".format(_)).mkString
     s"[$nextStr...$lastStr]"
   }
 
   /** Calculate progress based on downloaded accounts */
   def progress: Double =
-    if (done) 1.0
-    else if (accounts.isEmpty) 0.0
+    if done then 1.0
+    else if accounts.isEmpty then 0.0
     else {
       // Rough estimate based on account count
       // Typical ranges contain hundreds to thousands of accounts
@@ -98,7 +99,7 @@ object AccountTask {
   def createInitialTasks(rootHash: ByteString, concurrency: Int = 16): Seq[AccountTask] = {
     require(concurrency > 0, "Concurrency must be positive")
 
-    if (concurrency == 1) {
+    if concurrency == 1 then {
       // Single task covers entire range
       val min = bigIntTo32ByteString(BigInt(0))
       return Seq(
@@ -116,9 +117,9 @@ object AccountTask {
     val chunkSize = BigInt(2).pow(256) / concurrency
 
     (0 until concurrency).map { i =>
-      val start = if (i == 0) BigInt(0) else chunkSize * i
+      val start = if i == 0 then BigInt(0) else chunkSize * i
       // For the last chunk, use the maximum possible hash as the upper bound.
-      val endOpt = if (i == concurrency - 1) None else Some(chunkSize * (i + 1))
+      val endOpt = if i == concurrency - 1 then None else Some(chunkSize * (i + 1))
 
       AccountTask(
         next = bigIntTo32ByteString(start),
@@ -140,7 +141,7 @@ object AccountTask {
   private def bigIntTo32ByteString(bi: BigInt): ByteString = {
     val bytes = bi.toByteArray
     // BigInt.toByteArray includes a sign bit, so remove it if present
-    val unsigned = if (bytes.length > 0 && bytes(0) == 0) bytes.drop(1) else bytes
+    val unsigned = if bytes.length > 0 && bytes(0) == 0 then bytes.drop(1) else bytes
     // Pad to 32 bytes on the left (big-endian) and take right 32 bytes if too long
     ByteString(Array.fill(32 - unsigned.length.min(32))(0.toByte) ++ unsigned.takeRight(32))
   }

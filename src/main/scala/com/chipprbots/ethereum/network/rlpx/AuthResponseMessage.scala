@@ -27,6 +27,6 @@ case class AuthResponseMessage(ephemeralPublicKey: ECPoint, nonce: ByteString, k
   lazy val encoded: ByteString = ByteString(
     ephemeralPublicKey.getEncoded(false).drop(1) ++
       nonce ++
-      Array(if (knownPeer) 1.toByte else 0.toByte)
+      Array(if knownPeer then 1.toByte else 0.toByte)
   )
 }

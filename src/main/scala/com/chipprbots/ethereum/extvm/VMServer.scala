@@ -40,8 +40,8 @@ object VmServerApp extends Logger {
   def main(args: Array[String]): Unit = {
     val config = ConfigFactory.load()
 
-    val port = if (args.length > 0) args(0).toInt else config.getInt("fukuii.vm.external.port")
-    val host = if (args.length > 1) args(1) else config.getString("fukuii.vm.external.host")
+    val port = if args.length > 0 then args(0).toInt else config.getInt("fukuii.vm.external.port")
+    val host = if args.length > 1 then args(1) else config.getString("fukuii.vm.external.host")
 
     Tcp().bind(host, port).runForeach(connection => handleConnection(connection.flow))
     log.info(s"VM server listening on $host:$port")
@@ -87,11 +87,11 @@ class VMServer(messageHandler: MessageHandler) extends Logger {
 
   private def awaitHello(): Unit = {
     val helloMsg = messageHandler.awaitMessage[msg.Hello]
-    if (helloMsg.version != ApiVersionProvider.version)
+    if helloMsg.version != ApiVersionProvider.version then
       throw new IllegalArgumentException(
         s"Wrong Hello message version. Expected ${ApiVersionProvider.version} but was ${helloMsg.version}"
       )
-    if (!helloMsg.config.isEthereumConfig)
+    if !helloMsg.config.isEthereumConfig then
       throw new IllegalArgumentException("Hello message ethereum config must be true")
 
     defaultBlockchainConfig = constructBlockchainConfig(
@@ -229,7 +229,7 @@ class VMServer(messageHandler: MessageHandler) extends Logger {
       byzantiumBlockNumber = conf.byzantiumBlockNumber,
       constantinopleBlockNumber = conf.constantinopleBlockNumber,
       istanbulBlockNumber = conf.istanbulBlockNumber,
-      maxCodeSize = if (conf.maxCodeSize.isEmpty) None else Some(bigintFromGByteString(conf.maxCodeSize)),
+      maxCodeSize = if conf.maxCodeSize.isEmpty then None else Some(bigintFromGByteString(conf.maxCodeSize)),
       accountStartNonce = conf.accountStartNonce,
       atlantisBlockNumber = BigInt(8772000),
       aghartaBlockNumber = BigInt(9573000),

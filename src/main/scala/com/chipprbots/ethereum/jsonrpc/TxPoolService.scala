@@ -141,7 +141,7 @@ class TxPoolService(
     getTransactionsFromPool.map { resp =>
       val filters = req.params.map(_.filters).getOrElse(Seq.empty)
       val filtered =
-        if (filters.isEmpty) resp.pendingTransactions
+        if filters.isEmpty then resp.pendingTransactions
         else resp.pendingTransactions.filter(pt => applyFilters(pt, filters))
       val txs = req.limit match {
         case Some(n) => filtered.take(n)
@@ -175,7 +175,7 @@ class TxPoolService(
           compareNumerically(tx.value, f.predicate, BigInt(f.value.stripPrefix("0x"), 16))
         case "nonce" =>
           val n =
-            if (f.value.startsWith("0x")) BigInt(f.value.stripPrefix("0x"), 16)
+            if f.value.startsWith("0x") then BigInt(f.value.stripPrefix("0x"), 16)
             else BigInt(f.value)
           compareNumerically(tx.nonce, f.predicate, n)
         case _ => true

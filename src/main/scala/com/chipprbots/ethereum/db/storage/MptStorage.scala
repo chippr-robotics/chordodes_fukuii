@@ -48,7 +48,7 @@ class SerializingMptStorage(storage: NodesKeyValueStorage) extends MptStorage {
     storage.persist()
 
   override def multiGetNodes(hashes: Seq[Array[Byte]]): Seq[Option[MptNode]] = {
-    if (hashes.isEmpty) return Seq.empty
+    if hashes.isEmpty then return Seq.empty
     storage
       .multiGet(hashes.map(ByteString(_)))
       .zip(hashes)

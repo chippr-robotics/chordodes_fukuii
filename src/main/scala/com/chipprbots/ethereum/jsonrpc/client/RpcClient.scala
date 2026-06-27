@@ -44,7 +44,7 @@ abstract class RpcClient(node: Uri, timeout: Duration, getSSLContext: () => Eith
       // We only need code and message for error handling
     } yield JsonRpcError(code, message, None)
 
-  lazy val connectionContext: HttpsConnectionContext = if (node.scheme.startsWith("https")) {
+  lazy val connectionContext: HttpsConnectionContext = if node.scheme.startsWith("https") then {
     getSSLContext().toOption.fold(Http().defaultClientHttpsContext)(ConnectionContext.httpsClient)
   } else {
     Http().defaultClientHttpsContext

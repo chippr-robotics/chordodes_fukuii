@@ -31,10 +31,8 @@ object Node {
     Option(uri.getQuery).fold(default) { query =>
       Try {
         val params = query.split("=")
-        if (params(0) == "discport")
-          params(1).toInt
-        else
-          default
+        if params(0) == "discport" then params(1).toInt
+        else default
       } match {
         case Success(udpPort) => udpPort
         case Failure(_)       => default

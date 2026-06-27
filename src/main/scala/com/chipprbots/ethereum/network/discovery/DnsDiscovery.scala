@@ -82,7 +82,7 @@ object DnsDiscovery extends Logger {
                 val enodes = mutable.Set.empty[String]
                 val skipped = mutable.Set.empty[String] // tracking for log only
                 resolveTree(ctx, domain, enrRoot, visited, enodes, skipped, forkIdFilter, depth = 0)
-                if (skipped.nonEmpty) {
+                if skipped.nonEmpty then {
                   log.info(
                     "DNS_DISCOVERY: Resolved {} enode(s) from {} (skipped {} on fork-ID mismatch)",
                     enodes.size,
@@ -126,9 +126,9 @@ object DnsDiscovery extends Logger {
     var seq: Long = 0
 
     parts.foreach { part =>
-      if (part.startsWith("e=")) enrRoot = Some(part.stripPrefix("e="))
-      else if (part.startsWith("l=")) linkRoot = Some(part.stripPrefix("l="))
-      else if (part.startsWith("seq=")) seq = Try(part.stripPrefix("seq=").toLong).getOrElse(0L)
+      if part.startsWith("e=") then enrRoot = Some(part.stripPrefix("e="))
+      else if part.startsWith("l=") then linkRoot = Some(part.stripPrefix("l="))
+      else if part.startsWith("seq=") then seq = Try(part.stripPrefix("seq=").toLong).getOrElse(0L)
     }
 
     enrRoot.map(e => (e, linkRoot.getOrElse(""), seq))
@@ -145,7 +145,7 @@ object DnsDiscovery extends Logger {
       forkIdFilter: Option[EnrForkIdFilter],
       depth: Int
   ): Unit = {
-    if (depth > MaxDepth || enodes.size >= MaxRecords || visited.contains(hash)) return
+    if depth > MaxDepth || enodes.size >= MaxRecords || visited.contains(hash) then return
     visited += hash
 
     val subdomain = s"$hash.$domain"
@@ -193,7 +193,7 @@ object DnsDiscovery extends Logger {
     try {
       val base64Data = enrRecord.stripPrefix("enr:")
       val bytes = decodeBase64Url(base64Data)
-      if (bytes.isEmpty) return Left("empty ENR payload")
+      if bytes.isEmpty then return Left("empty ENR payload")
 
       val decoded = rawDecode(bytes)
       decoded match {
@@ -237,10 +237,8 @@ object DnsDiscovery extends Logger {
               decompressToNodeId(compressedKey)
                 .map { id =>
                   val udpPort = udpOpt.getOrElse(tcpPort)
-                  if (udpPort != tcpPort)
-                    s"enode://$id@${formatIp(ip)}:$tcpPort?discport=$udpPort"
-                  else
-                    s"enode://$id@${formatIp(ip)}:$tcpPort"
+                  if udpPort != tcpPort then s"enode://$id@${formatIp(ip)}:$tcpPort?discport=$udpPort"
+                  else s"enode://$id@${formatIp(ip)}:$tcpPort"
                 }
                 .toRight("invalid secp256k1 pubkey")
 
@@ -259,7 +257,7 @@ object DnsDiscovery extends Logger {
   private def parseKVPairs(items: Seq[rlp.RLPEncodeable]): Map[String, Array[Byte]] = {
     val pairs = mutable.Map.empty[String, Array[Byte]]
     var i = 0
-    while (i + 1 < items.size) {
+    while i + 1 < items.size do {
       (items(i), items(i + 1)) match {
         case (RLPValue(keyBytes), RLPValue(valBytes)) =>
           val key = new String(keyBytes, "UTF-8")
@@ -272,13 +270,11 @@ object DnsDiscovery extends Logger {
   }
 
   private def parseIp(bytes: Array[Byte]): Option[InetAddress] =
-    if (bytes.length == 4 || bytes.length == 16)
-      Try(InetAddress.getByAddress(bytes)).toOption
-    else
-      None
+    if bytes.length == 4 || bytes.length == 16 then Try(InetAddress.getByAddress(bytes)).toOption
+    else None
 
   private def parsePort(bytes: Array[Byte]): Int = {
-    if (bytes.isEmpty) return 0
+    if bytes.isEmpty then return 0
     // Big-endian integer
     bytes.foldLeft(0)((acc, b) => (acc << 8) | (b & 0xff))
   }
@@ -286,7 +282,7 @@ object DnsDiscovery extends Logger {
   private def formatIp(addr: InetAddress): String = {
     val host = addr.getHostAddress
     // IPv6 addresses need brackets
-    if (host.contains(":")) s"[$host]" else host
+    if host.contains(":") then s"[$host]" else host
   }
 
   /** Decompress a 33-byte compressed secp256k1 public key to a 64-char hex node ID. Node ID =
@@ -295,13 +291,13 @@ object DnsDiscovery extends Logger {
     */
   private def decompressToNodeId(compressedKey: Array[Byte]): Option[String] =
     try {
-      if (compressedKey.length != 33) return None
+      if compressedKey.length != 33 then return None
       val point = crypto.curve.getCurve.decodePoint(compressedKey)
       val key = new ECPublicKeyParameters(point, crypto.curve)
       // Uncompressed encoding is 65 bytes: 0x04 prefix + 64 bytes (x || y)
       // Node ID is the 64 bytes without prefix
       val uncompressed = key.getQ.getEncoded(false).drop(1) // drop 0x04 prefix
-      if (uncompressed.length != 64) return None
+      if uncompressed.length != 64 then return None
       Some(Hex.toHexString(uncompressed))
     } catch {
       case _: Exception => None
@@ -328,7 +324,7 @@ object DnsDiscovery extends Logger {
     try {
       val attrs = ctx.getAttributes(domain, Array("TXT"))
       val txtAttr = attrs.get("TXT")
-      if (txtAttr != null && txtAttr.size > 0) {
+      if txtAttr != null && txtAttr.size > 0 then {
         // TXT records may be returned with quotes
         val value = txtAttr.get(0).toString.stripPrefix("\"").stripSuffix("\"")
         // DNS may split long TXT records into multiple strings — concatenate

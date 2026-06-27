@@ -38,7 +38,7 @@ class PoWBlockCreator(
       withTransactions: Boolean = true,
       initialWorldStateBeforeExecution: Option[InMemoryWorldStateProxy] = None
   )(implicit blockchainConfig: BlockchainConfig): IO[PendingBlockAndState] = {
-    val transactions = if (withTransactions) getTransactionsFromPool else IO.pure(PendingTransactionsResponse(Nil))
+    val transactions = if withTransactions then getTransactionsFromPool else IO.pure(PendingTransactionsResponse(Nil))
     (getOmmersFromPool(parentBlock.hash), transactions).parMapN { case (ommers, pendingTxs) =>
       blockGenerator.generateBlock(
         parentBlock,

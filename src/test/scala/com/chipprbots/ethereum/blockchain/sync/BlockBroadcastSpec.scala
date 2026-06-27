@@ -594,7 +594,7 @@ class BlockBroadcastSpec
     SyncTest
   ) in {
     // Both PoW and PoS configurations must send NewBlock to ETH68 peers
-    for (isPoW <- Seq(true, false))
+    for isPoW <- Seq(true, false) do
       new TestKit(ActorSystem(s"BlockBroadcastSpec_eth68_$isPoW")) {
         val pm: TestProbe = TestProbe()
         val bb = new BlockBroadcast(pm.ref, isPoWChain = isPoW)

@@ -104,7 +104,7 @@ class PoWMining private (
 
   private[this] def startMiningProcess(node: Node, blockCreator: PoWBlockCreator): Unit =
     mutex.synchronized {
-      if (minerCoordinatorRef.isEmpty && mockedMinerRef.isEmpty) {
+      if minerCoordinatorRef.isEmpty && mockedMinerRef.isEmpty then {
         config.generic.protocol match {
           case PoW | RestrictedPoW =>
             log.info("Instantiating PoWMiningCoordinator")
@@ -142,7 +142,7 @@ class PoWMining private (
   /** Starts the mining protocol on the current `node`.
     */
   def startProtocol(node: Node): Unit =
-    if (config.miningEnabled) {
+    if config.miningEnabled then {
       log.info("Mining is enabled. Will try to start configured miner actor")
       val blockCreator = node.mining match {
         case mining: PoWMining =>
@@ -161,7 +161,7 @@ class PoWMining private (
     } else log.info("Not starting any miner actor because mining is disabled")
 
   def stopProtocol(): Unit =
-    if (config.miningEnabled) {
+    if config.miningEnabled then {
       stopMiningProcess()
     }
 

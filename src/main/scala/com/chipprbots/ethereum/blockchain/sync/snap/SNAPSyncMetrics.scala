@@ -473,7 +473,7 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setHealingPrunedDurationMs(ms: Long): Unit = HealingPrunedDurationMsGauge.set(ms)
 
   // spec 004 C9/T019 — decoupled heal serve-root (observation-only)
-  def setHealingDecoupledEngaged(engaged: Boolean): Unit = HealingDecoupledEngagedGauge.set(if (engaged) 1L else 0L)
+  def setHealingDecoupledEngaged(engaged: Boolean): Unit = HealingDecoupledEngagedGauge.set(if engaged then 1L else 0L)
   def setHealingWalkRoot(shortLabel: Long): Unit = HealingWalkRootGauge.set(shortLabel)
   def setHealingServeRoot(shortLabel: Long): Unit = HealingServeRootGauge.set(shortLabel)
   def setHealingCrossRootHeals(count: Long): Unit = HealingCrossRootHealsGauge.set(count)
@@ -497,11 +497,11 @@ object SNAPSyncMetrics extends MetricsContainer {
   // ===== Backpressure / Pivot / Peer-Pool Metrics (PR #1233, #1237, #1239, #1241, #1242) =====
 
   def setStorageQueueDepth(depth: Long): Unit = StorageQueueDepthGauge.set(depth)
-  def setStorageBackpressure(engaged: Boolean): Unit = StorageBackpressureGauge.set(if (engaged) 1L else 0L)
+  def setStorageBackpressure(engaged: Boolean): Unit = StorageBackpressureGauge.set(if engaged then 1L else 0L)
   def setStoragePendingTries(count: Long): Unit = StoragePendingTriesGauge.set(count)
 
   def setByteCodeQueueDepth(depth: Long): Unit = ByteCodeQueueDepthGauge.set(depth)
-  def setByteCodeBackpressure(engaged: Boolean): Unit = ByteCodeBackpressureGauge.set(if (engaged) 1L else 0L)
+  def setByteCodeBackpressure(engaged: Boolean): Unit = ByteCodeBackpressureGauge.set(if engaged then 1L else 0L)
 
   def incrementPivotRefreshed(): Unit = PivotRefreshedCounter.increment()
   def incrementLaggingPeerEvicted(): Unit = LaggingPeerEvictedCounter.increment()

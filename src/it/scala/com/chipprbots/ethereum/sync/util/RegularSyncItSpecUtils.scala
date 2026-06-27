@@ -206,7 +206,7 @@ object RegularSyncItSpecUtils {
       // Scale timeout based on block number - larger syncs need more time
       // Use minimum 90 retries, but add 1 retry per 20 blocks for large syncs
       val baseRetries = 90
-      val additionalRetries = if (blockNumber > 1000) ((blockNumber - 1000) / 20).toInt else 0
+      val additionalRetries = if blockNumber > 1000 then ((blockNumber - 1000) / 20).toInt else 0
       val maxRetries = baseRetries + additionalRetries
       retryUntilWithDelay(IO(blockchainReader.getBestBlockNumber == blockNumber), 1.second, maxRetries)(isDone =>
         isDone
@@ -229,7 +229,7 @@ object RegularSyncItSpecUtils {
     def mineNewBlocks(delay: FiniteDuration, nBlocks: Int)(
         updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy
     ): IO[Unit] =
-      if (nBlocks > 0) {
+      if nBlocks > 0 then {
         mineNewBlock()(updateWorldForBlock)
           .delayBy(delay)
           .flatMap(_ => mineNewBlocks(delay, nBlocks - 1)(updateWorldForBlock))

@@ -104,6 +104,6 @@ class SnapSyncProgressStorage(val dataSource: DataSource)
     val keys = storageContent.compile.toList
       .unsafeRunSync()(IORuntime.global)
       .collect { case Right((k, _)) => k }
-    if (keys.nonEmpty) update(keys, Nil).commit()
+    if keys.nonEmpty then update(keys, Nil).commit()
   }
 }

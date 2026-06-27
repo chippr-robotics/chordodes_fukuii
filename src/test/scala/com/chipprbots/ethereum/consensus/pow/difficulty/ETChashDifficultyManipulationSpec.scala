@@ -87,7 +87,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
   ): BlockHeader =
     BlockHeader(
       parentHash = ByteString(new Array[Byte](32)),
-      ommersHash = if (hasUncles) ByteString(new Array[Byte](32)) else BlockHeader.EmptyOmmers,
+      ommersHash = if hasUncles then ByteString(new Array[Byte](32)) else BlockHeader.EmptyOmmers,
       beneficiary = ByteString(new Array[Byte](20)),
       stateRoot = ByteString(new Array[Byte](32)),
       transactionsRoot = ByteString(new Array[Byte](32)),
@@ -136,7 +136,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
     val results = scala.collection.mutable.ArrayBuffer.empty[(BigInt, BigInt)]
     var prevDiff = parentDiff
     var prevTs = parentTs
-    for (i <- 1 to count) {
+    for i <- 1 to count do {
       val num = startBlock + i
       val childTs = prevTs + gapSecs
       val parentHdr = header(num - 1, prevDiff, prevTs)
@@ -167,7 +167,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
     (Seq(mergeSpikeParent) ++ mergeSpike).sliding(2).foreach {
       case Seq(parent, child) =>
         val gap = child.timestamp - parent.timestamp
-        if (gap < 9) {
+        if gap < 9 then {
           val expectedDelta = parent.difficulty / 2048
           withClue(s"block ${child.number} gap=${gap}s") {
             child.difficulty shouldBe parent.difficulty + expectedDelta
@@ -390,7 +390,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       val chain = syntheticChain(cycleStart.number, startDiff, startTs, gapSecs, count = 500)
       val endDiff = chain.last._2
 
-      if (cCoeff(gapSecs) == 0L) {
+      if cCoeff(gapSecs) == 0L then {
         // Below threshold — no trough; difficulty stays approximately flat
         val drift = (endDiff - startDiff).abs
         drift should be < startDiff / 20 // < 5% movement

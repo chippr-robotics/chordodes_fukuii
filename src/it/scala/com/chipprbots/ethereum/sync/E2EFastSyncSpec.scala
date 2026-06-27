@@ -41,7 +41,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
   def updateStateAtBlock(
       blockNumber: Int
   )(currentBlockNumber: BigInt, world: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
-    if (currentBlockNumber == blockNumber) {
+    if currentBlockNumber == blockNumber then {
       val accountAddress = Address(currentBlockNumber.toByteArray)
       val account = Account(
         nonce = 1,
@@ -226,11 +226,11 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       val bestBlockNumber = peer1.blockchainReader.getBestBlockNumber
 
       // Verify chain continuity - all blocks should be linked
-      for (i <- 1 to bestBlockNumber.toInt) {
+      for i <- 1 to bestBlockNumber.toInt do {
         val block = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, i)
         block shouldBe defined
 
-        if (i > 1) {
+        if i > 1 then {
           val prevBlock = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, i - 1)
           prevBlock shouldBe defined
           // Use getOrElse with meaningful error message instead of .get
@@ -318,7 +318,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     val blockNumber = 1000
 
     def updateComplexState(currentBlockNumber: BigInt, world: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
-      if (currentBlockNumber % 100 == 0 && currentBlockNumber > 0) {
+      if currentBlockNumber % 100 == 0 && currentBlockNumber > 0 then {
         val accountAddress = Address(currentBlockNumber.toByteArray)
         val account = Account(
           nonce = UInt256(currentBlockNumber),

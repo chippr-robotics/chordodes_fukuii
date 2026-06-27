@@ -83,7 +83,7 @@ final class PivotHeaderBootstrap(
   override def receive: Receive = {
     case Fetch =>
       attempt += 1
-      if (attempt > maxAttempts) {
+      if attempt > maxAttempts then {
         context.parent ! Failed(s"exhausted attempts ($maxAttempts) fetching pivot header $targetDesc")
         context.stop(self)
       } else {
@@ -94,7 +94,7 @@ final class PivotHeaderBootstrap(
       try {
         blockchainWriter.storeBlockHeader(header).commit()
         // For by-hash mode: report the actual block number we discovered.
-        val resolvedNumber = if (byHashMode) header.number else targetBlock
+        val resolvedNumber = if byHashMode then header.number else targetBlock
         log.info(
           s"[PIVOT] Bootstrap complete — block=${header.number} hash=${header.hashAsHexString.take(10)} " +
             s"parentHash=${header.parentHash.take(4).toArray.map("%02x".format(_)).mkString}"
@@ -121,7 +121,7 @@ final class PivotHeaderBootstrap(
       // Models Besu's waitForPeer(!peersUsed.contains(p)) / go-ethereum's idle-loop peer wait.
       // Does NOT increment `attempt` — starvation waits don't consume the retry budget.
       waitCount += 1
-      if (waitCount % 4 == 0) {
+      if waitCount % 4 == 0 then {
         log.warning(
           "Pivot header bootstrap for {} has been waiting for a fresh peer for ~{}s ({} peer(s) tried so far)",
           targetDesc,
@@ -147,9 +147,9 @@ final class PivotHeaderBootstrap(
     //   By-hash (preferSnapPeers=false in SyncController): BestPeer — CL-driven path.
     //   By-hash + preferSnapPeers: unreachable in production (targetBlock=0, no meaningful minBlock).
     val selector =
-      if (preferSnapPeers && !byHashMode) BestSnapPeerWithMinBlockExcluding(targetBlock, triedPeers.toSet)
-      else if (preferSnapPeers) BestSnapPeer
-      else if (byHashMode) BestPeer
+      if preferSnapPeers && !byHashMode then BestSnapPeerWithMinBlockExcluding(targetBlock, triedPeers.toSet)
+      else if preferSnapPeers then BestSnapPeer
+      else if byHashMode then BestPeer
       else BestPeerWithMinBlockExcluding(targetBlock, triedPeers.toSet)
     val req = Request[ETHPackets.GetBlockHeaders](msg, selector, (m: ETHPackets.GetBlockHeaders) => m)
 
@@ -161,7 +161,7 @@ final class PivotHeaderBootstrap(
           val fallbackMsg =
             ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, target, maxHeaders = 1, skip = 0, reverse = false)
           val fallbackSelector =
-            if (byHashMode) BestPeer else BestPeerWithMinBlockExcluding(targetBlock, triedPeers.toSet)
+            if byHashMode then BestPeer else BestPeerWithMinBlockExcluding(targetBlock, triedPeers.toSet)
           val fallbackReq =
             Request[ETHPackets.GetBlockHeaders](fallbackMsg, fallbackSelector, (m: ETHPackets.GetBlockHeaders) => m)
           peersClient ? fallbackReq

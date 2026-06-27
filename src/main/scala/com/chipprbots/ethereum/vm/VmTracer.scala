@@ -72,10 +72,10 @@ class VmTracer extends ExecutionTracer {
       prevState: ProgramState[W, S],
       nextState: ProgramState[W, S]
   ): Unit = {
-    if (frameStack.isEmpty) return
+    if frameStack.isEmpty then return
     val frame = frameStack.top
 
-    if (frame.code.isEmpty) {
+    if frame.code.isEmpty then {
       frame.code = prevState.env.program.code
     }
 
@@ -83,10 +83,8 @@ class VmTracer extends ExecutionTracer {
     val exUsed = nextState.gas
 
     val exPush: Seq[BigInt] =
-      if (opCode.alpha > 0)
-        nextState.stack.toSeq.take(opCode.alpha).map(_.toBigInt)
-      else
-        Seq.empty
+      if opCode.alpha > 0 then nextState.stack.toSeq.take(opCode.alpha).map(_.toBigInt)
+      else Seq.empty
 
     val exMem: Option[(BigInt, ByteString)] = opCode match {
       case MSTORE if prevState.stack.size >= 2 =>
@@ -133,10 +131,10 @@ class VmTracer extends ExecutionTracer {
   }
 
   override def onCallExit(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit = {
-    if (frameStack.size <= 1) return
+    if frameStack.size <= 1 then return
     val frame = frameStack.pop()
     val encoded = encodeFrame(frame)
-    if (frameStack.nonEmpty && frameStack.top.ops.nonEmpty) {
+    if frameStack.nonEmpty && frameStack.top.ops.nonEmpty then {
       frameStack.top.ops.last.sub = Some(encoded)
     }
   }
@@ -172,6 +170,6 @@ class VmTracer extends ExecutionTracer {
   }
 
   private def encodeHexBytes(bs: ByteString): JString =
-    if (bs.isEmpty) JString("0x")
+    if bs.isEmpty then JString("0x")
     else JString("0x" + Hex.toHexString(bs.toArray))
 }

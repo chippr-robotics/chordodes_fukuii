@@ -194,7 +194,7 @@ class EthInfoService(
     val next = futureForks.headOption.map(f => toForkConfig(f._1, f._2, f._3, f._4))
     val last = forks.lastOption.map(f => toForkConfig(f._1, f._2, f._3, f._4))
 
-    Right(ConfigResponse(current, next, if (futureForks.nonEmpty) last else None))
+    Right(ConfigResponse(current, next, if futureForks.nonEmpty then last else None))
   }
 
   def call(req: CallRequest): ServiceResponse[CallResponse] =
@@ -258,7 +258,7 @@ class EthInfoService(
   } yield {
     // EIP-1559: When no gas price is explicitly specified, use baseFee=0 so calls
     // don't need to worry about funding. Matches geth behavior for eth_call/eth_estimateGas.
-    val header = if (!req.tx.gasPriceExplicit && block.block.header.baseFee.isDefined) {
+    val header = if !req.tx.gasPriceExplicit && block.block.header.baseFee.isDefined then {
       import BlockHeader.HeaderExtraFields.*
       val zeroBaseFeeExtra = block.block.header.extraFields match {
         case HefPostOlympia(_)                    => HefPostOlympia(0)

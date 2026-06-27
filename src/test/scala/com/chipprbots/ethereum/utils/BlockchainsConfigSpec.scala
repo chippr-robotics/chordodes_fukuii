@@ -21,12 +21,12 @@ class BlockchainsConfigSpec extends AnyFlatSpec with Matchers with BeforeAndAfte
   }
 
   override def afterEach(): Unit =
-    if (tempDir != null && tempDir.exists()) {
+    if tempDir != null && tempDir.exists() then {
       deleteDirectory(tempDir)
     }
 
   private def deleteDirectory(dir: File): Unit = {
-    if (dir.isDirectory) {
+    if dir.isDirectory then {
       dir.listFiles().foreach(deleteDirectory)
     }
     dir.delete()

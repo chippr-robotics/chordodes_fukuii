@@ -55,19 +55,16 @@ case class TestModeWorldStateProxy(
     )
 
   override def touchAccounts(addresses: Address*): TestModeWorldStateProxy =
-    if (noEmptyAccounts)
-      copy(touchedAccounts = touchedAccounts ++ addresses.toSet)
-    else
-      this
+    if noEmptyAccounts then copy(touchedAccounts = touchedAccounts ++ addresses.toSet)
+    else this
 
   override def clearTouchedAccounts: TestModeWorldStateProxy =
     copy(touchedAccounts = touchedAccounts.empty)
 
   override def keepPrecompileTouched(world: InMemoryWorldStateProxy): TestModeWorldStateProxy =
-    if (world.touchedAccounts.contains(ripmdContractAddress))
+    if world.touchedAccounts.contains(ripmdContractAddress) then
       copy(touchedAccounts = touchedAccounts + ripmdContractAddress)
-    else
-      this
+    else this
 
   override def saveCode(address: Address, code: ByteString): TestModeWorldStateProxy =
     copy(accountCodes = accountCodes + (address -> code))

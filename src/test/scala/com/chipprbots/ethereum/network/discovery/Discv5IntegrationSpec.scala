@@ -53,7 +53,7 @@ class Discv5IntegrationSpec extends AnyFlatSpec with Matchers {
       def localEnr: EthereumNodeRecord = enrRef.get
       def localEnrSeq: Long = enrRef.get.content.seq
       def findNodes(distances: List[Int]): List[EthereumNodeRecord] =
-        if (distances.contains(0)) List(enrRef.get) else Nil
+        if distances.contains(0) then List(enrRef.get) else Nil
     }
     v5.Discv5SyncResponder(
       privateKey = privateKey,
@@ -91,7 +91,7 @@ class Discv5IntegrationSpec extends AnyFlatSpec with Matchers {
       def localEnr: EthereumNodeRecord = enrRefB.get
       def localEnrSeq: Long = enrRefB.get.content.seq
       def findNodes(distances: List[Int]): List[EthereumNodeRecord] =
-        if (distances.contains(0)) List(enrRefB.get) else Nil
+        if distances.contains(0) then List(enrRefB.get) else Nil
     }
     val sessionsB = new v5.Session.SessionCache()
     sessionsB.put(

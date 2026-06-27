@@ -103,7 +103,7 @@ class GasLimitCalculationSpec
 
     // Run until convergence
     var blocks = 0
-    while (limit < target * 99 / 100 && blocks < 100_000) {
+    while limit < target * 99 / 100 && blocks < 100_000 do {
       limit = gen.calcGasLimit(limit)
       blocks += 1
     }
@@ -128,7 +128,7 @@ class GasLimitCalculationSpec
 
     // Run until convergence
     var blocks = 0
-    while (limit > target * 101 / 100 && blocks < 100_000) {
+    while limit > target * 101 / 100 && blocks < 100_000 do {
       limit = gen.calcGasLimit(limit)
       blocks += 1
     }
@@ -160,7 +160,7 @@ class GasLimitCalculationSpec
     val threshold = target * 99 / 100
 
     var blocks = 0
-    while (limit < threshold && blocks < 200_000) {
+    while limit < threshold && blocks < 200_000 do {
       limit = gen.calcGasLimit(limit)
       blocks += 1
     }

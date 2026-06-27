@@ -17,10 +17,8 @@ trait CachedKeyValueStorage[K, V, T <: CachedKeyValueStorage[K, V, T]] extends S
   }
 
   def updateCond(toRemove: Seq[K], toUpsert: Seq[(K, V)], inMemory: Boolean): T = {
-    if (inMemory)
-      cache.update(toRemove, toUpsert)
-    else
-      storage.update(toRemove, toUpsert)
+    if inMemory then cache.update(toRemove, toUpsert)
+    else storage.update(toRemove, toUpsert)
 
     apply(cache, storage)
   }
@@ -31,7 +29,7 @@ trait CachedKeyValueStorage[K, V, T <: CachedKeyValueStorage[K, V, T]] extends S
   }
 
   def persist(): Boolean =
-    if (cache.shouldPersist) {
+    if cache.shouldPersist then {
       forcePersist()
       true
     } else {

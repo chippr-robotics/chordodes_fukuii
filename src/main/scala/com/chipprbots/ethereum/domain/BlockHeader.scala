@@ -84,7 +84,7 @@ case class BlockHeader(
   def isPostMerge: Boolean = difficulty == 0 && baseFee.isDefined
 
   /** Post-merge, mixHash carries the prevRandao value from the beacon chain. */
-  def prevRandao: Option[ByteString] = if (isPostMerge) Some(mixHash) else None
+  def prevRandao: Option[ByteString] = if isPostMerge then Some(mixHash) else None
 
   def isParentOf(child: BlockHeader): Boolean = number + 1 == child.number && child.parentHash == hash
 
@@ -257,7 +257,7 @@ object BlockHeaderImplicits {
       rlpEncodeable match {
         case rlpList: RLPList =>
           val items = rlpList.items
-          if (items.length < 15)
+          if items.length < 15 then
             throw new Exception(s"BlockHeader cannot be decoded: expected >= 15 items, got ${items.length}")
 
           val base = BlockHeader(

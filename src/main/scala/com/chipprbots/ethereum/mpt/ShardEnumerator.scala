@@ -33,7 +33,7 @@ object ShardEnumerator {
     * empty trie (`EmptyRootHash`, never stored) yields no shards.
     */
   def enumShards(rootHash: ByteString, storage: MptStorage, depth: Int = 1): Vector[Shard] =
-    if (java.util.Arrays.equals(rootHash.toArray, MerklePatriciaTrie.EmptyRootHash)) Vector.empty
+    if java.util.Arrays.equals(rootHash.toArray, MerklePatriciaTrie.EmptyRootHash) then Vector.empty
     else expand(ByteString.empty, resolve(HashNode(rootHash.toArray), storage), storage, depth)
 
   private def resolve(node: MptNode, storage: MptStorage): MptNode = node match {

@@ -75,8 +75,8 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     */
   def hash(): ByteString = {
     hashNode(root, EmptyPath)
-    if (root.typ == Hashed && root.value.length == 32) ByteString(root.value)
-    else if (root.typ == Empty) ByteString(crypto.kec256(EmptyTrieRlp))
+    if root.typ == Hashed && root.value.length == 32 then ByteString(root.value)
+    else if root.typ == Empty then ByteString(crypto.kec256(EmptyTrieRlp))
     else {
       // root is inline (<32B) — its blob is its own RLP. The "root hash" is
       // keccak256 of that blob (callers want a 32-byte root, not the inline blob).
@@ -112,8 +112,8 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     */
   private[mpt] def hashExternal(node: StNode): ByteString = {
     hashNode(node, EmptyPath)
-    if (node.typ == Hashed && node.value.length == 32) ByteString(node.value)
-    else if (node.typ == Empty) ByteString(crypto.kec256(EmptyTrieRlp))
+    if node.typ == Hashed && node.value.length == 32 then ByteString(node.value)
+    else if node.typ == Empty then ByteString(crypto.kec256(EmptyTrieRlp))
     else ByteString(crypto.kec256(node.value))
   }
 
@@ -136,8 +136,8 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
       case Leaf =>
         val origKey = node.key
         val diff = diffIndex(origKey, key)
-        if (diff >= origKey.length) {
-          if (allowUpdate && diff >= key.length) {
+        if diff >= origKey.length then {
+          if allowUpdate && diff >= key.length then {
             // Exact key match: update value in-place. Mirrors go-ethereum's Trie.insert which replaces the valueNode
             // rather than throwing. Required for SNAP proof verification where Phase 1 resolves a boundary leaf into
             // the tree and Phase 3 re-inserts the same key with the peer's claimed value.
@@ -150,7 +150,7 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
             s"StackTrie: duplicate or extending key at path ${hexStr(path)} (existing key=${hexStr(origKey)}, new key=${hexStr(key)})"
           )
         }
-        if (diff == 0) {
+        if diff == 0 then {
           // No shared prefix: convert leaf into a branch with two leaves.
           val branch = StNode.newBranch()
           val origIdx = origKey(0) & 0xff
@@ -176,20 +176,20 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
       case Ext =>
         val extKey = node.key
         val diff = diffIndex(extKey, key)
-        if (diff >= extKey.length) {
+        if diff >= extKey.length then {
           // Full ext key consumed — descend into the child.
           val keyTail = sliceFrom(key, extKey.length)
           val newPath = appendNibbles(path, extKey, 0, extKey.length)
           node.children(0) = insert(node.children(0), keyTail, value, newPath, allowUpdate)
           node
-        } else if (diff == 0) {
+        } else if diff == 0 then {
           // No shared prefix: ext becomes a branch (or a branch directly if extKey.length == 1).
           val branch = StNode.newBranch()
           val origIdx = extKey(0) & 0xff
           val newIdx = key(0) & 0xff
           // Original side: either the child directly (if ext key was 1 nibble) or a shorter ext over the remaining key.
           val origChild =
-            if (extKey.length == 1) node.children(0)
+            if extKey.length == 1 then node.children(0)
             else StNode.newExt(sliceFrom(extKey, 1), node.children(0))
           branch.children(origIdx) = origChild
           branch.children(newIdx) = StNode.newLeaf(sliceFrom(key, 1), value)
@@ -201,7 +201,7 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
           val origIdx = extKey(diff) & 0xff
           val newIdx = key(diff) & 0xff
           val origChild =
-            if (diff + 1 == extKey.length) node.children(0)
+            if diff + 1 == extKey.length then node.children(0)
             else StNode.newExt(sliceFrom(extKey, diff + 1), node.children(0))
           branch.children(origIdx) = origChild
           branch.children(newIdx) = StNode.newLeaf(sliceFrom(key, diff + 1), value)
@@ -216,10 +216,10 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
         // Invariant: at most one slot < idx holds a non-Hashed node.
         var i = idx - 1
         var done = false
-        while (i >= 0 && !done) {
+        while i >= 0 && !done do {
           val sib = node.children(i)
-          if (sib != null && sib.typ != Empty) {
-            if (sib.typ != Hashed) hashNode(sib, appendNibble(path, i.toByte))
+          if sib != null && sib.typ != Empty then {
+            if sib.typ != Hashed then hashNode(sib, appendNibble(path, i.toByte))
             done = true
           }
           i -= 1
@@ -227,10 +227,8 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
         val keyTail = sliceFrom(key, 1)
         val childPath = appendNibble(path, idx.toByte)
         val existing = node.children(idx)
-        if (existing == null || existing.typ == Empty)
-          node.children(idx) = StNode.newLeaf(keyTail, value)
-        else
-          node.children(idx) = insert(existing, keyTail, value, childPath, allowUpdate)
+        if existing == null || existing.typ == Empty then node.children(idx) = StNode.newLeaf(keyTail, value)
+        else node.children(idx) = insert(existing, keyTail, value, childPath, allowUpdate)
         node
 
       case Hashed =>
@@ -247,7 +245,7 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     * No-op if `node` is already `Hashed` or `Empty`.
     */
   private def hashNode(node: StNode, path: Array[Byte]): Unit = {
-    if (node == null || node.typ == Hashed || node.typ == Empty) return
+    if node == null || node.typ == Hashed || node.typ == Empty then return
 
     node.typ match {
       case Leaf =>
@@ -264,10 +262,9 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
       case Branch =>
         // Hash all non-hashed children in slot order.
         var i = 0
-        while (i < 16) {
+        while i < 16 do {
           val c = node.children(i)
-          if (c != null && c.typ != Empty && c.typ != Hashed)
-            hashNode(c, appendNibble(path, i.toByte))
+          if c != null && c.typ != Empty && c.typ != Hashed then hashNode(c, appendNibble(path, i.toByte))
           i += 1
         }
         val blob = encodeBranch(node)
@@ -283,7 +280,7 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     * on a 32-byte root hash.
     */
   private def finalise(node: StNode, blob: Array[Byte], path: Array[Byte]): Unit = {
-    if (blob.length < 32 && path.length > 0) {
+    if blob.length < 32 && path.length > 0 then {
       // Inline: the parent will splice these bytes directly into its own RLP.
       node.value = blob
     } else {
@@ -295,7 +292,7 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     node.key = Array.emptyByteArray
     // Release child references for GC.
     var i = 0
-    while (i < 16) { node.children(i) = null; i += 1 }
+    while i < 16 do { node.children(i) = null; i += 1 }
   }
 
   // ---- RLP encoding helpers (purpose-built for StNode) ----
@@ -321,20 +318,20 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     // consumed within this call, never aliased into `out`, never read after return, non-reentrant.
     val refs = branchRefsScratch
     var i = 0
-    while (i < 16) {
+    while i < 16 do {
       refs(i) = encodeChildRef(node.children(i))
       i += 1
     }
     refs(16) = EmptyBytesRlp // terminator value (empty string)
     var total = 0
     i = 0
-    while (i < 17) { total += refs(i).length; i += 1 }
+    while i < 17 do { total += refs(i).length; i += 1 }
     val header = listHeader(total)
     val out = new Array[Byte](header.length + total)
     var pos = 0
     System.arraycopy(header, 0, out, pos, header.length); pos += header.length
     i = 0
-    while (i < 17) {
+    while i < 17 do {
       System.arraycopy(refs(i), 0, out, pos, refs(i).length)
       pos += refs(i).length
       i += 1
@@ -349,10 +346,10 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     *   - Hashed with inline <32B blob → the blob bytes spliced in raw (the blob IS its own RLP encoding)
     */
   private def encodeChildRef(child: StNode): Array[Byte] =
-    if (child == null || child.typ == Empty) {
+    if child == null || child.typ == Empty then {
       EmptyBytesRlp
-    } else if (child.typ == Hashed) {
-      if (child.value.length == 32) encodeBytes(child.value)
+    } else if child.typ == Hashed then {
+      if child.value.length == 32 then encodeBytes(child.value)
       else child.value // inline RLP — splice raw
     } else {
       throw new IllegalStateException(
@@ -363,12 +360,12 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
   /** RLP-encode a single byte string. Standard RLP rules. */
   private def encodeBytes(b: Array[Byte]): Array[Byte] = {
     val len = b.length
-    if (len == 1 && (b(0) & 0xff) < 0x80) {
+    if len == 1 && (b(0) & 0xff) < 0x80 then {
       // Single byte under 0x80 encodes as itself.
       val out = new Array[Byte](1)
       out(0) = b(0)
       out
-    } else if (len < 56) {
+    } else if len < 56 then {
       val out = new Array[Byte](1 + len)
       out(0) = (0x80 + len).toByte
       System.arraycopy(b, 0, out, 1, len)
@@ -394,7 +391,7 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
   }
 
   private def listHeader(contentLen: Int): Array[Byte] =
-    if (contentLen < 56) {
+    if contentLen < 56 then {
       val out = new Array[Byte](1)
       out(0) = (0xc0 + contentLen).toByte
       out
@@ -408,12 +405,12 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
 
   /** Big-endian, minimum-length encoding of a non-negative length. */
   private def lengthAsBytes(n: Int): Array[Byte] = {
-    if (n == 0) return Array.emptyByteArray
+    if n == 0 then return Array.emptyByteArray
     val byteCount = (32 - Integer.numberOfLeadingZeros(n) + 7) / 8
     val out = new Array[Byte](byteCount)
     var i = byteCount - 1
     var v = n
-    while (i >= 0) {
+    while i >= 0 do {
       out(i) = (v & 0xff).toByte
       v >>>= 8
       i -= 1
@@ -478,7 +475,7 @@ object StackTrie {
   private[mpt] def diffIndex(a: Array[Byte], b: Array[Byte]): Int = {
     val n = math.min(a.length, b.length)
     var i = 0
-    while (i < n && a(i) == b(i)) i += 1
+    while i < n && a(i) == b(i) do i += 1
     i
   }
 
@@ -486,10 +483,10 @@ object StackTrie {
   private[mpt] def byteCompare(a: Array[Byte], b: Array[Byte]): Int = {
     val n = math.min(a.length, b.length)
     var i = 0
-    while (i < n) {
+    while i < n do {
       val ai = a(i) & 0xff
       val bi = b(i) & 0xff
-      if (ai != bi) return if (ai < bi) -1 else 1
+      if ai != bi then return if ai < bi then -1 else 1
       i += 1
     }
     Integer.compare(a.length, b.length)
@@ -498,7 +495,7 @@ object StackTrie {
   /** Allocate a slice `arr(from .. arr.length)`. */
   private[mpt] def sliceFrom(arr: Array[Byte], from: Int): Array[Byte] = {
     val n = arr.length - from
-    if (n <= 0) Array.emptyByteArray
+    if n <= 0 then Array.emptyByteArray
     else {
       val out = new Array[Byte](n)
       System.arraycopy(arr, from, out, 0, n)
@@ -509,7 +506,7 @@ object StackTrie {
   /** Allocate a slice `arr(from until until)`. */
   private[mpt] def sliceRange(arr: Array[Byte], from: Int, until: Int): Array[Byte] = {
     val n = until - from
-    if (n <= 0) Array.emptyByteArray
+    if n <= 0 then Array.emptyByteArray
     else {
       val out = new Array[Byte](n)
       System.arraycopy(arr, from, out, 0, n)
@@ -520,18 +517,18 @@ object StackTrie {
   /** Append a single nibble to a path. Allocates a new array. */
   private[mpt] def appendNibble(path: Array[Byte], nibble: Byte): Array[Byte] = {
     val out = new Array[Byte](path.length + 1)
-    if (path.length > 0) System.arraycopy(path, 0, out, 0, path.length)
+    if path.length > 0 then System.arraycopy(path, 0, out, 0, path.length)
     out(path.length) = nibble
     out
   }
 
   /** Append the slice `nibbles(from until from+count)` to a path. */
   private[mpt] def appendNibbles(path: Array[Byte], nibbles: Array[Byte], from: Int, count: Int): Array[Byte] =
-    if (count <= 0) {
-      if (path.length == 0) EmptyPath else path
+    if count <= 0 then {
+      if path.length == 0 then EmptyPath else path
     } else {
       val out = new Array[Byte](path.length + count)
-      if (path.length > 0) System.arraycopy(path, 0, out, 0, path.length)
+      if path.length > 0 then System.arraycopy(path, 0, out, 0, path.length)
       System.arraycopy(nibbles, from, out, path.length, count)
       out
     }
@@ -539,9 +536,9 @@ object StackTrie {
   private[mpt] def hexStr(arr: Array[Byte]): String = {
     val sb = new StringBuilder(arr.length)
     var i = 0
-    while (i < arr.length) {
+    while i < arr.length do {
       val c = arr(i) & 0x0f
-      sb.append(if (c < 10) ('0' + c).toChar else ('a' + (c - 10)).toChar)
+      sb.append(if c < 10 then ('0' + c).toChar else ('a' + (c - 10)).toChar)
       i += 1
     }
     sb.toString

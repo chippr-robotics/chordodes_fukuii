@@ -44,9 +44,9 @@ object Account {
             RLPValue(codeHashBytes)
           ) =>
         val normalizedStorageRoot =
-          if (storageRootBytes.isEmpty) Account.EmptyStorageRootHash else ByteString(storageRootBytes)
+          if storageRootBytes.isEmpty then Account.EmptyStorageRootHash else ByteString(storageRootBytes)
         val normalizedCodeHash =
-          if (codeHashBytes.isEmpty) Account.EmptyCodeHash else ByteString(codeHashBytes)
+          if codeHashBytes.isEmpty then Account.EmptyCodeHash else ByteString(codeHashBytes)
         Account(
           UInt256(ByteUtils.bytesToBigInt(nonceBytes)),
           UInt256(ByteUtils.bytesToBigInt(balanceBytes)),

@@ -34,7 +34,7 @@ class ChainImporter(
     */
   def importChainFile(filePath: String)(implicit blockchainConfig: BlockchainConfig): (Int, Int, Int) = {
     val file = new File(filePath)
-    if (!file.exists()) {
+    if !file.exists() then {
       log.warn(s"Chain import file not found: $filePath")
       return (0, 0, 0)
     }
@@ -45,7 +45,7 @@ class ChainImporter(
     val blocks = decodeBlocks(bytes)
     log.info(s"Chain import: decoded ${blocks.size} blocks")
 
-    if (blocks.isEmpty) return (0, 0, 0)
+    if blocks.isEmpty then return (0, 0, 0)
 
     // Log genesis vs first block's expected parent for debugging genesis mismatches
     val genesisOpt = blockchainReader.getBlockHeaderByNumber(0)
@@ -67,7 +67,7 @@ class ChainImporter(
     var skipped = 0
     var failed = 0
 
-    for (block <- blocks) {
+    for block <- blocks do {
       val blockNum = block.header.number
       val blockHash = block.header.hash
 
@@ -83,7 +83,7 @@ class ChainImporter(
         case None => false
       }
 
-      if (alreadyExists) {
+      if alreadyExists then {
         skipped += 1
       } else {
         importBlock(block) match {
@@ -101,7 +101,7 @@ class ChainImporter(
             blockchainWriter.save(block, receipts, newWeight, saveAsBestBlock = true)
             imported += 1
 
-            if (imported % 10 == 0 || blockNum == blocks.last.header.number) {
+            if imported % 10 == 0 || blockNum == blocks.last.header.number then {
               log.info(s"Chain import: block $blockNum imported ($imported/${blocks.size})")
             }
 
@@ -142,7 +142,7 @@ class ChainImporter(
     val blocks = scala.collection.mutable.ArrayBuffer.empty[Block]
     var pos = 0
 
-    while (pos < data.length)
+    while pos < data.length do
       try {
         val nextPos = nextElementIndex(data, pos)
         val blockBytes = data.slice(pos, nextPos)

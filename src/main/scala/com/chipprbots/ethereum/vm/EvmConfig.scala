@@ -32,26 +32,26 @@ object EvmConfig {
   def forBlock(blockNumber: BigInt, timestamp: Long, blockchainConfig: BlockchainConfig): EvmConfig = {
     var config = forBlock(blockNumber, blockchainConfig)
     // Apply timestamp-based fork upgrades for ETH chains
-    if (blockchainConfig.isShanghaiTimestamp(timestamp)) {
+    if blockchainConfig.isShanghaiTimestamp(timestamp) then {
       config = config.copy(
         opCodeList = SpiralOpCodes, // Adds PUSH0 (EIP-3855)
         eip3651Enabled = true, // Warm COINBASE
         eip3860Enabled = true // Initcode metering
       )
     }
-    if (blockchainConfig.isCancunTimestamp(timestamp)) {
+    if blockchainConfig.isCancunTimestamp(timestamp) then {
       config = config.copy(
         opCodeList = OlympiaOpCodes, // Adds TSTORE/TLOAD/MCOPY/BLOBHASH/BLOBBASEFEE
         feeSchedule = new FeeSchedule.OlympiaFeeSchedule,
         eip6780Enabled = true // SELFDESTRUCT restriction
       )
     }
-    if (blockchainConfig.isPragueTimestamp(timestamp)) {
+    if blockchainConfig.isPragueTimestamp(timestamp) then {
       config = config.copy(
         feeSchedule = new FeeSchedule.PragueFeeSchedule // EIP-7623: increased calldata costs
       )
     }
-    if (blockchainConfig.isOsakaTimestamp(timestamp)) {
+    if blockchainConfig.isOsakaTimestamp(timestamp) then {
       config = config.copy(
         feeSchedule = new FeeSchedule.OsakaFeeSchedule,
         opCodeList = OsakaOpCodes // EIP-7939: CLZ opcode
@@ -67,7 +67,7 @@ object EvmConfig {
     // standard Ethereum fork schedule where London only activates EIP-1559/3529/3541.
     // On ETC, Spiral < Olympia in the fork sequence, so Olympia bundles all EIPs.
     val etcForksDisabled = blockchainConfig.spiralBlockNumber > blockchainConfig.olympiaBlockNumber
-    val olympiaBuilder = if (etcForksDisabled) LondonConfigBuilder else OlympiaConfigBuilder
+    val olympiaBuilder = if etcForksDisabled then LondonConfigBuilder else OlympiaConfigBuilder
 
     val transitionBlockToConfigWithPriorityMapping: List[(BigInt, Int, EvmConfigBuilder)] = List(
       (blockchainConfig.frontierBlockNumber, 1, FrontierConfigBuilder),
@@ -272,13 +272,10 @@ case class EvmConfig(
       G_memory * a + a * a / 512
     }
 
-    val memNeeded = if (dataSize == 0) BigInt(0) else offset + dataSize
-    if (memNeeded > MaxMemory)
-      UInt256.MaxValue / 2
-    else if (memNeeded <= memSize)
-      0
-    else
-      c(memNeeded) - c(memSize)
+    val memNeeded = if dataSize == 0 then BigInt(0) else offset + dataSize
+    if memNeeded > MaxMemory then UInt256.MaxValue / 2
+    else if memNeeded <= memSize then 0
+    else c(memNeeded) - c(memSize)
   }
 
   /** Calculates transaction intrinsic gas. See YP section 6.2
@@ -299,11 +296,11 @@ case class EvmConfig(
     // EIP-7702: Per-authorization intrinsic gas = PER_AUTH_BASE_COST (25000) per EIP spec
     val authListPrice: BigInt = BigInt(authorizationListSize) * BigInt(25000)
 
-    val initCodeCost: BigInt = if (isContractCreation) calcInitCodeCost(txData) else BigInt(0)
+    val initCodeCost: BigInt = if isContractCreation then calcInitCodeCost(txData) else BigInt(0)
 
     txDataZero * G_txdatazero +
       txDataNonZero * G_txdatanonzero + accessListPrice + authListPrice +
-      (if (isContractCreation) G_txcreate else 0) +
+      (if isContractCreation then G_txcreate else 0) +
       G_transaction +
       initCodeCost
   }
@@ -330,7 +327,7 @@ case class EvmConfig(
   /** EIP-3860: Maximum initcode size (2 * MAX_CODE_SIZE)
     */
   def maxInitCodeSize: Option[BigInt] =
-    if (eip3860Enabled) maxCodeSize.map(_ * 2) else None
+    if eip3860Enabled then maxCodeSize.map(_ * 2) else None
 
   /** EIP-3860: Calculate gas cost for initcode
     * @param initCode
@@ -339,7 +336,7 @@ case class EvmConfig(
     *   Gas cost (INITCODE_WORD_COST * ceil(len(initcode) / 32))
     */
   def calcInitCodeCost(initCode: ByteString): BigInt =
-    if (eip3860Enabled) {
+    if eip3860Enabled then {
       val words = wordsForBytes(initCode.size)
       feeSchedule.G_initcode_word * words
     } else {

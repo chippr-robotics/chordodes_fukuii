@@ -44,10 +44,9 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
       localSubchainTD: BigInt,
       proposedSubchainTD: BigInt
   ): Boolean =
-    if (etcMainnetConfig.isActiveAtBlock(localHeadBlock))
+    if etcMainnetConfig.isActiveAtBlock(localHeadBlock) then
       ArtificialFinality.shouldRejectReorg(timeDeltaSeconds, localSubchainTD, proposedSubchainTD)
-    else
-      false
+    else false
 
   // ── Pre-activation: any reorg accepted ───────────────────────────────────
 

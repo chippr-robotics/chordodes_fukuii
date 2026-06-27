@@ -52,12 +52,12 @@ class ConsensusAdapter(
       blockchainReader.getBestBlock.map(_.header).orElse(blockchainReader.getBestBlockHeader)
     bestHeaderOpt match {
       case Some(bestHeader) =>
-        if (isBlockADuplicate(block.header, bestHeader.number)) {
+        if isBlockADuplicate(block.header, bestHeader.number) then {
           log.debug("Ignoring duplicated block: {}", block.idTag)
           IO.pure(DuplicateBlock)
         } else {
           // If chain weight lookup fails, treat it as recoverable: log and continue.
-          if (blockchainReader.getChainWeightByHash(bestHeader.hash).isEmpty) {
+          if blockchainReader.getChainWeightByHash(bestHeader.hash).isEmpty then {
             log.warn(
               "Total chain weight for current best block {} is missing — continuing import (test harness may not provide chain weight)",
               bestHeader.hashAsHexString
@@ -69,7 +69,7 @@ class ConsensusAdapter(
           // doBlockPreValidation runs on a different thread pool (validationScheduler) which can
           // race with the storage write, causing intermittent HeaderParentNotFoundError.
           // The consensus.evaluateBranch will validate blocks during execution.
-          val validated = if (bestHeader.hash == block.header.parentHash) {
+          val validated = if bestHeader.hash == block.header.parentHash then {
             IO.pure(Right(BlockExecutionSuccess): Either[ValidationBeforeExecError, BlockExecutionSuccess])
           } else {
             doBlockPreValidation(block)

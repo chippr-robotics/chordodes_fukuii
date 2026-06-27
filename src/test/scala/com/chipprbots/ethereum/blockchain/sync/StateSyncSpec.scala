@@ -188,9 +188,9 @@ class StateSyncSpec
     }
 
     val mixedResponseConfig: PeerConfig = peersMap.map { case (peer, _) =>
-      if (peer.remoteAddress.getPort <= 3) {
+      if peer.remoteAddress.getPort <= 3 then {
         peer.id -> FullResponse
-      } else if (peer.remoteAddress.getPort > 3 && peer.remoteAddress.getPort <= 6) {
+      } else if peer.remoteAddress.getPort > 3 && peer.remoteAddress.getPort <= 6 then {
         peer.id -> PartialResponse
       } else {
         peer.id -> NoResponse

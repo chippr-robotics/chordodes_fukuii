@@ -103,7 +103,7 @@ object ByteCodeWorker {
     Behaviors.receive[Command] { (context, msg) =>
       msg match {
         case ByteCodesResponseMsg(response) =>
-          if (response.requestId == requestId) {
+          if response.requestId == requestId then {
             // IMPORTANT: mark the request complete so SNAPRequestTracker doesn't fire a timeout.
             requestTracker.completeRequest(requestId, response.codes.size.max(1))
             context.log.debug(s"Received bytecodes response for request $requestId")
@@ -115,7 +115,7 @@ object ByteCodeWorker {
           }
 
         case ByteCodeRequestTimeout(reqId) =>
-          if (reqId == requestId) {
+          if reqId == requestId then {
             // RequestTracker already removed this request when firing the callback; this is defensive.
             requestTracker.completeRequest(requestId)
             context.log.warn(s"Bytecode request $requestId timed out")
@@ -124,7 +124,7 @@ object ByteCodeWorker {
           } else Behaviors.same
 
         case ByteCodeWorkerRelease(reqId) =>
-          if (reqId == requestId) {
+          if reqId == requestId then {
             requestTracker.completeRequest(requestId)
             goIdle
           } else {
@@ -134,7 +134,7 @@ object ByteCodeWorker {
 
         case task: ByteCodeWorkerFetchTask =>
           // Important: never drop tasks. Coordinator may already have recorded this request as active.
-          if (!stash.isFull) stash.stash(task)
+          if !stash.isFull then stash.stash(task)
           Behaviors.same
 
         case _: FetchByteCodes => Behaviors.same // legacy message, not used by this worker

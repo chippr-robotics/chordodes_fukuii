@@ -66,7 +66,7 @@ object EthashBlockHeaderValidator {
       powCacheData.cache
     )
 
-    if (proofOfWork.mixHash == blockHeader.mixHash && checkDifficulty(blockHeader.difficulty.toLong, proofOfWork))
+    if proofOfWork.mixHash == blockHeader.mixHash && checkDifficulty(blockHeader.difficulty.toLong, proofOfWork) then
       Right(BlockHeaderValid)
     else Left(HeaderPoWError)
   }

@@ -25,7 +25,7 @@ class BlockchainWriter(
 ) extends Logger {
 
   def save(block: Block, receipts: Seq[Receipt], weight: ChainWeight, saveAsBestBlock: Boolean): Unit = {
-    val updateBestBlocks = if (saveAsBestBlock) {
+    val updateBestBlocks = if saveAsBestBlock then {
       log.debug(
         "New best known block number - {}",
         block.header.number
@@ -99,7 +99,7 @@ class BlockchainWriter(
     * No-op if `currentBest <= targetNumber`.
     */
   def setCanonicalChainHead(targetNumber: BigInt, targetHash: ByteString, currentBest: BigInt): Unit =
-    if (currentBest > targetNumber) {
+    if currentBest > targetNumber then {
       val batch = ((targetNumber + 1) to currentBest).foldLeft(blockNumberMappingStorage.emptyBatchUpdate) { (acc, n) =>
         acc.and(blockNumberMappingStorage.remove(n))
       }
@@ -122,23 +122,23 @@ class BlockchainWriter(
   ): Unit = {
     var cursor: Option[ByteString] = Some(headHash)
     val buf = scala.collection.mutable.ListBuffer.empty[(BigInt, ByteString)]
-    while (cursor.isDefined) {
+    while cursor.isDefined do {
       val hash = cursor.get
       reader.getBlockHeaderByHash(hash) match {
         case None => cursor = None
         case Some(header) =>
           val canonicalHashAtNumber = reader.getBlockHeaderByNumber(header.number).map(_.hash)
-          if (canonicalHashAtNumber.contains(hash)) {
+          if canonicalHashAtNumber.contains(hash) then {
             // reached existing canonical ancestor — stop
             cursor = None
           } else {
             buf += ((header.number, hash))
-            if (header.number == 0) cursor = None
+            if header.number == 0 then cursor = None
             else cursor = Some(header.parentHash)
           }
       }
     }
-    if (buf.nonEmpty) {
+    if buf.nonEmpty then {
       // Rewrite number→hash AND tx-location for every block on the newly canonical branch.
       // Without the tx-location rewrite, eth_getTransactionReceipt returns the old (now
       // sidechain) block via the stale mapping — hive's 'Transaction Re-Org, Re-Org to

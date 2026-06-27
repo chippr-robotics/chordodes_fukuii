@@ -42,9 +42,9 @@ object AuthHandshaker {
 
   private def toLoggableHex(bytes: ByteString): String = {
     val arr = bytes.toArray[Byte]
-    val truncated = if (arr.length <= MaxLoggedBytes) arr else arr.take(MaxLoggedBytes)
+    val truncated = if arr.length <= MaxLoggedBytes then arr else arr.take(MaxLoggedBytes)
     val hex = Hex.toHexString(truncated)
-    if (arr.length > MaxLoggedBytes) s"$hex...(+${arr.length - MaxLoggedBytes} bytes)" else hex
+    if arr.length > MaxLoggedBytes then s"$hex...(+${arr.length - MaxLoggedBytes} bytes)" else hex
   }
 
   val InitiatePacketLength: Int = AuthInitiateMessage.EncodedLength + ECIESCoder.OverheadSize
@@ -261,13 +261,13 @@ case class AuthHandshaker(
       val agreedSecret = bigIntegerToBytes(secretScalar, SecretSize)
 
       val sharedSecret =
-        if (isInitiator) kec256(agreedSecret, kec256(remoteNonce.toArray, nonce.toArray))
+        if isInitiator then kec256(agreedSecret, kec256(remoteNonce.toArray, nonce.toArray))
         else kec256(agreedSecret, kec256(nonce.toArray, remoteNonce.toArray))
 
       val aesSecret = kec256(agreedSecret, sharedSecret)
 
       val (egressMacSecret, ingressMacSecret) =
-        if (isInitiator) macSecretSetup(agreedSecret, aesSecret, initiatePacket, nonce, responsePacket, remoteNonce)
+        if isInitiator then macSecretSetup(agreedSecret, aesSecret, initiatePacket, nonce, responsePacket, remoteNonce)
         else macSecretSetup(agreedSecret, aesSecret, initiatePacket, remoteNonce, responsePacket, nonce)
 
       AuthHandshakeSuccess(
@@ -309,7 +309,7 @@ case class AuthHandshaker(
     mac2.update(responsePacket.toArray, 0, responsePacket.toArray.length)
     new KeccakDigest(mac2).doFinal(buf, 0)
 
-    if (isInitiator) (mac1, mac2)
+    if isInitiator then (mac1, mac2)
     else (mac2, mac1)
   }
 

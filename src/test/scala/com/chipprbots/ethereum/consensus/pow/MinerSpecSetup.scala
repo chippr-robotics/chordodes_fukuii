@@ -196,12 +196,12 @@ trait MinerSpecSetup
     val GasLimitBoundDivisor: Int = 1024
     val target = UInt256(miningConfig.gasLimitTarget)
     val delta = parentGas / GasLimitBoundDivisor - 1
-    if (parentGas < target) {
+    if parentGas < target then {
       val next = parentGas + delta
-      if (next > target) target else next
-    } else if (parentGas > target) {
+      if next > target then target else next
+    } else if parentGas > target then {
       val next = parentGas - delta
-      if (next < target) target else next
+      if next < target then target else next
     } else {
       parentGas
     }

@@ -205,11 +205,11 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
 
     private val paramsForDelegate = params.take(4) ++ params.drop(5)
 
-    private val stack = Stack.empty().push(if (op == DELEGATECALL) paramsForDelegate else params)
+    private val stack = Stack.empty().push(if op == DELEGATECALL then paramsForDelegate else params)
     private val mem = Memory.empty.store(UInt256.Zero, inputData)
 
     val baseStateIn: PS = ProgramState(vm, context, env).withStack(stack).withMemory(mem)
-    val stateIn: PS = if (toAlreadyAccessed) baseStateIn.addAccessedAddress(to) else baseStateIn
+    val stateIn: PS = if toAlreadyAccessed then baseStateIn.addAccessedAddress(to) else baseStateIn
     val stateOut: PS = op.execute(stateIn)
     val world: MockWorldState = stateOut.world
 

@@ -80,7 +80,7 @@ object FixtureProvider {
     fixtures.blockHeaders.toSeq
       .sortBy { case (_, header) => header.number }
       .foreach { case (originalHash, header) =>
-        if (header.number <= blockNumber) {
+        if header.number <= blockNumber then {
           val receiptsUpdates = fixtures.receipts
             .get(originalHash)
             .map(r => storages.receiptStorage.put(originalHash, r))
@@ -111,12 +111,12 @@ object FixtureProvider {
                 Try(m.value.toArray[Byte].toAccount).toOption.foreach { account =>
                   // Note: We've already saved all EVM code above, so this check is now redundant
                   // but kept for backwards compatibility with fixtures that have correct codeHash
-                  if (account.codeHash != DumpChainActor.emptyEvm) {
+                  if account.codeHash != DumpChainActor.emptyEvm then {
                     fixtures.evmCode.get(account.codeHash).foreach { code =>
                       storages.evmCodeStorage.put(account.codeHash, code).commit()
                     }
                   }
-                  if (account.storageRoot != DumpChainActor.emptyStorage) {
+                  if account.storageRoot != DumpChainActor.emptyStorage then {
                     traverse(account.storageRoot)
                   }
                 }
@@ -262,7 +262,7 @@ object FixtureProvider {
       .toSeq
       .sortBy(_._1)
 
-    if (missing.nonEmpty) {
+    if missing.nonEmpty then {
       val details = missing.map { case (number, root) => s"  block $number -> stateRoot 0x$root" }.mkString("\n")
       throw new IllegalStateException(
         s"Corrupt txExecTest fixture at '$path': ${missing.size} block header(s) reference a stateRoot " +

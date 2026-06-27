@@ -37,7 +37,7 @@ class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
     */
   def loadTestSuiteFromFile(filePath: String): BlockchainTestSuite = {
     val file = new File(filePath)
-    if (!file.exists()) {
+    if !file.exists() then {
       BlockchainTestSuite(Map.empty)
     } else {
       val source = Source.fromFile(file)
@@ -71,7 +71,7 @@ class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
     */
   def runTestsInDirectory(testDir: String, maxTests: Int = Int.MaxValue): (Int, Int, Int) = {
     val dir = new File(testDir)
-    if (!dir.exists() || !dir.isDirectory) {
+    if !dir.exists() || !dir.isDirectory then {
       info(s"Directory not found: $testDir")
       return (0, 0, 0)
     }
@@ -84,7 +84,7 @@ class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
     testFiles.foreach { file =>
       val suite = loadTestSuiteFromFile(file.getAbsolutePath)
 
-      if (suite.tests.isEmpty) {
+      if suite.tests.isEmpty then {
         skipped += 1
       } else {
         suite.tests.foreach { case (testName, test) =>
@@ -94,10 +94,10 @@ class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
               passed += 1
             case Left(error) =>
               // Log failure but don't spam console for known gas issues
-              if (error.contains("invalid gas used")) {
+              if error.contains("invalid gas used") then {
                 // Known gas calculation issue - see GAS_CALCULATION_ISSUES.md
                 failed += 1
-              } else if (error.contains("invalid state root")) {
+              } else if error.contains("invalid state root") then {
                 // State root mismatch - may be related to gas or other issues
                 failed += 1
               } else {

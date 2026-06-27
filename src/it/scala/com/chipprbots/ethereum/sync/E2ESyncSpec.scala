@@ -321,7 +321,7 @@ class E2ESyncSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll {
           bestBlock.number shouldBe blockNumber
 
           // Verify we can retrieve any block from storage
-          for (i <- 1 to blockNumber) {
+          for i <- 1 to blockNumber do {
             val block = peer2.blockchainReader.getBlockByNumber(peer2.blockchainReader.getBestBranch, i)
             block shouldBe defined
           }

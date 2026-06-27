@@ -445,7 +445,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       n: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
     IO(blockchainReader.getBestBlock).flatMap { block =>
-      if (block.get.number >= n) {
+      if block.get.number >= n then {
         IO(())
       } else {
         generateValidBlock(block.get)(updateWorldForBlock).flatMap(_ => importBlocksUntil(n)(updateWorldForBlock))
@@ -457,9 +457,9 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
     IO(blockchainReader.getBestBlock).flatMap { block =>
-      if (block.get.number >= to) {
+      if block.get.number >= to then {
         IO(())
-      } else if (block.get.number >= from) {
+      } else if block.get.number >= from then {
         generateInvalidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlocks(from, to)(updateWorldForBlock)
         )
@@ -476,9 +476,9 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
     IO(blockchainReader.getBestBlock).flatMap { block =>
-      if (block.get.number >= to) {
+      if block.get.number >= to then {
         IO(())
-      } else if (block.get.number >= from) {
+      } else if block.get.number >= from then {
         generateInvalidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlockNumbers(from, to)(updateWorldForBlock)
         )

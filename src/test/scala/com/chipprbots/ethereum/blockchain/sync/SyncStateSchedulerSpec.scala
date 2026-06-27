@@ -273,7 +273,7 @@ class SyncStateSchedulerSpec
       schedulerBlockchainWriter.storeBlockHeader(header).commit()
       schedulerBlockchainWriter.saveBestKnownBlocks(header.hash, 1)
       var state = scheduler.initState(worldHash).get
-      while (state.activeRequest.nonEmpty) {
+      while state.activeRequest.nonEmpty do {
         val (allMissingNodes1, state2) = scheduler.getAllMissingNodes(state)
         val allMissingNodes1Response = prov.getNodes(allMissingNodes1)
         val state3 = scheduler.processResponses(state2, allMissingNodes1Response).value._1
@@ -311,7 +311,7 @@ class SyncStateSchedulerSpec
         provider: TrieProvider
     ): SchedulerState = {
       var state = initState
-      while (state.activeRequest.nonEmpty) {
+      while state.activeRequest.nonEmpty do {
         val (allMissingNodes1, state2) = scheduler.getAllMissingNodes(state)
         val allMissingNodes1Response = provider.getNodes(allMissingNodes1)
         val state3 = scheduler.processResponses(state2, allMissingNodes1Response).value._1

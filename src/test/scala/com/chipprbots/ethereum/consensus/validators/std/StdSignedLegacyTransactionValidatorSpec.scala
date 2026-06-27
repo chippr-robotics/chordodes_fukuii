@@ -80,10 +80,8 @@ class StdSignedLegacyTransactionValidatorSpec extends AnyFlatSpec with Matchers 
       fromBeforeHomestead: Boolean
   ): Either[SignedTransactionError, SignedTransactionValid] = {
     val (senderAccount, blockHeader) =
-      if (fromBeforeHomestead)
-        (senderAccountBeforeHomestead, blockHeaderBeforeHomestead)
-      else
-        (senderAccountAfterHomestead, blockHeaderAfterHomestead)
+      if fromBeforeHomestead then (senderAccountBeforeHomestead, blockHeaderBeforeHomestead)
+      else (senderAccountAfterHomestead, blockHeaderAfterHomestead)
     StdSignedTransactionValidator.validate(
       stx = stx,
       senderAccount = senderAccount,

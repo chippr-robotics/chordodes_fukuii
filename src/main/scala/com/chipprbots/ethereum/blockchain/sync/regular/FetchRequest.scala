@@ -37,7 +37,7 @@ trait FetchRequest[A] {
     * peers are exhausted, exponential backoff is applied before retrying (go-ethereum grace period pattern).
     */
   def makeRequest(
-      request: Request[_],
+      request: Request[?],
       responseFallback: A,
       triedPeers: Set[PeerId] = Set.empty,
       retryCount: Int = 0
@@ -124,6 +124,6 @@ trait FetchRequest[A] {
     val maxDelay = syncConfig.maxRetryDelay
     val multiplier = math.pow(2.0, retryCount.toDouble).toLong
     val delay = base * multiplier
-    if (delay > maxDelay) maxDelay else delay
+    if delay > maxDelay then maxDelay else delay
   }
 }

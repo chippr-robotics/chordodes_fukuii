@@ -72,7 +72,7 @@ object TransactionReceiptResponse {
       gasUsedByTransaction: BigInt,
       baseLogIndex: Int
   )(implicit blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig): TransactionReceiptResponse = {
-    val contractAddress = if (stx.tx.isContractInit) {
+    val contractAddress = if stx.tx.isContractInit then {
       // do not subtract 1 from nonce because in transaction we have nonce of account before transaction execution
       val hash = kec256(
         rlp.encode(RLPList(toEncodeable(signedTransactionSender.bytes), UInt256(stx.tx.nonce).toRLPEncodable))

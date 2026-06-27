@@ -31,7 +31,7 @@ class ConfigSpec extends AnyFlatSpec with Matchers {
     val peerConfig = testConfig.getConfig("fukuii.network.peer")
 
     // Simulate the logic from Config.scala
-    val p2pVersion = if (peerConfig.hasPath("p2p-version")) peerConfig.getInt("p2p-version") else 5
+    val p2pVersion = if peerConfig.hasPath("p2p-version") then peerConfig.getInt("p2p-version") else 5
 
     // Verify default is applied when key is missing
     peerConfig.hasPath("p2p-version") shouldBe false

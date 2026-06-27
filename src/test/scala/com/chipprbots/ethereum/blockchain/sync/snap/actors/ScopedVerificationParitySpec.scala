@@ -52,7 +52,7 @@ class ScopedVerificationParitySpec
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
+    if gauge == null then Double.NaN else gauge.value()
   }
 
   /** A present, complete root: a childless leaf in storage so a FULL-ROOT verification walk from it finds 0 missing and
@@ -136,7 +136,7 @@ class ScopedVerificationParitySpec
       coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
       awaitStateHealingComplete(controller)
       // The mode gauge distinguishes the two paths: 1 = scoped engaged, 0 = full-root fallback.
-      if (scoped) gaugeValue("snapsync.healing.scoped_verification.gauge") shouldBe 1.0 +- 1e-9
+      if scoped then gaugeValue("snapsync.healing.scoped_verification.gauge") shouldBe 1.0 +- 1e-9
       else gaugeValue("snapsync.healing.scoped_verification.gauge") shouldBe 0.0 +- 1e-9
       // The state root is unchanged by verification (a pure local read); assert the invariant explicitly.
       root shouldBe storedRoot(new TestMptStorage())

@@ -28,13 +28,13 @@ object NodeClientType {
     */
   def recognize(clientId: String): ClientType = {
     val lower = clientId.toLowerCase
-    if (lower.contains("core-geth") || lower.contains("coregeth")) CoreGeth
-    else if (lower.startsWith("geth") || lower.contains("/geth/")) Geth
-    else if (lower.startsWith("besu") || lower.contains("/besu/")) Besu
-    else if (lower.startsWith("nethermind") || lower.contains("nethermind")) Nethermind
-    else if (lower.startsWith("erigon") || lower.contains("erigon")) Erigon
-    else if (lower.startsWith("reth") || lower.contains("/reth/")) Reth
-    else if (lower.startsWith("fukuii") || lower.contains("fukuii") || lower.contains("chippr")) Fukuii
+    if lower.contains("core-geth") || lower.contains("coregeth") then CoreGeth
+    else if lower.startsWith("geth") || lower.contains("/geth/") then Geth
+    else if lower.startsWith("besu") || lower.contains("/besu/") then Besu
+    else if lower.startsWith("nethermind") || lower.contains("nethermind") then Nethermind
+    else if lower.startsWith("erigon") || lower.contains("erigon") then Erigon
+    else if lower.startsWith("reth") || lower.contains("/reth/") then Reth
+    else if lower.startsWith("fukuii") || lower.contains("fukuii") || lower.contains("chippr") then Fukuii
     else Other(clientId.take(30))
   }
 }

@@ -39,7 +39,7 @@ package object domain {
       // Handle empty byte arrays as per Ethereum RLP specification where empty byte string represents zero
       // Java's BigInteger constructor throws NumberFormatException on empty arrays, so we must check first
       override def fromBytes(bytes: Array[Byte]): BigInt =
-        if (bytes.isEmpty) BigInt(0) else BigInt(bytes)
+        if bytes.isEmpty then BigInt(0) else BigInt(bytes)
       override def toBytes(input: BigInt): Array[Byte] = input.toByteArray
     }
 

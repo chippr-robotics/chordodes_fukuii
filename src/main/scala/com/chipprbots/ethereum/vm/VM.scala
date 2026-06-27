@@ -54,7 +54,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
     */
   private[vm] def call(context: PC, ownerAddr: Address): PR = {
     val isSubCall = context.callDepth > 0
-    if (isSubCall)
+    if isSubCall then
       tracer.foreach(
         _.onCallEnter(
           callTypeName(context),
@@ -66,19 +66,17 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         )
       )
     val result =
-      if (!isValidCall(context))
-        invalidCallResult(context, Set.empty, Set.empty)
+      if !isValidCall(context) then invalidCallResult(context, Set.empty, Set.empty)
       else {
         val recipientAddr = context.recipientAddr.getOrElse(
           throw new IllegalArgumentException("Recipient address must be defined for message call")
         )
 
         def makeTransfer = context.world.transfer(context.callerAddr, recipientAddr, context.endowment)
-        val world1 = if (context.doTransfer) makeTransfer else context.world
+        val world1 = if context.doTransfer then makeTransfer else context.world
         val context1: PC = context.copy(world = world1)
 
-        if (PrecompiledContracts.isDefinedAt(context1))
-          PrecompiledContracts.run(context1)
+        if PrecompiledContracts.isDefinedAt(context1) then PrecompiledContracts.run(context1)
         else {
           val code = resolveCode(world1, recipientAddr)
           val env = ExecEnv(context1, code, ownerAddr)
@@ -98,7 +96,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
           exec(warmState).toResult
         }
       }
-    if (isSubCall)
+    if isSubCall then
       tracer.foreach(
         _.onCallExit(context.startGas - result.gasRemaining, result.returnData, result.error.map(_.toString))
       )
@@ -124,21 +122,20 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
       salt: Option[UInt256] = None
   ): (PR, Address) = {
     val isSubCall = context.callDepth > 0
-    val opName = if (salt.isDefined) "CREATE2" else "CREATE"
-    if (isSubCall)
+    val opName = if salt.isDefined then "CREATE2" else "CREATE"
+    if isSubCall then
       tracer.foreach(
         _.onCallEnter(opName, context.callerAddr, Address(0), context.startGas, context.endowment, context.inputData)
       )
     val (result, newAddress) =
-      if (!isValidCall(context))
-        (invalidCallResult(context, Set.empty, Set.empty), Address(0))
+      if !isValidCall(context) then (invalidCallResult(context, Set.empty, Set.empty), Address(0))
       else {
         require(context.recipientAddr.isEmpty, "recipient address must be empty for contract creation")
         require(context.doTransfer, "contract creation will always transfer funds")
 
         // EIP-3860: Check initcode size limit
         val maxInitCodeSize = context.evmConfig.maxInitCodeSize
-        if (context.evmConfig.eip3860Enabled && maxInitCodeSize.exists(max => context.inputData.size > max)) {
+        if context.evmConfig.eip3860Enabled && maxInitCodeSize.exists(max => context.inputData.size > max) then {
           // Exceptional abort: initcode too large (consumes all gas)
           return (
             invalidCallResult(context, Set.empty, Set.empty).copy(error = Some(InitCodeSizeLimit), gasRemaining = 0),
@@ -146,7 +143,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
           )
         }
 
-        if (DebugTrace.enabledForBlock(context.blockHeader.number)) {
+        if DebugTrace.enabledForBlock(context.blockHeader.number) then {
           val callerAccountNonce = context.world.getAccount(context.callerAddr).map(_.nonce)
           callerAccountNonce.foreach { n =>
             val nonceForCreate = n - 1
@@ -172,8 +169,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         // Activation matches the EELS test marker `valid_from("Paris")` — we use
         // BlockHeader.isPostMerge (difficulty==0 && baseFee set) as the Paris signal.
         val conflict =
-          if (context.blockHeader.isPostMerge)
-            context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
+          if context.blockHeader.isPostMerge then context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
           else context.world.nonEmptyCodeOrNonceAccount(contractAddr)
 
         /** Specification of https://eips.ethereum.org/EIPS/eip-1283 states, that `originalValue` should be taken from
@@ -191,7 +187,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         val world1: W =
           context.world.initialiseAccount(contractAddr).transfer(context.callerAddr, contractAddr, context.endowment)
 
-        val code = if (conflict) ByteString(INVALID.code) else context.inputData
+        val code = if conflict then ByteString(INVALID.code) else context.inputData
 
         val env = ExecEnv(context, code, contractAddr).copy(inputData = ByteString.empty)
 
@@ -204,7 +200,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         val newContractResult = saveNewContract(context, contractAddr, execResult, env.evmConfig)
         (newContractResult, contractAddr)
       }
-    if (isSubCall)
+    if isSubCall then
       tracer.foreach(
         _.onCallExit(context.startGas - result.gasRemaining, result.returnData, result.error.map(_.toString))
       )
@@ -227,15 +223,13 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
           s"$opCode | pc: $pc | depth: ${env.callDepth} | gasUsed: ${state.gas - gas} | gas: $gas | stack: $stack"
         )
         // Opcode-level tracing for targeted debugging
-        if (DebugTrace.enabledForBlock(state.env.blockHeader.number) && state.env.callDepth == 0) {
+        if DebugTrace.enabledForBlock(state.env.blockHeader.number) && state.env.callDepth == 0 then {
           System.err.println(
             s"[EVM] pc=${state.pc} op=$opCode gas=${state.gas} -> gasAfter=$gas depth=${env.callDepth}"
           )
         }
-        if (newState.halted)
-          newState
-        else
-          exec(newState)
+        if newState.halted then newState
+        else exec(newState)
 
       case None =>
         state.withError(InvalidOpCode(byte)).halt
@@ -247,9 +241,9 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
     * ~1125-1143).
     */
   private def callTypeName(context: PC): String =
-    if (context.staticCtx) "STATICCALL"
-    else if (!context.doTransfer && context.endowment == UInt256.Zero) "DELEGATECALL"
-    else if (!context.doTransfer) "CALLCODE"
+    if context.staticCtx then "STATICCALL"
+    else if !context.doTransfer && context.endowment == UInt256.Zero then "DELEGATECALL"
+    else if !context.doTransfer then "CALLCODE"
     else "CALL"
 
   protected def isValidCall(context: PC): Boolean =
@@ -286,8 +280,8 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
     val tracing = DebugTrace.enabledForBlock(context.blockHeader.number)
 
     val out: PR =
-      if (result.error.isDefined) {
-        if (result.error.contains(RevertOccurs)) result else result.copy(gasRemaining = 0)
+      if result.error.isDefined then {
+        if result.error.contains(RevertOccurs) then result else result.copy(gasRemaining = 0)
       } else {
         val contractCode = result.returnData
         val codeDepositCost = config.calcCodeDepositCost(contractCode)
@@ -297,13 +291,13 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         // EIP-3541: Reject new contracts starting with 0xEF byte
         val startsWithEF = config.eip3541Enabled && contractCode.nonEmpty && contractCode.head == 0xef.toByte
 
-        if (startsWithEF) {
+        if startsWithEF then {
           // EIP-3541: Code starting with 0xEF byte causes exceptional abort
           result.copy(error = Some(InvalidCode), gasRemaining = 0)
-        } else if (maxCodeSizeExceeded || (codeStoreOutOfGas && config.exceptionalFailedCodeDeposit)) {
+        } else if maxCodeSizeExceeded || (codeStoreOutOfGas && config.exceptionalFailedCodeDeposit) then {
           // Code size too big or code storage causes out-of-gas with exceptionalFailedCodeDeposit enabled
           result.copy(error = Some(OutOfGas), gasRemaining = 0)
-        } else if (codeStoreOutOfGas && !config.exceptionalFailedCodeDeposit) {
+        } else if codeStoreOutOfGas && !config.exceptionalFailedCodeDeposit then {
           // Code storage causes out-of-gas with exceptionalFailedCodeDeposit disabled
           result
         } else {
@@ -315,7 +309,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         }
       }
 
-    if (tracing) {
+    if tracing then {
       val contractCodeSize = result.returnData.size
       val codeDepositCost = config.calcCodeDepositCost(result.returnData)
       val maxCodeSizeExceeded = exceedsMaxContractSize(context, config, result.returnData)

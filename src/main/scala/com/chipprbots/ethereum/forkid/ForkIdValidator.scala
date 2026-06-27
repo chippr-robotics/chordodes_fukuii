@@ -140,7 +140,8 @@ object ForkIdValidator {
       .zip(forks)
       .take(i)
       .collectFirst {
-        case (sum, fork) if sum == remoteId.hash => if (fork == remoteId.next.getOrElse(0)) Connect else ErrRemoteStale
+        case (sum, fork) if sum == remoteId.hash =>
+          if fork == remoteId.next.getOrElse(0) then Connect else ErrRemoteStale
       }
 
   /** 3) If the remote FORK_HASH is a superset of the local past forks and can be completed with locally known future

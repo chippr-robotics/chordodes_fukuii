@@ -61,9 +61,9 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       stx: SignedTransaction,
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] = {
-    if (blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETH)
+    if blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETH then
       return Right(SignedTransactionValid)
-    if (blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber)
+    if blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber then
       return Right(SignedTransactionValid)
     stx.tx match {
       case _: TransactionWithDynamicFee =>
@@ -117,9 +117,8 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       case None => Right(SignedTransactionValid)
       case Some((maxFee, prio)) =>
         val baseFee = blockHeader.baseFee.getOrElse(BigInt(0))
-        if (prio > maxFee)
-          Left(TransactionSyntaxError(s"maxPriorityFeePerGas ($prio) > maxFeePerGas ($maxFee)"))
-        else if (maxFee < baseFee)
+        if prio > maxFee then Left(TransactionSyntaxError(s"maxPriorityFeePerGas ($prio) > maxFeePerGas ($maxFee)"))
+        else if maxFee < baseFee then
           Left(
             TransactionSyntaxError(
               s"INSUFFICIENT_MAX_FEE_PER_GAS: maxFeePerGas ($maxFee) < baseFee ($baseFee)"
@@ -147,20 +146,13 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     val maxR = BigInt(2).pow(8 * ECDSASignature.RLength) - 1
     val maxS = BigInt(2).pow(8 * ECDSASignature.SLength) - 1
 
-    if (nonce > maxNonceValue)
-      Left(TransactionSyntaxError(s"Invalid nonce: $nonce > $maxNonceValue"))
-    else if (gasLimit > maxGasValue)
-      Left(TransactionSyntaxError(s"Invalid gasLimit: $gasLimit > $maxGasValue"))
-    else if (gasPrice > maxGasValue)
-      Left(TransactionSyntaxError(s"Invalid gasPrice: $gasPrice > $maxGasValue"))
-    else if (value > maxValue)
-      Left(TransactionSyntaxError(s"Invalid value: $value > $maxValue"))
-    else if (signature.r > maxR)
-      Left(TransactionSyntaxError(s"Invalid signatureRandom: ${signature.r} > $maxR"))
-    else if (signature.s > maxS)
-      Left(TransactionSyntaxError(s"Invalid signature: ${signature.s} > $maxS"))
-    else
-      Right(SignedTransactionValid)
+    if nonce > maxNonceValue then Left(TransactionSyntaxError(s"Invalid nonce: $nonce > $maxNonceValue"))
+    else if gasLimit > maxGasValue then Left(TransactionSyntaxError(s"Invalid gasLimit: $gasLimit > $maxGasValue"))
+    else if gasPrice > maxGasValue then Left(TransactionSyntaxError(s"Invalid gasPrice: $gasPrice > $maxGasValue"))
+    else if value > maxValue then Left(TransactionSyntaxError(s"Invalid value: $value > $maxValue"))
+    else if signature.r > maxR then Left(TransactionSyntaxError(s"Invalid signatureRandom: ${signature.r} > $maxR"))
+    else if signature.s > maxS then Left(TransactionSyntaxError(s"Invalid signature: ${signature.s} > $maxS"))
+    else Right(SignedTransactionValid)
   }
 
   /** Validates if the transaction signature is valid as stated in appendix F in YP
@@ -183,7 +175,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     val beforeEIP155 = blockNumber < blockchainConfig.forkBlockNumbers.eip155BlockNumber
 
     val validR = r > 0 && r < secp256k1n
-    val validS = s > 0 && s < (if (beforeHomestead) secp256k1n else secp256k1n / 2)
+    val validS = s > 0 && s < (if beforeHomestead then secp256k1n else secp256k1n / 2)
 
     // Validate signing schema based on transaction type
     val validSigningSchema = stx.tx match {
@@ -205,17 +197,17 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
         // 1. Unprotected signatures (v = 27 or 28)
         // 2. EIP-155 protected signatures (v = chainId * 2 + 35 or chainId * 2 + 36)
         val isUnprotected = v == ECDSASignature.negativePointSign || v == ECDSASignature.positivePointSign
-        val isEIP155Protected = if (v >= 35) {
+        val isEIP155Protected = if v >= 35 then {
           // Check if v corresponds to valid EIP-155 format: v = chainId * 2 + 35 + {0,1}
           val chainIdFromV = (v - 35) / 2
           v == chainIdFromV * 2 + 35 || v == chainIdFromV * 2 + 36
         } else false
 
-        if (beforeEIP155) isUnprotected
+        if beforeEIP155 then isUnprotected
         else isUnprotected || isEIP155Protected
     }
 
-    if (validR && validS && validSigningSchema) Right(SignedTransactionValid)
+    if validR && validS && validSigningSchema then Right(SignedTransactionValid)
     else Left(TransactionSignatureError)
   }
 
@@ -232,7 +224,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       stx: SignedTransaction,
       senderNonce: UInt256
   ): Either[SignedTransactionError, SignedTransactionValid] =
-    if (senderNonce == UInt256(stx.tx.nonce)) Right(SignedTransactionValid)
+    if senderNonce == UInt256(stx.tx.nonce) then Right(SignedTransactionValid)
     else Left(TransactionNonceError(UInt256(stx.tx.nonce), senderNonce))
 
   /** Validates the initcode size for contract creation transactions (EIP-3860)
@@ -249,7 +241,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       blockHeaderNumber: BigInt
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] = {
     import stx.tx
-    if (tx.isContractInit) {
+    if tx.isContractInit then {
       val config = EvmConfig.forBlock(blockHeaderNumber, blockchainConfig)
       config.maxInitCodeSize match {
         case Some(maxSize) if config.eip3860Enabled && tx.payload.size > maxSize =>
@@ -283,7 +275,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     }
     val txIntrinsicGas =
       config.calcTransactionIntrinsicGas(tx.payload, tx.isContractInit, Transaction.accessList(tx), authListSize)
-    if (stx.tx.gasLimit >= txIntrinsicGas) Right(SignedTransactionValid)
+    if stx.tx.gasLimit >= txIntrinsicGas then Right(SignedTransactionValid)
     else Left(TransactionNotEnoughGasForIntrinsicError(stx.tx.gasLimit, txIntrinsicGas))
   }
 
@@ -300,7 +292,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       senderBalance: UInt256,
       upfrontCost: UInt256
   ): Either[SignedTransactionError, SignedTransactionValid] =
-    if (senderBalance >= upfrontCost) Right(SignedTransactionValid)
+    if senderBalance >= upfrontCost then Right(SignedTransactionValid)
     else Left(TransactionSenderCantPayUpfrontCostError(upfrontCost, senderBalance))
 
   /** EIP-7825: Validates that the transaction gas limit does not exceed the per-tx cap (2^24 = 16.77M). Active on ETC
@@ -317,10 +309,9 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     // maps London→olympiaBlockNumber, so we must NOT trip the Olympia gate there.
     val isOlympiaActivated = !isEth && blockHeaderNumber >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
     val isOsakaActivated = blockchainConfig.isOsakaTimestamp(blockHeaderTimestamp)
-    if ((isOlympiaActivated || isOsakaActivated) && stx.tx.gasLimit > TxGasLimitCap)
+    if (isOlympiaActivated || isOsakaActivated) && stx.tx.gasLimit > TxGasLimitCap then
       Left(TransactionGasLimitExceedsCap(stx.tx.gasLimit, TxGasLimitCap))
-    else
-      Right(SignedTransactionValid)
+    else Right(SignedTransactionValid)
   }
 
   /** The sum of the transaction’s gas limit and the gas utilised in this block prior must be no greater than the
@@ -340,6 +331,6 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       accumGasUsed: BigInt,
       blockGasLimit: BigInt
   ): Either[SignedTransactionError, SignedTransactionValid] =
-    if (stx.tx.gasLimit + accumGasUsed <= blockGasLimit) Right(SignedTransactionValid)
+    if stx.tx.gasLimit + accumGasUsed <= blockGasLimit then Right(SignedTransactionValid)
     else Left(TransactionGasLimitTooBigError(stx.tx.gasLimit, accumGasUsed, blockGasLimit))
 }

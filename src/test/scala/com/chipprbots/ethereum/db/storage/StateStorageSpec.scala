@@ -75,7 +75,7 @@ class StateStorageSpec extends AnyFlatSpec with Matchers with ScalaCheckProperty
       val storage = archiveStateStorage.getBackingStorage(0)
       nodes.foreach(node => storage.updateNodesInStorage(Some(node), Nil))
 
-      if (testCache.shouldPersist) {
+      if testCache.shouldPersist then {
         val sizeBefore = ints.size
         archiveStateStorage.onBlockSave(1, 0) { () =>
           ints = 1 :: ints
@@ -93,7 +93,7 @@ class StateStorageSpec extends AnyFlatSpec with Matchers with ScalaCheckProperty
       val storage = archiveStateStorage.getBackingStorage(0)
       nodes.foreach(node => storage.updateNodesInStorage(Some(node), Nil))
 
-      if (testCache.shouldPersist) {
+      if testCache.shouldPersist then {
         val sizeBefore = ints.size
         archiveStateStorage.onBlockRollback(1, 0) { () =>
           ints = 1 :: ints
@@ -123,7 +123,7 @@ class StateStorageSpec extends AnyFlatSpec with Matchers with ScalaCheckProperty
       val storage = referenceCounteStateStorage.getBackingStorage(0)
       nodes.foreach(node => storage.updateNodesInStorage(Some(node), Nil))
 
-      if (testCache.shouldPersist) {
+      if testCache.shouldPersist then {
         val sizeBefore = ints.size
         referenceCounteStateStorage.onBlockSave(1, 0) { () =>
           ints = 1 :: ints
@@ -141,7 +141,7 @@ class StateStorageSpec extends AnyFlatSpec with Matchers with ScalaCheckProperty
       val storage = referenceCounteStateStorage.getBackingStorage(0)
       nodes.foreach(node => storage.updateNodesInStorage(Some(node), Nil))
 
-      if (testCache.shouldPersist) {
+      if testCache.shouldPersist then {
         val sizeBefore = ints.size
         referenceCounteStateStorage.onBlockRollback(1, 0) { () =>
           ints = 1 :: ints

@@ -26,7 +26,7 @@ object ConfigUtils {
   }
 
   def getOptionalValue[V](config: TypesafeConfig, getter: TypesafeConfig => String => V, path: String): Option[V] =
-    if (config.hasPath(path)) Some(getter(config)(path))
+    if config.hasPath(path) then Some(getter(config)(path))
     else None
 
   def keys(config: TypesafeConfig): Set[String] = config

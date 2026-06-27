@@ -53,7 +53,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
         val bigKey = step * i + step / 2
         val raw = bigKey.toByteArray
         val keyBytes = Array.fill(32)(0.toByte)
-        val src = if (raw.length >= 32) raw.takeRight(32) else raw
+        val src = if raw.length >= 32 then raw.takeRight(32) else raw
         src.copyToArray(keyBytes, 32 - src.length)
         ByteString(keyBytes) -> Account(nonce = i.toLong, balance = i.toLong)
       }

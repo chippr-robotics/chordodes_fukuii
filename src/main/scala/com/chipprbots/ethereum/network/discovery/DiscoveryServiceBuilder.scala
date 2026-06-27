@@ -185,10 +185,8 @@ trait DiscoveryServiceBuilder extends Logger {
   ): IO[v4.DiscoveryConfig] =
     for {
       reusedKnownNodes <-
-        if (discoveryConfig.reuseKnownNodes)
-          IO(knownNodesStorage.getKnownNodes.map(Node.fromUri))
-        else
-          IO.pure(Set.empty[Node])
+        if discoveryConfig.reuseKnownNodes then IO(knownNodesStorage.getKnownNodes.map(Node.fromUri))
+        else IO.pure(Set.empty[Node])
       // Discovery is going to enroll with all the bootstrap nodes passed to it.
       // Since we're running the enrollment in the background, it won't hold up
       // anything even if we have to enroll with hundreds of previously known nodes.
@@ -298,7 +296,7 @@ trait DiscoveryServiceBuilder extends Logger {
               // pass 0 and are written immediately.
               val send = peerGroup.sendRaw(addr, bytes)
               val task =
-                if (delayMillis > 0) IO.sleep(scala.concurrent.duration.FiniteDuration(delayMillis, "ms")) *> send
+                if delayMillis > 0 then IO.sleep(scala.concurrent.duration.FiniteDuration(delayMillis, "ms")) *> send
                 else send
               task.unsafeRunAndForget()(runtime)
             }
@@ -364,7 +362,7 @@ trait DiscoveryServiceBuilder extends Logger {
         // distance=0 yields the local ENR explicitly.
         val builder = List.newBuilder[EthereumNodeRecord]
         distances.foreach { d =>
-          if (d == 0) builder += enrRef.get
+          if d == 0 then builder += enrRef.get
           else builder ++= bystanders.atDistance(localNodeId, d)
         }
         builder.result()

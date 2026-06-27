@@ -282,7 +282,7 @@ final private class BlockImporterLogic(
         BlockImporter.survivedExhausts += 1
         val missingHashStr = pendingStateNodeHash.map(ByteStringUtils.hash2string).getOrElse("<unknown>")
 
-        if (BlockImporter.survivedExhausts >= BlockImporter.StuckEscapeThreshold) {
+        if BlockImporter.survivedExhausts >= BlockImporter.StuckEscapeThreshold then {
           // Multiple consecutive exhausts mean peers genuinely don't have our parent state and
           // never will (we're far behind their snap-serve window). The only recovery is to re-pivot
           // via SNAP. Reset our local counter so we don't re-fire if SyncController bounces us back
@@ -591,7 +591,7 @@ final private class BlockImporterLogic(
             )
             val strikes = unknownParentStrikes.getOrElse(failedBlock.hash, 0) + 1
             unknownParentStrikes = unknownParentStrikes + (failedBlock.hash -> strikes)
-            if (strikes == BadBlockEvictionThreshold) {
+            if strikes == BadBlockEvictionThreshold then {
               log.warning(
                 "BAD-BLOCK-EVICT: block {} (hash={}) import failure x{} — evicting peer",
                 failedBlock.number,
@@ -604,7 +604,7 @@ final private class BlockImporterLogic(
                   .BlockImportError(s"import failure x$strikes on block ${failedBlock.header.hashAsHexString}")
               )
             }
-            if (strikes >= ForkDetectThreshold) {
+            if strikes >= ForkDetectThreshold then {
               val ourHashAtHeight = blockchainReader
                 .getBlockHeaderByNumber(failedBlock.number)
                 .map(h => ByteStringUtils.hash2string(h.hash))
@@ -691,7 +691,7 @@ final private class BlockImporterLogic(
     branchResolution.resolveBranch(blocks.map(_.header)) match {
       case NewBetterBranch(oldBranch) =>
         val depth = oldBranch.size
-        if (depth > 0) {
+        if depth > 0 then {
           log.info(
             "Chain reorg: evicting {} minority-fork blocks, importing {} canonical (depth={})",
             depth,
@@ -719,13 +719,13 @@ final private class BlockImporterLogic(
         // giving genesis as the floor — the same fallback geth uses.
         val floor = blockchainReader.getSnapSyncPivotBlock.getOrElse(BigInt(0))
         val goingBackTo = (currentBlock - syncConfig.branchResolutionRequestSize).max(floor)
-        if (goingBackTo >= currentBlock) {
+        if goingBackTo >= currentBlock then {
           // At the pivot floor after SNAP sync — skip branch resolution and import directly.
           // After SNAP sync only the pivot header exists, so branch resolution can never
           // find a known parent below the pivot. The blocks ARE valid (they continue from
           // the SNAP-validated pivot). Filter blocks to only those at or above the pivot.
           val validBlocks = blocks.filter(_.number > floor)
-          if (validBlocks.nonEmpty) {
+          if validBlocks.nonEmpty then {
             log.info(s"Branch resolution at SNAP pivot floor ($floor), importing ${validBlocks.size} blocks directly")
             Right(validBlocks)
           } else {
@@ -763,7 +763,7 @@ final private class BlockImporterLogic(
             blockchainReader
               .getAccount(blockchainReader.getBestBranch, address, parentBlockNumber)
               .flatMap { account =>
-                if (account.codeHash != Account.EmptyCodeHash) {
+                if account.codeHash != Account.EmptyCodeHash then {
                   evmCodeStorage.get(account.codeHash) match {
                     case None =>
                       log.info(

@@ -20,7 +20,7 @@ class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig {
       def expectedDelay(retryCount: Int): FiniteDuration = {
         val multiplier = math.pow(2.0, retryCount.toDouble).toLong
         val delay = base * multiplier
-        if (delay > maxDelay) maxDelay else delay
+        if delay > maxDelay then maxDelay else delay
       }
 
       // retry 0: 1s * 2^0 = 1s
@@ -46,7 +46,7 @@ class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig {
         val base = configWith2sCap.syncRetryInterval
         val multiplier = math.pow(2.0, retryCount.toDouble).toLong
         val delay = base * multiplier
-        if (delay > configWith2sCap.maxRetryDelay) configWith2sCap.maxRetryDelay else delay
+        if delay > configWith2sCap.maxRetryDelay then configWith2sCap.maxRetryDelay else delay
       }
 
       expectedDelay(0) shouldBe 1.second

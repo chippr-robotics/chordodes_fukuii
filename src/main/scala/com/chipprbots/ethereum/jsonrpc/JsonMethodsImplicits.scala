@@ -42,7 +42,7 @@ trait JsonMethodsImplicits {
 
   def decode(s: String): Array[Byte] = {
     val stripped = s.replaceFirst("^0x", "")
-    val normalized = if (stripped.length % 2 == 1) "0" + stripped else stripped
+    val normalized = if stripped.length % 2 == 1 then "0" + stripped else stripped
     Hex.decode(normalized)
   }
 
@@ -76,10 +76,9 @@ trait JsonMethodsImplicits {
     extractAddress(input.s)
 
   protected def extractBytes(input: String): Either[JsonRpcError, ByteString] =
-    if (!input.startsWith("0x") && !input.startsWith("0X") && input.nonEmpty)
+    if !input.startsWith("0x") && !input.startsWith("0X") && input.nonEmpty then
       Left(InvalidParams(s"invalid argument: hex string without 0x prefix"))
-    else
-      Try(ByteString(decode(input))).toEither.left.map(_ => InvalidParams())
+    else Try(ByteString(decode(input))).toEither.left.map(_ => InvalidParams())
 
   protected def extractBytes(input: JString): Either[JsonRpcError, ByteString] =
     extractBytes(input.s)
@@ -411,7 +410,7 @@ object JsonMethodsImplicits extends JsonMethodsImplicits {
               val s = sig.drop(ECDSASignature.RLength).take(ECDSASignature.SLength)
               val v = sig.last
 
-              if (ECDSASignature.allowedPointSigns.contains(v)) {
+              if ECDSASignature.allowedPointSigns.contains(v) then {
                 Right(EcRecoverRequest(msg, ECDSASignature(r, s, v)))
               } else {
                 Left(InvalidParams("invalid point sign v, allowed values are 27 and 28"))

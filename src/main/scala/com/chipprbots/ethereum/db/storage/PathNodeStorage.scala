@@ -145,7 +145,7 @@ class PathNodeStorage(val dataSource: DataSource) {
       .toVector
       .unsafeRunSync()
 
-    if (keys.nonEmpty)
+    if keys.nonEmpty then
       dataSource.update(
         Seq(DataSourceUpdateOptimized(namespace = ns, toRemove = keys, toUpsert = Nil))
       )

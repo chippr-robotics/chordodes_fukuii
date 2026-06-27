@@ -35,7 +35,7 @@ class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
         val dagSize = EthashUtils.dagSize(epoch)
         val dagNumHashes = (dagSize / EthashUtils.HASH_BYTES).toInt
         val dag =
-          if (!dagFile(seed).exists()) generateDagAndSaveToFile(epoch, dagNumHashes, seed)
+          if !dagFile(seed).exists() then generateDagAndSaveToFile(epoch, dagNumHashes, seed)
           else {
             val res = loadDagFromFile(seed, dagNumHashes)
             res.failed.foreach { ex =>
@@ -57,7 +57,7 @@ class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
 
   private def generateDagAndSaveToFile(epoch: Long, dagNumHashes: Int, seed: ByteString): Array[Array[Int]] = {
     val file = dagFile(seed)
-    if (file.exists()) file.delete()
+    if file.exists() then file.delete()
     file.getParentFile.mkdirs()
     file.createNewFile()
 
@@ -72,7 +72,7 @@ class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
       outputStream.write(ByteUtils.intsToBytes(item, bigEndian = false))
       res(i) = item
 
-      if (i % 100000 == 0) log.info(s"Generating DAG ${((i / dagNumHashes.toDouble) * 100).toInt}%")
+      if i % 100000 == 0 then log.info(s"Generating DAG ${((i / dagNumHashes.toDouble) * 100).toInt}%")
     }
 
     Try(outputStream.close())
@@ -84,22 +84,22 @@ class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
     val inputStream = new FileInputStream(dagFile(seed).getAbsolutePath)
 
     val prefix = new Array[Byte](8)
-    if (inputStream.read(prefix) != 8 || ByteString(prefix) != DagFilePrefix) {
+    if inputStream.read(prefix) != 8 || ByteString(prefix) != DagFilePrefix then {
       Failure(new RuntimeException("Invalid DAG file prefix"))
     } else {
       val buffer = new Array[Byte](64) // scalastyle:ignore magic.number
       val res = new Array[Array[Int]](dagNumHashes)
       var index = 0
 
-      while (inputStream.read(buffer) > 0) {
-        if (index % 100000 == 0) log.info(s"Loading DAG from file ${((index / res.length.toDouble) * 100).toInt}%")
+      while inputStream.read(buffer) > 0 do {
+        if index % 100000 == 0 then log.info(s"Loading DAG from file ${((index / res.length.toDouble) * 100).toInt}%")
         res(index) = ByteUtils.bytesToInts(buffer, bigEndian = false)
         index += 1
       }
 
       Try(inputStream.close())
 
-      if (index == dagNumHashes) Success(res)
+      if index == dagNumHashes then Success(res)
       else Failure(new RuntimeException("DAG file ended unexpectedly"))
     }
   }

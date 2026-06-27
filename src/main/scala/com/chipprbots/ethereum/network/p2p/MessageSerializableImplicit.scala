@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.network.p2p
 abstract class MessageSerializableImplicit[T <: Message](val msg: T) extends MessageSerializable {
 
   override def equals(that: Any): Boolean = that match {
-    case that: MessageSerializableImplicit[_] => that.msg.equals(msg)
+    case that: MessageSerializableImplicit[?] => that.msg.equals(msg)
     case _                                    => false
   }
 

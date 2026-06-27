@@ -38,7 +38,7 @@ object RocksDbCacheMetrics extends MetricsContainer with Logger {
   def register(dataSource: DataSource): Unit =
     dataSource match {
       case rdb: RocksDbDataSource =>
-        if (registered.compareAndSet(false, true)) {
+        if registered.compareAndSet(false, true) then {
           // hit
           val _ = metrics.gauge(
             "db.rocksdb.block_cache.hit",
@@ -56,7 +56,7 @@ object RocksDbCacheMetrics extends MetricsContainer with Logger {
               rdb.cacheStats match {
                 case Some((hit, miss, _, _)) =>
                   val total = hit + miss
-                  if (total <= 0L) 0.0 else hit.toDouble / total.toDouble
+                  if total <= 0L then 0.0 else hit.toDouble / total.toDouble
                 case None => 0.0
               }
           )

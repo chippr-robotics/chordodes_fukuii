@@ -31,24 +31,19 @@ trait OpCodeTesting extends AnyFunSuiteLike {
   def verifyAllOpCodesRegistered(except: OpCode*): Unit =
     test("all opcodes have been registered") {
       val untested = config.opCodes.filterNot(op => testNames(op.toString)).diff(except)
-      if (untested.isEmpty)
-        succeed
-      else
-        fail("Unregistered opcodes: " + untested.mkString(", "))
+      if untested.isEmpty then succeed
+      else fail("Unregistered opcodes: " + untested.mkString(", "))
     }
 
   def verifyGas(expectedGas: BigInt, stateIn: PS, stateOut: PS, allowOOG: Boolean = true): Unit =
-    if (stateOut.error.contains(OutOfGas) && allowOOG)
-      stateIn.gas should be < expectedGas
-    else if (stateOut.error.contains(OutOfGas) && !allowOOG)
-      fail(s"Unexpected $OutOfGas error")
-    else if (
-      stateOut.error.isDefined && stateOut.error.collect {
+    if stateOut.error.contains(OutOfGas) && allowOOG then stateIn.gas should be < expectedGas
+    else if stateOut.error.contains(OutOfGas) && !allowOOG then fail(s"Unexpected $OutOfGas error")
+    else if stateOut.error.isDefined && stateOut.error.collect {
         case InvalidJump(_)     => ()
         case RevertOccurs       => ()
         case ReturnDataOverflow => ()
       }.isEmpty
-    ) {
+    then {
       // Found error that is neither an InvalidJump nor RevertOccurs
       fail(s"Unexpected ${stateOut.error.get} error")
     } else {

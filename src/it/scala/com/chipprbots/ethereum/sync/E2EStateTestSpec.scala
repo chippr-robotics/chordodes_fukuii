@@ -66,7 +66,7 @@ class E2EStateTestSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
   def updateStateAtBlock(
       blockNumber: Int
   )(currentBlockNumber: BigInt, world: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
-    if (currentBlockNumber == blockNumber) {
+    if currentBlockNumber == blockNumber then {
       val accountAddress = Address(currentBlockNumber.toByteArray)
       val account = Account(
         nonce = 1,
@@ -79,7 +79,7 @@ class E2EStateTestSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
   def updateStateAtMultipleBlocks(
       blockNumbers: Set[Int]
   )(currentBlockNumber: BigInt, world: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
-    if (blockNumbers.contains(currentBlockNumber.toInt)) {
+    if blockNumbers.contains(currentBlockNumber.toInt) then {
       val accountAddress = Address(currentBlockNumber.toByteArray)
       val account = Account(
         nonce = UInt256(currentBlockNumber),
@@ -93,7 +93,7 @@ class E2EStateTestSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       currentBlockNumber: BigInt,
       world: InMemoryWorldStateProxy
   ): InMemoryWorldStateProxy =
-    if (currentBlockNumber % 50 == 0 && currentBlockNumber > 0) {
+    if currentBlockNumber % 50 == 0 && currentBlockNumber > 0 then {
       val accountAddress = Address(currentBlockNumber.toByteArray)
       val account = Account(
         nonce = UInt256(currentBlockNumber),
@@ -352,7 +352,7 @@ class E2EStateTestSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
         val blockNumber = 300
 
         def rapidStateUpdates(currentBlockNumber: BigInt, world: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
-          if (currentBlockNumber > 0) {
+          if currentBlockNumber > 0 then {
             val accountAddress = Address(currentBlockNumber.toByteArray)
             val account = Account(
               nonce = UInt256(currentBlockNumber),

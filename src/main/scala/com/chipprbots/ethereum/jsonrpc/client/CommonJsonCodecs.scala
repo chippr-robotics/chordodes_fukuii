@@ -37,5 +37,5 @@ object CommonJsonCodecs {
     (c: HCursor) => c.as[String].map(Address(_))
 
   private def stringToBigInt(s: String): Either[Throwable, BigInt] =
-    if (s.isEmpty || s == "0x") Right(BigInt(0)) else Try(parseHexOrDecNumber(s)).toEither
+    if s.isEmpty || s == "0x" then Right(BigInt(0)) else Try(parseHexOrDecNumber(s)).toEither
 }

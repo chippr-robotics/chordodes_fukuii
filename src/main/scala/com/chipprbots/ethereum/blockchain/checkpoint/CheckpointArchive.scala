@@ -154,16 +154,16 @@ object CheckpointArchive {
 
     private def rb(): Int = {
       val b = in.read()
-      if (b < 0) throw new EOFException("unexpected EOF")
+      if b < 0 then throw new EOFException("unexpected EOF")
       crc.update(b)
       b
     }
     private def r(n: Int): Array[Byte] = {
       val buf = new Array[Byte](n)
       var off = 0
-      while (off < n) {
+      while off < n do {
         val got = in.read(buf, off, n - off)
-        if (got < 0) throw new EOFException("unexpected EOF")
+        if got < 0 then throw new EOFException("unexpected EOF")
         off += got
       }
       crc.update(buf)
@@ -179,24 +179,24 @@ object CheckpointArchive {
         require(!headerRead, "header already read")
         headerRead = true
         val magicBuf = r(4)
-        if (!magicBuf.sameElements(Magic)) Left(BadMagic)
+        if !magicBuf.sameElements(Magic) then Left(BadMagic)
         else {
           val version = rb().toByte
-          if (version != Version) Left(UnsupportedVersion(version))
+          if version != Version then Left(UnsupportedVersion(version))
           else {
             val chainId = rLong()
             val hdrLen = rInt()
-            if (hdrLen < 0 || hdrLen > MaxHeaderBytes) Left(Malformed(s"hdrLen=$hdrLen"))
+            if hdrLen < 0 || hdrLen > MaxHeaderBytes then Left(Malformed(s"hdrLen=$hdrLen"))
             else {
               val hdrBytes = r(hdrLen)
               val header =
                 try hdrBytes.toBlockHeader
                 catch { case e: Exception => return Left(Malformed(s"blockHeader: ${e.getMessage}")) }
               val weightLen = rInt()
-              if (weightLen < 0 || weightLen > MaxWeightBytes) Left(Malformed(s"weightLen=$weightLen"))
+              if weightLen < 0 || weightLen > MaxWeightBytes then Left(Malformed(s"weightLen=$weightLen"))
               else {
                 val weightBytes = r(weightLen)
-                val totalDifficulty = if (weightBytes.isEmpty) BigInt(0) else BigInt(1, weightBytes)
+                val totalDifficulty = if weightBytes.isEmpty then BigInt(0) else BigInt(1, weightBytes)
                 Right(Header(chainId, header, ChainWeight(totalDifficulty)))
               }
             }
@@ -217,14 +217,14 @@ object CheckpointArchive {
             Right(EndOfStream)
           case TagNode | TagBytecode =>
             val hashLen = rb() & 0xff
-            if (hashLen == 0 || hashLen > 64) Left(Malformed(s"hashLen=$hashLen"))
+            if hashLen == 0 || hashLen > 64 then Left(Malformed(s"hashLen=$hashLen"))
             else {
               val hash = r(hashLen)
               val dataLen = rInt()
-              if (dataLen < 0 || dataLen > MaxEntryBytes) Left(Malformed(s"dataLen=$dataLen"))
+              if dataLen < 0 || dataLen > MaxEntryBytes then Left(Malformed(s"dataLen=$dataLen"))
               else {
                 val data = r(dataLen)
-                if (tag == TagNode) Right(NodeEntry(ByteString(hash), data))
+                if tag == TagNode then Right(NodeEntry(ByteString(hash), data))
                 else Right(BytecodeEntry(ByteString(hash), data))
               }
             }
@@ -241,10 +241,10 @@ object CheckpointArchive {
       require(endSeen, "must reach end-of-stream first")
       val expected = crc.getValue.toInt
       val b0 = in.read(); val b1 = in.read(); val b2 = in.read(); val b3 = in.read()
-      if ((b0 | b1 | b2 | b3) < 0) Left(Truncated("crc-trailer"))
+      if (b0 | b1 | b2 | b3) < 0 then Left(Truncated("crc-trailer"))
       else {
         val found = ((b0 & 0xff) << 24) | ((b1 & 0xff) << 16) | ((b2 & 0xff) << 8) | (b3 & 0xff)
-        if (found == expected) Right(()) else Left(BadCrc)
+        if found == expected then Right(()) else Left(BadCrc)
       }
     }
   }

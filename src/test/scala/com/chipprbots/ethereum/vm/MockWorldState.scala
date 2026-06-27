@@ -42,30 +42,22 @@ case class MockWorldState(
     storages.getOrElse(address, MockStorage.Empty)
 
   def getBlockHash(number: UInt256): Option[UInt256] =
-    if (numberOfHashes >= number && number >= 0)
-      Some(UInt256(kec256(number.toString.getBytes)))
-    else
-      None
+    if numberOfHashes >= number && number >= 0 then Some(UInt256(kec256(number.toString.getBytes)))
+    else None
 
   def saveCode(address: Address, code: ByteString): MockWorldState =
-    if (code.isEmpty)
-      copy(codeRepo = codeRepo - address)
-    else
-      copy(codeRepo = codeRepo + (address -> code))
+    if code.isEmpty then copy(codeRepo = codeRepo - address)
+    else copy(codeRepo = codeRepo + (address -> code))
 
   def saveStorage(address: Address, storage: MockStorage): MockWorldState =
-    if (storage.isEmpty)
-      copy(storages = storages - address)
-    else
-      copy(storages = storages + (address -> storage))
+    if storage.isEmpty then copy(storages = storages - address)
+    else copy(storages = storages + (address -> storage))
 
   def getEmptyAccount: Account = Account.empty()
 
   override def touchAccounts(addresses: Address*): MockWorldState =
-    if (noEmptyAccounts)
-      copy(touchedAccounts = touchedAccounts ++ addresses.toSet)
-    else
-      this
+    if noEmptyAccounts then copy(touchedAccounts = touchedAccounts ++ addresses.toSet)
+    else this
 
   def clearTouchedAccounts: MockWorldState =
     copy(touchedAccounts = touchedAccounts.empty)
@@ -73,8 +65,7 @@ case class MockWorldState(
   def noEmptyAccounts: Boolean = noEmptyAccountsCond
 
   override def keepPrecompileTouched(world: MockWorldState): MockWorldState =
-    if (world.touchedAccounts.contains(ripmdContractAddress))
+    if world.touchedAccounts.contains(ripmdContractAddress) then
       copy(touchedAccounts = touchedAccounts + ripmdContractAddress)
-    else
-      this
+    else this
 }

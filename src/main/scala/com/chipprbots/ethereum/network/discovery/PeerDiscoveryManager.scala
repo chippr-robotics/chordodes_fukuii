@@ -57,11 +57,11 @@ object PeerDiscoveryManager {
       val log = ctx.log
 
       val alreadyDiscoveredNodes: Vector[Node] =
-        if (!discoveryConfig.reuseKnownNodes) Vector.empty
+        if !discoveryConfig.reuseKnownNodes then Vector.empty
         else {
           val bootstrapNodes: Set[Node] = discoveryConfig.bootstrapNodes
           val knownNodes: Set[Node] =
-            if (!discoveryConfig.discoveryEnabled) Set.empty
+            if !discoveryConfig.discoveryEnabled then Set.empty
             else knownNodesStorage.getKnownNodes.map(Node.fromUri)
           (bootstrapNodes ++ knownNodes).filterNot(n => n.id == localNodeId).toVector
         }
@@ -153,7 +153,7 @@ object PeerDiscoveryManager {
           Behaviors.same
 
         case Start =>
-          if (discoveryConfig.discoveryEnabled) {
+          if discoveryConfig.discoveryEnabled then {
             ctx.log.info("Starting peer discovery...")
             startDiscoveryService()
             starting()

@@ -51,7 +51,7 @@ final class ProofTrieInserter(initialRoot: MptNode) {
     case branch: BranchNode =>
       val st = StNode.newBranch()
       var i = 0
-      while (i < 16) {
+      while i < 16 do {
         st.children(i) = mptToStNode(branch.children(i))
         i += 1
       }
@@ -72,7 +72,7 @@ final class ProofTrieInserter(initialRoot: MptNode) {
   private def toNibbleArray(bs: ByteString): Array[Byte] = {
     val arr = new Array[Byte](bs.length)
     var i = 0
-    while (i < bs.length) {
+    while i < bs.length do {
       arr(i) = (bs(i) & 0xff).toByte
       i += 1
     }

@@ -100,7 +100,7 @@ class BlockchainReader(
     val bestKnownBlockinfo = appStateStorage.getBestBlockInfo()
     log.debug("Trying to get best block with number {}", bestKnownBlockinfo.number)
     val bestBlock = getBlockByHash(bestKnownBlockinfo.hash)
-    if (bestBlock.isEmpty) {
+    if bestBlock.isEmpty then {
       log.debug(
         "Best block {} (number: {}) not found in storage — expected during SNAP sync (pivot header only).",
         Hex.toHexString(bestKnownBlockinfo.hash.toArray),
@@ -140,7 +140,7 @@ class BlockchainReader(
   /** Returns a block hash for the block at the given height if any */
   def getHashByBlockNumber(branch: Branch, number: BigInt): Option[ByteString] = branch match {
     case BestBranch(_, tipBlockNumber) =>
-      if (tipBlockNumber >= number && number >= 0) {
+      if tipBlockNumber >= number && number >= 0 then {
         blockNumberMappingStorage.get(number)
       } else None
 
@@ -168,20 +168,16 @@ class BlockchainReader(
     */
   def getAccount(branch: Branch, address: Address, blockNumber: BigInt): Option[Account] = branch match {
     case BestBranch(_, tipBlockNumber) =>
-      if (blockNumber <= tipBlockNumber)
-        getAccountMpt(blockNumber).flatMap(_.get(address))
-      else
-        None
+      if blockNumber <= tipBlockNumber then getAccountMpt(blockNumber).flatMap(_.get(address))
+      else None
     case EmptyBranch => None
   }
 
   def getAccountProof(branch: Branch, address: Address, blockNumber: BigInt): Option[Vector[MptNode]] =
     branch match {
       case BestBranch(_, tipBlockNumber) =>
-        if (blockNumber <= tipBlockNumber)
-          getAccountMpt(blockNumber).flatMap(_.getProof(address))
-        else
-          None
+        if blockNumber <= tipBlockNumber then getAccountMpt(blockNumber).flatMap(_.getProof(address))
+        else None
       case EmptyBranch => None
     }
 
@@ -218,7 +214,7 @@ class BlockchainReader(
               .flatMap(h => getChainWeightByHash(h.hash))
               .map(_.totalDifficulty)
               .getOrElse(BigInt(1))
-            if (ourBestNum > 0) {
+            if ourBestNum > 0 then {
               val rate = bestHeaderOpt.map(h => rollingWindowDiff(h, ourBestTD)).getOrElse(BigInt(1))
               val gap = (latestBlock - ourBestNum).max(BigInt(0))
               val estimatedTD = ourBestTD + rate * gap
@@ -241,8 +237,8 @@ class BlockchainReader(
     * head.difficulty when the window start block is not in our DB (evicted or not yet synced).
     */
   private def rollingWindowDiff(head: BlockHeader, headTd: BigInt): BigInt =
-    if (head.number == 0) head.difficulty
-    else if (head.number < Tier3RollingWindow) headTd / head.number
+    if head.number == 0 then head.difficulty
+    else if head.number < Tier3RollingWindow then headTd / head.number
     else {
       val windowStart = head.number - Tier3RollingWindow
       getBlockHeaderByNumber(windowStart)

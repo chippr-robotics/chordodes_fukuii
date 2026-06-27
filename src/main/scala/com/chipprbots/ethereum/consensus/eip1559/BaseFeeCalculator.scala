@@ -24,14 +24,14 @@ object BaseFeeCalculator {
     */
   def calcBaseFee(parent: BlockHeader, blockchainConfig: BlockchainConfig): BigInt = {
     val isParentOlympia = parent.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-    if (!isParentOlympia) return InitialBaseFee
+    if !isParentOlympia then return InitialBaseFee
 
     val parentBaseFee = parent.baseFee.getOrElse(InitialBaseFee)
     val parentGasTarget = parent.gasLimit / ElasticityMultiplier
 
-    if (parent.gasUsed == parentGasTarget) {
+    if parent.gasUsed == parentGasTarget then {
       parentBaseFee
-    } else if (parent.gasUsed > parentGasTarget) {
+    } else if parent.gasUsed > parentGasTarget then {
       // Parent used more gas than target — baseFee increases
       // max(1, parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator)
       val gasUsedDelta = parent.gasUsed - parentGasTarget

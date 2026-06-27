@@ -68,7 +68,7 @@ class VMTestsSpec extends EthereumTestsSpec {
   def discoverVMTests(testCategory: String): Seq[String] = {
     val categoryPath = new File(s"$vmTestsBasePath/$testCategory")
 
-    if (!categoryPath.exists() || !categoryPath.isDirectory) {
+    if !categoryPath.exists() || !categoryPath.isDirectory then {
       Seq.empty
     } else {
       Option(categoryPath.listFiles())
@@ -95,7 +95,7 @@ class VMTestsSpec extends EthereumTestsSpec {
     given IORuntime = IORuntime.global
 
     val file = new File(filePath)
-    if (!file.exists()) {
+    if !file.exists() then {
       BlockchainTestSuite(Map.empty)
     } else {
       Using(Source.fromFile(file)) { source =>
@@ -133,7 +133,7 @@ class VMTestsSpec extends EthereumTestsSpec {
   "VMTests" should "discover vmArithmeticTest tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       info("Run 'git submodule init && git submodule update' to initialize")
       pending
@@ -147,7 +147,7 @@ class VMTestsSpec extends EthereumTestsSpec {
   it should "discover vmBitwiseLogicOperation tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       pending
     } else {
@@ -160,7 +160,7 @@ class VMTestsSpec extends EthereumTestsSpec {
   it should "discover vmIOandFlowOperations tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       pending
     } else {
@@ -173,7 +173,7 @@ class VMTestsSpec extends EthereumTestsSpec {
   it should "discover vmLogTest tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       pending
     } else {
@@ -186,7 +186,7 @@ class VMTestsSpec extends EthereumTestsSpec {
   it should "discover vmTests tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       pending
     } else {
@@ -230,7 +230,7 @@ class VMTestsSpec extends EthereumTestsSpec {
     val testFile = s"$vmTestsBasePath/vmArithmeticTest/add.json"
     val file = new File(testFile)
 
-    if (!file.exists()) {
+    if !file.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized")
       pending
     } else {

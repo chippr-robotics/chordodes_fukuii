@@ -52,7 +52,7 @@ class BlockPreparator(
     // Post-merge: no PoW rewards, no ommer rewards. EIP-4895 withdrawals are applied by
     // BlockExecution.processWithdrawals after payBlockReward returns; applying them here
     // too would double-credit every withdrawal and break state-root validation.
-    if (block.header.isPostMerge) {
+    if block.header.isPostMerge then {
       return worldStateProxy
     }
 
@@ -86,9 +86,9 @@ class BlockPreparator(
       world: InMemoryWorldStateProxy
   )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy = {
     val isOlympiaActivated = blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-    if (!isOlympiaActivated) return world
+    if !isOlympiaActivated then return world
 
-    if (treasuryAddress == Address(0)) {
+    if treasuryAddress == Address(0) then {
       log.error(
         "Olympia is active at block {} but treasury address is zero — baseFee revenue will not be credited",
         blockHeader.number
@@ -222,9 +222,9 @@ class BlockPreparator(
     val minBlobBaseFee = BigInt(1)
     // EIP-7691 (Prague): BLOB_BASE_FEE_UPDATE_FRACTION bumped from 3338477 → 5007716.
     val updateFraction =
-      if (blockchainConfig.isPragueTimestamp(blockTimestamp)) BigInt(5007716)
+      if blockchainConfig.isPragueTimestamp(blockTimestamp) then BigInt(5007716)
       else BigInt(3338477)
-    if (excessBlobGas == 0) minBlobBaseFee
+    if excessBlobGas == 0 then minBlobBaseFee
     else {
       // Simplified: baseFee = minBlobBaseFee * e^(excessBlobGas / updateFraction)
       // Use the integer approximation from the spec
@@ -237,7 +237,7 @@ class BlockPreparator(
     var i = 1
     var output = BigInt(0)
     var numeratorAccum = factor * denominator
-    while (numeratorAccum > 0) {
+    while numeratorAccum > 0 do {
       output += numeratorAccum
       numeratorAccum = (numeratorAccum * numerator) / (denominator * i)
       i += 1
@@ -257,11 +257,10 @@ class BlockPreparator(
     // Apply simulation flags if set (for eth_simulateV1)
     val contextWithSimFlags = {
       var ctx = context
-      if (_simulatePrecompileRelocations.nonEmpty)
+      if _simulatePrecompileRelocations.nonEmpty then
         ctx = ctx.copy(precompileRelocations = _simulatePrecompileRelocations)
-      if (_simulateTraceTransfers)
-        ctx = ctx.copy(traceTransfers = true)
-      if (tracer.isDefined) ctx = ctx.copy(tracer = tracer)
+      if _simulateTraceTransfers then ctx = ctx.copy(traceTransfers = true)
+      if tracer.isDefined then ctx = ctx.copy(tracer = tracer)
       ctx
     }
     vm.run(contextWithSimFlags)
@@ -285,10 +284,9 @@ class BlockPreparator(
     val context: PC = ProgramContext(stx, blockHeader, senderAddress, world, evmConfig)
     val contextWithSimFlags = {
       var ctx = context
-      if (_simulatePrecompileRelocations.nonEmpty)
+      if _simulatePrecompileRelocations.nonEmpty then
         ctx = ctx.copy(precompileRelocations = _simulatePrecompileRelocations)
-      if (_simulateTraceTransfers)
-        ctx = ctx.copy(traceTransfers = true)
+      if _simulateTraceTransfers then ctx = ctx.copy(traceTransfers = true)
       ctx
     }
     tracerVm.run(contextWithSimFlags)
@@ -312,7 +310,7 @@ class BlockPreparator(
         val etcFork = blockchainConfigForEvm.etcForkForBlockNumber(blockNumber)
         // EIP-3529: post-London refund cap is gasUsed/5 (not gasUsed/2)
         val isPostLondon = blockNumber >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-        val maxRefundQuotient = if (BlockchainConfigForEvm.isEip3529Enabled(etcFork) || isPostLondon) 5 else 2
+        val maxRefundQuotient = if BlockchainConfigForEvm.isEip3529Enabled(etcFork) || isPostLondon then 5 else 2
         result.gasRemaining + (gasUsed / maxRefundQuotient).min(result.gasRefund)
     }
 
@@ -331,13 +329,13 @@ class BlockPreparator(
     // must not materialise the account). All other zero-value payments still
     // count as touches when withTouch=true — an existing empty account that
     // receives one becomes a deletion candidate via deleteEmptyTouchedAccounts.
-    if (world.isZeroValueTransferToNonExistentAccount(address, value)) {
+    if world.isZeroValueTransferToNonExistentAccount(address, value) then {
       world
-    } else if (value == UInt256.Zero) {
-      if (withTouch) world.touchAccounts(address) else world
+    } else if value == UInt256.Zero then {
+      if withTouch then world.touchAccounts(address) else world
     } else {
       val savedWorld = increaseAccountBalance(address, value)(world)
-      if (withTouch) savedWorld.touchAccounts(address) else savedWorld
+      if withTouch then savedWorld.touchAccounts(address) else savedWorld
     }
 
   /** Delete all accounts (that appear in SUICIDE list). YP eq (78). The contract storage should be cleared during
@@ -374,10 +372,9 @@ class BlockPreparator(
       world: InMemoryWorldStateProxy
   )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy = {
     def deleteEmptyAccount(world: InMemoryWorldStateProxy, address: Address) =
-      if (world.getAccount(address).exists(_.isEmpty(blockchainConfig.accountStartNonce)))
+      if world.getAccount(address).exists(_.isEmpty(blockchainConfig.accountStartNonce)) then
         world.deleteAccount(address)
-      else
-        world
+      else world
 
     world.touchedAccounts
       .foldLeft(world)(deleteEmptyAccount)
@@ -439,20 +436,19 @@ class BlockPreparator(
     val result = runVM(stx, senderAddress, blockHeader, worldAfterAuths)
 
     val resultWithErrorHandling: PR =
-      if (result.error.isDefined) {
+      if result.error.isDefined then {
         // Rollback to the world before transfer was done if an error happened
         result.copy(world = checkpointWorldState, addressesToDelete = Set.empty, logs = Nil)
-      } else
-        result
+      } else result
 
     // EIP-7702: Add auth refund to the VM's refund counter before capping
-    val resultWithAuthRefund = if (authExistingAccountRefund > 0) {
+    val resultWithAuthRefund = if authExistingAccountRefund > 0 then {
       resultWithErrorHandling.copy(gasRefund = resultWithErrorHandling.gasRefund + authExistingAccountRefund)
     } else resultWithErrorHandling
     val totalGasToRefundBase = calcTotalGasToRefund(stx, resultWithAuthRefund, blockHeader.number)
     val executionGasBase = gasLimit - totalGasToRefundBase
 
-    if (DebugTrace.enabledForBlock(blockHeader.number)) {
+    if DebugTrace.enabledForBlock(blockHeader.number) then {
       val evmConfig = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
       val isCreate = stx.tx.isContractInit
       val intrinsicGas = evmConfig.calcTransactionIntrinsicGas(stx.tx.payload, isCreate, Seq.empty)
@@ -474,7 +470,7 @@ class BlockPreparator(
       blockchainConfig.isPragueTimestamp(blockHeader.unixTimestamp) ||
         (blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC &&
           blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber)
-    val executionGasToPayToMiner = if (eip7623Active) {
+    val executionGasToPayToMiner = if eip7623Active then {
       executionGasBase.max(BlockPreparator.calcFloorDataGas(stx.tx.payload))
     } else {
       executionGasBase
@@ -510,7 +506,7 @@ class BlockPreparator(
 
     val world2 = deleteAccountsFn.andThen(deleteTouchedAccountsFn).andThen(persistStateFn)(worldAfterBlobGas)
 
-    if (DebugTrace.enabledForTx(blockHeader.number, stx.hash.toHex)) {
+    if DebugTrace.enabledForTx(blockHeader.number, stx.hash.toHex) then {
       val tx = stx.tx
       val accessList = Transaction.accessList(tx)
       val authListSize = tx match {
@@ -523,7 +519,7 @@ class BlockPreparator(
       val toOrCreate = tx.receivingAddress.map(_.toString).getOrElse("CREATE")
       val isCreate = tx.isContractInit
       val returnDataSize = result.returnData.size
-      val codeDepositCost = if (isCreate) evmConfig.calcCodeDepositCost(result.returnData) else 0
+      val codeDepositCost = if isCreate then evmConfig.calcCodeDepositCost(result.returnData) else 0
       val maxCodeSize = evmConfig.blockchainConfig.maxCodeSize
       val codeSizeExceeded = isCreate && maxCodeSize.exists(limit => returnDataSize.toLong > limit.toLong)
 
@@ -574,7 +570,7 @@ class BlockPreparator(
       case Nil =>
         Right(BlockResult(worldState = world, gasUsed = acumGas, receipts = acumReceipts))
 
-      case Seq(stx, otherStxs @ _*) =>
+      case Seq(stx, otherStxs*) =>
         // EIP-4844: upfront balance check must include blob-gas cost too —
         // otherwise a sender pre-funded with exactly gasLimit*maxFee + blobCost
         // passes the check but underflows when the upfront deduction runs.
@@ -611,11 +607,10 @@ class BlockPreparator(
 
             // spec: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-658.md
             val transactionOutcome =
-              if (
-                blockHeader.number >= blockchainConfig.forkBlockNumbers.byzantiumBlockNumber ||
+              if blockHeader.number >= blockchainConfig.forkBlockNumbers.byzantiumBlockNumber ||
                 blockHeader.number >= blockchainConfig.forkBlockNumbers.atlantisBlockNumber
-              ) {
-                if (vmError.isDefined) FailureOutcome else SuccessOutcome
+              then {
+                if vmError.isDefined then FailureOutcome else SuccessOutcome
               } else {
                 HashOutcome(newWorld.stateRootHash)
               }
@@ -735,7 +730,7 @@ class BlockPreparator(
     import com.chipprbots.ethereum.rlp.RLPImplicitConversions.toEncodeable
     import com.chipprbots.ethereum.rlp.RLPImplicits.given
 
-    if (auth.chainId != 0 && auth.chainId != blockchainConfig.chainId) return None
+    if auth.chainId != 0 && auth.chainId != blockchainConfig.chainId then return None
 
     val sigHash = com.chipprbots.ethereum.crypto.kec256(
       encode(
@@ -749,11 +744,11 @@ class BlockPreparator(
         )
       )
     )
-    val rawV = if (auth.v == 0) ECDSASignature.negativePointSign else ECDSASignature.positivePointSign
+    val rawV = if auth.v == 0 then ECDSASignature.negativePointSign else ECDSASignature.positivePointSign
     val ecdsaSig = ECDSASignature(auth.r, auth.s, BigInt(rawV))
     ecdsaSig.publicKey(sigHash).flatMap { key =>
       val addrBytes = com.chipprbots.ethereum.crypto.kec256(key).slice(12, 32)
-      if (addrBytes.length == Address.Length) Some(Address(addrBytes)) else None
+      if addrBytes.length == Address.Length then Some(Address(addrBytes)) else None
     }
   }
 
@@ -768,7 +763,7 @@ class BlockPreparator(
     import com.chipprbots.ethereum.rlp.RLPImplicits.given
 
     // 1. Verify chain ID: must be 0 (wildcard) or match current chain
-    if (auth.chainId != 0 && auth.chainId != blockchainConfig.chainId) None
+    if auth.chainId != 0 && auth.chainId != blockchainConfig.chainId then None
     else {
       // 2. Recover authority address from authorization signature
       val sigHash = com.chipprbots.ethereum.crypto.kec256(
@@ -785,23 +780,23 @@ class BlockPreparator(
       )
 
       // Convert y-parity (0/1) to point sign (27/28) for recovery
-      val rawV = if (auth.v == 0) ECDSASignature.negativePointSign else ECDSASignature.positivePointSign
+      val rawV = if auth.v == 0 then ECDSASignature.negativePointSign else ECDSASignature.positivePointSign
       val ecdsaSig = ECDSASignature(auth.r, auth.s, BigInt(rawV))
       val recoveredKey = ecdsaSig.publicKey(sigHash)
       val authority = recoveredKey.flatMap { key =>
         val addrBytes = com.chipprbots.ethereum.crypto.kec256(key).slice(12, 32)
-        if (addrBytes.length == Address.Length) Some(Address(addrBytes)) else None
+        if addrBytes.length == Address.Length then Some(Address(addrBytes)) else None
       }
       authority.flatMap { authorityAddr =>
         // 3. Check that authority does not have code (unless it's already a delegation)
         val code = world.getCode(authorityAddr)
-        if (code.nonEmpty && !SetCodeTransaction.isDelegation(code)) None
+        if code.nonEmpty && !SetCodeTransaction.isDelegation(code) then None
         else {
           // 4. Verify nonce matches
           val account = world
             .getAccount(authorityAddr)
             .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
-          if (account.nonce != UInt256(auth.nonce)) None
+          if account.nonce != UInt256(auth.nonce) then None
           else {
             // 5. Increment nonce
             val updatedAccount = account.copy(nonce = account.nonce + 1)
@@ -809,7 +804,7 @@ class BlockPreparator(
 
             // 6. Set delegation code (or clear if target is zero address)
             val zeroAddress = Address(0L)
-            val w2 = if (auth.address == zeroAddress) {
+            val w2 = if auth.address == zeroAddress then {
               w1.saveCode(authorityAddr, ByteString.empty)
             } else {
               w1.saveCode(authorityAddr, SetCodeTransaction.addressToDelegation(auth.address))

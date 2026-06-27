@@ -60,7 +60,7 @@ case object PeerTelemetry extends MetricsContainer with Logger {
         "network_id",
         status.networkId.toString,
         "direction",
-        if (peer.incomingConnection) "inbound" else "outbound",
+        if peer.incomingConnection then "inbound" else "outbound",
         "snap",
         status.supportsSnap.toString
       )
@@ -89,7 +89,7 @@ case object PeerTelemetry extends MetricsContainer with Logger {
         address,
         client,
         capabilityLabel(status.capability),
-        if (peer.incomingConnection) "inbound" else "outbound",
+        if peer.incomingConnection then "inbound" else "outbound",
         status.supportsSnap,
         bestBlock.toLong
       )
@@ -113,7 +113,7 @@ case object PeerTelemetry extends MetricsContainer with Logger {
 
   private def removeMeter(map: ConcurrentHashMap[PeerId, Meter], peerId: PeerId): Unit = {
     val existing = map.remove(peerId)
-    if (existing != null) {
+    if existing != null then {
       val _ = metrics.registry.remove(existing)
     }
   }

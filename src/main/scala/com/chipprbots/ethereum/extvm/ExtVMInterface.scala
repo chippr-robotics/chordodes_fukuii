@@ -53,7 +53,7 @@ class ExtVMInterface(externaVmConfig: VmConfig.ExternalConfig, blockchainConfig:
 
   @tailrec
   final override def run(context: PC): PR = {
-    if (vmClient.isEmpty) initConnection()
+    if vmClient.isEmpty then initConnection()
 
     val client = vmClient.getOrElse(throw new IllegalStateException("VM client not initialized"))
     Try(client.run(context)) match {

@@ -95,7 +95,7 @@ object ApacheHttpClientStreamClient {
       aborted = true
 
     override def call(): StreamResponseMessage = {
-      if (aborted) {
+      if aborted then {
         return null
       }
 
@@ -140,7 +140,7 @@ object ApacheHttpClientStreamClient {
 
       // Set response body
       val entity = response.getEntity()
-      if (entity != null) {
+      if entity != null then {
         val bodyBytes = EntityUtils.toByteArray(entity)
         streamResponse.setBody(UpnpMessage.BodyType.BYTES, bodyBytes)
         // Use charset from Content-Type if available, otherwise UTF-8
@@ -173,7 +173,7 @@ object ApacheHttpClientStreamClient {
       httpClient.execute(
         request,
         response =>
-          if (aborted) {
+          if aborted then {
             null
           } else {
             populateResponse(response.getCode(), response.getReasonPhrase(), response)
@@ -192,12 +192,12 @@ object ApacheHttpClientStreamClient {
       }
 
       // Set request body
-      if (requestMessage.hasBody()) {
+      if requestMessage.hasBody() then {
         val bodyBytes = requestMessage.getBodyBytes()
         val contentType = requestMessage.getContentTypeHeader()
         val entity = new ByteArrayEntity(
           bodyBytes,
-          if (contentType != null) {
+          if contentType != null then {
             try
               ContentType.parse(contentType.toString())
             catch {
@@ -213,7 +213,7 @@ object ApacheHttpClientStreamClient {
       httpClient.execute(
         request,
         response =>
-          if (aborted) {
+          if aborted then {
             null
           } else {
             populateResponse(response.getCode(), response.getReasonPhrase(), response)

@@ -28,12 +28,11 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     op.execute(stateIn).copy(gas = stateIn.gas, gasRefund = stateIn.gasRefund)
 
   def withStackVerification(op: OpCode, stateIn: PS, stateOut: PS)(body: => Any): Any =
-    if (stateIn.stack.size < op.delta)
-      stateOut shouldEqual stateIn.withError(StackUnderflow).halt
-    else if (stateIn.stack.size - op.delta + op.alpha > stateIn.stack.maxSize)
+    if stateIn.stack.size < op.delta then stateOut shouldEqual stateIn.withError(StackUnderflow).halt
+    else if stateIn.stack.size - op.delta + op.alpha > stateIn.stack.maxSize then
       stateOut shouldEqual stateIn.withError(StackOverflow).halt
     else {
-      if (stateOut.error.isEmpty) {
+      if stateOut.error.isEmpty then {
         val expectedStackSize = stateIn.stack.size - op.delta + op.alpha
         stateOut.stack.size shouldEqual expectedStackSize
 
@@ -199,7 +198,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
       withStackVerification(op, stateInWithAccount, stateOutWithAccount) {
         // if account is empty we should push 0 onto stack
-        val toPushOnStack = if (codeHash == Account.EmptyCodeHash) UInt256.Zero else UInt256(codeHash)
+        val toPushOnStack = if codeHash == Account.EmptyCodeHash then UInt256.Zero else UInt256(codeHash)
         val stack2 = stack1.push(toPushOnStack)
         stateOutWithAccount shouldEqual stateInWithAccount.addAccessedAddress(Address(addr)).withStack(stack2).step()
       }
@@ -312,7 +311,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
       addr = Address(stateIn.stack.pop()._1)
       hash = kec256(extCode)
-      world = if (doSave) stateIn.world.saveAccount(addr, Account.empty().copy(codeHash = hash)) else stateIn.world
+      world = if doSave then stateIn.world.saveAccount(addr, Account.empty().copy(codeHash = hash)) else stateIn.world
     } yield stateIn.withWorld(world)
 
     forAll(stateGen) { stateIn =>
@@ -496,10 +495,9 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
       withStackVerification(op, stateIn, stateOut) {
         val (dest, _) = stateIn.stack.pop()
-        if (dest <= UInt256(Int.MaxValue) && stateIn.program.validJumpDestinations.contains(dest.toInt))
+        if dest <= UInt256(Int.MaxValue) && stateIn.program.validJumpDestinations.contains(dest.toInt) then
           stateOut shouldEqual stateIn.withStack(stateOut.stack).goto(dest.toInt)
-        else
-          stateOut shouldEqual stateIn.withError(InvalidJump(dest))
+        else stateOut shouldEqual stateIn.withError(InvalidJump(dest))
       }
     }
 
@@ -538,10 +536,8 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       val stateOut = executeOp(op, stateIn)
 
       val expectedState =
-        if (isValid)
-          stateIn.withStack(Stack.empty()).goto(destination.toInt)
-        else
-          stateIn.withError(InvalidJump(destination))
+        if isValid then stateIn.withStack(Stack.empty()).goto(destination.toInt)
+        else stateIn.withError(InvalidJump(destination))
 
       stateOut shouldEqual expectedState
     }
@@ -575,12 +571,10 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       withStackVerification(op, stateIn, stateOut) {
         val (Seq(dest, cond), _) = stateIn.stack.pop(2)
         val expectedState =
-          if (cond.isZero)
-            stateIn.withStack(stateOut.stack).step()
-          else if (dest <= UInt256(Int.MaxValue) && stateIn.program.validJumpDestinations.contains(dest.toInt))
+          if cond.isZero then stateIn.withStack(stateOut.stack).step()
+          else if dest <= UInt256(Int.MaxValue) && stateIn.program.validJumpDestinations.contains(dest.toInt) then
             stateIn.withStack(stateOut.stack).goto(dest.toInt)
-          else
-            stateIn.withError(InvalidJump(dest))
+          else stateIn.withError(InvalidJump(dest))
 
         stateOut shouldEqual expectedState
       }
@@ -623,12 +617,9 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       val stateOut = executeOp(op, stateIn)
 
       val expectedState =
-        if (cond.isZero)
-          stateIn.withStack(Stack.empty()).step()
-        else if (isValid)
-          stateIn.withStack(Stack.empty()).goto(destination.toInt)
-        else
-          stateIn.withError(InvalidJump(destination))
+        if cond.isZero then stateIn.withStack(Stack.empty()).step()
+        else if isValid then stateIn.withStack(Stack.empty()).goto(destination.toInt)
+        else stateIn.withError(InvalidJump(destination))
 
       stateOut shouldEqual expectedState
     }
@@ -693,7 +684,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       val stateOut = executeOp(op, stateIn)
 
       withStackVerification(op, stateIn, stateOut) {
-        val (Seq(offset, size, topics @ _*), stack1) = stateIn.stack.pop(op.delta): @unchecked
+        val (Seq(offset, size, topics*), stack1) = stateIn.stack.pop(op.delta): @unchecked
         val (data, mem1) = stateIn.memory.load(offset, size)
         val logEntry = TxLogEntry(stateIn.env.ownerAddr, topics.map(_.bytes), data)
         val expectedState = stateIn.withStack(stack1).withMemory(mem1).withLog(logEntry).step()
@@ -717,7 +708,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
         val (Seq(offset, size), _) = stateIn.stack.pop(2)
         val (data, mem1) = stateIn.memory.load(offset, size)
 
-        if (size.isZero) {
+        if size.isZero then {
           mem1.size shouldBe stateIn.memory.size
         } else {
           mem1.size should be >= (offset + size).toInt
@@ -741,7 +732,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       withStackVerification(op, stateIn, stateOut) {
         val (Seq(memOffset, offset, size), _) = stateIn.stack.pop(3)
 
-        if (offset + size > stateIn.returnData.size) {
+        if offset + size > stateIn.returnData.size then {
           stateOut shouldEqual stateIn.withStack(stateOut.stack).withError(ReturnDataOverflow)
         } else {
           val (data, _) = stateIn.memory.load(offset, size)
@@ -767,7 +758,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
         val (Seq(offset, size), _) = stateIn.stack.pop(2)
         val (data, mem1) = stateIn.memory.load(offset, size)
 
-        if (size.isZero) {
+        if size.isZero then {
           mem1.size shouldBe stateIn.memory.size
         } else {
           mem1.size should be >= (offset + size).toInt

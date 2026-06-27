@@ -70,18 +70,18 @@ object Capability {
       // We only return a capability from our own set (ethVersions1) to guarantee we have
       // a decoder for it. The .orElse(ethVersions2...) fallback was a bug: it could
       // return a peer cap we don't support (e.g. ETH67 when we only have ETH68/69).
-      if (ethVersions1.nonEmpty && ethVersions2.nonEmpty) {
+      if ethVersions1.nonEmpty && ethVersions2.nonEmpty then {
         val versions1 = ethVersions1.map(_.version).toSet
         val versions2 = ethVersions2.map(_.version).toSet
         val commonVersions = versions1.intersect(versions2)
-        if (commonVersions.isEmpty) None
+        if commonVersions.isEmpty then None
         else {
           val maxCommon = commonVersions.max
           ethVersions1.find(_.version == maxCommon) // always from our side — we have the decoder
         }
       } else None,
       // SNAP: exact match required
-      if (snapVersions1.intersect(snapVersions2).nonEmpty) Some(SNAP1) else None
+      if snapVersions1.intersect(snapVersions2).nonEmpty then Some(SNAP1) else None
     ).flatten
 
     negotiatedCapabilities match {

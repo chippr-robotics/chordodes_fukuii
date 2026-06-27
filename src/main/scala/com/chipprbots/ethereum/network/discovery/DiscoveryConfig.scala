@@ -36,7 +36,7 @@ object DiscoveryConfig extends Logger {
     val staticNodes = StaticNodesLoader.loadFromDatadir(datadir)
 
     // Resolve DNS discovery domains (EIP-1459) to enode URLs
-    val dnsNodes: Set[String] = if (dnsDiscoveryDomains.nonEmpty) {
+    val dnsNodes: Set[String] = if dnsDiscoveryDomains.nonEmpty then {
       log.info(s"Resolving ${dnsDiscoveryDomains.size} DNS discovery domain(s): ${dnsDiscoveryDomains.mkString(", ")}")
       dnsDiscoveryDomains.flatMap { domain =>
         DnsDiscovery.resolveEnodes(domain, enrForkIdFilter)
@@ -55,21 +55,21 @@ object DiscoveryConfig extends Logger {
       }
 
     // Combine nodes based on configuration
-    val allBootstrapNodes = if (useBootstrapNodes) {
+    val allBootstrapNodes = if useBootstrapNodes then {
       // Public/default mode: merge bootstrap nodes, DNS-discovered nodes, and static nodes
       val combined = bootstrapNodes ++ dnsNodes ++ staticNodes
       val sources = Seq(
-        if (bootstrapNodes.nonEmpty) Some(s"${bootstrapNodes.size} config") else None,
-        if (dnsNodes.nonEmpty) Some(s"${dnsNodes.size} DNS") else None,
-        if (staticNodes.nonEmpty) Some(s"${staticNodes.size} static") else None
+        if bootstrapNodes.nonEmpty then Some(s"${bootstrapNodes.size} config") else None,
+        if dnsNodes.nonEmpty then Some(s"${dnsNodes.size} DNS") else None,
+        if staticNodes.nonEmpty then Some(s"${staticNodes.size} static") else None
       ).flatten
-      if (sources.nonEmpty) {
+      if sources.nonEmpty then {
         log.info(s"Bootstrap nodes: ${combined.size} total (${sources.mkString(", ")})")
       }
       combined
     } else {
       // Enterprise mode: use only static nodes, ignore bootstrap nodes and DNS
-      if (staticNodes.nonEmpty) {
+      if staticNodes.nonEmpty then {
         log.info(s"Using ${staticNodes.size} static node(s) from static-nodes.json (bootstrap nodes ignored)")
       } else {
         log.warn("Bootstrap nodes disabled but no static-nodes.json found - node may not connect to any peers")

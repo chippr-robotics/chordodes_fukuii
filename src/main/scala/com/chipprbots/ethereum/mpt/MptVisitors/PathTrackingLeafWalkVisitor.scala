@@ -24,7 +24,7 @@ class PathTrackingLeafWalkVisitor(
     // Convert nibbles to bytes: every 2 nibbles = 1 byte
     val bytes = new Array[Byte](fullNibblePath.length / 2)
     var i = 0
-    while (i < bytes.length) {
+    while i < bytes.length do {
       val hi = fullNibblePath(i * 2) & 0xff
       val lo = fullNibblePath(i * 2 + 1) & 0xff
       bytes(i) = ((hi << 4) | lo).toByte

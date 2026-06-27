@@ -444,17 +444,17 @@ class TrieNodeHealingCoordinatorSpec
     var healingStagnatedSent = false
 
     // Simulate 3 consecutive HEAL-PULSE ticks with zero new nodes healed
-    for (_ <- 1 to MaxConsecutiveStagnations) {
+    for _ <- 1 to MaxConsecutiveStagnations do {
       val recentHealed = 0 // no progress
       val pendingTasksNonEmpty = true
 
-      if (recentHealed == 0 && pendingTasksNonEmpty) {
+      if recentHealed == 0 && pendingTasksNonEmpty then {
         consecutiveStagnations += 1
-        if (consecutiveStagnations >= MaxConsecutiveStagnations) {
+        if consecutiveStagnations >= MaxConsecutiveStagnations then {
           healingStagnatedSent = true // → snapSyncController ! HealingStagnated(...)
           consecutiveStagnations = 0
         }
-      } else if (recentHealed > 0) {
+      } else if recentHealed > 0 then {
         consecutiveStagnations = 0
       }
     }
@@ -474,7 +474,7 @@ class TrieNodeHealingCoordinatorSpec
 
     // ...then a productive cycle
     val recentHealed = 5
-    if (recentHealed > 0) consecutiveStagnations = 0
+    if recentHealed > 0 then consecutiveStagnations = 0
 
     consecutiveStagnations shouldBe 0
     // Need 3 more zero cycles to hit threshold again
@@ -505,24 +505,24 @@ class TrieNodeHealingCoordinatorSpec
     var stagnatedSignals = 0
 
     def tick(recentHealed: Int, hasPending: Boolean): Unit =
-      if (!pivotRefreshRequested && recentHealed == 0 && hasPending) {
+      if !pivotRefreshRequested && recentHealed == 0 && hasPending then {
         consecutiveStagnations += 1
-        if (consecutiveStagnations >= MaxConsecutiveStagnations) {
+        if consecutiveStagnations >= MaxConsecutiveStagnations then {
           stagnatedSignals += 1
           pivotRefreshRequested = true
           consecutiveStagnations = 0
         }
-      } else if (recentHealed > 0) {
+      } else if recentHealed > 0 then {
         consecutiveStagnations = 0
       }
 
     // First escalation
-    for (_ <- 1 to MaxConsecutiveStagnations) tick(0, hasPending = true)
+    for _ <- 1 to MaxConsecutiveStagnations do tick(0, hasPending = true)
     stagnatedSignals shouldBe 1
     pivotRefreshRequested shouldBe true
 
     // Additional ticks while pivotRefreshRequested=true must not fire a second signal
-    for (_ <- 1 to MaxConsecutiveStagnations * 2) tick(0, hasPending = true)
+    for _ <- 1 to MaxConsecutiveStagnations * 2 do tick(0, hasPending = true)
     stagnatedSignals shouldBe 1
   }
 
@@ -533,19 +533,19 @@ class TrieNodeHealingCoordinatorSpec
     var stagnatedSignals = 0
 
     def tick(recentHealed: Int, hasPending: Boolean): Unit =
-      if (!pivotRefreshRequested && recentHealed == 0 && hasPending) {
+      if !pivotRefreshRequested && recentHealed == 0 && hasPending then {
         consecutiveStagnations += 1
-        if (consecutiveStagnations >= MaxConsecutiveStagnations) {
+        if consecutiveStagnations >= MaxConsecutiveStagnations then {
           stagnatedSignals += 1
           pivotRefreshRequested = true
           consecutiveStagnations = 0
         }
-      } else if (recentHealed > 0) {
+      } else if recentHealed > 0 then {
         consecutiveStagnations = 0
       }
 
     // First escalation
-    for (_ <- 1 to MaxConsecutiveStagnations) tick(0, hasPending = true)
+    for _ <- 1 to MaxConsecutiveStagnations do tick(0, hasPending = true)
     stagnatedSignals shouldBe 1
 
     // Simulate HealingPivotRefreshed resetting the suppression flag
@@ -553,7 +553,7 @@ class TrieNodeHealingCoordinatorSpec
     consecutiveStagnations = 0
 
     // Second escalation cycle should succeed now
-    for (_ <- 1 to MaxConsecutiveStagnations) tick(0, hasPending = true)
+    for _ <- 1 to MaxConsecutiveStagnations do tick(0, hasPending = true)
     stagnatedSignals shouldBe 2
   }
 

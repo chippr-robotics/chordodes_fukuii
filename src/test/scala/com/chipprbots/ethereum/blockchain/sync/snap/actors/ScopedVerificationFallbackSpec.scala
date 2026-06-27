@@ -60,7 +60,7 @@ class ScopedVerificationFallbackSpec
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
+    if gauge == null then Double.NaN else gauge.value()
   }
 
   private def storedRoot(storage: TestMptStorage): ByteString = {
@@ -114,7 +114,7 @@ class ScopedVerificationFallbackSpec
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
-    if (markComplete) store.markComplete()
+    if markComplete then store.markComplete()
 
     val storage = new TestMptStorage()
     val root = storedRoot(storage)

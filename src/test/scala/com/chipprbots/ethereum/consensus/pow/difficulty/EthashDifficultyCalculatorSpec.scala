@@ -24,7 +24,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
   ): BlockHeader =
     BlockHeader(
       parentHash = ByteString(new Array[Byte](32)),
-      ommersHash = if (hasUncles) ByteString(new Array[Byte](32)) else BlockHeader.EmptyOmmers,
+      ommersHash = if hasUncles then ByteString(new Array[Byte](32)) else BlockHeader.EmptyOmmers,
       beneficiary = ByteString(new Array[Byte](20)),
       stateRoot = ByteString(new Array[Byte](32)),
       transactionsRoot = ByteString(new Array[Byte](32)),

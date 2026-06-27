@@ -31,7 +31,7 @@ object SignatureValidator extends App with SecureRandomBuilder with JsonMethodsI
           val publicKey = ByteStringUtils.string2hash(pk)
           recoveredPk match {
             case Some(recoveredKey) =>
-              if (recoveredKey == publicKey) {
+              if recoveredKey == publicKey then {
                 System.err.println(
                   s"Recovered public key [${ByteStringUtils.hash2string(recoveredKey)}] is the same as given one"
                 )

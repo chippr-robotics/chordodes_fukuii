@@ -62,10 +62,8 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
           .saveStorage(data.accountAddress, modifiedStorage)
 
         val finalWorld =
-          if (data.accountCode.isDefined)
-            worldWithAccAndStorage.saveCode(data.accountAddress, data.accountCode.get)
-          else
-            worldWithAccAndStorage
+          if data.accountCode.isDefined then worldWithAccAndStorage.saveCode(data.accountAddress, data.accountCode.get)
+          else worldWithAccAndStorage
         finalWorld
       }
 
@@ -104,7 +102,7 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
       blNumber: BigInt
   ): Boolean = {
     def go(remaining: List[MptNodeData]): Boolean =
-      if (remaining.isEmpty) {
+      if remaining.isEmpty then {
         true
       } else {
         val dataToCheck = remaining.head
@@ -117,7 +115,7 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
           ByteUtils.toBigInt(stored) == value
         }
 
-        if (address.isDefined && code.isDefined && storageCorrect) {
+        if address.isDefined && code.isDefined && storageCorrect then {
           go(remaining.tail)
         } else {
           false

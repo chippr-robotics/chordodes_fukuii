@@ -21,18 +21,15 @@ class NodeCapper(withUpdates: Boolean) {
   private val nodesToUpdate = mutable.ArrayBuffer.empty[(NodeHash, NodeEncoded)]
 
   def capNode(nodeEncoded: RLPEncodeable, depth: Int): RLPEncodeable =
-    if (depth > 0)
-      capNode(nodeEncoded)
-    else
-      nodeEncoded
+    if depth > 0 then capNode(nodeEncoded)
+    else nodeEncoded
 
   private def capNode(nodeEncoded: RLPEncodeable): RLPEncodeable = {
     val asArray = com.chipprbots.ethereum.rlp.encode(nodeEncoded)
-    if (asArray.length < MptNode.MaxEncodedNodeLength)
-      nodeEncoded
+    if asArray.length < MptNode.MaxEncodedNodeLength then nodeEncoded
     else {
       val hash = Node.hashFn(asArray)
-      if (withUpdates) {
+      if withUpdates then {
         nodesToUpdate += ((ByteString(hash), asArray))
       }
       RLPValue(hash)
@@ -79,12 +76,10 @@ class RlpHashingBranchVisitor(
     new RlpHashingVisitor(downstream.visitChild(), depth + 1, nodeCapper)
 
   override def visitChild(child: => RLPEncodeable): Unit =
-    if (parsedRlp.isEmpty)
-      downstream.visitChild(child)
+    if parsedRlp.isEmpty then downstream.visitChild(child)
 
   override def visitTerminator(term: Option[NodeHash]): Unit =
-    if (parsedRlp.isEmpty)
-      downstream.visitTerminator(term)
+    if parsedRlp.isEmpty then downstream.visitTerminator(term)
 }
 
 class RlpHashingExtensionVisitor(
@@ -94,8 +89,7 @@ class RlpHashingExtensionVisitor(
     nodeCapper: NodeCapper
 ) extends ExtensionVisitor[RLPEncodeable] {
   override def visitNext(value: => RLPEncodeable): Unit =
-    if (parsedRlp.isEmpty)
-      downstream.visitNext(value)
+    if parsedRlp.isEmpty then downstream.visitNext(value)
 
   override def visitNext(): MptVisitor[RLPEncodeable] =
     new RlpHashingVisitor(downstream.visitNext(), depth + 1, nodeCapper)

@@ -76,7 +76,7 @@ object MessageCodec {
     * string For larger data: shows first 32 bytes + "..." + last 32 bytes
     */
   def truncateHex(data: Array[Byte]): String =
-    if (data.length <= MaxFullHexLength) {
+    if data.length <= MaxFullHexLength then {
       Hex.toHexString(data)
     } else {
       Hex.toHexString(data.take(32)) + "..." + Hex.toHexString(data.takeRight(32))
@@ -103,14 +103,14 @@ class MessageCodec(
   )
 
   def enableInboundCompression(reason: String): Unit =
-    if (compressionPolicy.enableInboundCompression()) {
+    if compressionPolicy.enableInboundCompression() then {
       log.info(
         "COMPRESSION_POLICY_UPDATE: peerClientId={}, peerP2pVersion={}, reason={}, expectInboundCompressed=true",
         remoteClientId,
         remotePeer2PeerVersion,
         reason
       )
-    } else if (!compressionPolicy.isInboundCompressionNegotiated) {
+    } else if !compressionPolicy.isInboundCompressionNegotiated then {
       log.debug(
         "COMPRESSION_POLICY_UPDATE: Skipping inbound compression enable for peer {} - not negotiated (reason={})",
         remoteClientId,
@@ -156,11 +156,11 @@ class MessageCodec(
         remotePeer2PeerVersion,
         shouldAttemptDecompression,
         frameData.length,
-        if (frameData.length > 0) Integer.toHexString(frameData(0) & 0xff) else "N/A"
+        if frameData.length > 0 then Integer.toHexString(frameData(0) & 0xff) else "N/A"
       )
 
       val payloadTry =
-        if (shouldAttemptDecompression) {
+        if shouldAttemptDecompression then {
           // Attempt decompression when compression is expected (p2pVersion >= 5)
           // If decompression fails, fall back to treating the data as uncompressed
           decompressData(frameData, frame).recoverWith { case ex =>
@@ -169,7 +169,7 @@ class MessageCodec(
                 "Peer sent uncompressed despite p2pVersion={}. firstByte=0x{}, size={}, error: {}",
               frame.`type`.toHexString,
               remotePeer2PeerVersion,
-              if (frameData.length > 0) Integer.toHexString(frameData(0) & 0xff) else "N/A",
+              if frameData.length > 0 then Integer.toHexString(frameData(0) & 0xff) else "N/A",
               frameData.length,
               ex.getMessage
             )
@@ -209,7 +209,7 @@ class MessageCodec(
 
   private def decompressData(data: Array[Byte], frame: Frame): Try[Array[Byte]] = {
     // First, let's check if this might be uncompressed data sent by mistake
-    val dataHex = if (data.length <= 32) Hex.toHexString(data) else Hex.toHexString(data.take(32)) + "..."
+    val dataHex = if data.length <= 32 then Hex.toHexString(data) else Hex.toHexString(data.take(32)) + "..."
 
     log.debug(
       "decompressData: Attempting to decompress frame type 0x{}, size {} bytes, hex: {}",
@@ -221,7 +221,7 @@ class MessageCodec(
     val result = Try(Snappy.uncompressedLength(data))
       .flatMap { decompressedSize =>
         log.debug("decompressData: Snappy header indicates uncompressed size: {} bytes", decompressedSize)
-        if (decompressedSize > MaxDecompressedLength)
+        if decompressedSize > MaxDecompressedLength then
           Failure(new RuntimeException(s"Message size larger than 16mb: $decompressedSize bytes"))
         else
           Try(Snappy.uncompress(data)).recoverWith { case ex =>
@@ -254,7 +254,7 @@ class MessageCodec(
         "DECOMPRESSION_DEBUG: Frame details - " +
           s"header: ${frame.header}, " +
           s"payload.length: ${frame.payload.length}, " +
-          s"first8bytes: ${if (data.length >= 8) Hex.toHexString(data.take(8)) else "N/A"}"
+          s"first8bytes: ${if data.length >= 8 then Hex.toHexString(data.take(8)) else "N/A"}"
       )
 
       // Propagate the failure - fallback logic is handled in readFrames
@@ -285,10 +285,10 @@ class MessageCodec(
       val shouldCompressThis = compressionPolicy.compressOutbound
 
       val payload =
-        if (shouldCompressThis) {
+        if shouldCompressThis then {
           val compressed = Snappy.compress(framedPayload)
           // Safe compression ratio calculation (avoid division by zero)
-          val ratio = if (framedPayload.length > 0) compressed.length.toDouble / framedPayload.length else 0.0
+          val ratio = if framedPayload.length > 0 then compressed.length.toDouble / framedPayload.length else 0.0
           log.debug(
             "ENCODE_MSG: Snappy compressed frame {} from {} to {} bytes (ratio: {}), code=0x{}, p2pVersion={}, clientId={}",
             frameNo,
@@ -309,9 +309,9 @@ class MessageCodec(
           framedPayload
         }
 
-      val totalPacketSize = if (frameNo == 0) Some(encoded.length) else None
+      val totalPacketSize = if frameNo == 0 then Some(encoded.length) else None
       val header =
-        if (numFrames > 1) Header(payload.length, 0, Some(contextId), totalPacketSize)
+        if numFrames > 1 then Header(payload.length, 0, Some(contextId), totalPacketSize)
         else Header(payload.length, 0, None, None)
       Frame(header, serializable.code, ByteString(payload))
     }

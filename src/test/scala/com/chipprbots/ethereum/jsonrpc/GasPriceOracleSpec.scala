@@ -135,7 +135,7 @@ class GasPriceOracleSpec
       bestBlock: Option[Block]
   ): BlockchainReader = {
     val r = mock[BlockchainReader]
-    val branch = if (bestNum > 0) BestBranch(zeroHash, bestNum) else EmptyBranch
+    val branch = if bestNum > 0 then BestBranch(zeroHash, bestNum) else EmptyBranch
     (() => r.getBestBlockNumber).expects().returning(bestNum).anyNumberOfTimes()
     (() => r.getBestBranch).expects().returning(branch).anyNumberOfTimes()
     (() => r.getBestBlock).expects().returning(bestBlock).anyNumberOfTimes()

@@ -194,7 +194,7 @@ class CachedReferenceCountedStorageSpec
 
     val result: Boolean = CachedReferenceCountedStorage.persistCache(testLruCache, nodeStorage)
 
-    if (result) {
+    if result then {
       assert(testLruCache.getValues.isEmpty)
       assertKeysExists(storage1, generateKeys(20))
     }

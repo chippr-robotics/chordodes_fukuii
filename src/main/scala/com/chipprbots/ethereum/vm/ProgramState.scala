@@ -13,7 +13,7 @@ object ProgramState {
       env: ExecEnv
   ): ProgramState[W, S] = {
     // EIP-3651: Mark COINBASE address as warm at transaction start
-    val coinbaseAddress: Set[Address] = if (context.evmConfig.eip3651Enabled) {
+    val coinbaseAddress: Set[Address] = if context.evmConfig.eip3651Enabled then {
       Set(Address(context.blockHeader.beneficiary))
     } else {
       Set.empty[Address]
@@ -155,7 +155,7 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
     copy(logs = logs ++ log)
 
   def withInternalTxs(txs: Seq[InternalTransaction]): ProgramState[W, S] =
-    if (config.traceInternalTransactions) copy(internalTxs = internalTxs ++ txs) else this
+    if config.traceInternalTransactions then copy(internalTxs = internalTxs ++ txs) else this
 
   def halt: ProgramState[W, S] =
     copy(halted = true)
@@ -178,7 +178,7 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
   def toResult: ProgramResult[W, S] =
     ProgramResult[W, S](
       returnData,
-      if (error.exists(_.useWholeGas)) 0 else gas,
+      if error.exists(_.useWholeGas) then 0 else gas,
       world,
       addressesToDelete,
       logs,

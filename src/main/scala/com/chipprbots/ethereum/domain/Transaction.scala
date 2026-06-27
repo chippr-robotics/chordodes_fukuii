@@ -18,7 +18,7 @@ sealed trait Transaction extends Product with Serializable {
     receivingAddress.map(_.toString).getOrElse("[Contract creation]")
 
   protected def payloadString: String =
-    s"${if (isContractInit) "ContractInit: " else "TransactionData: "}${Hex.toHexString(payload.toArray[Byte])}"
+    s"${if isContractInit then "ContractInit: " else "TransactionData: "}${Hex.toHexString(payload.toArray[Byte])}"
 }
 
 object Transaction {
@@ -323,7 +323,7 @@ object SetCodeTransaction {
     code.length == DelegationCodeLength && code.startsWith(ByteString(DelegationPrefix))
 
   def parseDelegation(code: ByteString): Option[Address] =
-    if (isDelegation(code)) Some(Address(code.drop(3)))
+    if isDelegation(code) then Some(Address(code.drop(3)))
     else None
 
   def addressToDelegation(addr: Address): ByteString =

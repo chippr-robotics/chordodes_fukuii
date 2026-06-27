@@ -196,7 +196,7 @@ class TimeSlotStatsSpec extends AnyFlatSpec with Matchers with ScalaCheckDrivenP
 
       val all = stats.getAll(Some(window))
 
-      if (windowBuffer.exists(_.slotStats.nonEmpty)) {
+      if windowBuffer.exists(_.slotStats.nonEmpty) then {
         all should not be empty
       } else {
         all shouldBe empty

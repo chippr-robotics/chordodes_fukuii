@@ -146,7 +146,7 @@ object PendingTransactionsManager {
       .maximumSize(txPoolConfig.txPoolSize)
       .removalListener(new com.google.common.cache.RemovalListener[ByteString, PendingTransaction] {
         def onRemoval(notification: RemovalNotification[ByteString, PendingTransaction]): Unit =
-          if (notification.wasEvicted()) {
+          if notification.wasEvicted() then {
             context.log.debug("Evicting transaction: {} due to {}", notification.getKey.toHex, notification.getCause)
             knownTransactions = knownTransactions.filterNot(_._1 == notification.getKey)
             blobTxNetworkBytes -= notification.getKey
@@ -173,13 +173,13 @@ object PendingTransactionsManager {
 
     /** Announce transaction hashes to connected peers via NewPooledTransactionHashes. */
     def notifyPeersOfTransactions(txs: Seq[SignedTransaction], peers: Seq[Peer]): Unit = {
-      if (txs.isEmpty || peers.isEmpty) return
+      if txs.isEmpty || peers.isEmpty then return
       import com.chipprbots.ethereum.domain.*
 
       val txSeq = txs.groupBy(_.hash).values.map(_.head).toSeq
       peers.foreach { peer =>
         val txsToNotify = txSeq.filterNot(stx => isTxKnown(stx, peer.id))
-        if (txsToNotify.nonEmpty) {
+        if txsToNotify.nonEmpty then {
           val hashes = txsToNotify.map(_.hash)
           val types = txsToNotify.map { stx =>
             stx.tx match {
@@ -203,7 +203,7 @@ object PendingTransactionsManager {
       txs.foreach { stx =>
         val nextNonce = stx.tx.tx.nonce + 1
         val current = pendingNonces.getOrElse(stx.senderAddress, BigInt(0))
-        if (nextNonce > current) pendingNonces = pendingNonces.updated(stx.senderAddress, nextNonce)
+        if nextNonce > current then pendingNonces = pendingNonces.updated(stx.senderAddress, nextNonce)
       }
 
     /** Validate transactions against the current chain state. Rejects: stale nonces, insufficient balance for value +
@@ -225,11 +225,11 @@ object PendingTransactionsManager {
       val currentBaseFee = bestBlockOpt.flatMap(_.header.baseFee).getOrElse(blockchainConfig.baseFeeFloor)
       val isOlympiaActive =
         bestBlockOpt.exists(_.header.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber)
-      val effectiveMinTip = if (isOlympiaActive) blockchainConfig.minTip else BigInt(1)
+      val effectiveMinTip = if isOlympiaActive then blockchainConfig.minTip else BigInt(1)
       val afterTipCheck = afterPendingNonceCheck.filter { stx =>
         val effectiveTip =
           com.chipprbots.ethereum.domain.Transaction.effectiveGasPrice(stx.tx.tx, Some(currentBaseFee)) - currentBaseFee
-        if (effectiveTip < effectiveMinTip) {
+        if effectiveTip < effectiveMinTip then {
           context.log.debug(
             "Rejecting tx {} from {}: effectiveTip {} < minTip {}",
             stx.tx.hash.toHex,
@@ -241,7 +241,7 @@ object PendingTransactionsManager {
         } else true
       }
 
-      if (blockchainReader == null || stateStorage == null) return afterTipCheck
+      if blockchainReader == null || stateStorage == null then return afterTipCheck
       try {
         import com.chipprbots.ethereum.domain.Account
         import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
@@ -330,13 +330,13 @@ object PendingTransactionsManager {
         )
         // Validate against chain state (nonce, balance) before adding to pool
         val transactionsToAdd = validateAgainstState(newTxs)
-        if (transactionsToAdd.nonEmpty) {
+        if transactionsToAdd.nonEmpty then {
           val timestamp = System.currentTimeMillis()
           transactionsToAdd.foreach(t => pendingTransactions.put(t.tx.hash, PendingTransaction(t, timestamp)))
           updatePendingNonces(transactionsToAdd)
           transactionsToAdd.foreach(t => context.system.toClassic.eventStream.publish(NewPendingTransaction(t)))
           val peers = connectedPeers.values.toSeq
-          if (peers.nonEmpty) {
+          if peers.nonEmpty then {
             context.self ! NotifyPeers(transactionsToAdd.toSeq, peers)
           }
         }
@@ -367,7 +367,7 @@ object PendingTransactionsManager {
         updatePendingNonces(Seq(newPendingTx))
         context.system.toClassic.eventStream.publish(NewPendingTransaction(newPendingTx))
         val peers = connectedPeers.values.toSeq
-        if (peers.nonEmpty) {
+        if peers.nonEmpty then {
           context.self ! NotifyPeers(Seq(newPendingTx), peers)
         }
         Behaviors.same
@@ -393,7 +393,7 @@ object PendingTransactionsManager {
               .MessageFromPeer(msg: ETHPackets.NewPooledTransactionHashes, peerId)
           ) =>
         val unknownHashes = msg.hashes.filterNot(h => pendingTransactions.asMap().containsKey(h))
-        if (unknownHashes.nonEmpty) {
+        if unknownHashes.nonEmpty then {
           // Track announced types/sizes for validation when PooledTransactions arrives
           msg.hashes.zip(msg.types).zip(msg.sizes).foreach { case ((hash, txType), size) =>
             pendingAnnouncements = pendingAnnouncements.updated(hash, (txType, size, peerId))
@@ -424,7 +424,7 @@ object PendingTransactionsManager {
             }
             val typeMismatch = actualType != announcedType
             // Use original wire size (from PooledTransactions decode) for accurate comparison
-            val sizeMismatch = if (idx < msg.originalSizes.size) {
+            val sizeMismatch = if idx < msg.originalSizes.size then {
               BigInt(msg.originalSizes(idx)) != announcedSize
             } else false
             typeMismatch || sizeMismatch
@@ -432,7 +432,7 @@ object PendingTransactionsManager {
         }
         // Clean up announcements for received txs
         msg.txs.foreach(stx => pendingAnnouncements -= stx.hash)
-        if (announcementViolation) {
+        if announcementViolation then {
           context.log.debug(
             "PooledTransactions from peer {} has type/size mismatch with announcement — disconnecting",
             peerId
@@ -444,7 +444,7 @@ object PendingTransactionsManager {
             blobTxNetworkBytes += (hash -> rawBytes)
           }
           val validTxs = SignedTransactionWithSender.getSignedTransactions(msg.txs)
-          if (validTxs.nonEmpty) {
+          if validTxs.nonEmpty then {
             context.self ! AddTransactions(validTxs.toSet)
             validTxs.foreach(stx => setTxKnown(stx.tx, peerId))
           }

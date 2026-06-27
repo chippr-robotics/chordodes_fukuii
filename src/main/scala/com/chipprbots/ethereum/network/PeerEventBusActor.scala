@@ -147,7 +147,7 @@ object PeerEventBusActor {
           messageSubscriptions
             .flatMap { sub =>
               val ((subscriber, peerSelector), messageCodes) = sub
-              if (peerSelector.contains(peerId) && messageCodes.contains(message.code)) Some(subscriber)
+              if peerSelector.contains(peerId) && messageCodes.contains(message.code) then Some(subscriber)
               else None
             }
             .toSeq
@@ -158,7 +158,7 @@ object PeerEventBusActor {
                 if classifier.peerSelector.contains(peerId) =>
               subscriber
           }
-        case _: PeerHandshakeSuccessful[_] =>
+        case _: PeerHandshakeSuccessful[?] =>
           connectionSubscriptions.collect { case Subscription(subscriber, PeerHandshaked) =>
             subscriber
           }
@@ -184,7 +184,7 @@ object PeerEventBusActor {
           messageSubscriptions + ((subscriber, to.peerSelector) -> (messageCodes ++ to.messageCodes))
         case None => messageSubscriptions + ((subscriber, to.peerSelector) -> to.messageCodes)
       }
-      if (newSubscriptions == messageSubscriptions) false
+      if newSubscriptions == messageSubscriptions then false
       else {
         messageSubscriptions = newSubscriptions
         true
@@ -201,7 +201,7 @@ object PeerEventBusActor {
       */
     private def subscribeToConnectionEvent(subscriber: ActorRef, to: Classifier): Boolean = {
       val subscription = Subscription(subscriber, to)
-      if (connectionSubscriptions.contains(subscription)) {
+      if connectionSubscriptions.contains(subscription) then {
         false
       } else {
         connectionSubscriptions = connectionSubscriptions :+ subscription
@@ -220,9 +220,10 @@ object PeerEventBusActor {
     private def unsubscribeFromMessageReceived(subscriber: ActorRef, from: MessageClassifier): Boolean =
       messageSubscriptions.get((subscriber, from.peerSelector)).exists { messageCodes =>
         val newMessageCodes = messageCodes -- from.messageCodes
-        if (messageCodes == newMessageCodes) false
+        if messageCodes == newMessageCodes then false
         else {
-          if (newMessageCodes.isEmpty) messageSubscriptions = messageSubscriptions - ((subscriber, from.peerSelector))
+          if newMessageCodes.isEmpty then
+            messageSubscriptions = messageSubscriptions - ((subscriber, from.peerSelector))
           else messageSubscriptions = messageSubscriptions + ((subscriber, from.peerSelector) -> newMessageCodes)
           true
         }
@@ -238,7 +239,7 @@ object PeerEventBusActor {
       */
     private def unsubscribeFromConnectionEvent(subscriber: ActorRef, from: Classifier): Boolean = {
       val subscription = Subscription(subscriber, from)
-      if (connectionSubscriptions.contains(subscription)) {
+      if connectionSubscriptions.contains(subscription) then {
         connectionSubscriptions = connectionSubscriptions.filterNot(_ == subscription)
         true
       } else {

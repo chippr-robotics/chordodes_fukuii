@@ -16,7 +16,7 @@ trait SecureRandomBuilder extends Logger {
   private lazy val rawFukuiiConfig: Config = ConfigFactory.load().getConfig("fukuii")
 
   private val secureRandomAlgo: Option[String] =
-    if (rawFukuiiConfig.hasPath("secure-random-algo")) Some(rawFukuiiConfig.getString("secure-random-algo"))
+    if rawFukuiiConfig.hasPath("secure-random-algo") then Some(rawFukuiiConfig.getString("secure-random-algo"))
     else None
 
   lazy val secureRandom: SecureRandom =

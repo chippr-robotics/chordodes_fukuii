@@ -276,7 +276,7 @@ object FastSyncItSpec {
       endAccount: Int = 1000
   ): (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy = {
     (blockNr: BigInt, world: InMemoryWorldStateProxy) =>
-      if (blockNr == blockWithUpdate) {
+      if blockNr == blockWithUpdate then {
         updateWorldWithAccounts(startAccount, endAccount, world)
       } else {
         IdentityUpdate(blockNr, world)

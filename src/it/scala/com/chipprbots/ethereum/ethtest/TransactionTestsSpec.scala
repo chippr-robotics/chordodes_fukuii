@@ -64,7 +64,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   def discoverTransactionTests(testCategory: String): Seq[String] = {
     val categoryPath = new File(s"$transactionTestsBasePath/$testCategory")
 
-    if (!categoryPath.exists() || !categoryPath.isDirectory) {
+    if !categoryPath.exists() || !categoryPath.isDirectory then {
       Seq.empty
     } else {
       Option(categoryPath.listFiles())
@@ -121,7 +121,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   "TransactionTests" should "discover ttNonce tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       info("Run 'git submodule init && git submodule update' to initialize")
       pending
@@ -135,7 +135,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   it should "discover ttData tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
     } else {
@@ -148,7 +148,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   it should "discover ttGasLimit tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
     } else {
@@ -161,7 +161,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   it should "discover ttGasPrice tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
     } else {
@@ -174,7 +174,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   it should "discover ttValue tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
     } else {
@@ -187,7 +187,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   it should "discover ttSignature tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
     } else {
@@ -200,7 +200,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   it should "discover ttVValue tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
     } else {
@@ -213,7 +213,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   it should "discover ttRSValue tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
     } else {
@@ -226,7 +226,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   it should "discover ttWrongRLP tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
     } else {
@@ -240,7 +240,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
     val testFile = s"$transactionTestsBasePath/ttNonce/TransactionWithHighNonce256.json"
     val file = new File(testFile)
 
-    if (!file.exists()) {
+    if !file.exists() then {
       info(s"Skipping test - ethereum/tests submodule not initialized")
       pending
     } else {

@@ -176,7 +176,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     implicit val ec: ExecutionContext = system.dispatcher
 
     val graphQLSvc: Option[GraphQLService] =
-      if (!graphQLEnabled) None
+      if !graphQLEnabled then None
       else {
         val ctx = GraphQLContext(
           blockchain,

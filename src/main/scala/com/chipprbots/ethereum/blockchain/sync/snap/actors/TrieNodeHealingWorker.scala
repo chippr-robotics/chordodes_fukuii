@@ -68,7 +68,7 @@ object TrieNodeHealingWorker {
 
         case HealingCheckIdle =>
           // If still working after timeout, go back to idle
-          if (currentRequestId.isEmpty) {
+          if currentRequestId.isEmpty then {
             context.log.debug("[HEALING-WORKER] idle check: no active request — worker idle, awaiting assignment")
             idle(coordinator, timers, currentRequestId = None)
           } else Behaviors.same

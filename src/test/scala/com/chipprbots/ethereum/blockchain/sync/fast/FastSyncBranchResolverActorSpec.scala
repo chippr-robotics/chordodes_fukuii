@@ -358,15 +358,14 @@ object FastSyncBranchResolverActorSpec extends Logger {
         case NetworkPeerManagerActor.SendMessage(rawMsg, peerId) =>
           val response = rawMsg.underlyingMsg match {
             case req: ETHGetBlockHeaders if !req.reverse =>
-              if (blockIndex < blocksSetSize)
-                blockIndex += 1
+              if blockIndex < blocksSetSize then blockIndex += 1
               ETHBlockHeaders(req.requestId, blocks.get(blockIndex).map(_.map(_.header)).getOrElse(Nil))
             case other =>
               throw new RuntimeException(s"Unexpected message sent to NetworkPeerManagerAutoPilot: $other")
           }
           val theResponse = MessageFromPeer(response, peerId)
           sender ! theResponse
-          if (blockIndex == blocksSetSize) ()
+          if blockIndex == blocksSetSize then ()
       }
       this
     }

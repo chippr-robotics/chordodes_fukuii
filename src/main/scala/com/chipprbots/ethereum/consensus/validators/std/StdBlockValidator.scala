@@ -40,7 +40,7 @@ object StdBlockValidator extends BlockValidator {
       block.body.transactionList,
       SignedTransaction.byteArraySerializable
     )
-    if (isValid) Right(BlockValid)
+    if isValid then Right(BlockValid)
     else Left(BlockTransactionsHashError)
   }
 
@@ -54,7 +54,7 @@ object StdBlockValidator extends BlockValidator {
     */
   private def validateOmmersHash(block: Block): Either[BlockError, BlockValid] = {
     val encodedOmmers: Array[Byte] = block.body.uncleNodesList.toBytes
-    if (kec256(encodedOmmers).sameElements(block.header.ommersHash)) Right(BlockValid)
+    if kec256(encodedOmmers).sameElements(block.header.ommersHash) then Right(BlockValid)
     else Left(BlockOmmersHashError)
   }
 
@@ -71,7 +71,7 @@ object StdBlockValidator extends BlockValidator {
 
     val isValid =
       MptListValidator.isValid[Receipt](blockHeader.receiptsRoot.toArray[Byte], receipts, Receipt.byteArraySerializable)
-    if (isValid) Right(BlockValid)
+    if isValid then Right(BlockValid)
     else Left(BlockReceiptsHashError)
   }
 
@@ -86,9 +86,9 @@ object StdBlockValidator extends BlockValidator {
     */
   private def validateLogBloom(blockHeader: BlockHeader, receipts: Seq[Receipt]): Either[BlockError, BlockValid] = {
     val logsBloomOr =
-      if (receipts.isEmpty) BloomFilter.EmptyBloomFilter
+      if receipts.isEmpty then BloomFilter.EmptyBloomFilter
       else ByteString(or(receipts.map(_.logsBloomFilter.toArray)*))
-    if (logsBloomOr == blockHeader.logsBloom) Right(BlockValid)
+    if logsBloomOr == blockHeader.logsBloom then Right(BlockValid)
     else Left(BlockLogBloomError)
   }
 
@@ -101,7 +101,7 @@ object StdBlockValidator extends BlockValidator {
     */
   private def validateBlockRLPSize(block: Block): Either[BlockError, BlockValid] = {
     val size = Block.size(block)
-    if (size <= BlockRLPSizeCap) Right(BlockValid)
+    if size <= BlockRLPSizeCap then Right(BlockValid)
     else Left(BlockRLPSizeError(size, BlockRLPSizeCap))
   }
 
@@ -172,12 +172,12 @@ object StdBlockValidator extends BlockValidator {
       case Some(expectedRoot) =>
         val withdrawals = block.body.withdrawals.getOrElse(Seq.empty)
         val computedRoot = computeWithdrawalsRoot(withdrawals)
-        if (computedRoot == expectedRoot) Right(BlockValid)
+        if computedRoot == expectedRoot then Right(BlockValid)
         else Left(BlockWithdrawalsRootError)
     }
 
   private def computeWithdrawalsRoot(withdrawals: Seq[Withdrawal]): ByteString =
-    if (withdrawals.isEmpty) {
+    if withdrawals.isEmpty then {
       BlockHeader.EmptyMpt
     } else {
       val serializable = new ByteArraySerializable[Withdrawal] {

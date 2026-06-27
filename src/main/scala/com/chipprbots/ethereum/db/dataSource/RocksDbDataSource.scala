@@ -102,7 +102,7 @@ class RocksDbDataSource(
     * batch; up to 16 keys per branch node in the healing DFS. Null entries in the result list indicate a cache miss.
     */
   override def multiGetOptimized(namespace: Namespace, keys: Seq[Array[Byte]]): Seq[Option[Array[Byte]]] = {
-    if (keys.isEmpty) return Seq.empty
+    if keys.isEmpty then return Seq.empty
     import scala.jdk.CollectionConverters.*
     dbLock.readLock().lock()
     try {
@@ -161,7 +161,7 @@ class RocksDbDataSource(
       try {
         val buf = scala.collection.mutable.ArrayBuffer.empty[(Array[Byte], Array[Byte])]
         it.seek(fromKey)
-        while (it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExclusive) < 0) {
+        while it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExclusive) < 0 do {
           buf += ((it.key(), it.value()))
           it.next()
         }
@@ -234,7 +234,7 @@ class RocksDbDataSource(
         .flatMap { _ =>
           Stream.repeatEval(for {
             isValid <- IO(it.isValid)
-            item <- if (isValid) IO(Right((it.key(), it.value()))) else IO.raiseError(IterationFinished)
+            item <- if isValid then IO(Right((it.key(), it.value()))) else IO.raiseError(IterationFinished)
             _ <- IO(it.next())
           } yield item)
         }
@@ -295,21 +295,22 @@ class RocksDbDataSource(
           assureNotClosed()
           val it = db.newIterator(handles(namespace), scanReadOptions)
           try {
-            if (lastKey == null) it.seek(fromKey)
+            if lastKey == null then it.seek(fromKey)
             else {
               // Resume strictly after the last key returned. Keys are unique, so seek+skip is exact.
               it.seek(lastKey)
-              if (it.isValid && java.util.Arrays.equals(it.key(), lastKey)) it.next()
+              if it.isValid && java.util.Arrays.equals(it.key(), lastKey) then it.next()
             }
             var taken = 0
-            while (taken < refillBatchSize && it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExcl) < 0) {
+            while taken < refillBatchSize && it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExcl) < 0
+            do {
               lastKey = it.key()
               buffer += it.value()
               it.next()
               taken += 1
             }
             // End of range reached within this batch (either no more valid keys or the next key is >= toKeyExcl).
-            if (taken < refillBatchSize) exhausted = true
+            if taken < refillBatchSize then exhausted = true
           } finally it.close()
         } catch {
           case error: RocksDbDataSourceClosedException => throw error
@@ -319,12 +320,12 @@ class RocksDbDataSource(
       }
 
       def hasNext: Boolean = {
-        if (buffer.isEmpty && !exhausted) refill()
+        if buffer.isEmpty && !exhausted then refill()
         buffer.nonEmpty
       }
 
       def next(): Array[Byte] = {
-        if (!hasNext) throw new NoSuchElementException("iterateSyncRange exhausted")
+        if !hasNext then throw new NoSuchElementException("iterateSyncRange exhausted")
         buffer.removeHead()
       }
     }
@@ -341,7 +342,7 @@ class RocksDbDataSource(
       .flatMap { _ =>
         Stream.repeatEval(for {
           isValid <- IO(it.isValid)
-          item <- if (isValid) IO(Right((it.key(), it.value()))) else IO.raiseError(IterationFinished)
+          item <- if isValid then IO(Right((it.key(), it.value()))) else IO.raiseError(IterationFinished)
           _ <- IO(it.next())
         } yield item)
       }
@@ -418,7 +419,7 @@ class RocksDbDataSource(
     */
   override def destroy(): Unit =
     try
-      if (!isClosed) {
+      if !isClosed then {
         close()
       }
     finally destroyDB()
@@ -452,7 +453,7 @@ class RocksDbDataSource(
     }
 
   private def assureNotClosed(): Unit =
-    if (isClosed) {
+    if isClosed then {
       throw RocksDbDataSourceClosedException(s"This ${getClass.getSimpleName} has been closed")
     }
 
@@ -531,14 +532,14 @@ object RocksDbDataSource extends Logger {
       log.debug(s"Initializing RocksDB at path: $path (exists: $pathExists, createIfMissing: $createIfMissing)")
 
       // Validate path before attempting to open database
-      if (!pathExists && !createIfMissing) {
+      if !pathExists && !createIfMissing then {
         throw RocksDbDataSourceException(
           s"Database path does not exist and createIfMissing is false: $path"
         )
       }
 
       // Create directory if needed
-      if (!pathExists && createIfMissing) {
+      if !pathExists && createIfMissing then {
         try {
           Files.createDirectories(dbPath)
           log.debug(s"Created database directory: $path")
@@ -581,7 +582,7 @@ object RocksDbDataSource extends Logger {
       // become observable. Off by default (~1-2% read overhead). The handle is returned so close()
       // can release it. EXCEPT_DETAILED_TIMERS keeps the cheaper tickers without the per-op histograms.
       val statistics: Option[Statistics] =
-        if (rocksDbConfig.enableStatistics) {
+        if rocksDbConfig.enableStatistics then {
           val stats = new Statistics()
           stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS)
           options.setStatistics(stats)

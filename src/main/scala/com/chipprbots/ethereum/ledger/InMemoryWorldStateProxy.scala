@@ -143,7 +143,7 @@ class InMemoryWorldStateProxyStorage(
 
   override def store(addr: BigInt, value: BigInt): InMemoryWorldStateProxyStorage = {
     val newWrapped =
-      if (value == 0) wrapped - addr
+      if value == 0 then wrapped - addr
       else wrapped + (addr -> value)
     new InMemoryWorldStateProxyStorage(newWrapped, flatSlotStorage, accountHash)
   }
@@ -245,10 +245,8 @@ class InMemoryWorldStateProxy(
     copyWith(contractStorages = contractStorages + (address -> storage.wrapped))
 
   override def touchAccounts(addresses: Address*): InMemoryWorldStateProxy =
-    if (noEmptyAccounts)
-      copyWith(touchedAccounts = touchedAccounts ++ addresses.toSet)
-    else
-      this
+    if noEmptyAccounts then copyWith(touchedAccounts = touchedAccounts ++ addresses.toSet)
+    else this
 
   override def clearTouchedAccounts: InMemoryWorldStateProxy =
     copyWith(touchedAccounts = touchedAccounts.empty)
@@ -256,10 +254,9 @@ class InMemoryWorldStateProxy(
   override def noEmptyAccounts: Boolean = noEmptyAccountsCond
 
   override def keepPrecompileTouched(world: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
-    if (world.touchedAccounts.contains(ripmdContractAddress))
+    if world.touchedAccounts.contains(ripmdContractAddress) then
       copyWith(touchedAccounts = touchedAccounts + ripmdContractAddress)
-    else
-      this
+    else this
 
   /** Returns world state root hash. This value is only updated after persist.
     */
@@ -326,7 +323,7 @@ class InMemoryWorldStateProxy(
       storageRoot: ByteString
   ): InMemorySimpleMapProxy[BigInt, BigInt, MerklePatriciaTrie[BigInt, BigInt]] = {
     val mpt =
-      if (ethCompatibleStorage) domain.EthereumUInt256Mpt.storageMpt(storageRoot, contractStorage)
+      if ethCompatibleStorage then domain.EthereumUInt256Mpt.storageMpt(storageRoot, contractStorage)
       else domain.ArbitraryIntegerMpt.storageMpt(storageRoot, contractStorage)
 
     InMemorySimpleMapProxy.wrap[BigInt, BigInt, MerklePatriciaTrie[BigInt, BigInt]](mpt)

@@ -13,13 +13,13 @@ object HexPrefix {
     */
   def encode(nibbles: Array[Byte], isLeaf: Boolean): Array[Byte] = {
     val hasOddLength = nibbles.length % 2 == 1
-    val firstByteFlag: Byte = (2 * (if (isLeaf) 1 else 0) + (if (hasOddLength) 1 else 0)).toByte
-    val lengthFlag = if (hasOddLength) 1 else 2
+    val firstByteFlag: Byte = (2 * (if isLeaf then 1 else 0) + (if hasOddLength then 1 else 0)).toByte
+    val lengthFlag = if hasOddLength then 1 else 2
 
     val nibblesWithFlag = new Array[Byte](nibbles.length + lengthFlag)
     Array.copy(nibbles, 0, nibblesWithFlag, lengthFlag, nibbles.length)
     nibblesWithFlag(0) = firstByteFlag
-    if (!hasOddLength) nibblesWithFlag(1) = 0
+    if !hasOddLength then nibblesWithFlag(1) = 0
     nibblesToBytes(nibblesWithFlag)
   }
 
@@ -35,7 +35,7 @@ object HexPrefix {
     val srcNibbles: Array[Byte] = bytesToNibbles(bytes = src)
     val t = (srcNibbles(0) & 2) != 0
     val hasOddLength = (srcNibbles(0) & 1) != 0
-    val flagLength = if (hasOddLength) 1 else 2
+    val flagLength = if hasOddLength then 1 else 2
 
     val res = new Array[Byte](srcNibbles.length - flagLength)
     Array.copy(srcNibbles, flagLength, res, 0, srcNibbles.length - flagLength)
@@ -53,7 +53,7 @@ object HexPrefix {
     val newArray = new Array[Byte](bytes.length * 2)
     var i = 0
     var n = 0
-    while (i < bytes.length) {
+    while i < bytes.length do {
       newArray(n) = ((bytes(i) >> 4) & 0xf).toByte
       newArray(n + 1) = (bytes(i) & 0xf).toByte
       n = n + 2
@@ -75,7 +75,7 @@ object HexPrefix {
     var i = 0
     var n = 0
 
-    while (i < nibbles.length) {
+    while i < nibbles.length do {
       val newValue = (16 * nibbles(i) + nibbles(i + 1)).toByte
       newArray(n) = newValue
       n = n + 1

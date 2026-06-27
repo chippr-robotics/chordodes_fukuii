@@ -178,7 +178,7 @@ private class MockedMiner(
       Behaviors.same
 
     case MineBlock =>
-      if (numBlocks > 0) {
+      if numBlocks > 0 then {
         context.pipeToSelf(
           blockCreator
             .getBlockForMining(parentBlock, withTransactions, initialWorldStateBeforeExecution)

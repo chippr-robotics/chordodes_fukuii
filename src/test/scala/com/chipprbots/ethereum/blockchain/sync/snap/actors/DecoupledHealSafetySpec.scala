@@ -61,7 +61,7 @@ class DecoupledHealSafetySpec
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
+    if gauge == null then Double.NaN else gauge.value()
   }
 
   private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessage): SNAP.GetTrieNodes =
@@ -85,7 +85,7 @@ class DecoupledHealSafetySpec
     */
   private def assertNoStateHealingComplete(controller: TestProbe, window: FiniteDuration): Unit = {
     val deadline = window.fromNow
-    while (deadline.hasTimeLeft())
+    while deadline.hasTimeLeft() do
       controller.receiveOne(deadline.timeLeft) match {
         case SNAPSyncController.StateHealingComplete =>
           fail("StateHealingComplete was declared while a heal task was still unsatisfied (SC-002)")
@@ -287,7 +287,8 @@ class DecoupledHealSafetySpec
       // Under decoupling, advancing the serve root must not change the completion outcome (it supplies node
       // bytes only; completion is decided against the unchanged walk root). The served node bytes are the
       // walk root's expectation either way (content-hash-verified), so the final stored state is identical.
-      if (decoupled) coordinator ! Messages.HealingServeRootRefresh(kec256(ByteString("decoupled-parity-serve-root")))
+      if decoupled then
+        coordinator ! Messages.HealingServeRootRefresh(kec256(ByteString("decoupled-parity-serve-root")))
       val peer = PeerTestHelpers.createTestPeer(s"parity-peer-$decoupled", TestProbe().ref)
       coordinator ! Messages.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
       coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)

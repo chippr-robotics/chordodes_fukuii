@@ -66,9 +66,9 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
       nextState: ProgramState[W2, S2]
   ): Unit = {
     val opName = opCode.toString
-    if (opName == "SLOAD" || opName == "SSTORE") {
+    if opName == "SLOAD" || opName == "SSTORE" then {
       val stack = prevState.stack
-      if (stack.size >= 1) {
+      if stack.size >= 1 then {
         val addr = prevState.env.ownerAddr
         val key = stack.toSeq.head
         touchedAddresses += addr
@@ -78,13 +78,13 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
     opName match {
       case "BALANCE" | "EXTCODESIZE" | "EXTCODECOPY" | "EXTCODEHASH" =>
         val stack = prevState.stack
-        if (stack.size >= 1) {
+        if stack.size >= 1 then {
           val addrUint = stack.toSeq.head
           touchedAddresses += Address(addrUint)
         }
       case "SELFDESTRUCT" =>
         val stack = prevState.stack
-        if (stack.size >= 1) {
+        if stack.size >= 1 then {
           val beneficiary = stack.toSeq.head
           touchedAddresses += Address(beneficiary)
           touchedAddresses += prevState.env.ownerAddr
@@ -94,7 +94,7 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
   }
 
   override def getResult: JValue =
-    if (diffMode) {
+    if diffMode then {
       postWorld match {
         case Some(pw) => encodeDiff(pw)
         case None     => encodePrestate()
@@ -129,12 +129,12 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
       postAccount.foreach { postAcc =>
         val preAcc = preAccount.getOrElse(com.chipprbots.ethereum.domain.Account.empty(0))
         val diff = encodeAccountDiff(addr, preAcc, postAcc, pw)
-        if (diff != JNothing) {
+        if diff != JNothing then {
           postFields += JField(addrHex, diff)
         }
       }
 
-      if (preAccount.isEmpty && postAccount.isDefined) {
+      if preAccount.isEmpty && postAccount.isDefined then {
         postFields += JField(addrHex, encodeAccountState(addr, postAccount.get, pw))
       }
     }
@@ -147,22 +147,22 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
       ("nonce" -> JInt(account.nonce.bigInteger))
 
     val code = world.getCode(addr)
-    if (code.nonEmpty) {
+    if code.nonEmpty then {
       obj = obj ~ ("code" -> JString("0x" + Hex.toHexString(code.toArray)))
     }
 
     val storageKeys = touchedStorageKeys.getOrElse(addr, Set.empty)
-    if (storageKeys.nonEmpty) {
+    if storageKeys.nonEmpty then {
       val storage = world.getStorage(addr)
       val storageFields = storageKeys.toList.flatMap { key =>
         val value = storage.load(key.toBigInt)
-        if (value != BigInt(0)) {
+        if value != BigInt(0) then {
           val keyHex = "0x" + key.toBigInt.toString(16).reverse.padTo(64, '0').reverse
           val valHex = "0x" + value.toString(16).reverse.padTo(64, '0').reverse
           Some(JField(keyHex, JString(valHex)))
         } else None
       }
-      if (storageFields.nonEmpty) {
+      if storageFields.nonEmpty then {
         obj = obj ~ ("storage" -> JObject(storageFields))
       }
     }
@@ -178,37 +178,37 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
   ): JValue = {
     var fields = List.empty[JField]
 
-    if (preAcc.balance != postAcc.balance) {
+    if preAcc.balance != postAcc.balance then {
       fields :+= JField("balance", JString("0x" + postAcc.balance.toBigInt.toString(16)))
     }
-    if (preAcc.nonce != postAcc.nonce) {
+    if preAcc.nonce != postAcc.nonce then {
       fields :+= JField("nonce", JInt(postAcc.nonce.bigInteger))
     }
 
     val preCode = preWorld.getCode(addr)
     val postCode = pw.getCode(addr)
-    if (preCode != postCode && postCode.nonEmpty) {
+    if preCode != postCode && postCode.nonEmpty then {
       fields :+= JField("code", JString("0x" + Hex.toHexString(postCode.toArray)))
     }
 
     val storageKeys = touchedStorageKeys.getOrElse(addr, Set.empty)
-    if (storageKeys.nonEmpty) {
+    if storageKeys.nonEmpty then {
       val preStorage = preWorld.getStorage(addr)
       val postStorage = pw.getStorage(addr)
       val storageFields = storageKeys.toList.flatMap { key =>
         val preVal = preStorage.load(key.toBigInt)
         val postVal = postStorage.load(key.toBigInt)
-        if (preVal != postVal) {
+        if preVal != postVal then {
           val keyHex = "0x" + key.toBigInt.toString(16).reverse.padTo(64, '0').reverse
           val valHex = "0x" + postVal.toString(16).reverse.padTo(64, '0').reverse
           Some(JField(keyHex, JString(valHex)))
         } else None
       }
-      if (storageFields.nonEmpty) {
+      if storageFields.nonEmpty then {
         fields :+= JField("storage", JObject(storageFields))
       }
     }
 
-    if (fields.isEmpty) JNothing else JObject(fields)
+    if fields.isEmpty then JNothing else JObject(fields)
   }
 }

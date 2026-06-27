@@ -104,7 +104,8 @@ class FastSync(
     // headers continued being written to RocksDB past the last SyncState snapshot.
     val existingBestHeader = blockchainReader.getBestBlockNumber
     val updatedState =
-      if (existingBestHeader > syncState.bestBlockHeaderNumber && existingBestHeader <= syncState.pivotBlock.number) {
+      if existingBestHeader > syncState.bestBlockHeaderNumber && existingBestHeader <= syncState.pivotBlock.number
+      then {
         log.info(
           "Headers in database ({}) ahead of persisted sync state ({}). Advancing to skip redundant download.",
           existingBestHeader,
@@ -146,7 +147,7 @@ class FastSync(
       )
       scheduler.scheduleOnce(startRetryInterval, self, RetryPivotBlockSelection)
     case PivotBlockSelector.Result(pivotBlockHeader) =>
-      if (pivotBlockHeader.number < 1) {
+      if pivotBlockHeader.number < 1 then {
         log.info("Unable to start block synchronization in fast mode: pivot block is less than 1")
         // Don't give up — peers may not have been fork-validated yet at startup.
         // Retry pivot selection after a delay instead of marking fast sync done.
@@ -157,7 +158,7 @@ class FastSync(
         // This avoids re-downloading millions of headers that survived a restart.
         val existingBestHeader = blockchainReader.getBestBlockNumber
         val bootstrappedHeaderNumber =
-          if (existingBestHeader > 0 && existingBestHeader <= pivotBlockHeader.number) {
+          if existingBestHeader > 0 && existingBestHeader <= pivotBlockHeader.number then {
             log.info(
               "Found existing headers in database up to block {}. Skipping redundant header download.",
               existingBestHeader
@@ -321,7 +322,7 @@ class FastSync(
             headersFetcherQueue.deliver(peerWithInfo, blockHeadersMsg, timeTaken) match {
               case DeliveryResult.Delivered(_) =>
                 removeRequestHandler(sender())
-                if (blockHeadersMsg.headers.nonEmpty) {
+                if blockHeadersMsg.headers.nonEmpty then {
                   headerResponseBuffer.put(blockHeadersMsg.headers.head.number, blockHeadersMsg.headers)
                   drainOrderedHeaders(peer)
                 } else {
@@ -380,13 +381,13 @@ class FastSync(
             items.flatMap {
               case v: RLPValue =>
                 val receiptBytes = v.bytes
-                if (receiptBytes.isEmpty) {
+                if receiptBytes.isEmpty then {
                   throw new RuntimeException("Cannot decode Receipt: empty RLPValue")
                 }
                 val first = receiptBytes(0)
                 // Typed receipt in wire format: RLPValue(typeByte || rlp(payload))
                 // Expand it to Seq(RLPValue(typeByte), RLPList(payload)) for toTypedRLPEncodables.
-                if ((first & 0xff) < 0x7f && receiptBytes.length > 1) {
+                if (first & 0xff) < 0x7f && receiptBytes.length > 1 then {
                   try
                     Seq(RLPValue(Array(first)), rawDecode(receiptBytes.tail))
                   catch {
@@ -449,7 +450,7 @@ class FastSync(
           syncState = syncState.copy(updatingPivotBlock = false)
           // On SyncRestart, the state scheduler is in idle state waiting for StartSyncingTo.
           // Send it the existing pivot's state root so it doesn't deadlock.
-          if (updateReason.isSyncRestart) {
+          if updateReason.isSyncRestart then {
             log.info(
               "SyncRestart: sending existing pivot state root to state scheduler (block {})",
               syncState.pivotBlock.number
@@ -493,8 +494,8 @@ class FastSync(
       )
 
     private def updatePivotBlock(updateReason: PivotBlockUpdateReason): Unit =
-      if (syncState.pivotBlockUpdateFailures <= syncConfig.maximumTargetUpdateFailures) {
-        if (assignedHandlers.nonEmpty || syncState.blockChainWorkQueued) {
+      if syncState.pivotBlockUpdateFailures <= syncConfig.maximumTargetUpdateFailures then {
+        if assignedHandlers.nonEmpty || syncState.blockChainWorkQueued then {
           log.debug("Still waiting for some responses, rescheduling pivot block update")
           scheduler.scheduleOnce(1.second, self, UpdatePivotBlock(updateReason))
           processSyncing()
@@ -509,11 +510,11 @@ class FastSync(
     private def updatePivotSyncState(updateReason: PivotBlockUpdateReason, pivotBlockHeader: BlockHeader): Unit =
       updateReason match {
         case ImportedLastBlock =>
-          if (pivotBlockHeader.number - syncState.pivotBlock.number <= syncConfig.maxTargetDifference) {
+          if pivotBlockHeader.number - syncState.pivotBlock.number <= syncConfig.maxTargetDifference then {
             log.debug("Current pivot block is fresh enough, starting state download.")
             // Empty root has means that there were no transactions in blockchain, and Mpt trie is empty
             // Asking for this root would result only with empty transactions
-            if (syncState.pivotBlock.stateRoot == ByteString(MerklePatriciaTrie.EmptyRootHash)) {
+            if syncState.pivotBlock.stateRoot == ByteString(MerklePatriciaTrie.EmptyRootHash) then {
               syncState = syncState.copy(stateSyncFinished = true, updatingPivotBlock = false)
             } else {
               syncState = syncState.copy(updatingPivotBlock = false)
@@ -561,9 +562,8 @@ class FastSync(
             syncState.safeDownloadTarget
           )
           // Start the state scheduler — without this, state download never begins after restart.
-          if (
-            !syncState.stateSyncFinished && pivotBlockHeader.stateRoot != ByteString(MerklePatriciaTrie.EmptyRootHash)
-          ) {
+          if !syncState.stateSyncFinished && pivotBlockHeader.stateRoot != ByteString(MerklePatriciaTrie.EmptyRootHash)
+          then {
             stateSyncRestartRequested = false
             stateSyncStarted = true
             syncStateScheduler ! StartSyncingTo(pivotBlockHeader.stateRoot, pivotBlockHeader.number)
@@ -586,7 +586,7 @@ class FastSync(
     private def validateHeader(header: BlockHeader, peer: Peer): Either[HeaderProcessingResult, BlockHeader] = {
       val shouldValidate = header.number >= syncState.nextBlockToFullyValidate
 
-      if (shouldValidate) {
+      if shouldValidate then {
         validators.blockHeaderValidator.validate(header, blockchainReader.getBlockHeaderByHash) match {
           case Right(_) =>
             updateValidationState(header)
@@ -607,7 +607,7 @@ class FastSync(
         .and(blockchainWriter.storeChainWeight(header.hash, parentWeight.increase(header)))
         .commit()
 
-      if (header.number > syncState.bestBlockHeaderNumber) {
+      if header.number > syncState.bestBlockHeaderNumber then {
         syncState = syncState.copy(bestBlockHeaderNumber = header.number)
       }
 
@@ -631,15 +631,15 @@ class FastSync(
         continueSyncing: Boolean = true
     ): Unit = {
       blacklist.add(peer.id, duration, BlockHeaderValidationFailed)
-      if (header.number <= syncState.safeDownloadTarget) {
+      if header.number <= syncState.safeDownloadTarget then {
         discardLastBlocks(header.number, N)
         syncState = syncState.updateDiscardedBlocks(header, N)
-        if (header.number >= syncState.pivotBlock.number) {
+        if header.number >= syncState.pivotBlock.number then {
           updatePivotBlock(LastBlockValidationFailed)
-        } else if (continueSyncing) {
+        } else if continueSyncing then {
           processSyncing()
         }
-      } else if (continueSyncing) {
+      } else if continueSyncing then {
         processSyncing()
       }
     }
@@ -657,22 +657,21 @@ class FastSync(
 
       @tailrec
       def processHeaders(headers: Seq[BlockHeader]): HeaderProcessingResult =
-        if (headers.nonEmpty) {
+        if headers.nonEmpty then {
           val header = headers.head
           processHeader(header) match {
             case Left(result) => result
             case Right((header, weight)) =>
               updateSyncState(header, weight)
-              if (header.number == syncState.safeDownloadTarget) {
+              if header.number == syncState.safeDownloadTarget then {
                 ImportedPivotBlock
               } else {
                 processHeaders(headers.tail)
               }
           }
-        } else
-          HeadersProcessingFinished
+        } else HeadersProcessingFinished
 
-      if (!checkHeadersChain(headers)) {
+      if !checkHeadersChain(headers) then {
         blacklist.add(peer.id, blacklistDuration, ErrorInBlockHeaders)
         return processSyncing() // scalafix:ok DisableSyntax.return
       }
@@ -705,7 +704,7 @@ class FastSync(
     }
 
     private def handleBlockBodies(peer: Peer, requestedHashes: Seq[ByteString], blockBodies: Seq[BlockBody]): Unit = {
-      if (blockBodies.isEmpty) {
+      if blockBodies.isEmpty then {
         val knownHashes = requestedHashes.map(ByteStringUtils.hash2string)
         blacklist.add(peer.id, blacklistDuration, EmptyBlockBodies(knownHashes))
         syncState = syncState.enqueueBlockBodies(requestedHashes)
@@ -727,7 +726,7 @@ class FastSync(
     }
 
     private def handleReceipts(peer: Peer, requestedHashes: Seq[ByteString], receipts: Seq[Seq[Receipt]]): Unit = {
-      if (receipts.isEmpty) {
+      if receipts.isEmpty then {
         val knownHashes = requestedHashes.map(ByteStringUtils.hash2string)
         blacklist.add(peer.id, blacklistDuration, EmptyReceipts(knownHashes))
         syncState = syncState.enqueueReceipts(requestedHashes)
@@ -735,7 +734,7 @@ class FastSync(
       } else {
         validateReceipts(requestedHashes, receipts) match {
           case ReceiptsValidationResult.Valid(blockHashesWithReceipts) =>
-            if (blockHashesWithReceipts.isEmpty) {
+            if blockHashesWithReceipts.isEmpty then {
               log.warning(
                 "Received receipts from peer [{}] but have no matching requested hashes (unsolicited or late response)",
                 peer.id
@@ -753,7 +752,7 @@ class FastSync(
             updateBestBlockIfNeeded(receivedHashes)
 
             val remainingReceipts = requestedHashes.drop(receipts.size)
-            if (remainingReceipts.nonEmpty) {
+            if remainingReceipts.nonEmpty then {
               syncState = syncState.enqueueReceipts(remainingReceipts)
               receiptsFetcherQueue.enqueue(remainingReceipts)
             }
@@ -784,15 +783,11 @@ class FastSync(
 
       // Return items to fetcher queues: unreserve if the peer is still tracked in-flight,
       // otherwise enqueue directly (handles post-redownloadBlockchain orphaned handlers).
-      if (bodiesFetcherQueue.inFlight(peer.id).isDefined)
-        bodiesFetcherQueue.unreserve(peer.id)
-      else if (failedBodies.nonEmpty)
-        bodiesFetcherQueue.enqueue(failedBodies)
+      if bodiesFetcherQueue.inFlight(peer.id).isDefined then bodiesFetcherQueue.unreserve(peer.id)
+      else if failedBodies.nonEmpty then bodiesFetcherQueue.enqueue(failedBodies)
 
-      if (receiptsFetcherQueue.inFlight(peer.id).isDefined)
-        receiptsFetcherQueue.unreserve(peer.id)
-      else if (failedReceipts.nonEmpty)
-        receiptsFetcherQueue.enqueue(failedReceipts)
+      if receiptsFetcherQueue.inFlight(peer.id).isDefined then receiptsFetcherQueue.unreserve(peer.id)
+      else if failedReceipts.nonEmpty then receiptsFetcherQueue.enqueue(failedReceipts)
 
       headersFetcherQueue.unreserve(peer.id)
       requestedBlockBodies = requestedBlockBodies - handler
@@ -839,7 +834,7 @@ class FastSync(
         s"${com.chipprbots.ethereum.network.getHostName(peer.remoteAddress.getAddress)}:${peer.remoteAddress.getPort}"
 
       def pct(done: BigInt, total: BigInt): Int =
-        if (total <= 0) 0
+        if total <= 0 then 0
         else {
           val p = ((done.toDouble / total.toDouble) * 100.0).toInt
           p.max(0).min(100)
@@ -855,9 +850,9 @@ class FastSync(
         val sb = new StringBuilder(slots + 3)
         sb.append('[')
         var i = 0
-        while (i < slots) {
-          if (i < wormPos) sb.append('=')
-          else if (i == wormPos) sb.append("🪱")
+        while i < slots do {
+          if i < wormPos then sb.append('=')
+          else if i == wormPos then sb.append("🪱")
           else sb.append('.')
           i += 1
         }
@@ -888,11 +883,11 @@ class FastSync(
       val blocksToBrain = wormToBrainBar(blockPercent)
 
       val phase =
-        if (!syncState.isBlockchainWorkFinished) {
-          if (syncState.receiptsQueue.nonEmpty) "Receipts"
-          else if (syncState.blockBodiesQueue.nonEmpty) "BlockBodies"
+        if !syncState.isBlockchainWorkFinished then {
+          if syncState.receiptsQueue.nonEmpty then "Receipts"
+          else if syncState.blockBodiesQueue.nonEmpty then "BlockBodies"
           else "BlockHeaders"
-        } else if (!syncState.stateSyncFinished) {
+        } else if !syncState.stateSyncFinished then {
           "State"
         } else {
           "Finalizing"
@@ -925,7 +920,7 @@ class FastSync(
 
     private def insertBlocks(requestedHashes: Seq[ByteString], blockBodies: Seq[BlockBody]): Unit = {
       val blockHashesWithBodies = requestedHashes.zip(blockBodies)
-      if (blockHashesWithBodies.isEmpty) {
+      if blockHashesWithBodies.isEmpty then {
         log.warning(
           "Received block bodies but have no matching requested hashes (unsolicited or late response)"
         )
@@ -942,7 +937,7 @@ class FastSync(
       val receivedHashes = requestedHashes.take(blockBodies.size)
       updateBestBlockIfNeeded(receivedHashes)
       val remainingBlockBodies = requestedHashes.drop(blockBodies.size)
-      if (remainingBlockBodies.nonEmpty) {
+      if remainingBlockBodies.nonEmpty then {
         syncState = syncState.enqueueBlockBodies(remainingBlockBodies)
         bodiesFetcherQueue.enqueue(remainingBlockBodies)
       }
@@ -969,7 +964,7 @@ class FastSync(
 
     def pivotBlockIsStale(): Boolean = {
       val peersWithInfo = peersToDownloadFrom.values.toList
-      if (peersWithInfo.isEmpty) {
+      if peersWithInfo.isEmpty then {
         false
       } else {
         val peerWithBestBlockInNetwork = peersWithInfo.maxBy(_.peerInfo.maxBlockNumber)
@@ -980,7 +975,7 @@ class FastSync(
         val peersWithTooFreshPossiblePivotBlock =
           getPeersWithFreshEnoughPivot(NonEmptyList.fromListUnsafe(peersWithInfo), syncState, syncConfig)
 
-        if (peersWithTooFreshPossiblePivotBlock.isEmpty) {
+        if peersWithTooFreshPossiblePivotBlock.isEmpty then {
           log.debug(
             s"There are no peers with too fresh possible pivot block. " +
               s"Current pivot block is {} blocks behind best possible target",
@@ -1016,10 +1011,9 @@ class FastSync(
       )
       // Start state download in parallel with block download — don't wait for blocks to finish.
       // State only depends on the pivot block's state root, which we know from the start.
-      if (
-        !stateSyncStarted && !syncState.stateSyncFinished && notInTheMiddleOfUpdate &&
+      if !stateSyncStarted && !syncState.stateSyncFinished && notInTheMiddleOfUpdate &&
         syncState.pivotBlock.stateRoot != ByteString(MerklePatriciaTrie.EmptyRootHash)
-      ) {
+      then {
         log.info(
           "Starting state download in parallel with block download for pivot block {}",
           syncState.pivotBlock.number
@@ -1033,18 +1027,17 @@ class FastSync(
       // The SNAP serve window is ~128 blocks (~28 min on ETC). If state download takes longer,
       // peers stop serving the old root. Refreshing the pivot gives state a fresh root to work with.
       // Reset the restart flag once the pivot update completes (updatingPivotBlock returns to false).
-      if (stateSyncRestartRequested && !syncState.updatingPivotBlock) {
+      if stateSyncRestartRequested && !syncState.updatingPivotBlock then {
         stateSyncRestartRequested = false
       }
-      if (
-        stateSyncStarted && !syncState.stateSyncFinished && !stateSyncRestartRequested &&
+      if stateSyncStarted && !syncState.stateSyncFinished && !stateSyncRestartRequested &&
         !syncState.updatingPivotBlock
-      ) {
+      then {
         // Detect stale state root via two signals:
         // 1. pivotBlockIsStale() — peers are ahead of our pivot
         // 2. All peers blacklisted — evidence the root expired (peers return empty for this root)
         val allPeersBlacklisted = peersToDownloadFrom.isEmpty && handshakedPeers.nonEmpty
-        if (pivotBlockIsStale() || allPeersBlacklisted) {
+        if pivotBlockIsStale() || allPeersBlacklisted then {
           log.info(
             "State root stale (allBlacklisted={}), requesting pivot update for state refresh",
             allPeersBlacklisted
@@ -1066,12 +1059,12 @@ class FastSync(
       // 99% even when the trie is genuinely 56% incomplete. Using maxTotalNodesCount keeps
       // the comparison honest across restarts so a node that bounced mid-state-download
       // resumes correctly instead of declaring itself done with a partial trie.
-      if (noBlockchainWorkRemaining && !syncState.stateSyncFinished && stateSyncStarted) {
+      if noBlockchainWorkRemaining && !syncState.stateSyncFinished && stateSyncStarted then {
         val downloaded = FastSyncMetrics.getDownloadedNodes
         val dynTotal = FastSyncMetrics.getTotalNodes
         val effectiveTotal = math.max(dynTotal, syncState.maxTotalNodesCount)
-        val pct = if (effectiveTotal > 0) (downloaded.toDouble / effectiveTotal * 100).toInt else 0
-        if (pct >= 95 && effectiveTotal > 1000) {
+        val pct = if effectiveTotal > 0 then (downloaded.toDouble / effectiveTotal * 100).toInt else 0
+        if pct >= 95 && effectiveTotal > 1000 then {
           log.info(
             "State download at {}% ({}/{}, peak total {}) with blocks complete. " +
               "Remaining nodes are at the chain tip and change every block. " +
@@ -1085,13 +1078,13 @@ class FastSync(
         }
       }
 
-      if (fullySynced) {
+      if fullySynced then {
         finish()
       } else {
-        if (blockchainDataToDownload) {
+        if blockchainDataToDownload then {
           processDownloads()
-        } else if (noBlockchainWorkRemaining && !syncState.stateSyncFinished && notInTheMiddleOfUpdate) {
-          if (pivotBlockIsStale()) {
+        } else if noBlockchainWorkRemaining && !syncState.stateSyncFinished && notInTheMiddleOfUpdate then {
+          if pivotBlockIsStale() then {
             log.debug("Restarting state sync to new pivot block")
             syncStateScheduler ! RestartRequested
             stateSyncRestartRequested = true
@@ -1128,27 +1121,22 @@ class FastSync(
 
     def processDownloads(): Unit = {
       // Self-heal: if syncState has items but fetcher queues are empty (e.g., post-restart), re-sync them
-      if (
-        syncState.blockBodiesQueue.nonEmpty && bodiesFetcherQueue.pending == 0 && bodiesFetcherQueue.inFlightCount == 0
-      )
-        bodiesFetcherQueue.enqueue(syncState.blockBodiesQueue)
-      if (
-        syncState.receiptsQueue.nonEmpty && receiptsFetcherQueue.pending == 0 && receiptsFetcherQueue.inFlightCount == 0
-      )
-        receiptsFetcherQueue.enqueue(syncState.receiptsQueue)
+      if syncState.blockBodiesQueue.nonEmpty && bodiesFetcherQueue.pending == 0 && bodiesFetcherQueue.inFlightCount == 0
+      then bodiesFetcherQueue.enqueue(syncState.blockBodiesQueue)
+      if syncState.receiptsQueue.nonEmpty && receiptsFetcherQueue.pending == 0 && receiptsFetcherQueue.inFlightCount == 0
+      then receiptsFetcherQueue.enqueue(syncState.receiptsQueue)
 
       val hasWork = bodiesFetcherQueue.pending > 0 || receiptsFetcherQueue.pending > 0 ||
         headersFetcherQueue.pending > 0 || headersFetcherQueue.inFlightCount > 0 ||
         syncState.bestBlockHeaderNumber < syncState.safeDownloadTarget
 
-      if (handshakedPeers.isEmpty) {
-        if (assignedHandlers.nonEmpty)
+      if handshakedPeers.isEmpty then {
+        if assignedHandlers.nonEmpty then
           log.debug("There are no available peers, waiting for [{}] responses.", assignedHandlers.size)
-        else
-          scheduler.scheduleOnce(syncRetryInterval, self, ProcessSyncing)
-      } else if (hasWork) {
+        else scheduler.scheduleOnce(syncRetryInterval, self, ProcessSyncing)
+      } else if hasWork then {
         dispatchWork()
-      } else if (assignedHandlers.nonEmpty) {
+      } else if assignedHandlers.nonEmpty then {
         log.debug("No pending work; waiting for [{}] in-flight responses.", assignedHandlers.size)
       } else {
         scheduler.scheduleOnce(syncRetryInterval, self, ProcessSyncing)
@@ -1223,7 +1211,7 @@ class FastSync(
 
     private def enqueueHeadersIfNeeded(): Unit = {
       val fillTarget = (headerQueueHighWatermark + FastSync.HeaderQueueLookahead).min(syncState.safeDownloadTarget)
-      if (fillTarget > headerQueueHighWatermark) {
+      if fillTarget > headerQueueHighWatermark then {
         val nums = (headerQueueHighWatermark + 1 to fillTarget).toSeq
         headersFetcherQueue.enqueue(nums)
         headerQueueHighWatermark = fillTarget
@@ -1233,12 +1221,12 @@ class FastSync(
 
     private def drainOrderedHeaders(peer: Peer): Unit = {
       // Prune anything superseded by a redownloadBlockchain reset
-      while (headerResponseBuffer.nonEmpty && headerResponseBuffer.firstKey <= syncState.bestBlockHeaderNumber)
+      while headerResponseBuffer.nonEmpty && headerResponseBuffer.firstKey <= syncState.bestBlockHeaderNumber do
         headerResponseBuffer.remove(headerResponseBuffer.firstKey)
 
       // Drain the contiguous run from bestBlockHeaderNumber + 1
       var continue = true
-      while (continue)
+      while continue do
         headerResponseBuffer.headOption match {
           case Some((blockNum, headers)) if blockNum == syncState.bestBlockHeaderNumber + 1 =>
             headerResponseBuffer.remove(blockNum)
@@ -1264,10 +1252,10 @@ class FastSync(
         } yield header
       }
 
-      if (fullBlocks.nonEmpty) {
+      if fullBlocks.nonEmpty then {
         val bestReceivedBlock = fullBlocks.maxBy(_.number)
         val lastStoredBestBlockNumber = blockchainReader.getBestBlockNumber
-        if (lastStoredBestBlockNumber < bestReceivedBlock.number) {
+        if lastStoredBestBlockNumber < bestReceivedBlock.number then {
           // Set best block info with BOTH hash and number (putBestBlockNumber only
           // sets the number, leaving getBestBlockInfo().hash stale/empty).
           appStateStorage
@@ -1373,10 +1361,8 @@ object FastSync {
 
     def updateNextBlockToValidate(header: BlockHeader, K: Int, X: Int): SyncState = copy(
       nextBlockToFullyValidate =
-        if (bestBlockHeaderNumber >= pivotBlock.number - X)
-          header.number + 1
-        else
-          (header.number + K / 2 + Random.nextInt(K)).min(pivotBlock.number - X)
+        if bestBlockHeaderNumber >= pivotBlock.number - X then header.number + 1
+        else (header.number + K / 2 + Random.nextInt(K)).min(pivotBlock.number - X)
     )
 
     def updateDiscardedBlocks(header: BlockHeader, N: Int): SyncState = copy(
@@ -1390,7 +1376,7 @@ object FastSync {
       copy(
         pivotBlock = newPivot,
         safeDownloadTarget = newPivot.number + numberOfSafeBlocks,
-        pivotBlockUpdateFailures = if (updateFailures) pivotBlockUpdateFailures + 1 else pivotBlockUpdateFailures,
+        pivotBlockUpdateFailures = if updateFailures then pivotBlockUpdateFailures + 1 else pivotBlockUpdateFailures,
         updatingPivotBlock = false
       )
 

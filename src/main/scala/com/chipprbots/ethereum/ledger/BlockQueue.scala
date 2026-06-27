@@ -118,7 +118,7 @@ class BlockQueue(
           import block.header.parentHash
 
           val isShared = childShared || parentToChildren.get(hash).exists(_.nonEmpty)
-          if (!isShared && dequeue) {
+          if !isShared && dequeue then {
             val siblings = parentToChildren.get(parentHash)
             siblings.foreach(sbls => parentToChildren += parentHash -> (sbls - hash))
             blocks -= hash

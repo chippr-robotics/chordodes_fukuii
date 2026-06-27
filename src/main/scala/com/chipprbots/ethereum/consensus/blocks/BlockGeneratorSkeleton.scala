@@ -138,7 +138,7 @@ abstract class BlockGeneratorSkeleton(
     // tx list from a pre-sealed header (→ HeaderPoWError). Gate on the Olympia activation block.
     val isOlympia = blockNumber >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
     val eligibleTransactions =
-      if (!isOlympia) transactions
+      if !isOlympia then transactions
       else
         transactions.filter { tx =>
           val effectiveTip =
@@ -159,7 +159,7 @@ abstract class BlockGeneratorSkeleton(
           .sortBy(-_.tx.gasPrice)
           .sortBy(_.tx.nonce)
           .foldLeft(Seq.empty[SignedTransaction]) { case (txs, tx) =>
-            if (txs.exists(_.tx.nonce == tx.tx.nonce)) {
+            if txs.exists(_.tx.nonce == tx.tx.nonce) then {
               txs
             } else {
               txs :+ tx
@@ -200,8 +200,8 @@ abstract class BlockGeneratorSkeleton(
       .gasLimitAdjustmentStartAt(blockNumber)
       .getOrElse(miningConfig.gasLimitTarget)
     val delta = parentGas / BlockHeaderValidator.GasLimitBoundDivisor - 1
-    if (parentGas < target) { val n = parentGas + delta; if (n > target) target else n }
-    else if (parentGas > target) { val n = parentGas - delta; if (n < target) target else n }
+    if parentGas < target then { val n = parentGas + delta; if n > target then target else n }
+    else if parentGas > target then { val n = parentGas - delta; if n < target then target else n }
     else parentGas
   }
 
@@ -223,7 +223,7 @@ abstract class BlockGeneratorSkeleton(
 
   def getPendingBlockAndState: Option[PendingBlockAndState] = {
     val pendingBlocks = cache.get()
-    if (pendingBlocks.isEmpty) None
+    if pendingBlocks.isEmpty then None
     else Some(pendingBlocks.maxBy(_.pendingBlock.block.header.unixTimestamp))
   }
 }

@@ -41,7 +41,7 @@ class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcS
     serverSocket = new UnixDomainServerSocket(config.socketFile)
     new Thread {
       override def run(): Unit =
-        while (!serverSocket.isClosed) {
+        while !serverSocket.isClosed do {
           val clientSocket = serverSocket.accept()
           // Note: consider using a thread pool to limit the number of connections/requests
           new ClientThread(jsonRpcController, clientSocket).start()
@@ -56,7 +56,7 @@ class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcS
 
   private def removeSocketFile(): Unit = {
     val socketFile = new File(config.socketFile)
-    if (socketFile.exists()) socketFile.delete()
+    if socketFile.exists() then socketFile.delete()
   }
 
   class ClientThread(jsonRpcController: JsonRpcController, clientSocket: Socket) extends Thread {
@@ -72,15 +72,14 @@ class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcS
     private var running = true
 
     override def run(): Unit = {
-      while (running)
-        handleNextRequest()
+      while running do handleNextRequest()
       clientSocket.close()
     }
 
     @tailrec
     private def readNextMessage(accum: String = ""): Option[JValue] = {
       val buff = new Array[Char](32)
-      if (in.read(buff) == -1) {
+      if in.read(buff) == -1 then {
         None
       } else {
         val newData = new String(buff.takeWhile(c => c != '\n' && c.toByte != 0x0))

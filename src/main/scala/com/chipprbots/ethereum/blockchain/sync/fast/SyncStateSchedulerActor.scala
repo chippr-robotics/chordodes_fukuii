@@ -120,7 +120,7 @@ class SyncStateSchedulerActor(
         peer
     }.toList
 
-    if (freePeers.isEmpty && peersToDownloadFrom.nonEmpty) {
+    if freePeers.isEmpty && peersToDownloadFrom.nonEmpty then {
       log.debug(
         "No free peers for state download ({} total, {} with active requests)",
         peersToDownloadFrom.size,
@@ -142,10 +142,10 @@ class SyncStateSchedulerActor(
       "Requesting {} nodes from peer {} via {}",
       request.nodes.size,
       request.peer.id,
-      if (useSnap) "GetTrieNodes" else "GetNodeData"
+      if useSnap then "GetTrieNodes" else "GetNodeData"
     )
 
-    val handler = if (useSnap && currentStateRoot.nonEmpty) {
+    val handler = if useSnap && currentStateRoot.nonEmpty then {
       // Convert hash-based requests to SNAP GetTrieNodes with nibble paths
       val paths: Seq[Seq[ByteString]] = request.nodes.toList.map { hash =>
         request.pathInfo.get(hash) match {
@@ -294,7 +294,7 @@ class SyncStateSchedulerActor(
   private def finalizeSync(
       state: SyncSchedulerActorState
   ): Unit =
-    if (state.memBatch.nonEmpty) {
+    if state.memBatch.nonEmpty then {
       log.debug("Persisting {} elements to blockchain and finalizing the state sync", state.memBatch.size)
       val finalState = sync.persistBatch(state.currentSchedulerState, state.targetBlock)
       reportStats(state.syncInitiator, state.currentStats.addSaved(state.memBatch.size), finalState)
@@ -366,11 +366,11 @@ class SyncStateSchedulerActor(
       case Some((prevSaved, prevMs)) =>
         val delta = savedNow - prevSaved
         val elapsedMs = nowMs - prevMs
-        if (delta >= StateStallMinProgress) {
+        if delta >= StateStallMinProgress then {
           // Real progress — refresh snapshot.
           stallWatchdog = Some((savedNow, nowMs))
           false
-        } else if (elapsedMs >= StateStallTimeout.toMillis) {
+        } else if elapsedMs >= StateStallTimeout.toMillis then {
           log.warning(
             "State download stalled: saved={} for {}ms (Δ={} nodes < {}). " +
               "Peer pool cannot serve our state requests. Emitting NetworkIncompatible to fall back from fast sync.",
@@ -392,7 +392,7 @@ class SyncStateSchedulerActor(
   def syncing(currentState: SyncSchedulerActorState): Receive =
     handlePeerListMessages.orElse(handleRequestResults).orElse {
       case Sync if currentState.hasRemainingPendingRequests && !currentState.restartHasBeenRequested =>
-        if (checkStateStall(currentState)) {
+        if checkStateStall(currentState) then {
           // Watchdog tripped, NetworkIncompatible emitted, actor stopping. Skip remaining work.
           ()
         } else {
@@ -431,7 +431,7 @@ class SyncStateSchedulerActor(
                   "{} active requests in flight",
                 currentState.activePeerRequests.size
               )
-              if (currentState.activePeerRequests.isEmpty) {
+              if currentState.activePeerRequests.isEmpty then {
                 // we are not processing anything, and there are no free peers and we not waiting for any requests in flight
                 // reschedule sync check
                 timers.startSingleTimer(SyncKey, Sync, syncConfig.syncRetryInterval)
@@ -454,7 +454,7 @@ class SyncStateSchedulerActor(
         finalizeSync(currentState)
 
       case result: RequestResult =>
-        if (currentState.isProcessing) {
+        if currentState.isProcessing then {
           log.debug(
             "Response received while processing. Enqueuing for import later. Current response queue size: {}",
             currentState.nodesToProcess.size + 1
@@ -469,7 +469,7 @@ class SyncStateSchedulerActor(
 
       case RestartRequested =>
         log.debug("Received restart request")
-        if (currentState.isProcessing) {
+        if currentState.isProcessing then {
           log.debug("Received restart while processing. Scheduling it after the task finishes")
           context.become(syncing(currentState.withRestartRequested(sender())))
         } else {
@@ -490,7 +490,7 @@ class SyncStateSchedulerActor(
           newState.numberOfPendingRequests,
           newState.numberOfMissingHashes
         )
-        val (newState1, newStats1) = if (newState.memBatch.size >= syncConfig.stateSyncPersistBatchSize) {
+        val (newState1, newStats1) = if newState.memBatch.size >= syncConfig.stateSyncPersistBatchSize then {
           log.debug("Current membatch size is {}, persisting nodes to database", newState.memBatch.size)
           (sync.persistBatch(newState, currentState.targetBlock), newStats.addSaved(newState.memBatch.size))
         } else {
@@ -515,7 +515,8 @@ class SyncStateSchedulerActor(
             blacklistWithReason match {
               case Some(InvalidStateResponse(_)) =>
                 consecutiveUselessResponses += 1
-                if (consecutiveUselessResponses >= UselessResponseThreshold && !currentState.restartHasBeenRequested) {
+                if consecutiveUselessResponses >= UselessResponseThreshold && !currentState.restartHasBeenRequested
+                then {
                   log.warning(
                     "{} consecutive useless responses — state root likely stale. Triggering self-restart.",
                     consecutiveUselessResponses

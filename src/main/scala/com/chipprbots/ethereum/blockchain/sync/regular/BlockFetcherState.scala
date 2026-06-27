@@ -178,7 +178,7 @@ case class BlockFetcherState(
   /** Validates received headers consistency and their compatibility with the state
     */
   private def validatedHeaders(headers: Seq[BlockHeader]): Either[ValidationErrors, Seq[BlockHeader]] =
-    if (headers.isEmpty) {
+    if headers.isEmpty then {
       Right(headers)
     } else {
       headers
@@ -226,10 +226,9 @@ case class BlockFetcherState(
       case (_, Seq())      => Some(matchedBlocks)
       case (header +: remainingHeaders, body +: remainingBodies) =>
         val doMatch = blockValidator.validateHeaderAndBody(header, body).isRight
-        if (doMatch)
+        if doMatch then
           bodiesAreOrderedSubsetOfRequested(remainingHeaders, remainingBodies, matchedBlocks :+ Block(header, body))
-        else
-          bodiesAreOrderedSubsetOfRequested(remainingHeaders, respondedBodies, matchedBlocks)
+        else bodiesAreOrderedSubsetOfRequested(remainingHeaders, respondedBodies, matchedBlocks)
     }
 
   /** If blocks is empty collection - headers in queue are removed as the cause is:
@@ -238,7 +237,7 @@ case class BlockFetcherState(
     *     a request)
     */
   def handleRequestedBlocks(blocks: Seq[Block], fromPeer: PeerId): BlockFetcherState =
-    if (blocks.isEmpty)
+    if blocks.isEmpty then
       copy(
         waitingHeaders = Queue.empty
       )
@@ -253,14 +252,13 @@ case class BlockFetcherState(
   def enqueueRequestedBlock(block: Block, fromPeer: PeerId): BlockFetcherState =
     waitingHeaders.dequeueOption
       .map { case (waitingHeader, waitingHeadersTail) =>
-        if (waitingHeader.hash == block.hash) {
+        if waitingHeader.hash == block.hash then {
           enqueueReadyBlock(block, fromPeer)
             .withPossibleNewTopAt(block.number)
             .copy(
               waitingHeaders = waitingHeadersTail
             )
-        } else
-          this
+        } else this
       }
       .getOrElse(this)
 
@@ -269,7 +267,7 @@ case class BlockFetcherState(
       .copy(readyBlocks = readyBlocks.enqueue(block))
 
   def pickBlocks(amount: Int): Option[(NonEmptyList[Block], BlockFetcherState)] =
-    if (readyBlocks.nonEmpty) {
+    if readyBlocks.nonEmpty then {
       val (picked, rest) = readyBlocks.splitAt(amount)
       Some((NonEmptyList(picked.head, picked.tail.toList), copy(readyBlocks = rest, lastBlock = picked.last.number)))
     } else {
@@ -299,7 +297,7 @@ case class BlockFetcherState(
     // Move all live in-flight headers to the "ignore" bucket; new dispatches are blocked
     // until headersToIgnore drains to zero.
     val newFetchingBodiesState =
-      if (fetchingBodiesState == AwaitingBodies) AwaitingBodiesToBeIgnored else fetchingBodiesState
+      if fetchingBodiesState == AwaitingBodies then AwaitingBodiesToBeIgnored else fetchingBodiesState
     copy(
       readyBlocks = Queue(),
       waitingHeaders = Queue(),
@@ -342,7 +340,7 @@ case class BlockFetcherState(
   def withKnownTopAt(nr: BigInt): BlockFetcherState = copy(knownTop = nr)
 
   def withPossibleNewTopAt(nr: BigInt): BlockFetcherState =
-    if (nr > knownTop) {
+    if nr > knownTop then {
       withKnownTopAt(nr)
     } else {
       this
@@ -361,7 +359,7 @@ case class BlockFetcherState(
 
   // Called when a header response arrives — decrements the appropriate counter.
   def withHeaderFetchReceived: BlockFetcherState =
-    if (headersToIgnore > 0) copy(headersToIgnore = headersToIgnore - 1)
+    if headersToIgnore > 0 then copy(headersToIgnore = headersToIgnore - 1)
     else copy(inFlightHeaders = (inFlightHeaders - 1).max(0))
 
   def isFetchingBodies: Boolean = fetchingBodiesState != NotFetchingBodies

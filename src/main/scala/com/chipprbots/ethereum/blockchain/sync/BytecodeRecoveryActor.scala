@@ -156,7 +156,7 @@ object BytecodeRecoveryActor {
       }
       Behaviors.receiveMessage {
         case ScanResult(missing) =>
-          if (missing.isEmpty) {
+          if missing.isEmpty then {
             ctx.log.info("Bytecode recovery: all contract bytecodes present. Marking recovery complete.")
             RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseComplete)
             appStateStorage.bytecodeRecoveryDone().commit()
@@ -256,8 +256,8 @@ object BytecodeRecoveryActor {
           lastBytecodeRecoveryMilestone = newM
           crossed.foreach { m =>
             val elapsedSecs = (System.nanoTime() - lastRateNanos) / 1e9
-            val rate = if (elapsedSecs > 0) ((downloadedCount - lastRateDownloaded) / elapsedSecs).toLong else 0L
-            if (m % 10 == 0 || m <= 5 || m >= 95) {
+            val rate = if elapsedSecs > 0 then ((downloadedCount - lastRateDownloaded) / elapsedSecs).toLong else 0L
+            if m % 10 == 0 || m <= 5 || m >= 95 then {
               lastRateNanos = System.nanoTime()
               lastRateDownloaded = downloadedCount
             }
@@ -268,7 +268,7 @@ object BytecodeRecoveryActor {
           Behaviors.same
 
         case CheckAbandon(progressAtSchedule) =>
-          if (progressAtSchedule == progressSeq) {
+          if progressAtSchedule == progressSeq then {
             ctx.log.warn(
               "Bytecode recovery abandoned: no download progress for {}s. " +
                 "Regular sync will fetch missing bytecodes on-demand via GetTrieNodes.",
@@ -311,10 +311,10 @@ object BytecodeRecoveryActor {
 
     val onLeaf: LeafNode => Unit = { leafNode =>
       accountCount += 1
-      if (accountCount % 100_000 == 0) {
+      if accountCount % 100_000 == 0 then {
         RecoveryMetrics.setBytecodeScanProgress(accountCount, contractCount, missing.size.toLong)
       }
-      if (accountCount % 1_000_000 == 0) {
+      if accountCount % 1_000_000 == 0 then {
         log.info(
           s"Bytecode recovery scan: $accountCount accounts, $contractCount contracts, ${missing.size} missing"
         )
@@ -322,10 +322,10 @@ object BytecodeRecoveryActor {
 
       Account(leafNode.value) match {
         case Success(account) =>
-          if (account.codeHash != Account.EmptyCodeHash && !seen.contains(account.codeHash)) {
+          if account.codeHash != Account.EmptyCodeHash && !seen.contains(account.codeHash) then {
             seen += account.codeHash
             contractCount += 1
-            if (evmCodeStorage.get(account.codeHash).isEmpty) {
+            if evmCodeStorage.get(account.codeHash).isEmpty then {
               missing += account.codeHash
             }
           }

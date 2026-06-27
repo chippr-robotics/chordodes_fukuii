@@ -114,7 +114,7 @@ object Config extends InstanceConfig(ConfigFactory.load().getConfig("fukuii"), "
         doFastSync = syncConfig.getBoolean("do-fast-sync"),
         doSnapSync = syncConfig.getBoolean("do-snap-sync"),
         fastSyncRestartCooloff =
-          if (syncConfig.hasPath("fast-sync-restart-cooloff"))
+          if syncConfig.hasPath("fast-sync-restart-cooloff") then
             syncConfig.getDuration("fast-sync-restart-cooloff").toMillis.millis
           else DefaultFastSyncRestartCooloff,
         peersScanInterval = syncConfig.getDuration("peers-scan-interval").toMillis.millis,
@@ -135,19 +135,17 @@ object Config extends InstanceConfig(ConfigFactory.load().getConfig("fukuii"), "
         peersToFetchFrom = syncConfig.getInt("peers-to-fetch-from"),
         pivotBlockOffset = syncConfig.getInt("pivot-block-offset"),
         pivotBlockMaxTotalSelectionAttempts =
-          if (syncConfig.hasPath("pivot-block-max-total-selection-attempts"))
+          if syncConfig.hasPath("pivot-block-max-total-selection-attempts") then
             syncConfig.getInt("pivot-block-max-total-selection-attempts")
           else DefaultPivotBlockMaxTotalSelectionAttempts,
         persistStateSnapshotInterval = syncConfig.getDuration("persist-state-snapshot-interval").toMillis.millis,
         blocksBatchSize = syncConfig.getInt("blocks-batch-size"),
         maxFetcherQueueSize = syncConfig.getInt("max-fetcher-queue-size"),
         maxReadyBlocksQueueSize =
-          if (syncConfig.hasPath("max-ready-blocks-queue-size"))
-            syncConfig.getInt("max-ready-blocks-queue-size")
+          if syncConfig.hasPath("max-ready-blocks-queue-size") then syncConfig.getInt("max-ready-blocks-queue-size")
           else 512,
         bodiesFetchConcurrency =
-          if (syncConfig.hasPath("bodies-fetch-concurrency"))
-            syncConfig.getInt("bodies-fetch-concurrency")
+          if syncConfig.hasPath("bodies-fetch-concurrency") then syncConfig.getInt("bodies-fetch-concurrency")
           else 1,
         checkForNewBlockInterval = syncConfig.getDuration("check-for-new-block-interval").toMillis.millis,
         branchResolutionRequestSize = syncConfig.getInt("branch-resolution-request-size"),
@@ -170,30 +168,25 @@ object Config extends InstanceConfig(ConfigFactory.load().getConfig("fukuii"), "
         fastSyncMaxBatchRetries = syncConfig.getInt("fast-sync-max-batch-retries"),
         maxPivotBlockFailuresCount = syncConfig.getInt("max-pivot-block-failures-count"),
         maxRetryDelay =
-          if (syncConfig.hasPath("max-retry-delay"))
-            syncConfig.getDuration("max-retry-delay").toMillis.millis
+          if syncConfig.hasPath("max-retry-delay") then syncConfig.getDuration("max-retry-delay").toMillis.millis
           else 30.seconds,
         maxBodyFetchRetries =
-          if (syncConfig.hasPath("max-body-fetch-retries"))
-            syncConfig.getInt("max-body-fetch-retries")
+          if syncConfig.hasPath("max-body-fetch-retries") then syncConfig.getInt("max-body-fetch-retries")
           else 10,
         maxSnapFastCycleTransitions =
-          if (syncConfig.hasPath("max-snap-fast-cycle-transitions"))
+          if syncConfig.hasPath("max-snap-fast-cycle-transitions") then
             syncConfig.getInt("max-snap-fast-cycle-transitions")
           else 3,
         useBootstrapCheckpoints =
-          if (syncConfig.hasPath("use-bootstrap-checkpoints"))
-            syncConfig.getBoolean("use-bootstrap-checkpoints")
+          if syncConfig.hasPath("use-bootstrap-checkpoints") then syncConfig.getBoolean("use-bootstrap-checkpoints")
           else false,
         engineApiRequired =
-          if (syncConfig.hasPath("engine-api-required"))
-            syncConfig.getBoolean("engine-api-required")
+          if syncConfig.hasPath("engine-api-required") then syncConfig.getBoolean("engine-api-required")
           else true,
         clWaitTimeout =
-          if (syncConfig.hasPath("cl-wait-timeout"))
-            syncConfig.getDuration("cl-wait-timeout").toMillis.millis
+          if syncConfig.hasPath("cl-wait-timeout") then syncConfig.getDuration("cl-wait-timeout").toMillis.millis
           else 5.minutes,
-        bootstrapCheckpoints = if (syncConfig.hasPath("bootstrap-checkpoints")) {
+        bootstrapCheckpoints = if syncConfig.hasPath("bootstrap-checkpoints") then {
           import scala.jdk.CollectionConverters.*
           syncConfig.getStringList("bootstrap-checkpoints").asScala.toSeq.flatMap { entry =>
             // Format: "blockNumber:0xblockHash"
@@ -210,13 +203,13 @@ object Config extends InstanceConfig(ConfigFactory.load().getConfig("fukuii"), "
             }
           }
         } else Seq.empty,
-        checkpointSyncFile = if (syncConfig.hasPath("checkpoint-sync-file")) {
+        checkpointSyncFile = if syncConfig.hasPath("checkpoint-sync-file") then {
           val raw = syncConfig.getString("checkpoint-sync-file").trim
-          if (raw.isEmpty) None else Some(java.nio.file.Paths.get(raw))
+          if raw.isEmpty then None else Some(java.nio.file.Paths.get(raw))
         } else None,
-        checkpointSyncUrl = if (syncConfig.hasPath("checkpoint-sync-url")) {
+        checkpointSyncUrl = if syncConfig.hasPath("checkpoint-sync-url") then {
           val raw = syncConfig.getString("checkpoint-sync-url").trim
-          if (raw.isEmpty) None else Some(raw)
+          if raw.isEmpty then None else Some(raw)
         } else None
       )
     }
@@ -270,16 +263,16 @@ object GraphQLConfig {
     val path = "network.rpc.graphql"
     // Default to enabled when the block is absent so users pick up the feature transparently.
     val cfg =
-      if (etcClientConfig.hasPath(path)) etcClientConfig.getConfig(path)
+      if etcClientConfig.hasPath(path) then etcClientConfig.getConfig(path)
       else ConfigFactory.empty()
 
     new GraphQLConfig {
       val enabled: Boolean =
-        if (cfg.hasPath("enabled")) cfg.getBoolean("enabled") else true
+        if cfg.hasPath("enabled") then cfg.getBoolean("enabled") else true
       val maxQueryDepth: Int =
-        if (cfg.hasPath("max-query-depth")) cfg.getInt("max-query-depth") else 20
+        if cfg.hasPath("max-query-depth") then cfg.getInt("max-query-depth") else 20
       val executionTimeout: FiniteDuration =
-        if (cfg.hasPath("execution-timeout")) cfg.getDuration("execution-timeout").toMillis.millis
+        if cfg.hasPath("execution-timeout") then cfg.getDuration("execution-timeout").toMillis.millis
         else 30.seconds
     }
   }
@@ -342,7 +335,7 @@ trait DaoForkConfig {
     blockExtraData.isDefined && (extratadaBlockRange contains blockNumber)
 
   def getExtraData(blockNumber: BigInt): Option[ByteString] =
-    if (requiresExtraData(blockNumber)) blockExtraData
+    if requiresExtraData(blockNumber) then blockExtraData
     else None
 }
 
@@ -386,11 +379,11 @@ object BlockchainsConfig extends Logger {
       .toMap
 
     // Check for custom chains directory
-    val customBlockchains = if (rawConfig.hasPath(customChainsDirKey)) {
+    val customBlockchains = if rawConfig.hasPath(customChainsDirKey) then {
       val customChainsDir = rawConfig.getString(customChainsDirKey)
       val chainsDir = new File(customChainsDir)
 
-      if (chainsDir.exists() && chainsDir.isDirectory) {
+      if chainsDir.exists() && chainsDir.isDirectory then {
         log.info(s"Loading custom chain configurations from: $customChainsDir")
         val chainFiles = chainsDir.listFiles().filter { f =>
           f.isFile && f.getName.endsWith("-chain.conf")
@@ -411,7 +404,7 @@ object BlockchainsConfig extends Logger {
           result.toOption
         }.toMap
       } else {
-        if (chainsDir.exists()) {
+        if chainsDir.exists() then {
           log.warn(s"Custom chains directory is not a directory: $customChainsDir")
         } else {
           log.warn(s"Custom chains directory does not exist: $customChainsDir")
@@ -425,7 +418,7 @@ object BlockchainsConfig extends Logger {
     // Merge blockchains, with custom configs taking precedence
     val allBlockchains = builtInBlockchains ++ customBlockchains
 
-    if (customBlockchains.nonEmpty) {
+    if customBlockchains.nonEmpty then {
       log.info(
         s"Loaded ${customBlockchains.size} custom chain configuration(s): ${customBlockchains.keys.mkString(", ")}"
       )

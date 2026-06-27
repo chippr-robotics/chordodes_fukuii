@@ -47,12 +47,12 @@ class BlockBroadcast(val networkPeerManager: ActorRef, val isPoWChain: Boolean =
     // gate, go-ethereum aligned (shouldSend() returns true only every 32 blocks forward).
     val newHeader = blockToBroadcast.block.header
     val shouldSendBRU = isPoWChain || (newHeader.number % 32 == 0)
-    if (shouldSendBRU) {
+    if shouldSendBRU then {
       val bru = ETH69.BlockRangeUpdate(BigInt(0), newHeader.number, newHeader.hash)
       val eth69Peers = peersWithoutBlock.filter { case (_, PeerWithInfo(_, info)) =>
         info.remoteStatus.capability == Capability.ETH69
       }
-      if (eth69Peers.nonEmpty) {
+      if eth69Peers.nonEmpty then {
         log.info(
           "ETH69_BRU_BROADCAST: block={} hash={} to {} ETH69 peers (isPoW={})",
           newHeader.number,

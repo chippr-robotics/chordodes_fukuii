@@ -52,10 +52,9 @@ case class World(
   protected def noEmptyAccounts: Boolean = noEmptyAccountsCond
 
   override def keepPrecompileTouched(world: World): World =
-    if (world.touchedAccounts.contains(ripmdContractAddress))
+    if world.touchedAccounts.contains(ripmdContractAddress) then
       copy(touchedAccounts = touchedAccounts + ripmdContractAddress)
-    else
-      this
+    else this
   def getCode(address: Address): ByteString =
     codeRepo.getOrElse(address, codeCache.getCode(address))
 

@@ -92,7 +92,7 @@ object HealingTrieFixtures {
 
     // The genuinely-shared present node, holding ONLY a reference to the missing grandchild.
     val shared: MptNode =
-      if (sharedIsExtension) ExtensionNode(ByteString(Array[Byte](0x4)), HashNode(missingGrandchildHash.toArray))
+      if sharedIsExtension then ExtensionNode(ByteString(Array[Byte](0x4)), HashNode(missingGrandchildHash.toArray))
       else branchWith(2 -> HashNode(missingGrandchildHash.toArray))
     storage.putNode(shared)
     val sharedHash = ByteString(shared.hash)

@@ -42,7 +42,7 @@ object StaticNodesLoader extends Logger {
 
   def load(datadir: Path): Seq[URI] = {
     val filePath = datadir.resolve(FileName)
-    if (!Files.exists(filePath)) {
+    if !Files.exists(filePath) then {
       log.debug("Static nodes file {} does not exist — no static peers will be dialled", filePath)
       Seq.empty
     } else {
@@ -58,7 +58,7 @@ object StaticNodesLoader extends Logger {
 
   private def parseContent(content: String, filePath: Path): Seq[URI] = {
     val trimmed = content.trim
-    if (trimmed.isEmpty || trimmed == "[]") {
+    if trimmed.isEmpty || trimmed == "[]" then {
       Seq.empty
     } else {
       Try(parse(trimmed)) match {

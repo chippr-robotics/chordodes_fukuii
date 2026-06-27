@@ -72,12 +72,12 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 2 =>
+      case RLPList(items*) if items.length >= 2 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
         // Reject reqId > 8 bytes per spec (geth ErrInvalidReqID).
         // The case-class `require` would also catch this, but failing in the
         // codec gives a cleaner error and lets the caller short-circuit.
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val enrSeq = items(1).decodeAs[Long]("enrSeq")
         Payload.Ping(requestId, enrSeq)
@@ -96,9 +96,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 4 =>
+      case RLPList(items*) if items.length >= 4 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val enrSeq = items(1).decodeAs[Long]("enrSeq")
         val recipientIp = items(2).decodeAs[ByteVector]("recipientIp")
@@ -117,9 +117,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 2 =>
+      case RLPList(items*) if items.length >= 2 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val distances = items(1).decodeAs[List[Int]]("distances")
         Payload.FindNode(requestId, distances)
@@ -137,9 +137,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 3 =>
+      case RLPList(items*) if items.length >= 3 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val total = items(1).decodeAs[Int]("total")
         val enrs = items(2).decodeAs[List[EthereumNodeRecord]]("enrs")
@@ -158,9 +158,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 3 =>
+      case RLPList(items*) if items.length >= 3 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val protocol = items(1).decodeAs[ByteVector]("protocol")
         val message = items(2).decodeAs[ByteVector]("message")
@@ -178,9 +178,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 2 =>
+      case RLPList(items*) if items.length >= 2 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val message = items(1).decodeAs[ByteVector]("message")
         Payload.TalkResponse(requestId, message)

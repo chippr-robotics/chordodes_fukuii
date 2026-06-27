@@ -100,7 +100,7 @@ class OlympiaGasLimitSpec
     val threshold = OlympiaGasTarget * 99 / 100
 
     var blocks = 0
-    while (limit < threshold && blocks < 200_000) {
+    while limit < threshold && blocks < 200_000 do {
       limit = gen.calcGasLimit(limit, OlympiaTestBlock + blocks)
       blocks += 1
     }
@@ -152,9 +152,9 @@ class OlympiaGasLimitSpec
     val rng = new scala.util.Random(42)
 
     // Simulate 10,000 blocks with 70% honest (60M) / 30% adversary (30M)
-    for (i <- 1 to 10_000)
+    for i <- 1 to 10_000 do
       limit =
-        if (rng.nextInt(100) < 70) honestGen.calcGasLimit(limit, OlympiaTestBlock + i)
+        if rng.nextInt(100) < 70 then honestGen.calcGasLimit(limit, OlympiaTestBlock + i)
         else adversaryGen.calcGasLimit(limit, OlympiaTestBlock + i)
 
     // With 70% honest, should converge near 60M (within 5%)

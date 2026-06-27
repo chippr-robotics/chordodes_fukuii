@@ -55,7 +55,7 @@ class ModExpEIP7883GasSpec extends AnyFlatSpec with Matchers {
       ByteString(arr)
     }
     val expData = new Array[Byte](expLen)
-    if (expLen > 0) expData(0) = expFirstByte
+    if expLen > 0 then expData(0) = expFirstByte
     toBytes32(baseLen) ++ toBytes32(expLen) ++ toBytes32(modLen) ++
       ByteString(new Array[Byte](baseLen)) ++
       ByteString(expData) ++

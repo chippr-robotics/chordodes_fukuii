@@ -119,7 +119,7 @@ class VMClient(messageHandler: MessageHandlerApi, testMode: Boolean) extends Log
       resultMsg.logs.map(l => TxLogEntry(l.address, l.topics.map(t => t: ByteString), l.data)),
       Nil,
       resultMsg.gasRefund,
-      if (resultMsg.error) Some(OutOfGas) else None,
+      if resultMsg.error then Some(OutOfGas) else None,
       accessedResultTuple._1,
       accessedResultTuple._2
     )
@@ -138,26 +138,26 @@ class VMClient(messageHandler: MessageHandlerApi, testMode: Boolean) extends Log
 
       val initialAccount = w.getAccount(address).getOrElse(w.getEmptyAccount)
       val updatedAccount =
-        if (change.nonce.isEmpty) initialAccount
+        if change.nonce.isEmpty then initialAccount
         else initialAccount.copy(nonce = change.nonce, balance = change.balance)
 
       val w1 = w.saveAccount(address, updatedAccount).saveStorage(address, updatedStorage)
-      if (change.code.isEmpty) w1 else w1.saveCode(address, change.code)
+      if change.code.isEmpty then w1 else w1.saveCode(address, change.code)
     }
 
     worldWithUpdatedAccounts.touchAccounts(resultMsg.touchedAccounts.map(a => a: Address)*)
   }
 
-  private def buildCallContextMsg(ctx: ProgramContext[_, _]): msg.CallContext = {
+  private def buildCallContextMsg(ctx: ProgramContext[?, ?]): msg.CallContext = {
     import msg.CallContext.Config
     val blockHeader = buildBlockHeaderMsg(ctx.blockHeader)
 
     val config =
-      if (testMode) Config.EthereumConfig(buildEthereumConfigMsg(ctx.evmConfig.blockchainConfig))
+      if testMode then Config.EthereumConfig(buildEthereumConfigMsg(ctx.evmConfig.blockchainConfig))
       else Config.Empty
 
     val txType =
-      if (ctx.warmAddresses.isEmpty && ctx.warmStorage.isEmpty) msg.CallContext.TxType.LEGACY
+      if ctx.warmAddresses.isEmpty && ctx.warmStorage.isEmpty then msg.CallContext.TxType.LEGACY
       else msg.CallContext.TxType.ACCESSLIST
 
     val extraData = txType match {

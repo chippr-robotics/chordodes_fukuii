@@ -81,7 +81,7 @@ class LauncherIntegrationSpec extends AnyFlatSpec with Matchers {
   }
 
   private def deleteRecursively(file: File): Unit = {
-    if (file.isDirectory) {
+    if file.isDirectory then {
       val children = Option(file.listFiles()).getOrElse(Array.empty[File])
       children.foreach(deleteRecursively)
     }

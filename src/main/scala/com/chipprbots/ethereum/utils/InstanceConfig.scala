@@ -39,7 +39,7 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
   val shutdownTimeout: Duration = config.getDuration("shutdown-timeout").toMillis.millis
 
   val secureRandomAlgo: Option[String] =
-    if (config.hasPath("secure-random-algo")) Some(config.getString("secure-random-algo"))
+    if config.hasPath("secure-random-algo") then Some(config.getString("secure-random-algo"))
     else None
 
   import com.chipprbots.ethereum.network.p2p.messages.Capability
@@ -63,21 +63,17 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
   locally {
     val p = networkProtocols
     val networkName =
-      if (config.hasPath("blockchains.network")) config.getString("blockchains.network") else instanceId
-    if (!p.eth68)
-      log.warn("[InstanceConfig] eth68 disabled; this node cannot communicate with legacy peers")
-    if (p.eth70 && !p.eth69)
-      log.warn("[InstanceConfig] eth70 requires eth69; both should be enabled")
-    if (p.eth71 && !p.eth70)
-      log.warn("[InstanceConfig] eth71 requires eth70; both should be enabled")
-    if (p.snap2 && !p.snap1)
-      log.warn("[InstanceConfig] snap2 requires snap1; both should be enabled")
+      if config.hasPath("blockchains.network") then config.getString("blockchains.network") else instanceId
+    if !p.eth68 then log.warn("[InstanceConfig] eth68 disabled; this node cannot communicate with legacy peers")
+    if p.eth70 && !p.eth69 then log.warn("[InstanceConfig] eth70 requires eth69; both should be enabled")
+    if p.eth71 && !p.eth70 then log.warn("[InstanceConfig] eth71 requires eth70; both should be enabled")
+    if p.snap2 && !p.snap1 then log.warn("[InstanceConfig] snap2 requires snap1; both should be enabled")
     val disabled = List(
       Option.unless(p.eth70)("eth70"),
       Option.unless(p.eth71)("eth71"),
       Option.unless(p.snap2)("snap2")
     ).flatten
-    val disabledNote = if (disabled.nonEmpty) s"; ${disabled.mkString("/")} disabled by config" else ""
+    val disabledNote = if disabled.nonEmpty then s"; ${disabled.mkString("/")} disabled by config" else ""
     log.info(
       s"[InstanceConfig] Protocol capabilities: [${supportedCapabilities.mkString(", ")}]" +
         s" (network=$networkName$disabledNote)"
@@ -98,7 +94,7 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
       val port: Int = serverConfig.getInt("port")
       val listenAddress = new InetSocketAddress(interface, port)
       val advertisedAddress: Option[String] =
-        if (serverConfig.hasPath("advertised-address") && !serverConfig.getIsNull("advertised-address"))
+        if serverConfig.hasPath("advertised-address") && !serverConfig.getIsNull("advertised-address") then
           Some(serverConfig.getString("advertised-address"))
         else None
     }
@@ -122,7 +118,7 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
       val pruneIncomingPeers: Int = peerConfig.getInt("prune-incoming-peers")
       val minPruneAge: FiniteDuration = peerConfig.getDuration("min-prune-age").toMillis.millis
       val networkId: Long = blockchainConfig.networkId
-      val p2pVersion: Int = if (peerConfig.hasPath("p2p-version")) peerConfig.getInt("p2p-version") else 5
+      val p2pVersion: Int = if peerConfig.hasPath("p2p-version") then peerConfig.getInt("p2p-version") else 5
 
       val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration {
         val waitForHandshakeTimeout: FiniteDuration =
@@ -166,10 +162,10 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
       override val blockSize: Long = rocksDbConfig.getLong("block-size")
       override val blockCacheSize: Long = rocksDbConfig.getLong("block-cache-size")
       override val dbWriteBufferSize: Long =
-        if (rocksDbConfig.hasPath("db-write-buffer-size")) rocksDbConfig.getLong("db-write-buffer-size")
+        if rocksDbConfig.hasPath("db-write-buffer-size") then rocksDbConfig.getLong("db-write-buffer-size")
         else 512L * 1024 * 1024
       override val maxTotalWalSize: Long =
-        if (rocksDbConfig.hasPath("max-total-wal-size")) rocksDbConfig.getLong("max-total-wal-size")
+        if rocksDbConfig.hasPath("max-total-wal-size") then rocksDbConfig.getLong("max-total-wal-size")
         else 512L * 1024 * 1024
       // spec 002 US2 (FR-005): off by default; enables block-cache hit/miss tickers at ~1-2% read overhead.
       override val enableStatistics: Boolean =

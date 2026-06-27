@@ -29,11 +29,11 @@ class TimeSlotStats[K, V: Monoid] private (
     val currSlotId = slotId(currentTimeMillis)
     val lastEntry = buffer(lastIdx)
 
-    if (currSlotId == lastEntry.slotId) {
+    if currSlotId == lastEntry.slotId then {
       // We're still in the same timeslot, so just append stats.
       val newEntry = lastEntry.add(key, stat)
       updated(lastIdx, newEntry)
-    } else if (currSlotId > lastEntry.slotId) {
+    } else if currSlotId > lastEntry.slotId then {
       // Go to the next slot.
       val newIdx = succ(lastIdx)
       val newEntry = Entry(currSlotId, Map(key -> stat))
@@ -66,12 +66,11 @@ class TimeSlotStats[K, V: Monoid] private (
     @tailrec
     def loop(idx: Int, acc: List[Map[K, V]]): List[Map[K, V]] = {
       val entry = buffer(idx)
-      if (entry.slotId < start || end < entry.slotId)
-        acc
+      if entry.slotId < start || end < entry.slotId then acc
       else {
         val nextAcc = entry.slotStats :: acc
         val nextIdx = pred(idx)
-        if (nextIdx == lastIdx) nextAcc else loop(nextIdx, nextAcc)
+        if nextIdx == lastIdx then nextAcc else loop(nextIdx, nextAcc)
       }
     }
 
@@ -93,7 +92,7 @@ class TimeSlotStats[K, V: Monoid] private (
   }
 
   private def succ(idx: Int): Int = (idx + 1) % slotCount
-  private def pred(idx: Int): Int = if (idx == 0) slotCount - 1 else idx - 1
+  private def pred(idx: Int): Int = if idx == 0 then slotCount - 1 else idx - 1
 
   private def updated(
       lastIdx: Int,
@@ -130,7 +129,7 @@ object TimeSlotStats {
       slotDuration: FiniteDuration,
       slotCount: Int
   )(implicit clock: Clock): Option[TimeSlotStats[K, V]] =
-    if (slotDuration == Duration.Zero || slotCount <= 0) None
+    if slotDuration == Duration.Zero || slotCount <= 0 then None
     else
       Some {
         new TimeSlotStats[K, V](

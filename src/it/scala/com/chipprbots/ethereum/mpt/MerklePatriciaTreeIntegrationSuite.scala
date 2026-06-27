@@ -101,7 +101,7 @@ class MerklePatriciaTreeIntegrationSuite
       // We slice some of the keys so that me test more code coverage (if not we only test keys with the same length)
       val slicedKeys = keys.zipWithIndex.map { case (key, index) =>
         val hashedKey = md5(key)
-        if (index % 2 == 0) hashedKey.take(hashedKey.length / 2) else hashedKey
+        if index % 2 == 0 then hashedKey.take(hashedKey.length / 2) else hashedKey
       }
       val keyValuePairs = slicedKeys.zip(keys)
 
@@ -124,7 +124,7 @@ class MerklePatriciaTreeIntegrationSuite
       // We slice some of the keys so that me test more code coverage (if not we only test keys with the same length)
       val slicedKeys = keys.zipWithIndex.map { case (key, index) =>
         val hashedKey = md5(key)
-        if (index % 2 == 0) hashedKey.take(hashedKey.length / 2) else hashedKey
+        if index % 2 == 0 then hashedKey.take(hashedKey.length / 2) else hashedKey
       }
       val keyValuePairs = slicedKeys.zip(keys)
 

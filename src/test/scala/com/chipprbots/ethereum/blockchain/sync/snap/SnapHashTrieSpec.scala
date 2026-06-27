@@ -150,7 +150,8 @@ class SnapHashTrieSpec extends AnyFlatSpec with Matchers {
     w.pendingBatchCount shouldEqual 0
     // The bytes we observed before commit plus any already-flushed bytes must
     // equal the total bytes seen by the writer.
-    val alreadyFlushed = rec.batches.dropRight(if (rec.batches.nonEmpty) 1 else 0).flatten.map(_._2.length.toLong).sum
+    val alreadyFlushed =
+      rec.batches.dropRight(if rec.batches.nonEmpty then 1 else 0).flatten.map(_._2.length.toLong).sum
     val finalFlush = rec.batches.lastOption.map(_.map(_._2.length.toLong).sum).getOrElse(0L)
     (alreadyFlushed + finalFlush) shouldEqual rec.totalBytes
     beforeCommit should be <= rec.totalBytes

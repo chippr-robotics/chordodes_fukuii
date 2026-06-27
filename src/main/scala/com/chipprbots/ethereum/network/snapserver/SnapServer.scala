@@ -33,7 +33,7 @@ object SnapServer extends Logger {
   def hashToNibbles(hash: ByteString): Array[Byte] = {
     val out = new Array[Byte](hash.size * 2)
     var i = 0
-    while (i < hash.size) {
+    while i < hash.size do {
       val b = hash(i) & 0xff
       out(i * 2) = ((b >>> 4) & 0x0f).toByte
       out(i * 2 + 1) = (b & 0x0f).toByte
@@ -44,11 +44,11 @@ object SnapServer extends Logger {
 
   /** Convert a 64-nibble key path back to a 32-byte hash. Returns None if length is odd. */
   def nibblesToHash(nibbles: Array[Byte]): Option[ByteString] =
-    if (nibbles.length % 2 != 0) None
+    if nibbles.length % 2 != 0 then None
     else {
       val out = new Array[Byte](nibbles.length / 2)
       var i = 0
-      while (i < out.length) {
+      while i < out.length do {
         out(i) = (((nibbles(i * 2) & 0x0f) << 4) | (nibbles(i * 2 + 1) & 0x0f)).toByte
         i += 1
       }
@@ -59,9 +59,9 @@ object SnapServer extends Logger {
   private def cmpNibbles(a: Array[Byte], b: Array[Byte]): Int = {
     val len = math.min(a.length, b.length)
     var i = 0
-    while (i < len) {
+    while i < len do {
       val cmp = (a(i) & 0xff) - (b(i) & 0xff)
-      if (cmp != 0) return cmp
+      if cmp != 0 then return cmp
       i += 1
     }
     a.length - b.length
@@ -97,10 +97,10 @@ object SnapServer extends Logger {
     val nonceRlp: RLPEncodeable = RLPValue(ByteUtils.bigIntToUnsignedByteArray(account.nonce))
     val balanceRlp: RLPEncodeable = RLPValue(ByteUtils.bigIntToUnsignedByteArray(account.balance))
     val srRlp: RLPEncodeable =
-      if (account.storageRoot == Account.EmptyStorageRootHash) RLPValue(Array.emptyByteArray)
+      if account.storageRoot == Account.EmptyStorageRootHash then RLPValue(Array.emptyByteArray)
       else RLPValue(account.storageRoot.toArray)
     val chRlp: RLPEncodeable =
-      if (account.codeHash == Account.EmptyCodeHash) RLPValue(Array.emptyByteArray)
+      if account.codeHash == Account.EmptyCodeHash then RLPValue(Array.emptyByteArray)
       else RLPValue(account.codeHash.toArray)
     RLPList(nonceRlp, balanceRlp, srRlp, chRlp)
   }
@@ -146,8 +146,8 @@ object SnapServer extends Logger {
     var stop = false
 
     def descend(node: MptNode, prefix: Array[Byte]): Unit = {
-      if (stop) return
-      if (!subtreeIntersectsRange(prefix, originNibbles, limitNibbles)) return
+      if stop then return
+      if !subtreeIntersectsRange(prefix, originNibbles, limitNibbles) then return
       resolve(node, storage) match {
         case NullNode                      => ()
         case LeafNode(key, value, _, _, _) =>
@@ -157,29 +157,29 @@ object SnapServer extends Logger {
           // (returns the matching leaf, then stops) and the "first at-or-after"
           // semantics for keys that don't exist.
           val fullKey = prefix ++ key.toArray
-          if (cmpNibbles(fullKey, originNibbles) >= 0) {
+          if cmpNibbles(fullKey, originNibbles) >= 0 then {
             nibblesToHash(fullKey).foreach { h =>
               val keep = visit(h, value)
               val pastLimit = cmpNibbles(fullKey, limitNibbles) >= 0
-              if (!keep || pastLimit) stop = true
+              if !keep || pastLimit then stop = true
             }
           }
         case ExtensionNode(sharedKey, next, _, _, _) =>
           descend(next, prefix ++ sharedKey.toArray)
         case BranchNode(children, terminator, _, _, _) =>
           terminator.foreach { value =>
-            if (cmpNibbles(prefix, originNibbles) >= 0) {
+            if cmpNibbles(prefix, originNibbles) >= 0 then {
               nibblesToHash(prefix).foreach { h =>
                 val keep = visit(h, value)
                 val pastLimit = cmpNibbles(prefix, limitNibbles) >= 0
-                if (!keep || pastLimit) stop = true
+                if !keep || pastLimit then stop = true
               }
             }
           }
           var nibble = 0
-          while (nibble < 16 && !stop) {
+          while nibble < 16 && !stop do {
             val child = children(nibble)
-            if (child != NullNode) descend(child, prefix :+ nibble.toByte)
+            if child != NullNode then descend(child, prefix :+ nibble.toByte)
             nibble += 1
           }
         case _: HashNode => () // resolve() above prevents reaching here
@@ -210,14 +210,14 @@ object SnapServer extends Logger {
             case LeafNode(_, _, _, _, _) => ()
             case ExtensionNode(sharedKey, next, _, _, _) =>
               val sk = sharedKey.toArray
-              if (remaining.length >= sk.length && remaining.take(sk.length).sameElements(sk)) {
+              if remaining.length >= sk.length && remaining.take(sk.length).sameElements(sk) then {
                 descend(next, remaining.drop(sk.length))
               }
             case BranchNode(children, _, _, _, _) =>
-              if (remaining.nonEmpty) {
+              if remaining.nonEmpty then {
                 val nibble = remaining(0) & 0x0f
                 val child = children(nibble)
-                if (child != NullNode) descend(child, remaining.drop(1))
+                if child != NullNode then descend(child, remaining.drop(1))
               }
             case _ => ()
           }
@@ -240,10 +240,10 @@ object SnapServer extends Logger {
       responseBytes: BigInt,
       storage: MptStorage
   ): AccountRange = {
-    if (isEmptyRoot(rootHash)) return AccountRange(requestId, Seq.empty, Seq.empty)
+    if isEmptyRoot(rootHash) then return AccountRange(requestId, Seq.empty, Seq.empty)
 
     val rootNode = fetchRootNode(rootHash, storage)
-    if (rootNode == NullNode) {
+    if rootNode == NullNode then {
       log.debug("SNAP serveAccountRange: root {} not in storage", rootHash.take(4))
       return AccountRange(requestId, Seq.empty, Seq.empty)
     }
@@ -258,13 +258,13 @@ object SnapServer extends Logger {
       val l = limitHash.toArray
       var i = 0
       var ord = 0
-      while (i < s.length && i < l.length && ord == 0) {
+      while i < s.length && i < l.length && ord == 0 do {
         ord = (s(i) & 0xff) - (l(i) & 0xff)
         i += 1
       }
       ord > 0
     }
-    val effectiveLimit = if (isReversed) ByteString(Array.fill[Byte](32)(0xff.toByte)) else limitHash
+    val effectiveLimit = if isReversed then ByteString(Array.fill[Byte](32)(0xff.toByte)) else limitHash
     val originNibbles = hashToNibbles(startingHash)
     val limitNibbles = hashToNibbles(effectiveLimit)
     val maxBytes = responseBytes.min(BigInt(2 * 1024 * 1024)).max(BigInt(0)).toInt
@@ -284,7 +284,7 @@ object SnapServer extends Logger {
       // Wrong-order requests: stop after a single item. Otherwise continue while under
       // budget; the first item is always emitted (the visitor only sees this branch
       // after we add to `collected`).
-      if (isReversed) false
+      if isReversed then false
       else accumulated < maxBytes && System.currentTimeMillis() < deadline
     }
 
@@ -302,7 +302,7 @@ object SnapServer extends Logger {
         case Some((lastKey, _)) =>
           val lastNibbles = hashToNibbles(lastKey)
           val startNibbles = hashToNibbles(startingHash)
-          if (lastNibbles.sameElements(startNibbles)) leftProof
+          if lastNibbles.sameElements(startNibbles) then leftProof
           else leftProof ++ proofFor(rootNode, storage, lastNibbles)
       }
     }
@@ -326,7 +326,7 @@ object SnapServer extends Logger {
       storage: MptStorage,
       accountRoot: ByteString => Option[ByteString]
   ): StorageRanges = {
-    if (isEmptyRoot(rootHash)) return StorageRanges(requestId, Seq.empty, Seq.empty)
+    if isEmptyRoot(rootHash) then return StorageRanges(requestId, Seq.empty, Seq.empty)
 
     val maxBytes = responseBytes.min(BigInt(2 * 1024 * 1024)).max(BigInt(0)).toInt
     val deadline = System.currentTimeMillis() + 4000
@@ -335,26 +335,25 @@ object SnapServer extends Logger {
     var firstProof: Seq[ByteString] = Seq.empty
     var done = false
     val it = accountHashes.iterator
-    while (it.hasNext && !done && System.currentTimeMillis() < deadline) {
+    while it.hasNext && !done && System.currentTimeMillis() < deadline do {
       val accountHash = it.next()
       accountRoot(accountHash) match {
         case None =>
           // Account or its storage root unknown — skip.
           perAccount += Seq.empty
         case Some(storageRoot) =>
-          if (isEmptyRoot(storageRoot)) {
+          if isEmptyRoot(storageRoot) then {
             perAccount += Seq.empty
           } else {
             val rootNode = fetchRootNode(storageRoot, storage)
-            if (rootNode == NullNode) {
+            if rootNode == NullNode then {
               perAccount += Seq.empty
             } else {
               // First account uses the requested [start, limit] range; subsequent
               // accounts are returned in FULL.
               val isFirst = perAccount.isEmpty
               val (originN, limitN) =
-                if (isFirst)
-                  (hashToNibbles(startingHash), hashToNibbles(limitHash))
+                if isFirst then (hashToNibbles(startingHash), hashToNibbles(limitHash))
                 else
                   (
                     hashToNibbles(ByteString(new Array[Byte](32))),
@@ -372,7 +371,7 @@ object SnapServer extends Logger {
                 System.currentTimeMillis() < deadline
               }
               val truncated = accumulated >= maxBytes
-              if (isFirst) {
+              if isFirst then {
                 // Per geth (handler.go:435-438): the right-bound proof is only
                 // needed when the response was truncated. If the walker ran to
                 // completion the right edge is implicit.
@@ -380,7 +379,7 @@ object SnapServer extends Logger {
                   val first = collected.headOption.map(_._1).getOrElse(startingHash)
                   val leftProof = proofFor(rootNode, storage, hashToNibbles(first))
                   val full =
-                    if (!truncated) leftProof
+                    if !truncated then leftProof
                     else
                       collected.lastOption match {
                         case Some((last, _)) if last != first =>
@@ -391,7 +390,7 @@ object SnapServer extends Logger {
                 }
               }
               perAccount += collected.toSeq
-              if (truncated) done = true
+              if truncated then done = true
             }
           }
       }
@@ -416,21 +415,20 @@ object SnapServer extends Logger {
 
     // Per geth (handler.go:522-525), a zero-item pathset anywhere in the request
     // is a protocol-level bad request — the whole response is empty.
-    if (paths.exists(_.isEmpty)) return TrieNodes(requestId, Seq.empty)
+    if paths.exists(_.isEmpty) then return TrieNodes(requestId, Seq.empty)
 
     val rootNode = fetchRootNode(rootHash, storage)
     val collected = scala.collection.mutable.ArrayBuffer.empty[ByteString]
 
-    if (rootNode == NullNode) {
+    if rootNode == NullNode then {
       // Root not found — return empty (sparse), matching go-ethereum's handler.go behaviour.
       return TrieNodes(requestId, Seq.empty)
     } else {
       var idx = 0
-      while (
-        idx < paths.size && (accumulated < maxBytes || collected.isEmpty) && System.currentTimeMillis() < deadline
-      ) {
+      while idx < paths.size && (accumulated < maxBytes || collected.isEmpty) && System.currentTimeMillis() < deadline
+      do {
         val pathSet = paths(idx)
-        if (pathSet.size == 1) {
+        if pathSet.size == 1 then {
           // Single-element path: account-trie node lookup (HP-encoded partial path).
           val nibbles = decodeHpPath(pathSet.head.toArray)
           collectNodeAtPath(rootNode, storage, nibbles) match {
@@ -450,9 +448,9 @@ object SnapServer extends Logger {
           resolveLeafAccount(rootNode, storage, accountNibbles) match {
             case Some(account) if account.storageRoot != Account.EmptyStorageRootHash =>
               val storageRootNode = fetchRootNode(account.storageRoot, storage)
-              if (storageRootNode != NullNode) {
+              if storageRootNode != NullNode then {
                 storageNibblesList.foreach { storagePath =>
-                  if (accumulated < maxBytes || collected.isEmpty) {
+                  if accumulated < maxBytes || collected.isEmpty then {
                     val sn = decodeHpPath(storagePath.toArray)
                     collectNodeAtPath(storageRootNode, storage, sn) match {
                       case Some(enc) =>
@@ -493,17 +491,17 @@ object SnapServer extends Logger {
         case NullNode => None
         case LeafNode(key, value, _, _, _) =>
           val k = key.toArray
-          if (remaining.sameElements(k)) {
+          if remaining.sameElements(k) then {
             try Some(value.toArray.toAccount)
             catch { case _: Throwable => None }
           } else None
         case ExtensionNode(sharedKey, next, _, _, _) =>
           val sk = sharedKey.toArray
-          if (remaining.length >= sk.length && remaining.take(sk.length).sameElements(sk))
+          if remaining.length >= sk.length && remaining.take(sk.length).sameElements(sk) then
             descend(next, remaining.drop(sk.length))
           else None
         case BranchNode(children, terminator, _, _, _) =>
-          if (remaining.isEmpty) {
+          if remaining.isEmpty then {
             // The account sits in the branch terminator slot.
             terminator.flatMap { v =>
               try Some(v.toArray.toAccount)
@@ -512,7 +510,7 @@ object SnapServer extends Logger {
           } else {
             val nibble = remaining(0) & 0x0f
             val child = children(nibble)
-            if (child == NullNode) None else descend(child, remaining.drop(1))
+            if child == NullNode then None else descend(child, remaining.drop(1))
           }
         case _: HashNode => None
       }
@@ -525,11 +523,11 @@ object SnapServer extends Logger {
     * leaf/extension flag bit.
     */
   private def decodeHpPath(bytes: Array[Byte]): Array[Byte] = {
-    if (bytes.isEmpty) return Array.emptyByteArray
+    if bytes.isEmpty then return Array.emptyByteArray
     val firstByte = bytes(0) & 0xff
     val oddLen = (firstByte & 0x10) != 0
-    val skipFirst = if (oddLen) 0 else 1
-    val firstNibble = if (oddLen) Array((firstByte & 0x0f).toByte) else Array.empty[Byte]
+    val skipFirst = if oddLen then 0 else 1
+    val firstNibble = if oddLen then Array((firstByte & 0x0f).toByte) else Array.empty[Byte]
     val rest = bytes.drop(1).flatMap { b =>
       Array(((b >>> 4) & 0x0f).toByte, (b & 0x0f).toByte)
     }
@@ -554,9 +552,9 @@ object SnapServer extends Logger {
     val collected = scala.collection.mutable.ListBuffer.empty[ByteString]
     var totalBytes = 0
     val it = hashes.take(1024).iterator
-    while (it.hasNext && (totalBytes < maxBytes || collected.isEmpty)) {
+    while it.hasNext && (totalBytes < maxBytes || collected.isEmpty) do {
       val codeHash = it.next()
-      if (codeHash == Account.EmptyCodeHash) {
+      if codeHash == Account.EmptyCodeHash then {
         collected += ByteString.empty
         // empty code contributes 0 bytes; do not count toward budget
       } else {
@@ -580,24 +578,24 @@ object SnapServer extends Logger {
 
     def descend(node: MptNode, remaining: Array[Byte]): Option[ByteString] = {
       val resolved = resolve(node, storage)
-      if (remaining.isEmpty) {
+      if remaining.isEmpty then {
         Some(ByteString(MptTraversals.encodeNode(resolved)))
       } else {
         resolved match {
           case NullNode => None
           case LeafNode(key, _, _, _, _) =>
             val k = key.toArray
-            if (remaining.sameElements(k)) Some(ByteString(MptTraversals.encodeNode(resolved)))
+            if remaining.sameElements(k) then Some(ByteString(MptTraversals.encodeNode(resolved)))
             else None
           case ExtensionNode(sharedKey, next, _, _, _) =>
             val sk = sharedKey.toArray
-            if (remaining.length >= sk.length && remaining.take(sk.length).sameElements(sk))
+            if remaining.length >= sk.length && remaining.take(sk.length).sameElements(sk) then
               descend(next, remaining.drop(sk.length))
             else None
           case BranchNode(children, _, _, _, _) =>
             val nibble = remaining(0) & 0x0f
             val child = children(nibble)
-            if (child == NullNode) None
+            if child == NullNode then None
             else descend(child, remaining.drop(1))
           case _: HashNode => None // resolve handles
         }

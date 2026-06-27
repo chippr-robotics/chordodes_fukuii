@@ -65,7 +65,7 @@ class PivotBlockSelector(
   override def receive: Receive = idle
 
   private def idle: Receive = handlePeerListMessages.orElse { case SelectPivotBlock =>
-    if (totalSelectionAttempts >= maxTotalSelectionAttempts) {
+    if totalSelectionAttempts >= maxTotalSelectionAttempts then {
       log.error(
         "Pivot block selection failed after {} total attempts. Stopping pivot block selector.",
         maxTotalSelectionAttempts
@@ -83,7 +83,7 @@ class PivotBlockSelector(
   private def startPivotBlockSelection(election: ElectionDetails): Unit = {
     val ElectionDetails(correctPeers, currentBestBlockNumber, expectedPivotBlock) = election
 
-    if (election.hasEnoughVoters(minPeersToChoosePivotBlock)) {
+    if election.hasEnoughVoters(minPeersToChoosePivotBlock) then {
       val (peersToAsk, waitingPeers) = correctPeers.splitAt(minPeersToChoosePivotBlock + peersToChoosePivotBlockMargin)
 
       log.debug(
@@ -122,7 +122,7 @@ class PivotBlockSelector(
   // Voters are collected until minimum peers to choose pivot block is obtained.
   private def retryPivotBlockSelection(pivotBlockNumber: BigInt): Unit = {
     pivotBlockRetryCount += 1
-    if (pivotBlockRetryCount <= maxPivotBlockFailuresCount && pivotBlockNumber > 0) {
+    if pivotBlockRetryCount <= maxPivotBlockFailuresCount && pivotBlockNumber > 0 then {
       val electionDetails = collectVoters(Some(pivotBlockNumber))
       startPivotBlockSelection(electionDetails)
     } else {
@@ -181,13 +181,13 @@ class PivotBlockSelector(
     // so there is no most voted header
     val maybeBlockHeaderWithVotes = headers.mostVotedHeader
     // All peers responded - consensus reached
-    if (peersToAsk.isEmpty && maybeBlockHeaderWithVotes.exists(hWv => hWv.votes >= minPeersToChoosePivotBlock)) {
+    if peersToAsk.isEmpty && maybeBlockHeaderWithVotes.exists(hWv => hWv.votes >= minPeersToChoosePivotBlock) then {
       timeout.cancel()
       maybeBlockHeaderWithVotes.foreach(hWv => sendResponseAndCleanup(hWv.header))
       // Consensus could not be reached - ask additional peer if available
-    } else if (!isPossibleToReachConsensus(peersToAsk.size, maybeBlockHeaderWithVotes.map(_.votes).getOrElse(0))) {
+    } else if !isPossibleToReachConsensus(peersToAsk.size, maybeBlockHeaderWithVotes.map(_.votes).getOrElse(0)) then {
       timeout.cancel()
-      if (waitingPeers.nonEmpty) { // There are more peers to ask
+      if waitingPeers.nonEmpty then { // There are more peers to ask
         val newTimeout = scheduler.scheduleOnce(peerResponseTimeout, self, ElectionPivotBlockTimeout)
         val additionalPeer :: newWaitingPeers = waitingPeers: @unchecked
 
@@ -231,7 +231,7 @@ class PivotBlockSelector(
     pivotBlockRetryCount = 0
     val delay = pivotRetryState.nextDelay
     pivotRetryState = pivotRetryState.recordAttempt
-    if (pivotRetryState.attempt % PivotBlockSelector.SuspiciousRetryThreshold == 0) {
+    if pivotRetryState.attempt % PivotBlockSelector.SuspiciousRetryThreshold == 0 then {
       log.warning(
         "{} pivot block selection retries have failed to obtain a valid pivot block",
         pivotRetryState.attempt

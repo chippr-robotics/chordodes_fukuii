@@ -77,7 +77,7 @@ object Block {
         // EIP-4895: a header that declares a withdrawalsRoot must be paired with a
         // withdrawals field in the block body. A 3-item RLP with a Shanghai+ header
         // is malformed — reject rather than silently treating the body as pre-Shanghai.
-        if (decodedHeader.withdrawalsRoot.isDefined)
+        if decodedHeader.withdrawalsRoot.isDefined then
           throw new RuntimeException("Cannot decode block: Shanghai+ header requires withdrawals in body")
         Block(
           decodedHeader,

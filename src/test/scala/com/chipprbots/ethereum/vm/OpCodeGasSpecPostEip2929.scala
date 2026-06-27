@@ -99,7 +99,7 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       val memIn = Memory.empty.store(addr.toUInt256, Array.fill[Byte](size.toInt)(-1))
       val stateIn = initState.withStack(stackIn).withMemory(memIn).copy(gas = expectedGas)
 
-      val stateOut = if (accessed) op.execute(stateIn.addAccessedAddress(addr)) else op.execute(stateIn)
+      val stateOut = if accessed then op.execute(stateIn.addAccessedAddress(addr)) else op.execute(stateIn)
 
       verifyGas(expectedGas, stateIn, stateOut, allowOOG = false)
       stateOut.accessedAddresses should contain(addr)
@@ -122,8 +122,7 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       val memCost = config.calcMemCost(stateIn.memory.size, offset, size)
       val copyCost = G_copy * wordsForBytes(size)
       val expectedGas =
-        if (stateIn.accessedAddresses.contains(addr))
-          G_warm_storage_read + memCost + copyCost
+        if stateIn.accessedAddresses.contains(addr) then G_warm_storage_read + memCost + copyCost
         else G_cold_account_access + memCost + copyCost
 
       verifyGas(expectedGas, stateIn, stateOut)
@@ -172,12 +171,10 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       val refundAddress = Address(refund)
       whenever(stateIn.world.getAccount(refundAddress).isEmpty && stateIn.ownBalance > 0) {
         val stateOut =
-          if (addressAlreadyAccessed) op.execute(stateIn.addAccessedAddress(refundAddress)) else op.execute(stateIn)
+          if addressAlreadyAccessed then op.execute(stateIn.addAccessedAddress(refundAddress)) else op.execute(stateIn)
         stateOut.gasRefund shouldEqual R_selfdestruct
-        if (addressAlreadyAccessed)
-          verifyGas(G_selfdestruct + G_newaccount, stateIn, stateOut)
-        else
-          verifyGas(G_selfdestruct + G_newaccount + G_cold_account_access, stateIn, stateOut)
+        if addressAlreadyAccessed then verifyGas(G_selfdestruct + G_newaccount, stateIn, stateOut)
+        else verifyGas(G_selfdestruct + G_newaccount + G_cold_account_access, stateIn, stateOut)
       }
     }
 
@@ -188,12 +185,10 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       val world = stateIn.world.saveAccount(refundAddress, Account.empty().increaseNonce())
       val updatedStateIn = stateIn.withWorld(world)
       val stateOut =
-        if (addressAlreadyAccessed) op.execute(updatedStateIn.addAccessedAddress(refundAddress))
+        if addressAlreadyAccessed then op.execute(updatedStateIn.addAccessedAddress(refundAddress))
         else op.execute(updatedStateIn)
-      if (addressAlreadyAccessed)
-        verifyGas(G_selfdestruct, updatedStateIn, stateOut)
-      else
-        verifyGas(G_selfdestruct + G_cold_account_access, updatedStateIn, stateOut)
+      if addressAlreadyAccessed then verifyGas(G_selfdestruct, updatedStateIn, stateOut)
+      else verifyGas(G_selfdestruct + G_cold_account_access, updatedStateIn, stateOut)
       stateOut.gasRefund shouldEqual R_selfdestruct
     }
 
@@ -204,12 +199,10 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       whenever(stateIn.world.getAccount(refundAddress).isEmpty && stateIn.ownBalance > 0) {
         val updatedStateIn = stateIn.withAddressToDelete(stateIn.env.ownerAddr)
         val stateOut =
-          if (addressAlreadyAccessed) op.execute(updatedStateIn.addAccessedAddress(refundAddress))
+          if addressAlreadyAccessed then op.execute(updatedStateIn.addAccessedAddress(refundAddress))
           else op.execute(updatedStateIn)
-        if (addressAlreadyAccessed)
-          verifyGas(G_selfdestruct + G_newaccount, updatedStateIn, stateOut)
-        else
-          verifyGas(G_selfdestruct + G_newaccount + G_cold_account_access, updatedStateIn, stateOut)
+        if addressAlreadyAccessed then verifyGas(G_selfdestruct + G_newaccount, updatedStateIn, stateOut)
+        else verifyGas(G_selfdestruct + G_newaccount + G_cold_account_access, updatedStateIn, stateOut)
         stateOut.gasRefund shouldEqual 0
       }
     }
@@ -237,7 +230,7 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       ).sample.get.withStack(stackIn).withStorage(storage).copy(gas = startGas)
 
       val stateOut =
-        if (alreadyAccessed) op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, offset))
+        if alreadyAccessed then op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, offset))
         else op.execute(stateIn)
       verifyGas(expectedGasConsumption, stateIn, stateOut, allowOOG = false)
     }
@@ -246,7 +239,7 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
     forAll(Arbitrary.arbitrary[Boolean]) { alreadyAccessed =>
       val offset = 0
       val value = 0
-      val expectedGasConsumption = if (alreadyAccessed) G_sreset else G_sreset + G_cold_sload
+      val expectedGasConsumption = if alreadyAccessed then G_sreset else G_sreset + G_cold_sload
 
       val stackIn = Stack.empty().push(value).push(offset)
       val stateIn = getProgramStateGen(
@@ -256,7 +249,7 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       ).sample.get.withStack(stackIn).copy(gas = expectedGasConsumption)
 
       val stateOut =
-        if (alreadyAccessed) op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, offset))
+        if alreadyAccessed then op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, offset))
         else op.execute(stateIn)
       verifyGas(expectedGasConsumption, stateIn, stateOut, allowOOG = false)
     }

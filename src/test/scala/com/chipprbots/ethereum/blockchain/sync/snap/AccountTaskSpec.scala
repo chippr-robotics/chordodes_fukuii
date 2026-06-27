@@ -20,7 +20,7 @@ class AccountTaskSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "produce N tasks when concurrency=N" taggedAs UnitTest in {
-    for (n <- Seq(4, 16, 256)) {
+    for n <- Seq(4, 16, 256) do {
       val tasks = AccountTask.createInitialTasks(dummyRoot, concurrency = n)
       tasks.size shouldBe n
     }

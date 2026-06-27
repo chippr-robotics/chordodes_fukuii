@@ -47,8 +47,8 @@ object ForkId {
     val allForks = blockForks.map((_, false)) ++ timestampForks.map((_, true))
 
     val next = allForks.find { case (fork, isTimestamp) =>
-      val passed = if (isTimestamp) fork <= BigInt(headTimestamp) else fork <= head
-      if (passed) {
+      val passed = if isTimestamp then fork <= BigInt(headTimestamp) else fork <= head
+      if passed then {
         crc.update(bigIntToBytes(fork, 8))
       }
       !passed
@@ -72,7 +72,7 @@ object ForkId {
 
   def gatherBlockForks(config: BlockchainConfig): List[BigInt] = {
     val maybeDaoBlock: Option[BigInt] = config.daoForkConfig.flatMap { daoConf =>
-      if (daoConf.includeOnForkIdList) Some(daoConf.forkBlockNumber)
+      if daoConf.includeOnForkIdList then Some(daoConf.forkBlockNumber)
       else None
     }
     val realForks = (maybeDaoBlock.toList ++ config.forkBlockNumbers.all)
@@ -81,7 +81,7 @@ object ForkId {
       .sorted
     // Advertise Olympia sentinel as the next fork when not yet scheduled
     val olympiaNext =
-      if (config.forkBlockNumbers.olympiaBlockNumber == olympiaSentinel) List(olympiaSentinel) else Nil
+      if config.forkBlockNumbers.olympiaBlockNumber == olympiaSentinel then List(olympiaSentinel) else Nil
     realForks ++ olympiaNext
   }
 
@@ -112,7 +112,7 @@ object ForkId {
     def decode(rlp: RLPEncodeable): ForkId = rlp match {
       case RLPList(hash, next) =>
         val i = bigIntFromEncodeable(next)
-        ForkId(bigIntFromEncodeable(hash), if (i == 0) None else Some(i))
+        ForkId(bigIntFromEncodeable(hash), if i == 0 then None else Some(i))
       case _ => throw new RuntimeException("Error when decoding ForkId")
     }
   }

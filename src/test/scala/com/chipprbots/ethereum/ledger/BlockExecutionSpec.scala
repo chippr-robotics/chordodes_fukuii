@@ -264,7 +264,7 @@ class BlockExecutionSpec
           val block = Block(blockHeader, blockBodyWithTxs)
 
           val mockValidators =
-            if (txValidAccordingToValidators) Mocks.MockValidatorsAlwaysSucceed else Mocks.MockValidatorsAlwaysFail
+            if txValidAccordingToValidators then Mocks.MockValidatorsAlwaysSucceed else Mocks.MockValidatorsAlwaysFail
           val mockVm = new MockVM(c =>
             createResult(
               context = c,
@@ -292,7 +292,7 @@ class BlockExecutionSpec
           val txsExecResult = blockExecution.executeBlockTransactions(block, initialWorld)
 
           txsExecResult.isRight shouldBe txValidAccordingToValidators
-          if (txsExecResult.isRight) {
+          if txsExecResult.isRight then {
             val BlockResult(resultingWorldState, resultingGasUsed, resultingReceipts, _) = txsExecResult.toOption.get
 
             val transaction = stx.tx.tx
@@ -541,14 +541,14 @@ class BlockExecutionSpec
 
       forAll(table) { (origin1Address, receiver1Address, origin2Address, receiver2Address) =>
         def keyPair(address: Address): AsymmetricCipherKeyPair =
-          if (address == originAddress) originKeyPair else receiverKeyPair
+          if address == originAddress then originKeyPair else receiverKeyPair
 
         val tx1 = validTx.copy(value = 100, receivingAddress = Some(receiver1Address), gasLimit = defaultGasLimit)
         val tx2 = validTx.copy(
           value = 50,
           receivingAddress = Some(receiver2Address),
           gasLimit = defaultGasLimit * 2,
-          nonce = validTx.nonce + (if (origin1Address == origin2Address) 1 else 0)
+          nonce = validTx.nonce + (if origin1Address == origin2Address then 1 else 0)
         )
         val keyPair1 = keyPair(origin1Address)
         val keyPair2 = keyPair(origin2Address)

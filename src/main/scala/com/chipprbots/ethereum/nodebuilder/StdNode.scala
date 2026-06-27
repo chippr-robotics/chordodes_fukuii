@@ -87,11 +87,11 @@ abstract class BaseNode extends Node {
       case Success(_) =>
         log.info("Metrics started")
 
-        if (metricsConfig.enabled) {
+        if metricsConfig.enabled then {
           val snapSyncEnabled =
             Try(instanceConfig.config.getConfig("sync").getBoolean("do-snap-sync")).getOrElse(false)
 
-          if (snapSyncEnabled) {
+          if snapSyncEnabled then {
             // Ensure app_snapsync_* series exist even before SNAP sync starts.
             val _ = SNAPSyncMetrics
           }
@@ -106,7 +106,7 @@ abstract class BaseNode extends Node {
   }
 
   private[this] def loadGenesisData(): Unit =
-    if (!Config.testmode) {
+    if !Config.testmode then {
       genesisDataLoader.loadGenesisData()
     }
 
@@ -124,7 +124,7 @@ abstract class BaseNode extends Node {
     // Skip consistency check after SNAP sync — block headers 0..pivot don't exist yet.
     // SNAP sync only stores the pivot block header; earlier headers are downloaded
     // incrementally during regular sync's block-by-block import.
-    if (appState.isSnapSyncDone()) {
+    if appState.isSnapSyncDone() then {
       log.info("Skipping DB consistency check: SNAP sync stores only pivot block header, not full header chain")
       return
     }
@@ -133,13 +133,13 @@ abstract class BaseNode extends Node {
     // incomplete. The consistency checker would see "best block hash not in block storage",
     // log "Database seems to be in inconsistent state", and call shutdown — turning a recoverable
     // mid-SNAP restart into an unrecoverable wipe-and-resync.
-    if (appState.isSnapSyncInProgress()) {
+    if appState.isSnapSyncInProgress() then {
       log.info("Skipping DB consistency check: SNAP sync in progress (pivot header only, no full chain yet)")
       return
     }
     // Skip consistency check in Engine API mode — optimistic imports store blocks
     // at the chain tip without the full header chain from genesis.
-    if (engineApiConfig.enabled) {
+    if engineApiConfig.enabled then {
       log.info("Skipping DB consistency check: Engine API mode uses optimistic block import")
       return
     }
@@ -161,7 +161,7 @@ abstract class BaseNode extends Node {
   private[this] def loadStaticNodes(): Unit = {
     val datadir = instanceConfig.config.getString("datadir")
     val nodes = StaticNodesLoader.load(datadir)
-    if (nodes.nonEmpty) {
+    if nodes.nonEmpty then {
       log.info("Loading {} static peer(s) from {}/{}", nodes.size, datadir, StaticNodesLoader.FileName)
       nodes.foreach { uri =>
         peerManager ! PeerManagerActor.AddMaintainedPeer(uri)
@@ -189,10 +189,10 @@ abstract class BaseNode extends Node {
     }
 
   private[this] def startJsonRpcWsServer(): Unit =
-    if (jsonRpcConfig.wsServerConfig.enabled) jsonRpcWsServer.run()
+    if jsonRpcConfig.wsServerConfig.enabled then jsonRpcWsServer.run()
 
   private[this] def startJsonRpcIpcServer(): Unit =
-    if (jsonRpcConfig.ipcServerConfig.enabled) jsonRpcIpcServer.run()
+    if jsonRpcConfig.ipcServerConfig.enabled then jsonRpcIpcServer.run()
 
   private[this] def startEngineApiServer(): Unit =
     maybeEngineApiServer.foreach { server =>
@@ -209,7 +209,7 @@ abstract class BaseNode extends Node {
     }
 
   def startPeriodicDBConsistencyCheck(): Unit =
-    if (Config.Db.periodicConsistencyCheck)
+    if Config.Db.periodicConsistencyCheck then
       ActorSystem(
         PeriodicConsistencyCheck.start(
           storagesInstance.storages.appStateStorage,
@@ -223,7 +223,7 @@ abstract class BaseNode extends Node {
 
   private[this] def startTuiUpdater(): Unit = {
     val tui = Tui.getInstance()
-    if (tui.isEnabled) {
+    if tui.isEnabled then {
       log.info("Starting TUI updater")
       val updater = TuiUpdater(
         tui,
@@ -260,7 +260,7 @@ abstract class BaseNode extends Node {
       )
     )
     tryAndLogFailure(() => Await.ready(stopPortForwarding(), shutdownTimeoutDuration))
-    if (jsonRpcConfig.ipcServerConfig.enabled) {
+    if jsonRpcConfig.ipcServerConfig.enabled then {
       tryAndLogFailure(() => jsonRpcIpcServer.close())
     }
     tryAndLogFailure(() => Metrics.get().close())
@@ -269,7 +269,7 @@ abstract class BaseNode extends Node {
 
   def fixDatabase(): Unit = {
     val bestBlockInfo = storagesInstance.storages.appStateStorage.getBestBlockInfo()
-    if (bestBlockInfo.hash == ByteString.empty && bestBlockInfo.number > 0) {
+    if bestBlockInfo.hash == ByteString.empty && bestBlockInfo.number > 0 then {
       log.warn("Fixing best block hash into database for block {}", bestBlockInfo.number)
       storagesInstance.storages.blockNumberMappingStorage.get(bestBlockInfo.number) match {
         case Some(hash) =>

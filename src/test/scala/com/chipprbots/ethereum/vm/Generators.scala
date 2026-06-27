@@ -30,7 +30,7 @@ object Generators extends ObjectGenerators {
     for {
       _ <- Arbitrary.arbitrary[Byte]
       bytes <- getByteStringGen(nBytes, nBytes)
-      bigInt = (if (mod > 0) BigInt(bytes.toArray).abs % mod else BigInt(0)) + min
+      bigInt = (if mod > 0 then BigInt(bytes.toArray).abs % mod else BigInt(0)) + min
     } yield bigInt
   }
 
@@ -98,7 +98,7 @@ object Generators extends ObjectGenerators {
       blockPlacement <- getUInt256Gen(0, blockNumber)
       returnData <- returnDataGen
 
-      blockHeader = exampleBlockHeader.copy(number = if (isTopHeader) blockNumber else blockNumber - blockPlacement)
+      blockHeader = exampleBlockHeader.copy(number = if isTopHeader then blockNumber else blockNumber - blockPlacement)
 
       world = MockWorldState(numberOfHashes = blockNumber - 1)
         .saveCode(ownerAddr, code)

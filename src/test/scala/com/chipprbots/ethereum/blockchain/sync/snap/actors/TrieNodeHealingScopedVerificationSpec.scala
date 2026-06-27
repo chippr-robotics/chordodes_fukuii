@@ -56,7 +56,7 @@ class TrieNodeHealingScopedVerificationSpec
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
+    if gauge == null then Double.NaN else gauge.value()
   }
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
@@ -115,7 +115,7 @@ class TrieNodeHealingScopedVerificationSpec
   /** Assert StateHealingComplete is NOT sent within `window` (ProgressNodesHealed is allowed). */
   private def assertNoCompletion(controller: TestProbe, window: FiniteDuration): Unit = {
     val deadline = window.fromNow
-    while (deadline.hasTimeLeft())
+    while deadline.hasTimeLeft() do
       controller.receiveOne(deadline.timeLeft) match {
         case SNAPSyncController.StateHealingComplete =>
           fail("StateHealingComplete was declared while a healed node still had a missing descendant (FR-006)")

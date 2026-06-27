@@ -35,7 +35,7 @@ package object network {
 
   def loadAsymmetricCipherKeyPair(filePath: String, secureRandom: SecureRandom): AsymmetricCipherKeyPair = {
     val file = new File(filePath)
-    if (!file.exists()) {
+    if !file.exists() then {
       val keysValuePair = generateKeyPair(secureRandom)
 
       // Write keys to file

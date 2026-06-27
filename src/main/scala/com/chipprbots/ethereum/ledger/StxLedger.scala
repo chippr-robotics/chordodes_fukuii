@@ -54,7 +54,7 @@ class StxLedger(
 
     val senderAddress = stx.senderAddress
     val world2 =
-      if (world1.getAccount(senderAddress).isEmpty) {
+      if world1.getAccount(senderAddress).isEmpty then {
         world1.saveAccount(senderAddress, Account.empty(blockchainConfig.accountStartNonce))
       } else {
         world1
@@ -96,10 +96,9 @@ class StxLedger(
 
     val senderAddress = stx.senderAddress
     val world2 =
-      if (world1.getAccount(senderAddress).isEmpty)
+      if world1.getAccount(senderAddress).isEmpty then
         world1.saveAccount(senderAddress, Account.empty(blockchainConfig.accountStartNonce))
-      else
-        world1
+      else world1
 
     val worldForTx = blockPreparator.updateSenderAccountBeforeExecution(tx, senderAddress, world2)
     tracer.onTxStart(senderAddress, tx.tx.receivingAddress, tx.tx.gasLimit, tx.tx.value, tx.tx.payload)
@@ -157,7 +156,7 @@ class StxLedger(
     val tx = stx.tx
     val highLimit = tx.tx.gasLimit
 
-    if (highLimit < lowLimit) {
+    if highLimit < lowLimit then {
       highLimit
     } else {
       StxLedger.binaryChop(lowLimit, highLimit) { gasLimit =>
@@ -188,15 +187,12 @@ object StxLedger {
   private[ledger] def binaryChop[Err](min: BigInt, max: BigInt)(f: BigInt => Option[Err]): BigInt = {
     assert(min <= max)
 
-    if (min == max)
-      max
+    if min == max then max
     else {
       val mid = min + (max - min) / 2
       val possibleError = f(mid)
-      if (possibleError.isEmpty)
-        binaryChop(min, mid)(f)
-      else
-        binaryChop(mid + 1, max)(f)
+      if possibleError.isEmpty then binaryChop(min, mid)(f)
+      else binaryChop(mid + 1, max)(f)
     }
   }
 }

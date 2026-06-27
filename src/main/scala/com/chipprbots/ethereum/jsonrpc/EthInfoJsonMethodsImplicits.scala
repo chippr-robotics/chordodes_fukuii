@@ -42,7 +42,7 @@ object EthJsonMethodsImplicits extends JsonMethodsImplicits {
           // completes they are 0 (no active trie progress) — reporting 0 falsely implies
           // the state was never downloaded. Omit them when not meaningful, matching
           // go-ethereum's behaviour post-SNAP (which drops these fields entirely).
-          if (s.knownStates == BigInt(0) && s.pulledStates == BigInt(0)) base
+          if s.knownStates == BigInt(0) && s.pulledStates == BigInt(0) then base
           else
             base ~ ("knownStates" -> encodeAsHex(s.knownStates)) ~
               ("pulledStates" -> encodeAsHex(s.pulledStates))

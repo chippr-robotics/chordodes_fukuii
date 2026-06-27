@@ -284,7 +284,7 @@ trait MESSBuilder {
 
   lazy val messConfigOpt: Option[MESSConfig] = {
     val config = blockchainConfig.messConfig
-    if (config.activationBlock.isDefined) Some(config) else None
+    if config.activationBlock.isDefined then Some(config) else None
   }
 }
 
@@ -977,7 +977,7 @@ trait EngineApiBuilder {
   lazy val engineApiController: EngineApiController = new EngineApiController(engineApiService, Some(jsonRpcController))
 
   lazy val maybeEngineApiServer: Option[EngineApiHttpServer] =
-    if (engineApiConfig.enabled) {
+    if engineApiConfig.enabled then {
       val jwtAuth = engineApiConfig.jwtSecretPath match {
         case Some(path) => JwtAuthenticator.fromFile(path)
         case None       => JwtAuthenticator.generateRandom()
@@ -1002,7 +1002,7 @@ trait GraphQLServiceBuilder {
     com.chipprbots.ethereum.utils.GraphQLConfig(com.chipprbots.ethereum.utils.Config.config)
 
   lazy val maybeGraphQLService: Option[com.chipprbots.ethereum.jsonrpc.graphql.GraphQLService] =
-    if (!graphQLConfig.enabled) None
+    if !graphQLConfig.enabled then None
     else {
       implicit val ec: scala.concurrent.ExecutionContext = system.dispatcher
       implicit val runtime: cats.effect.unsafe.IORuntime = cats.effect.unsafe.IORuntime.global
@@ -1184,7 +1184,7 @@ trait PortForwardingBuilder {
     // Only allocate the resource if it hasn't been started yet
     // Use a placeholder to ensure only one thread performs the allocation
     val placeholder = IO.unit
-    if (portForwardingRelease.compareAndSet(None, Some(placeholder))) {
+    if portForwardingRelease.compareAndSet(None, Some(placeholder)) then {
       // We won the race - allocate the resource and store the cleanup function
       portForwarding
         .flatMap { cleanup =>

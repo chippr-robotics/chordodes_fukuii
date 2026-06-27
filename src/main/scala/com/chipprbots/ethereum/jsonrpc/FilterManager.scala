@@ -147,12 +147,11 @@ object FilterManager {
       var blockLogIndex = 0
       receipts.zipWithIndex.foldLeft(Nil: Seq[TxLog]) { case (logsSoFar, (receipt, txIndex)) =>
         val txLogs =
-          if (
-            bytesToCheckInBloomFilter.isEmpty || BloomFilter.containsAnyOf(
+          if bytesToCheckInBloomFilter.isEmpty || BloomFilter.containsAnyOf(
               receipt.logsBloomFilter,
               bytesToCheckInBloomFilter
             )
-          ) {
+          then {
             receipt.logs.zipWithIndex
               .map { case (log, localIdx) => (log, blockLogIndex + localIdx) }
               .filter { case (log, _) =>
@@ -196,7 +195,7 @@ object FilterManager {
 
       @tailrec
       def recur(currentBlockNumber: BigInt, toBlockNumber: BigInt, logsSoFar: Seq[TxLog]): Seq[TxLog] =
-        if (currentBlockNumber > toBlockNumber) {
+        if currentBlockNumber > toBlockNumber then {
           logsSoFar
         } else {
           blockchainReader.getBlockHeaderByNumber(currentBlockNumber) match {
@@ -227,7 +226,7 @@ object FilterManager {
       val toBlockNumber = resolveBlockNumber(filter.toBlock.getOrElse(BlockParam.Latest), bestBlockNumber)
       val logs = recur(fromBlockNumber, toBlockNumber, Nil)
 
-      if (filter.toBlock.contains(BlockParam.Pending))
+      if filter.toBlock.contains(BlockParam.Pending) then
         logs ++ blockGenerator.getPendingBlock.map(p => getLogsFromBlock(filter, p.block, p.receipts)).getOrElse(Nil)
       else logs
     }
@@ -237,7 +236,7 @@ object FilterManager {
 
       @tailrec
       def recur(currentBlockNumber: BigInt, hashesSoFar: Seq[ByteString]): Seq[ByteString] =
-        if (currentBlockNumber > bestBlock) hashesSoFar
+        if currentBlockNumber > bestBlock then hashesSoFar
         else
           blockchainReader.getBlockHeaderByNumber(currentBlockNumber) match {
             case Some(header) => recur(currentBlockNumber + 1, hashesSoFar :+ header.hash)

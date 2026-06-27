@@ -61,7 +61,7 @@ class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matcher
         .evalMap { _ =>
           for {
             cur <- counter.updateAndGet(i => i + 1)
-            _ <- if (cur == finishMark) cancelMark.complete(()) else IO.unit
+            _ <- if cur == finishMark then cancelMark.complete(()) else IO.unit
           } yield ()
         }
         .compile

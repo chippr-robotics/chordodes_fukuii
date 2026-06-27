@@ -84,14 +84,14 @@ case class EthNodeStatus69ExchangeState(
 
     val localGenesisHash = blockchainReader.genesisHeader.hash
 
-    if (networkId != peerConfiguration.networkId) {
+    if networkId != peerConfiguration.networkId then {
       log.debug(
         "ETH69_STATUS: NetworkId mismatch! Local: {}, Remote: {} - disconnecting",
         peerConfiguration.networkId,
         networkId
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else if (genesisHash != localGenesisHash) {
+    } else if genesisHash != localGenesisHash then {
       log.debug(
         "ETH69_STATUS: Genesis hash mismatch! Local: {}, Remote: {} - disconnecting",
         localGenesisHash,
@@ -151,7 +151,7 @@ case class EthNodeStatus69ExchangeState(
 
     // Compute ForkId from current block (same as ETH64-68)
     val forkIdTimestamp =
-      if (bestBlockHeader.unixTimestamp == 0L) System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
+      if bestBlockHeader.unixTimestamp == 0L then System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
     val forkId = ForkId.create(genesisHash, blockchainConfig)(bestBlockNumber, forkIdTimestamp)
 
     // ETH/69: no TD, use block range instead. Use ETHPackets.Status69.Status69 (canonical type).

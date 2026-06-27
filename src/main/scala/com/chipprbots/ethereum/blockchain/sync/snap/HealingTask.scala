@@ -32,17 +32,17 @@ class HealingTask(
 
   /** Returns a short string representation for debugging */
   def toShortString: String = {
-    val pathStr = if (path.isEmpty) "root" else s"depth=${path.length}"
+    val pathStr = if path.isEmpty then "root" else s"depth=${path.length}"
     val hashStr = hash.take(4).map(b => f"$b%02x").mkString
-    val status = if (done) "done" else if (pending) "pending" else "active"
+    val status = if done then "done" else if pending then "pending" else "active"
     s"HealingTask($pathStr, hash=$hashStr..., $status)"
   }
 
   /** Returns the progress of this task (0.0 to 1.0) */
   def progress: Double =
-    if (done) 1.0
-    else if (nodeData.isDefined) 0.9
-    else if (!pending) 0.5
+    if done then 1.0
+    else if nodeData.isDefined then 0.9
+    else if !pending then 0.5
     else 0.0
 }
 

@@ -115,5 +115,5 @@ object RecoveryProgress {
   }
 
   /** Split a CSV field, treating "" as the empty list (Java's `"".split(",")` returns `Array("")`, not `Array()`). */
-  private def splitList(s: String): Array[String] = if (s.isEmpty) Array.empty else s.split(ListSep)
+  private def splitList(s: String): Array[String] = if s.isEmpty then Array.empty else s.split(ListSep)
 }

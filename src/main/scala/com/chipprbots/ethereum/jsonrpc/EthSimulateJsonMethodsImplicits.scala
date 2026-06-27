@@ -40,7 +40,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
               case bsc: JObject => decodeBlockStateCall(bsc)
               case _            => Left(InvalidParams("blockStateCall must be object"))
             }
-            if (parsed.exists(_.isLeft)) return parsed.collectFirst { case Left(e) => Left(e) }.get
+            if parsed.exists(_.isLeft) then return parsed.collectFirst { case Left(e) => Left(e) }.get
             Right(parsed.collect { case Right(v) => v })
           case JNothing | JNull => Right(Seq.empty)
           case _                => Left(InvalidParams("blockStateCalls must be array"))
@@ -67,7 +67,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
                 }
               case (k, _) => Left(InvalidParams(s"invalid state override entry: $k"))
             }
-            if (parsed.exists(_.isLeft)) return parsed.collectFirst { case Left(e) => Left(e) }.get
+            if parsed.exists(_.isLeft) then return parsed.collectFirst { case Left(e) => Left(e) }.get
             Some(parsed.collect { case Right((k, v)) => (k, v) }.toMap)
           case _ => None
         }
@@ -78,7 +78,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
               case c: JObject => decodeSimulateCall(c)
               case _          => Left(InvalidParams("call must be object"))
             }
-            if (parsed.exists(_.isLeft)) return parsed.collectFirst { case Left(e) => Left(e) }.get
+            if parsed.exists(_.isLeft) then return parsed.collectFirst { case Left(e) => Left(e) }.get
             Some(parsed.collect { case Right(v) => v })
           case _ => None
         }
@@ -112,9 +112,9 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
       private def decodeStorageMap(obj: JObject, field: String): Option[Map[BigInt, BigInt]] = {
         def hexToBigInt(hex: String): BigInt = {
           val clean = hex.stripPrefix("0x").stripPrefix("0X")
-          if (clean.isEmpty) BigInt(0)
+          if clean.isEmpty then BigInt(0)
           else {
-            val padded = if (clean.length % 2 != 0) "0" + clean else clean
+            val padded = if clean.length % 2 != 0 then "0" + clean else clean
             BigInt(1, org.bouncycastle.util.encoders.Hex.decode(padded))
           }
         }
@@ -156,9 +156,9 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
       private def optQty(obj: JObject, field: String): Option[BigInt] =
         (obj \ field).extractOpt[String].flatMap { s =>
           val hex = s.stripPrefix("0x").stripPrefix("0X")
-          if (hex.isEmpty) Some(BigInt(0))
+          if hex.isEmpty then Some(BigInt(0))
           else {
-            val padded = if (hex.length % 2 != 0) "0" + hex else hex
+            val padded = if hex.length % 2 != 0 then "0" + hex else hex
             scala.util.Try(BigInt(1, org.bouncycastle.util.encoders.Hex.decode(padded))).toOption
           }
         }
@@ -196,7 +196,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           "timestamp" -> encodeAsHex(BigInt(h.unixTimestamp)),
           "transactionsRoot" -> encodeAsHex(h.transactionsRoot),
           "uncles" -> JArray(Nil)
-        ) ++ (if (h.withdrawalsRoot.isDefined) List("withdrawals" -> JArray(Nil)) else Nil)
+        ) ++ (if h.withdrawalsRoot.isDefined then List("withdrawals" -> JArray(Nil)) else Nil)
 
         // Conditionally add fork-specific fields
         val baseFeeField = h.baseFee.map(bf => "baseFeePerGas" -> encodeAsHex(bf)).toList
@@ -210,9 +210,10 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           baseFeeField ::: blobFields ::: baseHeaderFields ::: beaconField ::: requestsField ::: withdrawalsRootField
 
         // Transactions: hashes or full objects depending on returnFullTransactions flag
-        val txField = if (returnFullTxs) {
+        val txField = if returnFullTxs then {
           "transactions" -> JArray(block.transactions.zipWithIndex.map { case (tx, idx) =>
-            val sender = if (idx < block.senders.size) block.senders(idx) else com.chipprbots.ethereum.domain.Address(0)
+            val sender =
+              if idx < block.senders.size then block.senders(idx) else com.chipprbots.ethereum.domain.Address(0)
             encodeSimulatedTxFull(tx, idx, h, sender)
           }.toList)
         } else {
@@ -311,7 +312,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           "status" -> encodeAsHex(cr.status)
         )
 
-        val logsField = if (cr.error.isEmpty) {
+        val logsField = if cr.error.isEmpty then {
           List("logs" -> JArray(cr.logs.map(log => encodeSimulateTxLog(log, blockHash)).toList))
         } else {
           List("logs" -> JArray(Nil))

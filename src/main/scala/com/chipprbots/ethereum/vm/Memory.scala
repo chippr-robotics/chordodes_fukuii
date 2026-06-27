@@ -36,8 +36,7 @@ class Memory private (private val underlying: ByteString) {
     val idx: Int = offset.toInt
 
     val newUnderlying: ByteString =
-      if (data.isEmpty)
-        underlying
+      if data.isEmpty then underlying
       else {
         val currentLength = underlying.length
         val dataLength = data.length
@@ -49,14 +48,14 @@ class Memory private (private val underlying: ByteString) {
         val newData = new Array[Byte](newLen)
 
         var i = 0
-        while (i < currentLength) {
+        while i < currentLength do {
           newData(i) = underlying(i)
           i += 1
         }
 
         var u = 0
         i = idx
-        while (u < dataLength) {
+        while u < dataLength do {
           newData(i) = data(u)
           i += 1
           u += 1
@@ -80,17 +79,14 @@ class Memory private (private val underlying: ByteString) {
     * expanded (with zeroes) when reading previously uninitialised regions, hence an OOM error may be thrown.
     */
   private def doLoad(offset: UInt256, size: Int): (ByteString, Memory) =
-    if (size <= 0)
-      (ByteString.empty, this)
+    if size <= 0 then (ByteString.empty, this)
     else {
       val start: Int = offset.toInt
       val end: Int = start + size
 
       val newUnderlying =
-        if (end <= underlying.size)
-          underlying
-        else
-          underlying ++ zeros(end - underlying.size)
+        if end <= underlying.size then underlying
+        else underlying ++ zeros(end - underlying.size)
 
       (newUnderlying.slice(start, end), new Memory(newUnderlying))
     }
@@ -101,8 +97,7 @@ class Memory private (private val underlying: ByteString) {
     */
   def expand(offset: UInt256, size: UInt256): Memory = {
     val totalSize = (offset + size).toInt
-    if (this.size >= totalSize || size.isZero)
-      this
+    if this.size >= totalSize || size.isZero then this
     else {
       val fill = zeros(totalSize - this.size)
       new Memory(underlying ++ fill)

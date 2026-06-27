@@ -52,7 +52,7 @@ class MessageHandlerSpec extends AnyFlatSpec with Matchers with MockFactory with
         override def writeTo(output: CodedOutputStream): Unit = output.writeRawBytes(bytes)
         override def getFieldByNumber(fieldNumber: Int): Any = ???
         override def getField(field: FieldDescriptor): PValue = ???
-        override def companion: GeneratedMessageCompanion[_] = ???
+        override def companion: GeneratedMessageCompanion[?] = ???
         override def serializedSize: Int = bytes.size
         override def toProtoString: String = ???
         // Scala 3 requires Product trait methods to be implemented

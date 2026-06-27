@@ -132,7 +132,7 @@ class EthBlocksService(
       blockchainReader.getReceiptsByHash(b.header.hash).isDefined
     }
     val blockResponseOpt =
-      if (!isExposed) None
+      if !isExposed then None
       else blockOpt.map(block => BlockResponse(block, weight, fullTxs = fullTxs))
     Right(BlockByBlockHashResponse(blockResponseOpt))
   }
@@ -179,10 +179,9 @@ class EthBlocksService(
     val uncleHeaderOpt = blockchainReader
       .getBlockBodyByHash(blockHash)
       .flatMap { body =>
-        if (uncleIndex >= 0 && uncleIndex < body.uncleNodesList.size)
+        if uncleIndex >= 0 && uncleIndex < body.uncleNodesList.size then
           Some(body.uncleNodesList.apply(uncleIndex.toInt))
-        else
-          None
+        else None
       }
     val weight = uncleHeaderOpt.flatMap(uncleHeader => blockchainReader.getChainWeightByHash(uncleHeader.hash))
 
@@ -208,7 +207,7 @@ class EthBlocksService(
     val UncleByBlockNumberAndIndexRequest(blockParam, uncleIndex) = request
     val uncleBlockResponseOpt = resolveBlock(blockParam).toOption
       .flatMap { case ResolvedBlock(block, pending) =>
-        if (uncleIndex >= 0 && uncleIndex < block.body.uncleNodesList.size) {
+        if uncleIndex >= 0 && uncleIndex < block.body.uncleNodesList.size then {
           val uncleHeader = block.body.uncleNodesList.apply(uncleIndex.toInt)
           val weight = blockchainReader.getChainWeightByHash(uncleHeader.hash)
 
@@ -220,8 +219,7 @@ class EthBlocksService(
               pendingBlock = pending.isDefined
             )
           )
-        } else
-          None
+        } else None
       }
 
     Right(UncleByBlockNumberAndIndexResponse(uncleBlockResponseOpt))
@@ -256,7 +254,7 @@ class EthBlocksService(
         var baseLogIndex = 0
         block.body.transactionList.zip(receipts).zipWithIndex.map { case ((stx, receipt), idx) =>
           val gasUsed =
-            if (idx == 0) receipt.cumulativeGasUsed
+            if idx == 0 then receipt.cumulativeGasUsed
             else receipt.cumulativeGasUsed - receipts(idx - 1).cumulativeGasUsed
           val sender = SignedTransaction.getSender(stx).getOrElse(Address(0))
           val resp = TransactionReceiptResponse(receipt, stx, sender, idx, block.header, gasUsed, baseLogIndex)
@@ -282,7 +280,7 @@ class EthBlocksService(
       blockchainReader
         .getBlockHeaderByNumber(num)
         .map { h =>
-          if (h.gasLimit > 0) h.gasUsed.toDouble / h.gasLimit.toDouble else 0.0
+          if h.gasLimit > 0 then h.gasUsed.toDouble / h.gasLimit.toDouble else 0.0
         }
         .getOrElse(0.0)
     }.toSeq
@@ -309,7 +307,7 @@ class EthBlocksService(
             .map { used =>
               val max = com.chipprbots.ethereum.consensus.engine.BlobGasUtils
                 .maxBlobGasPerBlock(h.unixTimestamp, blockchainConfig)
-              if (used > 0 && max > 0) used.toDouble / max.toDouble else 0.0
+              if used > 0 && max > 0 then used.toDouble / max.toDouble else 0.0
             }
             .getOrElse(0.0)
         }

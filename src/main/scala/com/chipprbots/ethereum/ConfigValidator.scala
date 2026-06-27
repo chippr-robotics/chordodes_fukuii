@@ -27,7 +27,7 @@ object ConfigValidator extends Logger {
   private def validateSync(config: TypesafeConfig, errors: collection.mutable.Builder[String, List[String]]): Unit = {
     val doFastSync = config.getBoolean("sync.do-fast-sync")
     val doSnapSync = config.getBoolean("sync.do-snap-sync")
-    if (doSnapSync && !doFastSync)
+    if doSnapSync && !doFastSync then
       errors += "SNAP sync (sync.do-snap-sync = true) requires fast sync to be enabled (sync.do-fast-sync = true)"
   }
 
@@ -39,8 +39,8 @@ object ConfigValidator extends Logger {
     val seen = collection.mutable.Set.empty[Int]
 
     def addIfEnabled(port: Int, enabled: Boolean, label: String): Unit =
-      if (enabled && port > 0) {
-        if (!seen.add(port))
+      if enabled && port > 0 then {
+        if !seen.add(port) then
           errors += s"Port number '$port' has been specified multiple times. Please review the supplied configuration. ($label)"
       }
 

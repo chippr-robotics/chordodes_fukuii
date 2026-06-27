@@ -162,13 +162,13 @@ class DumpChainActor(
           import com.chipprbots.ethereum.domain.Account.*
           val account = n.value.toArray[Byte].toAccount
 
-          if (account.codeHash != DumpChainActor.emptyEvm) {
+          if account.codeHash != DumpChainActor.emptyEvm then {
             peers.headOption.foreach { _ =>
               evmTorequest = evmTorequest :+ account.codeHash
               evmCodeHashes = evmCodeHashes + account.codeHash
             }
           }
-          if (account.storageRoot != DumpChainActor.emptyStorage) {
+          if account.storageRoot != DumpChainActor.emptyStorage then {
             peers.headOption.foreach { _ =>
               contractChildren = contractChildren :+ account.storageRoot
               contractNodesHashes = contractNodesHashes + account.storageRoot
@@ -204,20 +204,19 @@ class DumpChainActor(
   }
 
   private def assignWork(): Unit =
-    if (!anyRequestsRemaining()) {
+    if !anyRequestsRemaining() then {
       dumpChainToFile()
       println("Finished download, dumped chain to file")
       assignWorkTimeout.cancel()
       connectToBootstrapTimeout.cancel()
       context.stop(self)
     } else {
-      if (peers.nonEmpty) {
+      if peers.nonEmpty then {
         val peerToRequest = peers.head
         // Block headers are only requested once the pending receipts and bodies requests were finished
-        if (
-          blockHeaderToRequest < maxBlocks && receiptsRequested.isEmpty && blockBodiesRequested.isEmpty &&
+        if blockHeaderToRequest < maxBlocks && receiptsRequested.isEmpty && blockBodiesRequested.isEmpty &&
           blockBodiesToRequest.isEmpty && receiptsToRequest.isEmpty
-        ) {
+        then {
           val headersRemaining = maxBlocks - blockHeaderToRequest
           peerToRequest.ref ! SendMessage(
             GetBlockHeaders(
@@ -230,19 +229,19 @@ class DumpChainActor(
           )
           blockHeaderToRequest = blockHeaderToRequest + MaxHeadersPerRequest
 
-        } else if (nodesToRequest.nonEmpty) {
+        } else if nodesToRequest.nonEmpty then {
           val (currentNodesToRequest, remainingNodesToRequest) = nodesToRequest.splitAt(MaxNodesPerRequest)
           nodesToRequest = remainingNodesToRequest
           peerToRequest.ref ! SendMessage(GetNodeData(currentNodesToRequest))
 
-        } else if (blockBodiesToRequest.nonEmpty) {
+        } else if blockBodiesToRequest.nonEmpty then {
           val (currentBlockBodiesToRequest, remainingBodiesToRequest) =
             blockBodiesToRequest.splitAt(MaxBodiesPerRequest)
           blockBodiesToRequest = remainingBodiesToRequest
           blockBodiesRequested = currentBlockBodiesToRequest
           peerToRequest.ref ! SendMessage(GetBlockBodies(ETHPackets.nextRequestId, currentBlockBodiesToRequest))
 
-        } else if (receiptsToRequest.nonEmpty) {
+        } else if receiptsToRequest.nonEmpty then {
           val (currentReceiptsToRequest, remainingReceiptsToRequest) = receiptsToRequest.splitAt(MaxReceiptsPerRequest)
           receiptsToRequest = remainingReceiptsToRequest
           receiptsRequested = currentReceiptsToRequest

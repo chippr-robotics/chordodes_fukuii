@@ -62,9 +62,9 @@ class RateLimit(config: RateLimitConfig) extends Directive0 with Json4sSupport {
   //   2) no LRU is created unless config.enabled is true
   //   3) cache is accessed only once (using get)
   override def tapply(f: Unit => Route): Route =
-    if (config.enabled) {
+    if config.enabled then {
       extractClientIP { ip =>
-        if (isBelowRateLimit(ip)) {
+        if isBelowRateLimit(ip) then {
           val err = JsonRpcError.RateLimitError(minInterval)
           complete((StatusCodes.TooManyRequests, err))
         } else {

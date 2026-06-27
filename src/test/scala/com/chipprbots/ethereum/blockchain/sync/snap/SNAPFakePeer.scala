@@ -44,7 +44,7 @@ class SNAPFakePeer(
     val p = TestProbe(peer.id.value + "-network-peer-manager")
     p.setAutoPilot(new AutoPilot {
       def run(sender: ActorRef, msg: Any): AutoPilot = {
-        if (dropped.get()) return this
+        if dropped.get() then return this
         msg match {
           case NetworkPeerManagerActor.SendMessage(rawMsg, _) =>
             rawMsg.underlyingMsg match {

@@ -212,7 +212,7 @@ object FastSyncBranchResolverActor {
         handleCommon(message).getOrElse {
           message match {
             case ResponseReceived(peer, ETH68BlockHeaders(_, headers), timeTaken) if peer == masterPeer =>
-              if (headers.size == recentHeadersSize) {
+              if headers.size == recentHeadersSize then {
                 log.debug("Received {} block headers from peer {} in {} ms", headers.size, masterPeer.id, timeTaken)
                 handleRecentBlockHeadersResponse(headers, masterPeer, bestBlockNumber)
               } else {

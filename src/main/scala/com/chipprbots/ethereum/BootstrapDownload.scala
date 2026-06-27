@@ -26,7 +26,7 @@ object BootstrapDownload extends Logger {
   val leveldbFolderName = "leveldb"
 
   private def assertAndLog(cond: Boolean, msg: String): Unit = {
-    if (!cond) log.info(msg)
+    if !cond then log.info(msg)
     assert(cond, msg)
   }
 
@@ -64,10 +64,10 @@ object BootstrapDownload extends Logger {
       val zis = new ZipInputStream(in)
       try
         Iterator.continually(zis.getNextEntry).takeWhile(_ != null).foreach { file =>
-          if (!file.isDirectory) {
+          if !file.isDirectory then {
             val outPath = destination.resolve(file.getName)
             val outPathParent = outPath.getParent
-            if (!outPathParent.toFile.exists()) {
+            if !outPathParent.toFile.exists() then {
               outPathParent.toFile.mkdirs()
             }
 
@@ -84,7 +84,7 @@ object BootstrapDownload extends Logger {
   }
 
   def deleteDownloadedFile(downloadedFile: File): Unit =
-    if (downloadedFile.delete()) log.info(s"Downloaded file $downloadedFile successfully deleted")
+    if downloadedFile.delete() then log.info(s"Downloaded file $downloadedFile successfully deleted")
     else log.info(s"Failed to delete downloaded file $downloadedFile")
 
   // scalastyle:off method.length
@@ -116,7 +116,7 @@ object BootstrapDownload extends Logger {
     log.info(s"Download path is $urlToDownloadFrom")
     log.info(s"Path to download to is $pathToDownloadTo")
 
-    if (!pathToDownloadToAsFile.exists()) pathToDownloadToAsFile.mkdirs()
+    if !pathToDownloadToAsFile.exists() then pathToDownloadToAsFile.mkdirs()
 
     assertAndLog(pathToDownloadToAsFile.isDirectory, s"$pathToDownloadToAsFile must be a folder.")
     assertAndLog(

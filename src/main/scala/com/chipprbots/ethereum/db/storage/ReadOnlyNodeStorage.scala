@@ -40,7 +40,7 @@ class ReadOnlyNodeStorage private (wrapped: NodesKeyValueStorage) extends NodesK
   override def multiGet(keys: Seq[NodeHash]): Seq[Option[NodeEncoded]] = {
     val missKeys = keys.filterNot(buffer.contains)
     val missResults: Map[NodeHash, Option[NodeEncoded]] =
-      if (missKeys.isEmpty) Map.empty
+      if missKeys.isEmpty then Map.empty
       else missKeys.zip(wrapped.multiGet(missKeys)).toMap
     keys.map(k => buffer.getOrElse(k, missResults.getOrElse(k, None)))
   }

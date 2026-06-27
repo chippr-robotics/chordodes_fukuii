@@ -22,7 +22,7 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
   test("pop single element", UnitTest, VMTest) {
     forAll(stackGen) { stack =>
       val (v, stack1) = stack.pop()
-      if (stack.size > 0) {
+      if stack.size > 0 then {
         v shouldEqual stack.toSeq.head
         stack1.toSeq shouldEqual stack.toSeq.tail
       } else {
@@ -43,7 +43,7 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
   test("pop multiple elements", UnitTest, VMTest) {
     forAll(stackGen, intGen) { (stack, i) =>
       val (vs, stack1) = stack.pop(i)
-      if (stack.size >= i) {
+      if stack.size >= i then {
         vs shouldEqual stack.toSeq.take(i)
         stack1.toSeq shouldEqual stack.toSeq.drop(i)
       } else {
@@ -73,7 +73,7 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
     forAll(stackGen, uint256ListGen) { (stack, vs) =>
       val stack1 = stack.push(vs)
 
-      if (stack.size + vs.size <= stack.maxSize) {
+      if stack.size + vs.size <= stack.maxSize then {
         stack1.toSeq shouldEqual (vs.reverse ++ stack.toSeq)
       } else {
         stack1 shouldEqual stack
@@ -85,7 +85,7 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
     forAll(stackGen, intGen) { (stack, i) =>
       val stack1 = stack.dup(i)
 
-      if (i < stack.size && stack.size < stack.maxSize) {
+      if i < stack.size && stack.size < stack.maxSize then {
         val x = stack.toSeq(i)
         stack1.toSeq shouldEqual (x +: stack.toSeq)
       } else {
@@ -98,7 +98,7 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
     forAll(stackGen, intGen) { (stack, i) =>
       val stack1 = stack.swap(i)
 
-      if (i < stack.size) {
+      if i < stack.size then {
         val x = stack.toSeq.head
         val y = stack.toSeq(i)
         stack1.toSeq shouldEqual stack.toSeq.updated(0, y).updated(i, x)

@@ -100,7 +100,7 @@ class EthashBlockHeaderValidatorSpec
     forAll(bigIntGen) { difficulty =>
       val blockHeader = validBlockHeader.copy(difficulty = difficulty)
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
-      if (difficulty != validBlockHeader.difficulty) assert(validateResult == Left(HeaderDifficultyError))
+      if difficulty != validBlockHeader.difficulty then assert(validateResult == Left(HeaderDifficultyError))
       else assert(validateResult == Right(BlockHeaderValid))
     }
   }
@@ -109,7 +109,7 @@ class EthashBlockHeaderValidatorSpec
     forAll(bigIntGen) { gasUsed =>
       val blockHeader = validBlockHeader.copy(gasUsed = gasUsed)
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
-      if (gasUsed > validBlockHeader.gasLimit) assert(validateResult == Left(HeaderGasUsedError))
+      if gasUsed > validBlockHeader.gasLimit then assert(validateResult == Left(HeaderGasUsedError))
       else assert(validateResult == Right(BlockHeaderValid))
     }
   }
@@ -129,8 +129,7 @@ class EthashBlockHeaderValidatorSpec
     forAll(bigIntGen) { gasLimit =>
       val blockHeader = validBlockHeader.copy(gasLimit = gasLimit)
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
-      if (gasLimit < LowerGasLimit || gasLimit > UpperGasLimit)
-        assert(validateResult == Left(HeaderGasLimitError))
+      if gasLimit < LowerGasLimit || gasLimit > UpperGasLimit then assert(validateResult == Left(HeaderGasLimitError))
       else assert(validateResult == Right(BlockHeaderValid))
     }
   }
@@ -149,7 +148,7 @@ class EthashBlockHeaderValidatorSpec
       val blockHeader = validBlockHeader.copy(number = number)
       val parent = Block(validParentBlockHeader, validParentBlockBody)
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, parent.header)
-      if (number != validParentBlockHeader.number + 1)
+      if number != validParentBlockHeader.number + 1 then
         assert(validateResult == Left(HeaderNumberError) || validateResult == Left(HeaderDifficultyError))
       else assert(validateResult == Right(BlockHeaderValid))
     }
@@ -423,11 +422,11 @@ class EthashBlockHeaderValidatorSpec
       ),
       daoForkConfig = Some(new DaoForkConfig {
         override val blockExtraData: Option[ByteString] =
-          if (supportsDaoFork) Some(ProDaoForkBlock.header.extraData) else None
+          if supportsDaoFork then Some(ProDaoForkBlock.header.extraData) else None
         override val range: Int = 10
         override val drainList: Seq[Address] = Nil
         override val forkBlockHash: ByteString =
-          if (supportsDaoFork) ProDaoForkBlock.header.hash else DaoForkBlock.header.hash
+          if supportsDaoFork then ProDaoForkBlock.header.hash else DaoForkBlock.header.hash
         override val forkBlockNumber: BigInt = DaoForkBlock.header.number
         override val refundContract: Option[Address] = None
         override val includeOnForkIdList: Boolean = false

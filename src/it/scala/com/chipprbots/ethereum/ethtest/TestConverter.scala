@@ -26,7 +26,7 @@ object TestConverter {
     val _ = Address(ByteString(parseHex(address)))
     val balance = UInt256(parseBigInt(state.balance))
     val nonce = UInt256(parseBigInt(state.nonce))
-    val _ = if (state.code.isEmpty || state.code == "0x") {
+    val _ = if state.code.isEmpty || state.code == "0x" then {
       Account.EmptyCodeHash
     } else {
       // Code hash will be computed when storing
@@ -85,7 +85,7 @@ object TestConverter {
     val gasPrice = parseBigInt(testTx.gasPrice)
     val gasLimit = parseBigInt(testTx.gasLimit)
     val receivingAddress =
-      if (testTx.to.isEmpty || testTx.to == "0x") None
+      if testTx.to.isEmpty || testTx.to == "0x" then None
       else Some(Address(ByteString(parseHex(testTx.to))))
     val value = parseBigInt(testTx.value)
     val payload = ByteString(parseHex(testTx.data))
@@ -353,14 +353,14 @@ object TestConverter {
 
   /** Parse hex string to byte array, handling "0x" prefix */
   private def parseHex(hex: String): Array[Byte] = {
-    val cleaned = if (hex.startsWith("0x")) hex.substring(2) else hex
-    if (cleaned.isEmpty) Array.empty[Byte]
+    val cleaned = if hex.startsWith("0x") then hex.substring(2) else hex
+    if cleaned.isEmpty then Array.empty[Byte]
     else Hex.decode(cleaned)
   }
 
   /** Parse hex or decimal string to BigInt */
   private def parseBigInt(value: String): BigInt =
-    if (value.startsWith("0x")) {
+    if value.startsWith("0x") then {
       BigInt(value.substring(2), 16)
     } else {
       BigInt(value)

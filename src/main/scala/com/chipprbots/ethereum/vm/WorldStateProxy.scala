@@ -68,8 +68,7 @@ trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]] { self: WS 
     getAccount(address).map(a => UInt256(a.balance)).getOrElse(UInt256.Zero)
 
   def transfer(from: Address, to: Address, value: UInt256): WS =
-    if (from == to || isZeroValueTransferToNonExistentAccount(to, value))
-      touchAccounts(from)
+    if from == to || isZeroValueTransferToNonExistentAccount(to, value) then touchAccounts(from)
     else
       // perhaps as an optimisation we could avoid touching accounts having non-zero nonce or non-empty code
       guaranteedTransfer(from, to, value).touchAccounts(from, to)
@@ -91,10 +90,8 @@ trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]] { self: WS 
       .getOrElse(getEmptyAccount)
       .copy(codeHash = Account.EmptyCodeHash, storageRoot = Account.EmptyStorageRootHash)
     val accountWithCorrectNonce =
-      if (!noEmptyAccounts)
-        newAccount.copy(nonce = accountStartNonce)
-      else
-        newAccount.copy(nonce = accountStartNonce + 1)
+      if !noEmptyAccounts then newAccount.copy(nonce = accountStartNonce)
+      else newAccount.copy(nonce = accountStartNonce + 1)
 
     saveAccount(newAddress, accountWithCorrectNonce)
   }

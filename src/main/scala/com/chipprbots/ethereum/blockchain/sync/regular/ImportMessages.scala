@@ -76,7 +76,7 @@ class NewBlockImportMessages(block: Block, peerId: PeerId) extends ImportMessage
     val added = newBranch.size
     val dropfrom = oldBranch.headOption.map(_.header.number).getOrElse(number)
     val addfrom = newBranch.headOption.map(_.header.number).getOrElse(number)
-    if (dropped > 63)
+    if dropped > 63 then
       (
         WarningLevel,
         s"Large chain reorg detected number=$ancestorNumber hash=$ancestorHash " +

@@ -83,8 +83,7 @@ object MerklePatriciaTrie {
       kSerializer: ByteArrayEncoder[K],
       vSerializer: ByteArraySerializable[V]
   ): MerklePatriciaTrie[K, V] =
-    if (EmptyRootHash.sameElements(rootHash))
-      MerklePatriciaTrie(source)
+    if EmptyRootHash.sameElements(rootHash) then MerklePatriciaTrie(source)
     else {
       new MerklePatriciaTrie[K, V](Some(mpt.HashNode(rootHash)), source)(kSerializer, vSerializer)
     }
@@ -153,7 +152,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
     }
     // Besu ProofVisitor.java:64 — root is always included in proof (proof of non-existence)
     result.map { proof =>
-      if (proof.nonEmpty) proof
+      if proof.nonEmpty then proof
       else
         rootNode
           .map {
@@ -195,22 +194,19 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
           // In proofMode (getProof) include the leaf even on key mismatch — the diverging leaf
           // IS the EIP-1186 proof of absence. In normal mode (get) pass None so the callback
           // returns None and .flatten produces None, correctly signalling key-not-found.
-          if (key.toArray[Byte].sameElements(searchKey) || proofMode)
-            Some(op(acc, Some(leafNode)))
-          else
-            Some(op(acc, None))
+          if key.toArray[Byte].sameElements(searchKey) || proofMode then Some(op(acc, Some(leafNode)))
+          else Some(op(acc, None))
 
         case extNode @ ExtensionNode(sharedKey, _, _, _, _) =>
           val (commonKey, remainingKey) = searchKey.splitAt(sharedKey.length)
-          if (searchKey.length >= sharedKey.length && (sharedKey.toArray[Byte].sameElements(commonKey))) {
+          if searchKey.length >= sharedKey.length && (sharedKey.toArray[Byte].sameElements(commonKey)) then {
             pathTraverse(op(acc, Some(node)), extNode.next, remainingKey, accPath ++ sharedKey.toArray[Byte], op)
-          } else if (proofMode)
+          } else if proofMode then
             Some(op(acc, Some(node))) // include diverging extension as proof of absence (EIP-1186)
-          else
-            Some(op(acc, None))
+          else Some(op(acc, None))
 
         case branch: BranchNode =>
-          if (searchKey.isEmpty) Some(op(acc, Some(node)))
+          if searchKey.isEmpty then Some(op(acc, Some(node)))
           else
             pathTraverse(
               op(acc, Some(node)),
@@ -351,7 +347,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
       case 0 =>
         // There is no common prefix between the node which means that we need to replace this leaf node
         val (temporalBranchNode, _) =
-          if (existingKey.isEmpty) // This node has no key so it should be stored as branch's value
+          if existingKey.isEmpty then // This node has no key so it should be stored as branch's value
             BranchNode.withValueOnly(storedValue.toArray[Byte]) -> None
           else {
             // The leaf should be put inside one of new branch nibbles
@@ -368,7 +364,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
         // Partially shared prefix, we replace the leaf with an extension and a branch node
         val (searchKeyPrefix, searchKeySuffix) = searchKey.splitAt(ml)
         val temporalNode =
-          if (ml == existingKey.length) BranchNode.withValueOnly(storedValue.toArray[Byte])
+          if ml == existingKey.length then BranchNode.withValueOnly(storedValue.toArray[Byte])
           else LeafNode(existingKey.drop(ml), storedValue)
         val NodeInsertResult(newBranchNode: BranchNode, toDeleteFromStorage) =
           put(temporalNode, searchKeySuffix, value): @unchecked
@@ -392,7 +388,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
         val sharedKeyHead = sharedKey(0)
         val (temporalBranchNode, _) =
           // Direct extension, we just replace the extension with a branch
-          if (sharedKey.length == 1) BranchNode.withSingleChild(sharedKeyHead, next, None) -> None
+          if sharedKey.length == 1 then BranchNode.withSingleChild(sharedKeyHead, next, None) -> None
           else {
             // The new branch node will have an extension that replaces current one
             val newExtNode = ExtensionNode(sharedKey.tail, next)
@@ -429,7 +425,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
 
   private def putInBranchNode(branchNode: BranchNode, searchKey: Array[Byte], value: Array[Byte]): NodeInsertResult = {
     val BranchNode(children, _, _, _, _) = branchNode
-    if (searchKey.isEmpty) {
+    if searchKey.isEmpty then {
       // The key is empty, the branch node should now be a terminator node with the new value asociated with it
       val newBranchNode = BranchNode(children, Some(ByteString(value)))
       NodeInsertResult(
@@ -440,7 +436,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
       // Non empty key, we need to insert the value in the correct branch node's child
       val searchKeyHead: Int = searchKey(0)
       val searchKeyRemaining = searchKey.tail
-      if (!children(searchKeyHead).isNull) {
+      if !children(searchKeyHead).isNull then {
         // The associated child is not empty, we recursively insert in that child
         val NodeInsertResult(changedChild, toDeleteFromStorage) =
           put(branchNode.children(searchKeyHead), searchKeyRemaining, value)
@@ -514,7 +510,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
 
   private def removeFromLeafNode(leafNode: LeafNode, searchKey: Array[Byte]): NodeRemoveResult = {
     val LeafNode(existingKey, _, _, _, _) = leafNode
-    if (existingKey.sameElements(searchKey)) {
+    if existingKey.sameElements(searchKey) then {
       // We found the node to delete
       NodeRemoveResult(hasChanged = true, newNode = None, toDeleteFromStorage = List(leafNode))
     } else NodeRemoveResult(hasChanged = false, newNode = None)
@@ -523,7 +519,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
   private def removeFromExtensionNode(extensionNode: ExtensionNode, searchKey: Array[Byte]): NodeRemoveResult = {
     val ExtensionNode(sharedKey, _, _, _, _) = extensionNode
     val cp = matchingLength(sharedKey.toArray[Byte], searchKey)
-    if (cp == sharedKey.length) {
+    if cp == sharedKey.length then {
       // A child node of this extension is removed, so move forward
       remove(extensionNode.next, searchKey.drop(cp)) match {
         case NodeRemoveResult(true, maybeNewChild, nodesToRemoveFromStorage) =>
@@ -567,7 +563,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
   private def fix(node: MptNode): MptNode = node match {
     case BranchNode(children, optStoredValue, _, _, _) =>
       val usedIndexes = children.indices.foldLeft[Seq[Int]](Nil) { (acc, i) =>
-        if (!children(i).isNull) i +: acc else acc
+        if !children(i).isNull then i +: acc else acc
       }
       (usedIndexes, optStoredValue) match {
         case (Nil, None) => throw new MPTException("Branch with no subvalues")

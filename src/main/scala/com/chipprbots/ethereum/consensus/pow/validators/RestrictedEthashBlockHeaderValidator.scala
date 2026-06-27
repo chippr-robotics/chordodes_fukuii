@@ -34,7 +34,7 @@ object RestrictedEthashBlockHeaderValidator extends BlockHeaderValidatorSkeleton
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
     val tooLargeExtraData = blockHeader.extraData.length > ExtraDataMaxSize
 
-    if (tooLargeExtraData) {
+    if tooLargeExtraData then {
       Left(RestrictedPoWHeaderExtraDataError)
     } else {
       validateSignatureAgainstAllowedMiners(blockHeader, blockchainConfig.allowedMinersPublicKeys)

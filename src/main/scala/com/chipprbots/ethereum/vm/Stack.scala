@@ -32,18 +32,14 @@ class Stack private (private val underlying: Vector[UInt256], val maxSize: Int) 
     */
   def pop(n: Int): (Seq[UInt256], Stack) = {
     val (updated, popped) = underlying.splitAt(underlying.length - n)
-    if (popped.length == n)
-      (popped.reverse, copy(updated))
-    else
-      (Seq.fill(n)(UInt256.Zero), this)
+    if popped.length == n then (popped.reverse, copy(updated))
+    else (Seq.fill(n)(UInt256.Zero), this)
   }
 
   def push(word: UInt256): Stack = {
     val updated = underlying :+ word
-    if (updated.length <= maxSize)
-      copy(updated)
-    else
-      this
+    if updated.length <= maxSize then copy(updated)
+    else this
   }
 
   /** Push a sequence of elements to the stack. That last element of the sequence will be the top-most element in the
@@ -51,10 +47,8 @@ class Stack private (private val underlying: Vector[UInt256], val maxSize: Int) 
     */
   def push(words: Seq[UInt256]): Stack = {
     val updated = underlying ++ words
-    if (updated.length > maxSize)
-      this
-    else
-      copy(updated)
+    if updated.length > maxSize then this
+    else copy(updated)
   }
 
   /** Duplicate i-th element of the stack, pushing it to the top. i=0 is the top-most element.
@@ -62,10 +56,8 @@ class Stack private (private val underlying: Vector[UInt256], val maxSize: Int) 
   def dup(i: Int): Stack = {
     val j = underlying.length - i - 1
 
-    if (i < 0 || i >= underlying.length || underlying.length >= maxSize)
-      this
-    else
-      copy(underlying :+ underlying(j))
+    if i < 0 || i >= underlying.length || underlying.length >= maxSize then this
+    else copy(underlying :+ underlying(j))
   }
 
   /** Swap i-th and the top-most elements of the stack. i=0 is the top-most element (and that would be a no-op)
@@ -73,8 +65,7 @@ class Stack private (private val underlying: Vector[UInt256], val maxSize: Int) 
   def swap(i: Int): Stack = {
     val j = underlying.length - i - 1
 
-    if (i <= 0 || i >= underlying.length)
-      this
+    if i <= 0 || i >= underlying.length then this
     else {
       val a = underlying.last
       val b = underlying(j)

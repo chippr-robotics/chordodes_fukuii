@@ -177,7 +177,7 @@ object BlockchainHostActor {
                 blockchainReader.getReceiptsByHash(hash) match {
                   case None => (lists, false, cumBytes, false) // unknown block — skip silently
                   case Some(receipts) =>
-                    val toServe = if (blockIdx == 0) receipts.drop(firstBlockReceiptIndex.toInt) else receipts
+                    val toServe = if blockIdx == 0 then receipts.drop(firstBlockReceiptIndex.toInt) else receipts
                     // Encode per receipt, truncate at 2 MiB, track whether we finished the block
                     val (fittingEncs, incomplete, newBytes) =
                       toServe.foldLeft((Vector.empty[RLPEncodeable], false, cumBytes)) {
@@ -185,7 +185,7 @@ object BlockchainHostActor {
                         case ((encs, false, cb), receipt) =>
                           val enc = receipt.toRLPEncodable
                           val encBytes = encode(enc).length.toLong
-                          if (cb + encBytes > MaxResponseBytes) (encs, true, cb)
+                          if cb + encBytes > MaxResponseBytes then (encs, true, cb)
                           else (encs :+ enc, false, cb + encBytes)
                       }
                     val blockRLP = RLPList(fittingEncs.map(e => e)*)
@@ -252,7 +252,7 @@ object BlockchainHostActor {
           val headersCount: BigInt =
             maxHeaders.min(peerConfiguration.fastSyncHostConfiguration.maxBlocksHeadersPerMessage)
 
-          val range = if (reverse) {
+          val range = if reverse then {
             startBlockNumber to (startBlockNumber - (skip + 1) * headersCount + 1) by -(skip + 1)
           } else {
             startBlockNumber to (startBlockNumber + (skip + 1) * headersCount - 1) by (skip + 1)

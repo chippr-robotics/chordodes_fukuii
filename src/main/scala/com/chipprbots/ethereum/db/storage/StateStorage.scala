@@ -103,7 +103,7 @@ class CachedReferenceCountedStateStorage(
     changeLog.getDeathRowFromStorage(blockToPrune).foreach { deathRow =>
       CachedReferenceCountedStorage.prune(deathRow, lruCache, blockToPrune)
     }
-    if (CachedReferenceCountedStorage.persistCache(lruCache, nodeStorage)) {
+    if CachedReferenceCountedStorage.persistCache(lruCache, nodeStorage) then {
       updateBestBlocksData()
     }
     changeLog.removeBlockMetaData(blockToPrune)

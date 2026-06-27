@@ -24,24 +24,25 @@ object GraphQLScalars {
 
   // ---- Hex helpers ----
   private def stripHex(s: String): Option[String] =
-    if (s.startsWith("0x") || s.startsWith("0X")) Some(s.substring(2))
+    if s.startsWith("0x") || s.startsWith("0X") then Some(s.substring(2))
     else None
 
   def toHex(bs: ByteString): String =
     "0x" + Hex.toHexString(bs.toArray[Byte])
 
   def toHexEmptyOk(bs: ByteString): String =
-    if (bs.isEmpty) "0x" else toHex(bs)
+    if bs.isEmpty then "0x" else toHex(bs)
 
   def toHexBigInt(n: BigInt): String = {
     // EIP-1767 canonical: no leading zeroes, with "0x0" for zero.
     val raw = n.toString(16)
-    "0x" + (if (raw == "0") "0"
+    "0x" + (if raw == "0" then "0"
             else
               raw.dropWhile(_ == '0') match {
                 case ""    => "0"
                 case other => other
-              })
+              }
+    )
   }
 
   def toHexLong(n: Long): String = toHexBigInt(BigInt(n))
@@ -54,7 +55,7 @@ object GraphQLScalars {
   private def parseBigInt(s: String): Option[BigInt] = {
     val trimmed = s.trim
     stripHex(trimmed) match {
-      case Some(hex) => scala.util.Try(BigInt(if (hex.isEmpty) "0" else hex, 16)).toOption
+      case Some(hex) => scala.util.Try(BigInt(if hex.isEmpty then "0" else hex, 16)).toOption
       case None      => scala.util.Try(BigInt(trimmed)).toOption
     }
   }

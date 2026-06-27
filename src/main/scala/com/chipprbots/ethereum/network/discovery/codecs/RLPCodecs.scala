@@ -85,7 +85,7 @@ trait ContentCodecs {
         RLPEncoder.encode(address).asInstanceOf[RLPList] :+ id
       },
       {
-        case RLPList(items @ _*) if items.length == 4 =>
+        case RLPList(items*) if items.length == 4 =>
           val address = RLPList(items.take(3)*).decodeAs[Node.Address]("address")
           val id = items(3).decodeAs[PublicKey]("id")
           Node(id, address)
@@ -110,19 +110,19 @@ trait ContentCodecs {
         val kvs = attrs
           .foldRight(RLPList()) { case ((key, value), kvs) =>
             val k: RLPEncodeable = key
-            val v: RLPEncodeable = if (Predefined(key)) value else rlp.rawDecode(value.toArray)
+            val v: RLPEncodeable = if Predefined(key) then value else rlp.rawDecode(value.toArray)
             k +: v +: kvs
           }
         seq +: kvs
       },
-      { case RLPList(seq, kvs @ _*) =>
+      { case RLPList(seq, kvs*) =>
         val attrs = kvs
           .grouped(2)
           .collect { case Seq(k, v) =>
             val key = k.decodeAs[ByteVector]("key")
             val keyString = Try(new String(key.toArray)).getOrElse(key.toString)
             val value =
-              if (Predefined(key)) {
+              if Predefined(key) then {
                 v.decodeAs[ByteVector](s"value of key '${keyString}'")
               } else {
                 ByteVector(rlp.encode(v))
@@ -146,7 +146,7 @@ trait ContentCodecs {
         val contentList = RLPEncoder.encode(content).asInstanceOf[RLPList]
         signature +: contentList
       },
-      { case RLPList(signature, content @ _*) =>
+      { case RLPList(signature, content*) =>
         EthereumNodeRecord(
           signature.decodeAs[Signature]("signature"),
           RLPList(content*).decodeAs[EthereumNodeRecord.Content]("content")
@@ -171,13 +171,13 @@ trait PayloadCodecs { self: ContentCodecs =>
       RLPList(items*)
     },
     {
-      case RLPList(items @ _*) if items.length >= 4 =>
+      case RLPList(items*) if items.length >= 4 =>
         val version = items(0).decodeAs[Int]("version")
         val from = items(1).decodeAs[Node.Address]("from")
         val to = items(2).decodeAs[Node.Address]("to")
         val expiration = items(3).decodeAs[Long]("expiration")
         // Only try to decode enrSeq if it's an RLPValue (not a list), for EIP-8 forward compatibility
-        val enrSeq = if (items.length >= 5 && items(4).isInstanceOf[RLPValue]) {
+        val enrSeq = if items.length >= 5 && items(4).isInstanceOf[RLPValue] then {
           Some(items(4).decodeAs[Long]("enrSeq"))
         } else None
         Payload.Ping(version, from, to, expiration, enrSeq)
@@ -194,12 +194,12 @@ trait PayloadCodecs { self: ContentCodecs =>
       RLPList(items*)
     },
     {
-      case RLPList(items @ _*) if items.length >= 3 =>
+      case RLPList(items*) if items.length >= 3 =>
         val to = items(0).decodeAs[Node.Address]("to")
         val pingHash = items(1).decodeAs[Hash]("pingHash")
         val expiration = items(2).decodeAs[Long]("expiration")
         // Only try to decode enrSeq if it's an RLPValue (not a list), for EIP-8 forward compatibility
-        val enrSeq = if (items.length >= 4 && items(3).isInstanceOf[RLPValue]) {
+        val enrSeq = if items.length >= 4 && items(3).isInstanceOf[RLPValue] then {
           Some(items(3).decodeAs[Long]("enrSeq"))
         } else None
         Payload.Pong(to, pingHash, expiration, enrSeq)
@@ -214,7 +214,7 @@ trait PayloadCodecs { self: ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 2 =>
+      case RLPList(items*) if items.length >= 2 =>
         Payload.FindNode(
           items(0).decodeAs[PublicKey]("target"),
           items(1).decodeAs[Long]("expiration")
@@ -230,7 +230,7 @@ trait PayloadCodecs { self: ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 2 =>
+      case RLPList(items*) if items.length >= 2 =>
         Payload.Neighbors(
           items(0).decodeAs[List[Node]]("nodes"),
           items(1).decodeAs[Long]("expiration")

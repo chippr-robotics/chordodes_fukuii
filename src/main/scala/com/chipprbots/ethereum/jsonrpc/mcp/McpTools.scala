@@ -77,7 +77,7 @@ object NodeStatusTool {
       val (syncState, progress) = syncStatus match {
         case SyncProtocol.Status.Syncing(start, blocks, _) =>
           val pct =
-            if (blocks.target > 0) f"${(blocks.current.toDouble / blocks.target.toDouble * 100)}%.1f%%" else "N/A"
+            if blocks.target > 0 then f"${(blocks.current.toDouble / blocks.target.toDouble * 100)}%.1f%%" else "N/A"
           (s"Syncing (from block $start)", s"Block ${blocks.current}/${blocks.target} ($pct)")
         case SyncProtocol.Status.SyncDone   => ("Synced", "Complete")
         case SyncProtocol.Status.NotSyncing => ("Not syncing", "N/A")
@@ -144,7 +144,7 @@ object SyncStatusTool {
           case SyncProtocol.Status.Syncing(start, blocks, stateNodes) =>
             val remaining = blocks.target - blocks.current
             val pct =
-              if (blocks.target > 0) f"${(blocks.current.toDouble / blocks.target.toDouble * 100)}%.1f%%" else "N/A"
+              if blocks.target > 0 then f"${(blocks.current.toDouble / blocks.target.toDouble * 100)}%.1f%%" else "N/A"
             val stateInfo =
               stateNodes.filter(_.nonEmpty).map(s => s"\n  State Nodes: ${s.current}/${s.target}").getOrElse("")
             s"""Sync Status:
@@ -184,11 +184,11 @@ object PeerListTool {
         PeerManagerActor.Peers(Map.empty)
       }
       .map { peers =>
-        if (peers.peers.isEmpty) {
+        if peers.peers.isEmpty then {
           "Connected Peers: 0\n  No peers connected."
         } else {
           val peerLines = peers.peers.toList.sortBy(_._1.id.value).map { case (peer, status) =>
-            val direction = if (peer.incomingConnection) "inbound" else "outbound"
+            val direction = if peer.incomingConnection then "inbound" else "outbound"
             val addr = peer.remoteAddress.toString
             val statusStr = status match {
               case com.chipprbots.ethereum.network.PeerActor.Status.Handshaked   => "handshaked"
@@ -297,7 +297,7 @@ object GetTransactionTool {
     val hashStr = args.flatMap(a => (a \ "hash").extractOpt[String]).getOrElse("")
     val hashBytes =
       Try(org.bouncycastle.util.encoders.Hex.decode(hashStr.stripPrefix("0x"))).getOrElse(Array.empty[Byte])
-    if (hashBytes.length != 32) {
+    if hashBytes.length != 32 then {
       s"Invalid transaction hash: $hashStr (expected 32 bytes)"
     } else {
       deps.transactionMappingStorage.get(hashBytes.toIndexedSeq) match {
@@ -382,7 +382,7 @@ object DetectReorgTool {
       }
       .toList
 
-    if (inconsistencies.isEmpty) {
+    if inconsistencies.isEmpty then {
       s"No reorgs detected in blocks $startNum to $bestNum ($depth blocks checked)"
     } else {
       s"Reorg(s) detected in blocks $startNum to $bestNum:\n${inconsistencies.mkString("\n")}"
@@ -464,7 +464,7 @@ object GetEtcForksTool {
     val bestBlock = deps.blockchainReader.getBestBlockNumber
 
     def status(block: BigInt): String =
-      if (block <= bestBlock) "ACTIVE" else s"PENDING (in ${block - bestBlock} blocks)"
+      if block <= bestBlock then "ACTIVE" else s"PENDING (in ${block - bestBlock} blocks)"
 
     s"""ETC Fork History (Chain ID: ${deps.blockchainConfig.chainId}):
       |  Frontier:       block ${forks.frontierBlockNumber} [${status(forks.frontierBlockNumber)}]

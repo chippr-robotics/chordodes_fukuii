@@ -22,7 +22,7 @@ object SignedTransactionError {
   // so the hive consume-engine test framework's exception mapper can match them.
   case class TransactionNonceError(txNonce: UInt256, senderNonce: UInt256) extends SignedTransactionError {
     override def toString: String = {
-      val canonical = if (txNonce < senderNonce) "NONCE_MISMATCH_TOO_LOW" else "NONCE_MISMATCH_TOO_HIGH"
+      val canonical = if txNonce < senderNonce then "NONCE_MISMATCH_TOO_LOW" else "NONCE_MISMATCH_TOO_HIGH"
       s"$canonical: Got tx nonce $txNonce but sender in mpt is: $senderNonce"
     }
   }

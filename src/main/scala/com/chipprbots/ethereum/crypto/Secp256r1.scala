@@ -77,7 +77,7 @@ object Secp256r1 {
   /** Convert BigInteger to minimal unsigned byte array (with leading 0 if high bit set) */
   private def toUnsignedByteArray(value: BigInteger): Array[Byte] = {
     val bytes = value.toByteArray
-    if (bytes.length > 1 && bytes(0) == 0 && (bytes(1) & 0x80) == 0) {
+    if bytes.length > 1 && bytes(0) == 0 && (bytes(1) & 0x80) == 0 then {
       // Strip unnecessary leading zero
       bytes.drop(1)
     } else {

@@ -29,12 +29,12 @@ object StaticNodesLoader extends Logger {
   def loadFromFile(filePath: String): Set[String] = {
     val file = new File(filePath)
 
-    if (!file.exists()) {
+    if !file.exists() then {
       log.debug(s"Static nodes file not found: $filePath")
       return Set.empty
     }
 
-    if (!file.canRead()) {
+    if !file.canRead() then {
       log.warn(s"Cannot read static nodes file: $filePath")
       return Set.empty
     }
@@ -47,7 +47,7 @@ object StaticNodesLoader extends Logger {
       } finally source.close()
     } match {
       case Success(nodes) =>
-        if (nodes.nonEmpty) {
+        if nodes.nonEmpty then {
           log.info(s"Loaded ${nodes.size} static node(s) from $filePath")
         }
         nodes

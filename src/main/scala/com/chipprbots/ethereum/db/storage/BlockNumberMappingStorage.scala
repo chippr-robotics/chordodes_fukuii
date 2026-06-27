@@ -16,7 +16,7 @@ class BlockNumberMappingStorage(val dataSource: DataSource)
   override def keySerializer: (BigInt) => IndexedSeq[Byte] = index => ArraySeq.unsafeWrapArray(index.toByteArray)
 
   override def keyDeserializer: IndexedSeq[Byte] => BigInt = bytes =>
-    if (bytes.isEmpty) BigInt(0)
+    if bytes.isEmpty then BigInt(0)
     else new BigInt(new BigInteger(bytes.toArray))
 
   override def valueSerializer: (BlockHeaderHash) => IndexedSeq[Byte] = identity

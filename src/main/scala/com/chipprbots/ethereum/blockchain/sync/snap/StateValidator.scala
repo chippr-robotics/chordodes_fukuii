@@ -30,7 +30,7 @@ class StateValidator(mptStorage: MptStorage) {
         val rootNode = mptStorage.get(stateRoot.toArray)
         traverseForMissingNodes(rootNode, mptStorage, missingNodes)
 
-        if (missingNodes.isEmpty) Right(Seq.empty)
+        if missingNodes.isEmpty then Right(Seq.empty)
         else Right(missingNodes.toSeq)
       } catch {
         case _: MerklePatriciaTrie.MissingNodeException =>
@@ -58,7 +58,7 @@ class StateValidator(mptStorage: MptStorage) {
       }
 
       accounts.foreach { account =>
-        if (account.storageRoot != Account.EmptyStorageRootHash) {
+        if account.storageRoot != Account.EmptyStorageRootHash then {
           try {
             val storageRootNode = mptStorage.get(account.storageRoot.toArray)
             traverseForMissingNodes(storageRootNode, mptStorage, missingStorageNodes)
@@ -70,7 +70,7 @@ class StateValidator(mptStorage: MptStorage) {
         }
       }
 
-      if (missingStorageNodes.isEmpty) Right(Seq.empty)
+      if missingStorageNodes.isEmpty then Right(Seq.empty)
       else Right(missingStorageNodes.toSeq)
     } catch {
       case e: Exception =>
@@ -95,14 +95,14 @@ class StateValidator(mptStorage: MptStorage) {
 
       case ext: ExtensionNode =>
         val nodeHash = ByteString(ext.hash)
-        if (!visited.contains(nodeHash)) {
+        if !visited.contains(nodeHash) then {
           visited += nodeHash
           traverseForMissingNodes(ext.next, storage, missingNodes, visited)
         }
 
       case branch: BranchNode =>
         val nodeHash = ByteString(branch.hash)
-        if (!visited.contains(nodeHash)) {
+        if !visited.contains(nodeHash) then {
           visited += nodeHash
           branch.children.foreach { child =>
             traverseForMissingNodes(child, storage, missingNodes, visited)
@@ -111,7 +111,7 @@ class StateValidator(mptStorage: MptStorage) {
 
       case hash: HashNode =>
         val hashKey = ByteString(hash.hash)
-        if (!visited.contains(hashKey)) {
+        if !visited.contains(hashKey) then {
           try {
             val resolvedNode = storage.get(hash.hash)
             traverseForMissingNodes(resolvedNode, storage, missingNodes, visited)
@@ -144,14 +144,14 @@ class StateValidator(mptStorage: MptStorage) {
 
       case ext: ExtensionNode =>
         val nodeHash = ByteString(ext.hash)
-        if (!visited.contains(nodeHash)) {
+        if !visited.contains(nodeHash) then {
           visited += nodeHash
           collectAccounts(ext.next, storage, accounts, visited)
         }
 
       case branch: BranchNode =>
         val nodeHash = ByteString(branch.hash)
-        if (!visited.contains(nodeHash)) {
+        if !visited.contains(nodeHash) then {
           visited += nodeHash
           branch.children.foreach { child =>
             collectAccounts(child, storage, accounts, visited)
@@ -168,7 +168,7 @@ class StateValidator(mptStorage: MptStorage) {
 
       case hash: HashNode =>
         val hashKey = ByteString(hash.hash)
-        if (!visited.contains(hashKey)) {
+        if !visited.contains(hashKey) then {
           try {
             val resolvedNode = storage.get(hash.hash)
             collectAccounts(resolvedNode, storage, accounts, visited)
@@ -225,7 +225,7 @@ class StateValidator(mptStorage: MptStorage) {
     var totalSent = 0
 
     val flushIfFull: () => Unit = () =>
-      if (result.size >= batchSize) {
+      if result.size >= batchSize then {
         onBatch(result.toSeq)
         totalSent += result.size
         result.clear()
@@ -234,7 +234,7 @@ class StateValidator(mptStorage: MptStorage) {
     try {
       val rootNode = mptStorage.get(stateRoot.toArray)
       walkAccountTrieDFS(rootNode, result, flushIfFull)
-      if (result.nonEmpty) {
+      if result.nonEmpty then {
         onBatch(result.toSeq)
         totalSent += result.size
       }
@@ -266,12 +266,12 @@ class StateValidator(mptStorage: MptStorage) {
     var lastHeartbeat = System.currentTimeMillis()
     var nodesVisited = 0L
 
-    while (stack.nonEmpty) {
+    while stack.nonEmpty do {
       val (node, nibblePath) = stack.removeHead()
       nodesVisited += 1
 
       val now = System.currentTimeMillis()
-      if (now - lastHeartbeat >= 10_000L) {
+      if now - lastHeartbeat >= 10_000L then {
         log.info(s"[WALK-PULSE] visited=$nodesVisited missing-pending=${result.size} stack=${stack.size}")
         lastHeartbeat = now
       }
@@ -282,7 +282,7 @@ class StateValidator(mptStorage: MptStorage) {
         case leaf: LeafNode =>
           try {
             val account = accountSerializer.fromBytes(leaf.value.toArray)
-            if (account.storageRoot != com.chipprbots.ethereum.domain.Account.EmptyStorageRootHash) {
+            if account.storageRoot != com.chipprbots.ethereum.domain.Account.EmptyStorageRootHash then {
               val fullNibblePath = nibblePath ++ leaf.key.toArray
               val accountHashBytes = HexPrefix.nibblesToBytes(fullNibblePath)
               try {
@@ -300,26 +300,25 @@ class StateValidator(mptStorage: MptStorage) {
 
         case ext: ExtensionNode =>
           val nodeHash = ByteString(ext.hash)
-          if (!visited.contains(nodeHash)) {
+          if !visited.contains(nodeHash) then {
             visited += nodeHash
             stack.prepend((ext.next, nibblePath ++ ext.sharedKey.toArray))
           }
 
         case branch: BranchNode =>
           val nodeHash = ByteString(branch.hash)
-          if (!visited.contains(nodeHash)) {
+          if !visited.contains(nodeHash) then {
             visited += nodeHash
             // Push in reverse order so child 0 is processed first (consistent ordering)
-            for (i <- 15 to 0 by -1) {
+            for i <- 15 to 0 by -1 do {
               val child = branch.children(i)
-              if (!child.isNull)
-                stack.prepend((child, nibblePath :+ i.toByte))
+              if !child.isNull then stack.prepend((child, nibblePath :+ i.toByte))
             }
           }
 
         case hash: HashNode =>
           val hashKey = ByteString(hash.hash)
-          if (!visited.contains(hashKey)) {
+          if !visited.contains(hashKey) then {
             try
               mptStorage.get(hash.hash) // proven subtree — discoverMissingChildren handles children
             catch {
@@ -343,7 +342,7 @@ class StateValidator(mptStorage: MptStorage) {
     val visited = mutable.Set[ByteString]()
     stack.prepend((rootNode, Array.emptyByteArray))
 
-    while (stack.nonEmpty) {
+    while stack.nonEmpty do {
       val (node, nibblePath) = stack.removeHead()
 
       node match {
@@ -351,25 +350,24 @@ class StateValidator(mptStorage: MptStorage) {
 
         case ext: ExtensionNode =>
           val nodeHash = ByteString(ext.hash)
-          if (!visited.contains(nodeHash)) {
+          if !visited.contains(nodeHash) then {
             visited += nodeHash
             stack.prepend((ext.next, nibblePath ++ ext.sharedKey.toArray))
           }
 
         case branch: BranchNode =>
           val nodeHash = ByteString(branch.hash)
-          if (!visited.contains(nodeHash)) {
+          if !visited.contains(nodeHash) then {
             visited += nodeHash
-            for (i <- 15 to 0 by -1) {
+            for i <- 15 to 0 by -1 do {
               val child = branch.children(i)
-              if (!child.isNull)
-                stack.prepend((child, nibblePath :+ i.toByte))
+              if !child.isNull then stack.prepend((child, nibblePath :+ i.toByte))
             }
           }
 
         case hash: HashNode =>
           val hashKey = ByteString(hash.hash)
-          if (!visited.contains(hashKey)) {
+          if !visited.contains(hashKey) then {
             try {
               val resolvedNode = mptStorage.get(hash.hash)
               stack.prepend((resolvedNode, nibblePath))

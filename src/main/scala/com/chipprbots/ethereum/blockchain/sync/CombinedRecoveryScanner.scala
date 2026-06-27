@@ -72,7 +72,7 @@ final class CombinedRecoveryScanner(
     val shardCount = shards.length
 
     // An empty state trie has nothing to recover; never persist a checkpoint for it (invariant: shardCount >= 1).
-    if (shardCount == 0) return RecoveryScanResult(Vector.empty, Vector.empty)
+    if shardCount == 0 then return RecoveryScanResult(Vector.empty, Vector.empty)
 
     // Resume: a tag-matched checkpoint seeds the accumulators + dedup sets; a mismatch/absence starts fresh.
     val resumed = appStateStorage.getRecoveryProgressFor(scanRoot, shardCount)
@@ -84,7 +84,7 @@ final class CombinedRecoveryScanner(
 
     // Fast path: the checkpoint is already complete (e.g. the process died during the download phase). Skip the scan
     // and hand back the persisted gaps so download can resume without re-walking the trie.
-    if (completed.size >= shardCount) return RecoveryScanResult(accBytecodes.toVector, accStorage.toVector)
+    if completed.size >= shardCount then return RecoveryScanResult(accBytecodes.toVector, accStorage.toVector)
 
     val remaining = (0 until shardCount).filterNot(completed)
     val lock = new Object
@@ -97,16 +97,16 @@ final class CombinedRecoveryScanner(
     val missingStorageCount = new java.util.concurrent.atomic.AtomicLong(accStorage.size.toLong)
     val onAccount: Boolean => Unit = { isContract =>
       val n = accountsScanned.incrementAndGet()
-      if (isContract) contractsFound.incrementAndGet()
-      if (n % 100000 == 0) RecoveryMetrics.setStorageScanProgress(n, contractsFound.get(), missingStorageCount.get())
+      if isContract then contractsFound.incrementAndGet()
+      if n % 100000 == 0 then RecoveryMetrics.setStorageScanProgress(n, contractsFound.get(), missingStorageCount.get())
     }
 
     // Merge one shard's gaps (cross-shard dedup) and atomically persist completion + accumulated gaps. Serialized so
     // the shared accumulators/dedup-sets and the single-key write are consistent under parallel walks.
     def mergeAndPersist(idx: Int, scan: CombinedRecoveryScan): Unit = lock.synchronized {
-      scan.missingBytecodes.foreach(h => if (seenCodeHashes.add(h)) accBytecodes += h)
+      scan.missingBytecodes.foreach(h => if seenCodeHashes.add(h) then accBytecodes += h)
       scan.missingStorageTries.foreach { case (acct, root) =>
-        if (seenStorageRoots.add(root)) accStorage += ((acct, root))
+        if seenStorageRoots.add(root) then accStorage += ((acct, root))
       }
       missingStorageCount.set(accStorage.size.toLong)
       completed += idx
@@ -129,7 +129,7 @@ final class CombinedRecoveryScanner(
       mergeAndPersist(idx, scan)
     }
 
-    if (concurrency <= 1) {
+    if concurrency <= 1 then {
       remaining.foreach(scanOne)
     } else {
       val pool = Executors.newFixedThreadPool(math.min(concurrency, remaining.size))

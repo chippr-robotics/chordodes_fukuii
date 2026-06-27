@@ -213,7 +213,7 @@ class OlympiaFeeMarketSpec
         OlympiaTest
       ) in {
         var fee = InitialBaseFee
-        for (_ <- 1 to 100) {
+        for _ <- 1 to 100 do {
           val emptyParent = olympiaParent(gasLimit = BigInt(30_000_000), gasUsed = 0, baseFee = fee)
           fee = BaseFeeCalculator.calcBaseFee(emptyParent, config)
           fee should be >= InitialBaseFee

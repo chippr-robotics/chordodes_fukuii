@@ -48,7 +48,7 @@ object EthUserJsonMethodsImplicits extends JsonMethodsImplicits {
         params match {
           case Some(JArray((addressStr: JString) :: (positionStr: JString) :: (blockValue: JValue) :: Nil)) =>
             val keyHex = positionStr.s.stripPrefix("0x").stripPrefix("0X")
-            if (keyHex.length > 64)
+            if keyHex.length > 64 then
               Left(InvalidParams(s"""storage key too long (want at most 32 bytes): "${positionStr.s}""""))
             else
               for {
@@ -61,7 +61,7 @@ object EthUserJsonMethodsImplicits extends JsonMethodsImplicits {
 
       def encodeJson(t: GetStorageAtResponse): JValue = {
         // eth_getStorageAt returns a full 32-byte zero-padded value per spec
-        val padded = if (t.value.length < 32) {
+        val padded = if t.value.length < 32 then {
           ByteString(new Array[Byte](32 - t.value.length)) ++ t.value
         } else t.value
         encodeAsHex(padded)

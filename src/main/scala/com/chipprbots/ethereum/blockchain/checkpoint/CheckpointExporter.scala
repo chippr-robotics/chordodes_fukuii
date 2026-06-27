@@ -64,7 +64,7 @@ final class CheckpointExporter(
     val mpt = stateStorage.getReadOnlyStorage
     val raw = new FileOutputStream(output.toFile)
     val out =
-      if (gzip) new GZIPOutputStream(new BufferedOutputStream(raw, 65536), 65536)
+      if gzip then new GZIPOutputStream(new BufferedOutputStream(raw, 65536), 65536)
       else new BufferedOutputStream(raw, 65536)
     val writer = new CheckpointArchive.Writer(out)
     val visited = new java.util.HashSet[ByteString]
@@ -110,7 +110,7 @@ final class CheckpointExporter(
         storageRoots = storageRoots,
         onNodeEmitted = () => {
           nodesEmitted += 1
-          if (nodesEmitted % LogInterval == 0)
+          if nodesEmitted % LogInterval == 0 then
             log.info(
               "[CHECKPOINT EXPORT] nodes={} bytecodes={} storageQueue={}",
               nodesEmitted,
@@ -126,9 +126,9 @@ final class CheckpointExporter(
       }
 
       // Phase 2: per-account storage tries
-      while (storageRoots.nonEmpty) {
+      while storageRoots.nonEmpty do {
         val sroot = storageRoots.dequeue()
-        if (sroot != Account.EmptyStorageRootHash) {
+        if sroot != Account.EmptyStorageRootHash then {
           walkTrie(
             rootHash = sroot,
             isMainTrie = false,
@@ -139,7 +139,7 @@ final class CheckpointExporter(
             storageRoots = storageRoots,
             onNodeEmitted = () => {
               nodesEmitted += 1
-              if (nodesEmitted % LogInterval == 0)
+              if nodesEmitted % LogInterval == 0 then
                 log.info(
                   "[CHECKPOINT EXPORT] nodes={} bytecodes={} storageQueue={}",
                   nodesEmitted,
@@ -158,9 +158,9 @@ final class CheckpointExporter(
 
       // Phase 3: bytecodes
       val it = codeHashes.iterator()
-      while (it.hasNext) {
+      while it.hasNext do {
         val ch = it.next()
-        if (ch != Account.EmptyCodeHash) {
+        if ch != Account.EmptyCodeHash then {
           evmCodeStorage.get(ch) match {
             case Some(code) =>
               writer.writeBytecode(ch, code.toArray)
@@ -202,9 +202,9 @@ final class CheckpointExporter(
   ): Either[ExportError, Unit] = {
     val stack = new scala.collection.mutable.Stack[ByteString]
     stack.push(rootHash)
-    while (stack.nonEmpty) {
+    while stack.nonEmpty do {
       val h = stack.pop()
-      if (visited.add(h)) {
+      if visited.add(h) then {
         val decoded =
           try mpt.get(h.toArray)
           catch { case _: MerklePatriciaTrie.MissingNodeException => return Left(MissingTrieNode(h, isMainTrie)) }
@@ -233,8 +233,8 @@ final class CheckpointExporter(
     case LeafNode(_, value, _, _, _) if isMainTrie =>
       Account(value) match {
         case scala.util.Success(acct) =>
-          if (acct.storageRoot != Account.EmptyStorageRootHash) storageRoots += acct.storageRoot
-          if (acct.codeHash != Account.EmptyCodeHash) codeHashes.add(acct.codeHash)
+          if acct.storageRoot != Account.EmptyStorageRootHash then storageRoots += acct.storageRoot
+          if acct.codeHash != Account.EmptyCodeHash then codeHashes.add(acct.codeHash)
         case scala.util.Failure(_) =>
         // Storage-only or malformed leaf — best-effort; bytecodes still resolved per-trie.
       }
@@ -244,7 +244,7 @@ final class CheckpointExporter(
       collectChildren(next, isMainTrie, stack, codeHashes, storageRoots)
     case BranchNode(children, _, _, _, _) =>
       var i = 0
-      while (i < children.length) {
+      while i < children.length do {
         collectChildren(children(i), isMainTrie, stack, codeHashes, storageRoots)
         i += 1
       }

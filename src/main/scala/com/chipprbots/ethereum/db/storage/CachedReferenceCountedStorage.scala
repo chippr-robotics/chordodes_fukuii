@@ -82,7 +82,7 @@ object CachedReferenceCountedStorage {
     var nodesToDeleteFromCache = List.empty[NodeHash]
     deathRow.foreach { nodeHash =>
       cache.get(nodeHash).foreach { nodeFromCache =>
-        if (nodeFromCache.numOfParents == 0 && nodeFromCache.bn <= blockToPrune) {
+        if nodeFromCache.numOfParents == 0 && nodeFromCache.bn <= blockToPrune then {
           nodesToDeleteFromCache = nodeHash :: nodesToDeleteFromCache
         }
       }
@@ -93,7 +93,7 @@ object CachedReferenceCountedStorage {
   def persistCache[V](cache: Cache[ByteString, V], storage: NodeStorage, forced: Boolean = false)(implicit
       ser: ByteArraySerializable[V]
   ): Boolean =
-    if (cache.shouldPersist || forced) {
+    if cache.shouldPersist || forced then {
       val values = cache.getValues
       val serialized = values.map { case (key, value) => key -> ser.toBytes(value) }
       storage.update(Nil, serialized)
@@ -143,10 +143,8 @@ object CachedReferenceCountedStorage {
   ): (List[NodeHash], List[(NodeHash, HeapEntry)]) =
     previousState.foldLeft((List.empty[NodeHash], List.empty[(NodeHash, HeapEntry)])) {
       case ((toDel, toUpdate), (entryKey, (entryValue, deletable))) =>
-        if (entryValue.numOfParents == 0 && deletable)
-          (entryKey :: toDel, toUpdate)
-        else
-          (toDel, (entryKey, entryValue) :: toUpdate)
+        if entryValue.numOfParents == 0 && deletable then (entryKey :: toDel, toUpdate)
+        else (toDel, (entryKey, entryValue) :: toUpdate)
     }
 
   def rollback(
@@ -311,7 +309,7 @@ class BlockChangeLog(private val initialLog: List[Update], private val initialTo
   def registerChange(update: Update, refCountAfterUpdate: Int): Unit = {
     updates = update :: updates
 
-    if (refCountAfterUpdate == 0) {
+    if refCountAfterUpdate == 0 then {
       potentialNodesToDel = potentialNodesToDel + update.hash
     }
   }

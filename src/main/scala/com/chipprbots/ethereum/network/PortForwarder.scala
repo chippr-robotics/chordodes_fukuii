@@ -33,7 +33,7 @@ private[network] class ClientOnlyUpnpServiceConfiguration extends DefaultUpnpSer
   override def createDefaultExecutorService(): ExecutorService =
     QueueingThreadPoolExecutor.createInstance("fukuii-jupnp", THREAD_POOL_SIZE);
 
-  override def createStreamClient(): StreamClient[_ <: StreamClientConfiguration] = {
+  override def createStreamClient(): StreamClient[? <: StreamClientConfiguration] = {
     // Use Apache HttpClient-based transport to avoid URLStreamHandlerFactory issues
     val config = new StreamClientConfiguration() {
       override def getTimeoutSeconds(): Int = 10

@@ -179,7 +179,7 @@ object ServerActor {
     Behaviors.receiveMessagePartial { case TcpConnected(connection, remoteAddress) =>
       val addr = remoteAddress.getAddress
       val isLocal = addr.isLoopbackAddress || addr.isSiteLocalAddress
-      if (!isLocal && blacklist.isBlacklisted(PeerManagerActor.PeerAddress(remoteAddress.getHostString))) {
+      if !isLocal && blacklist.isBlacklisted(PeerManagerActor.PeerAddress(remoteAddress.getHostString)) then {
         ctx.log.debug("Dropping inbound TCP from blacklisted {}", remoteAddress.getHostString)
         connection ! Close
       } else {

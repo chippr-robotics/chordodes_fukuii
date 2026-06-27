@@ -478,7 +478,7 @@ object PeerActor {
         s"DISCONNECT_DEBUG: Received disconnect from ${peerAddress.getHostString}:${peerAddress.getPort} - reason code: 0x${d.reason.toHexString} (${Disconnect
             .reasonToString(d.reason)}), status: $status"
       )
-      if (d.reason == Other) {
+      if d.reason == Other then {
         log.info(
           s"DISCONNECT_DEBUG: Subprotocol disconnect (0x10) from ${peerAddress.getHostString}:${peerAddress.getPort}. " +
             s"This typically indicates: ForkId mismatch, malformed message, or protocol incompatibility. " +
@@ -548,11 +548,10 @@ object PeerActor {
         case RLPxConnectionHandler.MessageReceived(message) =>
           message match {
             case bru: com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate =>
-              if (
-                bru.earliestBlock > bru.latestBlock || bru.latestBlockHash == org.apache.pekko.util.ByteString(
+              if bru.earliestBlock > bru.latestBlock || bru.latestBlockHash == org.apache.pekko.util.ByteString(
                   new Array[Byte](32)
                 )
-              ) {
+              then {
                 log.warn(
                   "Invalid BlockRangeUpdate from peer {}: earliest={} > latest={} — disconnecting",
                   peerId,
@@ -592,7 +591,7 @@ object PeerActor {
     // The actor logs incoming messages, which can be quite verbose even for DEBUG mode.
     object MessageLogger {
       def logMessage(peerId: PeerId, message: Message): Unit =
-        if (log.isTraceEnabled) {
+        if log.isTraceEnabled then {
           log.trace(s"Received message: {} from $peerId", message)
         } else {
           log.debug(s"Received message: {} from $peerId", message.toShortString)

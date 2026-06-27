@@ -48,7 +48,7 @@ class FukuiiService(
   def getAccountTransactions(
       request: GetAccountTransactionsRequest
   ): ServiceResponse[GetAccountTransactionsResponse] =
-    if (request.blocksRange.length > jsonRpcConfig.accountTransactionsMaxBlocks) {
+    if request.blocksRange.length > jsonRpcConfig.accountTransactionsMaxBlocks then {
       IO.pure(
         Left(
           JsonRpcError.InvalidParams(

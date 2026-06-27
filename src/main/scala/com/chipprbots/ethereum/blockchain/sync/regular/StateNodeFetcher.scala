@@ -72,7 +72,7 @@ class StateNodeFetcher(
           case _ =>
             log.debug(
               "Start fetching {} {} (snap paths available: {}, fallback root available: {})",
-              if (isByteCode) "bytecode" else "state node",
+              if isByteCode then "bytecode" else "state node",
               ByteStringUtils.hash2string(hash),
               paths.isDefined,
               fallbackRoot.isDefined
@@ -93,7 +93,7 @@ class StateNodeFetcher(
       case AdaptedMessage(peer, TrieNodes(_, nodes)) if requester.isDefined =>
         log.info("Received SNAP TrieNodes response from peer {} with {} nodes", peer, nodes.size)
         totalNodesFetched += 1
-        if (totalNodesFetched % 1000 == 0) {
+        if totalNodesFetched % 1000 == 0 then {
           val rate = totalNodesFetched * 1000L / (System.currentTimeMillis() - nodesFetchStartMs).max(1)
           log.info("StateNodeFetcher: {} nodes fetched | {} nodes/s", totalNodesFetched, rate)
         }
@@ -103,7 +103,7 @@ class StateNodeFetcher(
       case AdaptedMessage(peer, ByteCodes(_, codes)) if requester.isDefined =>
         log.info("Received SNAP ByteCodes response from peer {} with {} codes", peer, codes.size)
         totalNodesFetched += 1
-        if (totalNodesFetched % 1000 == 0) {
+        if totalNodesFetched % 1000 == 0 then {
           val rate = totalNodesFetched * 1000L / (System.currentTimeMillis() - nodesFetchStartMs).max(1)
           log.info("StateNodeFetcher: {} nodes fetched | {} nodes/s", totalNodesFetched, rate)
         }
@@ -141,7 +141,7 @@ class StateNodeFetcher(
     */
   private def retryOrExhaust(req: StateNodeRequester): Unit = {
     val nextAttempt = req.attempts + 1
-    if (nextAttempt >= MaxStateNodeFetchRetries) {
+    if nextAttempt >= MaxStateNodeFetchRetries then {
       log.warn(
         "State node fetch for {} exhausted after {} attempts — signaling BlockImporter to back off",
         ByteStringUtils.hash2string(req.hash),
@@ -180,7 +180,7 @@ class StateNodeFetcher(
   private def handleTrieNodesValues(peer: Peer, nodes: Seq[ByteString]): Behavior[StateNodeFetcherCommand] =
     requester
       .collect { stateNodeRequester =>
-        if (nodes.isEmpty) {
+        if nodes.isEmpty then {
           // Empty TrieNodes from a snap peer almost always means "I don't have this root" —
           // typical when the parent stateRoot is older than the peer's ~128-block serve window.
           // Fall back to the recent canonical root we got from BlockFetcher: trie nodes are
@@ -264,7 +264,7 @@ class StateNodeFetcher(
   private def handleByteCodesValues(peer: Peer, codes: Seq[ByteString]): Behavior[StateNodeFetcherCommand] =
     requester
       .collect { stateNodeRequester =>
-        if (codes.isEmpty) {
+        if codes.isEmpty then {
           // Per SNAP/1, an empty ByteCodes response means the server doesn't have any of the
           // requested codes — equivalent to a stateless response. Retry against another peer.
           log.warn("SNAP ByteCodes response was empty, rotating to a different snap peer")
@@ -306,7 +306,7 @@ class StateNodeFetcher(
       isByteCode: Boolean,
       excludePeers: Set[PeerId]
   ): Unit =
-    if (isByteCode) {
+    if isByteCode then {
       sendGetByteCodes(hash, excludePeers)
     } else {
       (stateRoot, paths) match {

@@ -188,7 +188,7 @@ object RegularSync {
         val newState = progressState.copy(currentBlock = blockNumber)
         RegularSyncMetrics.setCurrentBlock(blockNumber)
         RegularSyncMetrics.incrementBlocksImported()
-        if (internally) {
+        if internally then {
           fetcher ! InternalLastBlockImport(blockNumber)
         }
         running(newState, fetcher, importer, log, ctx)
@@ -213,13 +213,13 @@ object RegularSync {
         val lag = progressState.bestKnownNetworkBlock - progressState.currentBlock
         val now = System.currentTimeMillis()
         val dtSecs =
-          if (progressState.lastPrintTimeMs > 0) (now - progressState.lastPrintTimeMs) / 1000.0 else 0.0
+          if progressState.lastPrintTimeMs > 0 then (now - progressState.lastPrintTimeMs) / 1000.0 else 0.0
         val deltaBlocks = progressState.currentBlock - progressState.lastPrintBlock
         val rate =
-          if (dtSecs > 0 && progressState.lastPrintTimeMs > 0) deltaBlocks.toDouble / dtSecs else 0.0
+          if dtSecs > 0 && progressState.lastPrintTimeMs > 0 then deltaBlocks.toDouble / dtSecs else 0.0
         val etaStr =
-          if (rate > 0.1 && lag > 0) f"${lag.toDouble / rate / 3600}%.1fh"
-          else if (lag == 0) "at head"
+          if rate > 0.1 && lag > 0 then f"${lag.toDouble / rate / 3600}%.1fh"
+          else if lag == 0 then "at head"
           else "unknown"
         log.info(
           s"RegularSync: current=${progressState.currentBlock} best=${progressState.bestKnownNetworkBlock} " +
@@ -245,9 +245,9 @@ object RegularSync {
       lastPrintTimeMs: Long = 0L
   ) {
     def toStatus: SyncProtocol.Status =
-      if (startedFetching && bestKnownNetworkBlock != 0 && currentBlock < bestKnownNetworkBlock) {
+      if startedFetching && bestKnownNetworkBlock != 0 && currentBlock < bestKnownNetworkBlock then {
         Status.Syncing(initialBlock, Progress(currentBlock, bestKnownNetworkBlock), None)
-      } else if (startedFetching && bestKnownNetworkBlock != 0 && currentBlock >= bestKnownNetworkBlock) {
+      } else if startedFetching && bestKnownNetworkBlock != 0 && currentBlock >= bestKnownNetworkBlock then {
         Status.SyncDone
       } else {
         Status.NotSyncing

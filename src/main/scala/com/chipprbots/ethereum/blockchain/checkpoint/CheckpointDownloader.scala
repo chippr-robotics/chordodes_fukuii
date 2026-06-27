@@ -41,7 +41,7 @@ final class CheckpointDownloader(
     * On any failure the `.tmp` is left in place so the next attempt can resume.
     */
   def download(url: String, target: Path): Either[DownloadError, Unit] = {
-    if (Files.exists(target)) {
+    if Files.exists(target) then {
       log.info("[CHECKPOINT DOWNLOAD] target {} already exists; skipping fetch", target)
       return Right(())
     }
@@ -64,7 +64,7 @@ final class CheckpointDownloader(
     try {
       try lockOpt = Option(tmpChannel.tryLock())
       catch { case _: OverlappingFileLockException => () }
-      if (lockOpt.isEmpty) {
+      if lockOpt.isEmpty then {
         log.warn("[CHECKPOINT DOWNLOAD] another process holds {}; refusing to start", tmpPath)
         return Left(AlreadyDownloading)
       }
@@ -111,7 +111,7 @@ final class CheckpointDownloader(
       .uri(URI.create(url))
       .timeout(Duration.ofMinutes(30))
       .GET()
-    if (resumeFrom > 0) {
+    if resumeFrom > 0 then {
       log.info("[CHECKPOINT DOWNLOAD] resuming from byte {} for {}", resumeFrom, url)
       builder.header("Range", s"bytes=$resumeFrom-")
     } else {
@@ -136,9 +136,9 @@ final class CheckpointDownloader(
     val status = response.statusCode()
     val rangeOk = resumeFrom > 0 && status == 206
     val fullOk = resumeFrom == 0 && (status == 200 || status == 206)
-    if (!rangeOk && !fullOk) {
+    if !rangeOk && !fullOk then {
       // 200 to a Range request means server ignored the range — start over from byte 0.
-      if (resumeFrom > 0 && status == 200) {
+      if resumeFrom > 0 && status == 200 then {
         log.warn(
           "[CHECKPOINT DOWNLOAD] server ignored Range header (status 200); restarting download from scratch"
         )
@@ -168,11 +168,11 @@ final class CheckpointDownloader(
     var nextLogAt = alreadyWritten + progressLogIntervalBytes
     try {
       var n = body.read(buf)
-      while (n >= 0) {
-        if (n > 0) {
+      while n >= 0 do {
+        if n > 0 then {
           out.write(buf, 0, n)
           total += n
-          if (total >= nextLogAt) {
+          if total >= nextLogAt then {
             log.info("[CHECKPOINT DOWNLOAD] {} MiB written", total / (1024 * 1024))
             nextLogAt = total + progressLogIntervalBytes
           }

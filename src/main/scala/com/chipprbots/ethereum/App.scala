@@ -78,7 +78,7 @@ object App extends Logger {
       case None =>
         val resourcePath = s"conf/$network.conf"
         val resourceExists = Option(getClass.getClassLoader.getResource(resourcePath)).isDefined
-        if (resourceExists) {
+        if resourceExists then {
           System.clearProperty("config.file")
           System.setProperty("config.resource", resourcePath)
           log.info(s"Loading network configuration from classpath resource: $resourcePath")
@@ -104,7 +104,7 @@ object App extends Logger {
 
   /** Apply modifiers to system configuration */
   private def applyModifiers(modifiers: Set[String]): Unit = {
-    if (modifiers.contains("public")) {
+    if modifiers.contains("public") then {
       System.setProperty("fukuii.network.discovery.discovery-enabled", "true")
       // Public mode: use both bootstrap nodes and static nodes for better sync experience
       System.setProperty("fukuii.network.discovery.use-bootstrap-nodes", "true")
@@ -112,7 +112,7 @@ object App extends Logger {
       log.info("- Using both bootstrap nodes and static-nodes.json for peer discovery")
     }
 
-    if (modifiers.contains("enterprise")) {
+    if modifiers.contains("enterprise") then {
       // Enterprise mode: Best practices for private/permissioned EVM networks
 
       // Disable public peer discovery - use static nodes only

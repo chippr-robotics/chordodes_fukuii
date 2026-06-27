@@ -77,7 +77,7 @@ object ReceiptCodecs {
 
   implicit class ReceiptDec(val bytes: Array[Byte]) extends AnyVal {
     def toReceipt: Receipt = {
-      if (bytes.isEmpty) throw new RuntimeException("Cannot decode Receipt: empty byte array")
+      if bytes.isEmpty then throw new RuntimeException("Cannot decode Receipt: empty byte array")
       val first = bytes(0)
       (first match {
         case txType if txType.isValidTransactionType && bytes.length > 1 =>
@@ -87,7 +87,7 @@ object ReceiptCodecs {
     }
 
     def toReceipts: Seq[Receipt] = rawDecode(bytes) match {
-      case RLPList(items @ _*) => items.toTypedRLPEncodables.map(_.toReceipt)
+      case RLPList(items*) => items.toTypedRLPEncodables.map(_.toReceipt)
       case other =>
         throw new RuntimeException(s"Cannot decode Receipts: expected RLPList, got ${other.getClass.getSimpleName}")
     }
@@ -142,7 +142,7 @@ object ReceiptCodecs {
           ByteString(Array.fill(256)(0.toByte)),
           logs.items.map(_.toTxLogEntry)
         )
-      case RLPList(items @ _*) =>
+      case RLPList(items*) =>
         throw new RuntimeException(s"Cannot decode Receipt: expected 3 or 4 items in RLPList, got ${items.length}")
       case RLPValue(bytes) if bytes.nonEmpty && bytes.head.isValidTransactionType && bytes.length > 1 =>
         rawDecode(bytes.tail).toLegacyReceipt

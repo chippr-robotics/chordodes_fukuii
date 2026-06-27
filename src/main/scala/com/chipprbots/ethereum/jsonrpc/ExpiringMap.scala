@@ -49,8 +49,7 @@ class ExpiringMap[K, V] private (
     underlying
       .get(k)
       .flatMap(value =>
-        if (isNotExpired(value))
-          Some(value.value)
+        if isNotExpired(value) then Some(value.value)
         else {
           remove(k)
           None

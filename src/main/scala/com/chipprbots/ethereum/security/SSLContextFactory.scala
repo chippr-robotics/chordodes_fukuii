@@ -41,14 +41,11 @@ case class SSLContextFactory() extends FileUtils with KeyStoreUtils {
   ): Either[SSLError, Unit] = {
     val keystoreDirMissing = !exist(keystorePath)
     val passwordFileMissing = !exist(passwordFile)
-    if (keystoreDirMissing && passwordFileMissing)
+    if keystoreDirMissing && passwordFileMissing then
       Left(SSLError("Certificate keystore path and password file configured but files are missing"))
-    else if (keystoreDirMissing)
-      Left(SSLError("Certificate keystore path configured but file is missing"))
-    else if (passwordFileMissing)
-      Left(SSLError("Certificate password file configured but file is missing"))
-    else
-      Right(())
+    else if keystoreDirMissing then Left(SSLError("Certificate keystore path configured but file is missing"))
+    else if passwordFileMissing then Left(SSLError("Certificate password file configured but file is missing"))
+    else Right(())
   }
 
   /** Constructs the SSL context given a certificate

@@ -154,7 +154,7 @@ final case class HeaderSkeleton(
   /** The complete skeleton plus the filled in batches, or `None` if not everything was downloaded
     */
   val fullChain: Option[Seq[BlockHeader]] =
-    if (isFull) Some(batchStartingHeaderNumbers.flatMap(batches.apply))
+    if isFull then Some(batchStartingHeaderNumbers.flatMap(batches.apply))
     else None
 }
 

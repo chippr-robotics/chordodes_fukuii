@@ -56,7 +56,7 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
   private var rootFrame: Option[CallFrame] = None
 
   override def onTxStart(from: Address, to: Option[Address], gas: BigInt, value: BigInt, input: ByteString): Unit = {
-    val opCode = if (to.isDefined) "CALL" else "CREATE"
+    val opCode = if to.isDefined then "CALL" else "CREATE"
     val frame = CallFrame(
       opCode = opCode,
       from = from,
@@ -70,12 +70,12 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
   }
 
   override def onTxEnd(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit =
-    if (callStack.nonEmpty) {
+    if callStack.nonEmpty then {
       val frame = callStack.pop()
       frame.gasUsed = gasUsed
       frame.output = output
       frame.error = error
-      if (error.exists(_.contains("execution reverted")) && output.length >= 4) {
+      if error.exists(_.contains("execution reverted")) && output.length >= 4 then {
         frame.revertReason = parseRevertReason(output)
       }
     }
@@ -88,7 +88,7 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
       value: BigInt,
       input: ByteString
   ): Unit = {
-    if (onlyTopCall) return
+    if onlyTopCall then return
 
     val frame = CallFrame(
       opCode = opCode,
@@ -102,18 +102,18 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
   }
 
   override def onCallExit(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit = {
-    if (onlyTopCall) return
-    if (callStack.size <= 1) return // don't pop the root frame
+    if onlyTopCall then return
+    if callStack.size <= 1 then return // don't pop the root frame
 
     val frame = callStack.pop()
     frame.gasUsed = gasUsed
     frame.output = output
     frame.error = error
-    if (error.exists(_.contains("execution reverted")) && output.length >= 4) {
+    if error.exists(_.contains("execution reverted")) && output.length >= 4 then {
       frame.revertReason = parseRevertReason(output)
     }
 
-    if (callStack.nonEmpty) {
+    if callStack.nonEmpty then {
       callStack.top.calls += frame
     }
   }
@@ -130,7 +130,7 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
       ("gas" -> JString("0x" + frame.gas.toString(16))) ~
       ("gasUsed" -> JString("0x" + frame.gasUsed.toString(16)))
 
-    if (frame.opCode == "CALL" || frame.opCode == "CREATE" || frame.opCode == "CREATE2") {
+    if frame.opCode == "CALL" || frame.opCode == "CREATE" || frame.opCode == "CREATE2" then {
       obj = obj ~ ("value" -> encodeHex(frame.value))
     }
 
@@ -141,7 +141,7 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
     frame.error.foreach(e => obj = obj ~ ("error" -> JString(e)))
     frame.revertReason.foreach(r => obj = obj ~ ("revertReason" -> JString(r)))
 
-    if (frame.calls.nonEmpty) {
+    if frame.calls.nonEmpty then {
       obj = obj ~ ("calls" -> JArray(frame.calls.toList.map(encodeFrame)))
     }
 
@@ -155,19 +155,19 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
     JString("0x" + value.toString(16))
 
   private def encodeHexBytes(bs: ByteString): JString =
-    if (bs.isEmpty) JString("0x")
+    if bs.isEmpty then JString("0x")
     else JString("0x" + Hex.toHexString(bs.toArray))
 
   /** Parse Solidity revert reason from ABI-encoded error data. Format: 0x08c379a0 + offset + length + utf8 string
     */
   private def parseRevertReason(data: ByteString): Option[String] = {
-    if (data.length < 68) return None
+    if data.length < 68 then return None
     val selector = data.take(4)
-    if (selector != ByteString(0x08, 0xc3, 0x79, 0xa0)) return None
+    if selector != ByteString(0x08, 0xc3, 0x79, 0xa0) then return None
     try {
       val offset = BigInt(1, data.slice(4, 36).toArray).toInt
       val length = BigInt(1, data.slice(36 + offset, 68 + offset).toArray).toInt
-      if (data.length < 68 + offset + length) return None
+      if data.length < 68 + offset + length then return None
       Some(new String(data.slice(68 + offset, 68 + offset + length).toArray, "UTF-8"))
     } catch {
       case _: Exception => None

@@ -53,14 +53,14 @@ object Blake2bCompression {
     val t = new Array[Long](2)
 
     var i = 0
-    while (i < h.length) {
+    while i < h.length do {
       val offset = 4 + i * 8
       h(i) = bytesToLong(copyOfRange(input, offset, offset + 8))
       i += 1
     }
 
     var j = 0
-    while (j < 16) {
+    while j < 16 do {
       val offset = 68 + j * 8
       m(j) = bytesToLong(copyOfRange(input, offset, offset + 8))
       j += 1
@@ -73,7 +73,7 @@ object Blake2bCompression {
   }
 
   def blake2bCompress(input: Array[Byte]): Option[Array[Byte]] =
-    if (isValidInput(input)) {
+    if isValidInput(input) then {
       val (rounds, h, m, t, f) = parseInput(input)
       compress(rounds, h, m, t, f)
       Some(convertToBytes(h))
@@ -84,7 +84,7 @@ object Blake2bCompression {
   private def convertToBytes(h: Array[Long]): Array[Byte] = {
     var i = 0
     val out = new Array[Byte](h.length * 8)
-    while (i < h.length) {
+    while i < h.length do {
       System.arraycopy(Pack.longToLittleEndian(h(i)), 0, out, i * 8, 8)
       i += 1
     }
@@ -100,12 +100,12 @@ object Blake2bCompression {
     v(12) ^= t0
     v(13) ^= t1
 
-    if (f) {
+    if f then {
       v(14) ^= 0xffffffffffffffffL
     }
 
     var j = 0L
-    while (j < rounds) {
+    while j < rounds do {
       val s: Array[Byte] = PRECOMPUTED((j % 10).toInt)
       mix(v, m(s(0)), m(s(4)), 0, 4, 8, 12)
       mix(v, m(s(1)), m(s(5)), 1, 5, 9, 13)
@@ -120,7 +120,7 @@ object Blake2bCompression {
 
     // update h:
     var offset = 0
-    while (offset < h.length) {
+    while offset < h.length do {
       h(offset) ^= v(offset) ^ v(offset + 8)
       offset += 1
     }

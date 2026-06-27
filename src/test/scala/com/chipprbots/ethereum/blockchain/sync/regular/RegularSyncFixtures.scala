@@ -293,7 +293,7 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
     implicit class ListOps[T](list: List[T]) {
 
       def get(index: Int): Option[T] =
-        if (list.isDefinedAt(index)) {
+        if list.isDefinedAt(index) then {
           Some(list(index))
         } else {
           None
@@ -374,13 +374,14 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
     def fakeEvaluateBlock(
         block: Block
     ): IO[BlockImportResult] = {
-      val result: BlockImportResult = if (didTryToImportBlock(block)) {
+      val result: BlockImportResult = if didTryToImportBlock(block) then {
         DuplicateBlock
       } else {
-        if (importedBlocksSet.isEmpty || bestBlock.isParentOf(block) || importedBlocksSet.exists(_.isParentOf(block))) {
+        if importedBlocksSet.isEmpty || bestBlock.isParentOf(block) || importedBlocksSet.exists(_.isParentOf(block))
+        then {
           importedBlocksSet.add(block)
           BlockImportedToTop(List(BlockData(block, Nil, ChainWeight.totalDifficultyOnly(block.header.difficulty))))
-        } else if (block.number > bestBlock.number) {
+        } else if block.number > bestBlock.number then {
           importedBlocksSet.add(block)
           BlockEnqueued
         } else {
@@ -409,14 +410,11 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
       override def resolveBranch(headers: NonEmptyList[BlockHeader]): BranchResolutionResult = {
         val importedHashes = importedBlocksSet.map(_.hash).toSet
 
-        if (
-          importedBlocksSet.isEmpty || (importedHashes.contains(
+        if importedBlocksSet.isEmpty || (importedHashes.contains(
             headers.head.parentHash
           ) && headers.last.number > bestBlock.number)
-        )
-          NewBetterBranch(Nil)
-        else
-          UnknownBranch
+        then NewBetterBranch(Nil)
+        else UnknownBranch
       }
     }
   }
@@ -447,13 +445,13 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
       .evaluateBranchBlock(_: Block)(_: IORuntime, _: BlockchainConfig))
       .when(*, *, *)
       .onCall { (block, _, _) =>
-        if (block == newBlock) {
+        if block == newBlock then {
           importedNewBlock = true
           IO.pure(
             BlockImportedToTop(List(BlockData(newBlock, Nil, ChainWeight(newBlock.number))))
           )
         } else {
-          if (block == testBlocks.last) {
+          if block == testBlocks.last then {
             importedLastTestBlock = true
           }
           IO.pure(BlockImportedToTop(Nil))
@@ -464,7 +462,7 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
       .evaluateBranch(_: NonEmptyList[Block])(_: IORuntime, _: BlockchainConfig))
       .when(*, *, *)
       .onCall { case (nel: NonEmptyList[Block], _, _) =>
-        if (nel.toList.contains(testBlocks.last)) importedLastTestBlock = true
+        if nel.toList.contains(testBlocks.last) then importedLastTestBlock = true
         val blockData = nel.toList.map(b => BlockData(b, Nil, ChainWeight.totalDifficultyOnly(b.header.difficulty)))
         IO.pure(BlockImportedToTop(blockData))
       }

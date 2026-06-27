@@ -73,7 +73,7 @@ object FastSyncItSpecUtils {
     def containsExpectedDataUpToAccountAtBlock(n: BigInt, blockNumber: BigInt): Boolean = {
       @tailrec
       def go(i: BigInt): Boolean =
-        if (i >= n) {
+        if i >= n then {
           true
         } else {
           val expectedBalance = i
@@ -92,7 +92,7 @@ object FastSyncItSpecUtils {
 
           val dataIsCorrect =
             account.balance.toBigInt == expectedBalance && code == accountExpectedCode && haveAllStoredData
-          if (dataIsCorrect) {
+          if dataIsCorrect then {
             go(i + 1)
           } else {
             false

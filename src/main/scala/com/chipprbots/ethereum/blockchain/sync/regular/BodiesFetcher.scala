@@ -61,11 +61,11 @@ class BodiesFetcher(
           triedPeers.size,
           retryCount
         )
-        if (hashes.isEmpty) {
+        if hashes.isEmpty then {
           log.warn("FetchBodies called with empty hashes list")
         }
         val concurrency = syncConfig.bodiesFetchConcurrency
-        if (concurrency <= 1 || hashes.size <= syncConfig.blockBodiesPerRequest) {
+        if concurrency <= 1 || hashes.size <= syncConfig.blockBodiesPerRequest then {
           requestBodies(hashes, triedPeers, retryCount)
         } else {
           fanOutBodies(hashes, triedPeers, retryCount, concurrency)
@@ -81,20 +81,20 @@ class BodiesFetcher(
         Behaviors.same
 
       case SliceComplete(bodies, peer, gen) =>
-        if (gen != currentBatchGen) {
+        if gen != currentBatchGen then {
           log.debug("Discarding stale SliceComplete gen={} current={}", gen, currentBatchGen)
         } else {
           collectedBodies = collectedBodies ++ bodies
-          if (sliceRepresentativePeer.isEmpty) sliceRepresentativePeer = Some(peer)
+          if sliceRepresentativePeer.isEmpty then sliceRepresentativePeer = Some(peer)
           pendingSlices -= 1
-          if (bodies.nonEmpty && bodies.size < syncConfig.blockBodiesPerRequest) {
+          if bodies.nonEmpty && bodies.size < syncConfig.blockBodiesPerRequest then {
             log.warn(
               "[RegularSync] slice truncated: got {} bodies from {} — server likely hit softResponseLimit",
               bodies.size,
               peer.id
             )
           }
-          if (pendingSlices == 0) {
+          if pendingSlices == 0 then {
             val mergedCount = collectedBodies.size
             log.info(
               "[RegularSync] bodies={} merged from fan-out, peer={}",
@@ -110,11 +110,11 @@ class BodiesFetcher(
         Behaviors.same
 
       case SliceFailed(hashes, failedPeerId, triedPeers, retryCount, gen) =>
-        if (gen != currentBatchGen) {
+        if gen != currentBatchGen then {
           log.debug("Discarding stale SliceFailed gen={} current={}", gen, currentBatchGen)
         } else {
           pendingSlices -= 1
-          if (retryCount < syncConfig.maxBodyFetchRetries) {
+          if retryCount < syncConfig.maxBodyFetchRetries then {
             val updatedTried = triedPeers ++ failedPeerId.toSet
             sliceIdCounter += 1
             val worker = context.spawn(
@@ -149,7 +149,7 @@ class BodiesFetcher(
       bodies: Seq[BlockBody],
       protocolLabel: String
   ): Behavior[Command] = {
-    if (bodies.nonEmpty) {
+    if bodies.nonEmpty then {
       totalBodiesFetched += bodies.size
       val rate = totalBodiesFetched * 1000L / (System.currentTimeMillis() - bodiesFetchStartMs).max(1)
       log.info(
@@ -202,7 +202,7 @@ class BodiesFetcher(
   private def requestBodies(hashes: Seq[ByteString], triedPeers: Set[PeerId], retryCount: Int): Unit = {
     log.debug("Requesting {} block bodies (excluding {} tried peers)", hashes.size, triedPeers.size)
     val msg = ETHPackets.GetBlockBodies(ETHPackets.nextRequestId, hashes)
-    val peerSelector = if (triedPeers.nonEmpty) ExcludingPeers(triedPeers) else BestPeer
+    val peerSelector = if triedPeers.nonEmpty then ExcludingPeers(triedPeers) else BestPeer
     val fallback = BodiesFetcher.RetryBodiesRequest(failedPeerId = None, triedPeers, retryCount)
     val resp = makeRequest(Request.create(msg, peerSelector), fallback, triedPeers, retryCount)
     context.pipeToSelf(resp.unsafeToFuture()) {

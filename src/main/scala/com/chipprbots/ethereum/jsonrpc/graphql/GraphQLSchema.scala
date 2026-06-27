@@ -175,7 +175,7 @@ object GraphQLSchema {
       receipt <- receipts.lift(info.txIndex)
     } yield {
       val gasUsed =
-        if (info.txIndex == 0) receipt.cumulativeGasUsed
+        if info.txIndex == 0 then receipt.cumulativeGasUsed
         else receipt.cumulativeGasUsed - receipts(info.txIndex - 1).cumulativeGasUsed
       val baseLogIndex = receipts.take(info.txIndex).map(_.logs.size).sum
       GReceiptBundle(info.block, info.txIndex, receipt, gasUsed, receipt.cumulativeGasUsed, baseLogIndex)
@@ -295,12 +295,12 @@ object GraphQLSchema {
     // intrinsic gas cost). Only trigger contract-creation semantics when the caller
     // actually supplied initcode via `data`.
     val to =
-      if (toRaw.isEmpty && data.isEmpty) Some(ByteString(new Array[Byte](20)))
+      if toRaw.isEmpty && data.isEmpty then Some(ByteString(new Array[Byte](20)))
       else toRaw
     // If dynamic fee fields are present but no legacy gasPrice, synthesise the legacy field to
     // maxFeePerGas so the existing stxLedger.simulateTransaction path can run unchanged.
     val effectiveGasPrice =
-      if (m.get("gasPrice").flatMap(asOption[BigInt]).isDefined) gasPrice else maxFee.getOrElse(gasPrice)
+      if m.get("gasPrice").flatMap(asOption[BigInt]).isDefined then gasPrice else maxFee.getOrElse(gasPrice)
     EthInfoService.CallTx(
       from = from,
       to = to,
@@ -343,7 +343,7 @@ object GraphQLSchema {
           // Left-pad BigInt key to 32 bytes.
           val bytes = com.chipprbots.ethereum.utils.ByteUtils.bigIntToUnsignedByteArray(n)
           val padded =
-            if (bytes.length >= 32) bytes.takeRight(32)
+            if bytes.length >= 32 then bytes.takeRight(32)
             else Array.fill[Byte](32 - bytes.length)(0) ++ bytes
           ByteString(padded)
         }
@@ -419,7 +419,7 @@ object GraphQLSchema {
                 // EIP-1767: Bytes32 — pad to 32 bytes.
                 val arr = v.toArray[Byte]
                 val padded =
-                  if (arr.length >= 32) arr.takeRight(32)
+                  if arr.length >= 32 then arr.takeRight(32)
                   else Array.fill[Byte](32 - arr.length)(0) ++ arr
                 ByteString(padded)
               case None =>
@@ -573,7 +573,7 @@ object GraphQLSchema {
           arguments = List(BlockNumberArg),
           resolve = { c =>
             c.value.blockInfo.flatMap { bi =>
-              if (c.value.stx.tx.isContractInit) {
+              if c.value.stx.tx.isContractInit then {
                 SignedTransaction.getSender(c.value.stx).map { sender =>
                   val createdAddress = createContractAddress(sender, c.value.stx.tx.nonce)
                   val blockNum = c.arg(BlockNumberArg).map(BigInt(_)).getOrElse(bi.block.header.number)
@@ -696,7 +696,7 @@ object GraphQLSchema {
           resolve = { c =>
             val idx = c.arg(IndexArg).toInt
             val uncles = c.value.block.body.uncleNodesList
-            if (idx >= 0 && idx < uncles.size) {
+            if idx >= 0 && idx < uncles.size then {
               val emptyBody = com.chipprbots.ethereum.domain.BlockBody.empty
               Some(GBlock(Block(uncles(idx), emptyBody), None))
             } else None
@@ -719,8 +719,7 @@ object GraphQLSchema {
           resolve = { c =>
             val idx = c.arg(IndexArg).toInt
             val txs = c.value.block.body.transactionList
-            if (idx >= 0 && idx < txs.size)
-              Some(GTransaction(txs(idx), Some(GTxBlockInfo(c.value.block, idx))))
+            if idx >= 0 && idx < txs.size then Some(GTransaction(txs(idx), Some(GTxBlockInfo(c.value.block, idx))))
             else None
           }
         ),
@@ -745,7 +744,7 @@ object GraphQLSchema {
             receipts.zipWithIndex.foreach { case (r, txIdx) =>
               val stxOpt = txs.lift(txIdx)
               r.logs.zipWithIndex.foreach { case (log, lIdx) =>
-                if (logMatches(log, addresses, topics)) {
+                if logMatches(log, addresses, topics) then {
                   stxOpt.foreach { stx =>
                     out += GLog(
                       GTransaction(stx, Some(GTxBlockInfo(c.value.block, txIdx))),
@@ -955,7 +954,7 @@ object GraphQLSchema {
           val from = c.arg(FromArg).map(BigInt(_)).getOrElse(BigInt(0))
           val to = c.arg(ToArg).map(BigInt(_)).getOrElse(best)
           // Hive test 43 (byWrongRange): `to < from` is Invalid params, not an empty list.
-          if (to < from) throw GraphQLDataFetchingError.invalidParams("blocks")
+          if to < from then throw GraphQLDataFetchingError.invalidParams("blocks")
           val count = (to - from + 1).min(MaxBlocksPerRange).toInt
           (0 until count).flatMap { i =>
             reader.getBlockByNumber(reader.getBestBranch, from + i).map(b => buildGBlock(c.ctx, b))
@@ -1022,7 +1021,7 @@ object GraphQLSchema {
           val from = fromBlock.getOrElse(best)
           val to = toBlock.getOrElse(best)
           val out = scala.collection.mutable.ArrayBuffer.empty[GLog]
-          if (to >= from) {
+          if to >= from then {
             val maxBlocks = (to - from + 1).min(MaxBlocksPerRange).toInt
             (0 until maxBlocks).foreach { i =>
               reader.getBlockByNumber(reader.getBestBranch, from + i).foreach { block =>
@@ -1032,7 +1031,7 @@ object GraphQLSchema {
                 receipts.zipWithIndex.foreach { case (r, txIdx) =>
                   val stxOpt = txs.lift(txIdx)
                   r.logs.zipWithIndex.foreach { case (log, lIdx) =>
-                    if (logMatches(log, addrs, topics)) {
+                    if logMatches(log, addrs, topics) then {
                       stxOpt.foreach { stx =>
                         out += GLog(
                           GTransaction(stx, Some(GTxBlockInfo(block, txIdx))),
@@ -1129,8 +1128,7 @@ object GraphQLSchema {
               throw GraphQLDataFetchingError.invalidParams("sendRawTransaction")
             case Some((stx, _)) =>
               val senderOpt = SignedTransaction.getSender(stx)
-              if (senderOpt.isEmpty)
-                throw GraphQLDataFetchingError.invalidParams("sendRawTransaction")
+              if senderOpt.isEmpty then throw GraphQLDataFetchingError.invalidParams("sendRawTransaction")
 
               val sender = senderOpt.get
               val reader = c.ctx.blockchainReader
@@ -1145,8 +1143,7 @@ object GraphQLSchema {
                   case _: MissingNodeException => c.ctx.blockchainConfig.accountStartNonce.toBigInt
                 }
 
-              if (stx.tx.nonce < currentNonce)
-                throw GraphQLDataFetchingError.nonceTooLow("sendRawTransaction")
+              if stx.tx.nonce < currentNonce then throw GraphQLDataFetchingError.nonceTooLow("sendRawTransaction")
 
               // Forward to the pool via the existing service. Any remaining failure path from
               // EthTxService (e.g. EIP-3860 initcode-too-large) surfaces as Invalid params.

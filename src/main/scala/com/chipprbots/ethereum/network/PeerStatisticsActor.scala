@@ -72,8 +72,8 @@ object PeerStatisticsActor {
   private def observe(msg: Message)(implicit clock: Clock): PeerStat = {
     val now = clock.millis
     PeerStat(
-      responsesReceived = if (ResponseCodes(msg.code)) 1 else 0,
-      requestsReceived = if (RequestCodes(msg.code)) 1 else 0,
+      responsesReceived = if ResponseCodes(msg.code) then 1 else 0,
+      requestsReceived = if RequestCodes(msg.code) then 1 else 0,
       firstSeenTimeMillis = Some(now),
       lastSeenTimeMillis = Some(now)
     )

@@ -44,7 +44,7 @@ case class AuthInitiateMessage(
     ephemeralPublicHash,
     publicKey.getEncoded(false).drop(1),
     nonce,
-    ByteString(if (knownPeer) 1.toByte else 0.toByte)
+    ByteString(if knownPeer then 1.toByte else 0.toByte)
   )
 
 }

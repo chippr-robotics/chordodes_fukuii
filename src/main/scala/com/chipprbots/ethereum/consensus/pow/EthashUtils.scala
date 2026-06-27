@@ -78,7 +78,7 @@ object EthashUtils {
   }
 
   private def calcEpochLength(blockNumber: Long, ecip1099ActivationBlock: Long): Long =
-    if (blockNumber < ecip1099ActivationBlock) EPOCH_LENGTH_BEFORE_ECIP_1099 else EPOCH_LENGTH_AFTER_ECIP_1099
+    if blockNumber < ecip1099ActivationBlock then EPOCH_LENGTH_BEFORE_ECIP_1099 else EPOCH_LENGTH_AFTER_ECIP_1099
 
   def epoch(blockNumber: Long, ecip1099ActivationBlock: Long): Long =
     blockNumber / calcEpochLength(blockNumber, ecip1099ActivationBlock)
@@ -95,7 +95,7 @@ object EthashUtils {
 
   @tailrec
   private def highestPrimeBelow(n: Long, len: Long): Long =
-    if (isPrime(n / len)) n
+    if isPrime(n / len) then n
     else highestPrimeBelow(n - 2 * len, len)
 
   private def isPrime(n: BigInt): Boolean = {
@@ -103,8 +103,8 @@ object EthashUtils {
     def isPrime(n: BigInt, i: BigInt): Boolean =
       (n % i != 0) && ((i * i > n) || isPrime(n, i + 2))
 
-    if (n == 2 || n == 3) true
-    else if (n < 2 || n % 2 == 0) false
+    if n == 2 || n == 3 then true
+    else if n < 2 || n % 2 == 0 then false
     else isPrime(n, 3)
   }
 
@@ -164,20 +164,20 @@ object EthashUtils {
     val numFullPages = (fullSize / MIX_BYTES).toInt
 
     var i = 0
-    while (i < ACCESSES) {
+    while i < ACCESSES do {
       val p = remainderUnsigned(fnv(i ^ s(0), mix(i % wHash)), numFullPages)
       val newData = new Array[Int](mix.length)
       val off = p * mixHashes
 
       var j = 0
-      while (j < mixHashes) {
+      while j < mixHashes do {
         val lookup = datasetLookup(off + j)
         System.arraycopy(lookup, 0, newData, j * lookup.length, lookup.length)
         j = j + 1
       }
 
       var k = 0
-      while (k < mix.length) {
+      while k < mix.length do {
         mix(k) = fnv(mix(k), newData(k))
         k = k + 1
       }
@@ -196,7 +196,7 @@ object EthashUtils {
 
   private def compressMix(mixToCompress: Array[Int], compressedMix: Array[Int]): Unit = {
     var l = 0
-    while (l < mixToCompress.length) {
+    while l < mixToCompress.length do {
       val fnv1 = fnv(mixToCompress(l), mixToCompress(l + 1))
       val fnv2 = fnv(fnv1, mixToCompress(l + 2))
       val fnv3 = fnv(fnv2, mixToCompress(l + 3))
@@ -229,12 +229,12 @@ object EthashUtils {
 
   private def mixArray(mix: Array[Int], cache: Array[Int], index: Int, r: Int, n: Int): Unit = {
     var j = 0
-    while (j < DATASET_PARENTS) {
+    while j < DATASET_PARENTS do {
       val cacheIdx = remainderUnsigned(fnv(index ^ j, mix(j % r)), n)
       val off = cacheIdx * r
 
       var k = 0
-      while (k < mix.length) {
+      while k < mix.length do {
         mix(k) = fnv(mix(k), cache(off + k))
         k = k + 1
       }
@@ -248,12 +248,12 @@ object EthashUtils {
   private[pow] def checkDifficulty(blockDifficulty: Long, proofOfWork: EthashProofOfWork): Boolean = {
     @tailrec
     def compare(a1: Array[Byte], a2: Array[Byte]): Int =
-      if (a1.length > a2.length) 1
-      else if (a1.length < a2.length) -1
+      if a1.length > a2.length then 1
+      else if a1.length < a2.length then -1
       else {
-        if (a1.length == 0 && a2.length == 0) 0
-        else if ((a1.head & 0xff) > (a2.head & 0xff)) 1
-        else if ((a1.head & 0xff) < (a2.head & 0xff)) -1
+        if a1.length == 0 && a2.length == 0 then 0
+        else if (a1.head & 0xff) > (a2.head & 0xff) then 1
+        else if (a1.head & 0xff) < (a2.head & 0xff) then -1
         else compare(a1.tail, a2.tail)
       }
 

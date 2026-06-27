@@ -10,8 +10,7 @@ trait SensitiveInformationToString {
   val method: String
 
   def toStringWithSensitiveInformation: String =
-    if (!method.contains("personal"))
-      toString
+    if !method.contains("personal") then toString
     else "sensitive information"
 }
 

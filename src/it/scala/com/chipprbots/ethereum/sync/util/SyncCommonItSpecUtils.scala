@@ -14,10 +14,10 @@ object SyncCommonItSpecUtils {
       predicate: A => Boolean
   ): IO[A] =
     source.delayBy(delay).flatMap { result =>
-      if (predicate(result)) {
+      if predicate(result) then {
         IO.pure(result)
       } else {
-        if (maxRetries > 0) {
+        if maxRetries > 0 then {
           retryUntilWithDelay(source, delay, maxRetries - 1)(predicate)
         } else {
           IO.raiseError(new TimeoutException("Task time out after all retries"))

@@ -104,7 +104,7 @@ object ETHPackets {
         var i = 0
         val items = encodables.toIndexedSeq
         val len = items.size
-        while (i < len)
+        while i < len do
           items(i) match {
             case RLPValue(v) if v.isValidTransactionType && i + 1 < len =>
               items(i + 1) match {
@@ -277,7 +277,7 @@ object ETHPackets {
               latestBlockHash = ByteString.empty
             )
           case other =>
-            val fieldCount = other match { case RLPList(items @ _*) => items.length; case _ => -1 }
+            val fieldCount = other match { case RLPList(items*) => items.length; case _ => -1 }
             throw new RuntimeException(s"Cannot decode Status69 (got $fieldCount fields): $other")
         }
       }
@@ -364,7 +364,7 @@ object ETHPackets {
               latestBlockHash = ByteString.empty
             )
           case other =>
-            val fieldCount = other match { case RLPList(items @ _*) => items.length; case _ => -1 }
+            val fieldCount = other match { case RLPList(items*) => items.length; case _ => -1 }
             throw new RuntimeException(s"Cannot decode Status70 (got $fieldCount fields): $other")
         }
       }
@@ -578,7 +578,7 @@ object ETHPackets {
               ByteUtils.bytesToBigInt(maxPriorityFeePerGasBytes),
               ByteUtils.bytesToBigInt(maxFeePerGasBytes),
               ByteUtils.bytesToBigInt(gasLimitBytes),
-              if (receivingAddress.bytes.isEmpty) None else Some(Address(receivingAddress.bytes)),
+              if receivingAddress.bytes.isEmpty then None else Some(Address(receivingAddress.bytes)),
               ByteUtils.bytesToBigInt(valueBytes),
               ByteString(payloadBytes),
               fromRlpList[AccessListItem](accessList).toList,
@@ -616,7 +616,7 @@ object ETHPackets {
               ByteUtils.bytesToBigInt(maxPriorityFeePerGasBytes),
               ByteUtils.bytesToBigInt(maxFeePerGasBytes),
               ByteUtils.bytesToBigInt(gasLimitBytes),
-              if (receivingAddress.bytes.isEmpty) None else Some(Address(receivingAddress.bytes)),
+              if receivingAddress.bytes.isEmpty then None else Some(Address(receivingAddress.bytes)),
               ByteUtils.bytesToBigInt(valueBytes),
               ByteString(payloadBytes),
               fromRlpList[AccessListItem](accessList).toList,
@@ -653,7 +653,7 @@ object ETHPackets {
               ByteUtils.bytesToBigInt(maxPriorityFeePerGasBytes),
               ByteUtils.bytesToBigInt(maxFeePerGasBytes),
               ByteUtils.bytesToBigInt(gasLimitBytes),
-              if (receivingAddress.bytes.isEmpty) None else Some(Address(receivingAddress.bytes)),
+              if receivingAddress.bytes.isEmpty then None else Some(Address(receivingAddress.bytes)),
               ByteUtils.bytesToBigInt(valueBytes),
               ByteString(payloadBytes),
               fromRlpList[AccessListItem](accessList).toList
@@ -686,7 +686,7 @@ object ETHPackets {
               ByteUtils.bytesToBigInt(nonceBytes),
               ByteUtils.bytesToBigInt(gasPriceBytes),
               ByteUtils.bytesToBigInt(gasLimitBytes),
-              if (receivingAddress.bytes.isEmpty) None else Some(Address(receivingAddress.bytes)),
+              if receivingAddress.bytes.isEmpty then None else Some(Address(receivingAddress.bytes)),
               ByteUtils.bytesToBigInt(valueBytes),
               ByteString(payloadBytes),
               fromRlpList[AccessListItem](accessList).toList
@@ -713,7 +713,7 @@ object ETHPackets {
               ByteUtils.bytesToBigInt(nonceBytes),
               ByteUtils.bytesToBigInt(gasPriceBytes),
               ByteUtils.bytesToBigInt(gasLimitBytes),
-              if (receivingAddress.bytes.isEmpty) None else Some(Address(receivingAddress.bytes)),
+              if receivingAddress.bytes.isEmpty then None else Some(Address(receivingAddress.bytes)),
               ByteUtils.bytesToBigInt(valueBytes),
               ByteString(payloadBytes)
             ),
@@ -851,7 +851,7 @@ object ETHPackets {
         import msg.*
         def num(b: BigInt): RLPValue = RLPValue(ByteUtils.bigIntToUnsignedByteArray(b))
         val reverseFlag: RLPValue =
-          if (reverse) RLPValue(Array[Byte](1.toByte)) else RLPValue(Array.emptyByteArray)
+          if reverse then RLPValue(Array[Byte](1.toByte)) else RLPValue(Array.emptyByteArray)
         val blockQuery = block match {
           case Left(blockNumber) => RLPList(num(blockNumber), num(maxHeaders), num(skip), reverseFlag)
           case Right(blockHash)  => RLPList(RLPValue(blockHash.toArray[Byte]), num(maxHeaders), num(skip), reverseFlag)
@@ -1112,7 +1112,7 @@ object ETHPackets {
           typedItems.foreach {
             case PrefixedRLPEncodable(Transaction.Type03, inner: RLPList) =>
               val isNetworkWrapped = inner.items.size == 4 && inner.items.head.isInstanceOf[RLPList]
-              if (!isNetworkWrapped)
+              if !isNetworkWrapped then
                 throw new RuntimeException("Blob tx in PooledTransactions missing sidecar (network wrapping required)")
             case _ =>
           }
@@ -1404,7 +1404,7 @@ object ETHPackets {
       override def toRLPEncodable: RLPEncodeable =
         RLPList(
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)),
-          if (msg.lastBlockIncomplete) RLPValue(Array[Byte](1)) else RLPValue(Array.emptyByteArray),
+          if msg.lastBlockIncomplete then RLPValue(Array[Byte](1)) else RLPValue(Array.emptyByteArray),
           msg.receiptsForBlocks
         )
     }

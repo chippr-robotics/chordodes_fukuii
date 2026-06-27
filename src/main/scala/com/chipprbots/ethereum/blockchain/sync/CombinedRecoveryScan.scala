@@ -43,12 +43,12 @@ final class CombinedRecoveryScan(
     Account(leaf.value) match {
       case Success(account) =>
         // Bytecode: a contract whose code is referenced but absent from EvmCodeStorage.
-        if (account.codeHash != Account.EmptyCodeHash && seenCodeHashes.add(account.codeHash)) {
-          if (evmCodeStorage.get(account.codeHash).isEmpty) missingCode += account.codeHash
+        if account.codeHash != Account.EmptyCodeHash && seenCodeHashes.add(account.codeHash) then {
+          if evmCodeStorage.get(account.codeHash).isEmpty then missingCode += account.codeHash
         }
         // Storage: a contract whose storage-root node is referenced but absent from MptStorage.
         val isContract = account.storageRoot != Account.EmptyStorageRootHash
-        if (isContract && seenStorageRoots.add(account.storageRoot)) {
+        if isContract && seenStorageRoots.add(account.storageRoot) then {
           try {
             val _ = mptStorage.get(account.storageRoot.toArray)
           } catch {

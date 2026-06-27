@@ -112,15 +112,15 @@ object Metrics {
     */
   def configure(config: MetricsConfig, instanceId: String = "default"): Try[Unit] =
     Try {
-      if (config.enabled) {
+      if config.enabled then {
         val registry = MeterRegistryBuilder.build(MetricsPrefix)
         val metrics = new Metrics(MetricsPrefix, registry, config.port)
         val existing = instances.putIfAbsent(instanceId, metrics)
-        if (existing == null) {
+        if existing == null then {
           metrics.start()
           // First instance also becomes the default
           val becameDefault = defaultRef.compareAndSet(defaultMetrics, metrics)
-          if (!becameDefault) {
+          if !becameDefault then {
             // Identify the owner of `defaultRef` — that's the instance whose writes the shared
             // registry actually reflects. `instances` may have other entries too (3+-way
             // multi-instance), but the default-owner is the one operators need to know about.

@@ -28,11 +28,11 @@ class AccountCache(messageHandler: MessageHandler) extends Logger {
         val accountMsg = messageHandler.awaitMessage[msg.Account]
         log.debug("Server received msg: Account")
 
-        if (accountMsg.nonce.isEmpty) {
+        if accountMsg.nonce.isEmpty then {
           cache += address -> None
           None
         } else {
-          val codeHash = if (accountMsg.codeEmpty) Account.EmptyCodeHash else nonEmptyCodeHash
+          val codeHash = if accountMsg.codeEmpty then Account.EmptyCodeHash else nonEmptyCodeHash
           val account = Account(accountMsg.nonce, accountMsg.balance, defaultStorageHash, codeHash)
           cache += address -> Some(account)
           Some(account)
@@ -67,14 +67,14 @@ class BlockhashCache(messageHandler: MessageHandler) extends Logger {
   def getBlockhash(offset: UInt256): Option[UInt256] =
     cache.getOrElse(
       offset, {
-        val getBlockhashMsg = msg.GetBlockhash(if (offset > Int.MaxValue) -1 else offset.toInt)
+        val getBlockhashMsg = msg.GetBlockhash(if offset > Int.MaxValue then -1 else offset.toInt)
         val query = msg.VMQuery(query = msg.VMQuery.Query.GetBlockhash(getBlockhashMsg))
         messageHandler.sendMessage(query)
 
         val blockhashMsg = messageHandler.awaitMessage[msg.Blockhash]
         log.debug("Server received msg: Blockhash")
 
-        if (blockhashMsg.hash.isEmpty) {
+        if blockhashMsg.hash.isEmpty then {
           cache += offset -> None
           None
         } else {

@@ -42,7 +42,7 @@ class PeerRateTracker extends Logger {
   def update(peerId: String, msgType: Int, elapsedMs: Long, items: Int): Unit = synchronized {
     val stats = peers.getOrElseUpdate(peerId, PeerStats())
 
-    if (items == 0) {
+    if items == 0 then {
       // Timeout or unavailable — slash capacity to zero (geth: Update with 0,0)
       stats.capacity.update(msgType, 0.0)
     } else {
@@ -106,7 +106,7 @@ class PeerRateTracker extends Logger {
     * with fixed periods.
     */
   def tune(): Unit = synchronized {
-    if (peers.isEmpty) return
+    if peers.isEmpty then return
 
     // Collect RTTs from all peers, sort, and pick geometric-mean index (√N)
     val rtts = peers.values.map(_.roundtripMs).toArray.sorted
@@ -133,14 +133,14 @@ class PeerRateTracker extends Logger {
     *   the new peer
     */
   def addPeer(peerId: String): Unit = synchronized {
-    if (!peers.contains(peerId)) {
+    if !peers.contains(peerId) then {
       peers.put(peerId, PeerStats())
 
       // Detune confidence (geth: detune on new peer)
       val n = peers.size
-      if (n == 1) {
+      if n == 1 then {
         confidence = 1.0 // Single peer is authoritative
-      } else if (n < TuningConfidenceCap) {
+      } else if n < TuningConfidenceCap then {
         confidence = (confidence * (n - 1).toDouble / n).max(RttMinConfidence)
       }
       // If n >= TuningConfidenceCap (10), don't detune (stable network)

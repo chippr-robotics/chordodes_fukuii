@@ -33,7 +33,7 @@ class EthashNonceSearchSpec extends AnyFlatSpec with Matchers {
       .map { nonce =>
         val nb = java.nio.ByteBuffer.allocate(8).putLong(nonce).array()
         val pow = EthashUtils.hashimotoLight(headerHash, nb, epoch0FullSize, epoch0Cache)
-        if (EthashUtils.checkDifficulty(difficulty, pow)) Some((pow.mixHash, ByteString(nb))) else None
+        if EthashUtils.checkDifficulty(difficulty, pow) then Some((pow.mixHash, ByteString(nb))) else None
       }
       .collectFirst { case Some(x) => x }
 

@@ -99,7 +99,7 @@ object EthereumTestExecutor {
         world = world.saveAccount(address, account)
 
         // Save code if present
-        if (code.nonEmpty) {
+        if code.nonEmpty then {
           world = world.saveCode(address, code)
         }
 
@@ -136,11 +136,11 @@ object EthereumTestExecutor {
           val expectedBalance = UInt256(parseBigInt(expectedAccount.balance))
           val expectedNonce = UInt256(parseBigInt(expectedAccount.nonce))
 
-          if (account.balance != expectedBalance) {
+          if account.balance != expectedBalance then {
             break(Left(s"Balance mismatch for $addressHex: expected $expectedBalance, got ${account.balance}"))
           }
 
-          if (account.nonce != expectedNonce) {
+          if account.nonce != expectedNonce then {
             break(Left(s"Nonce mismatch for $addressHex: expected $expectedNonce, got ${account.nonce}"))
           }
 
@@ -151,7 +151,7 @@ object EthereumTestExecutor {
             val storage = finalWorld.getStorage(address)
             val actualValue = storage.load(key)
 
-            if (actualValue != expectedValue) {
+            if actualValue != expectedValue then {
               break(Left(s"Storage mismatch for $addressHex at $key: expected $expectedValue, got $actualValue"))
             }
           }
@@ -166,14 +166,14 @@ object EthereumTestExecutor {
 
   /** Parse hex string to byte array */
   private def parseHex(hex: String): Array[Byte] = {
-    val cleaned = if (hex.startsWith("0x")) hex.substring(2) else hex
-    if (cleaned.isEmpty) Array.empty[Byte]
+    val cleaned = if hex.startsWith("0x") then hex.substring(2) else hex
+    if cleaned.isEmpty then Array.empty[Byte]
     else org.bouncycastle.util.encoders.Hex.decode(cleaned)
   }
 
   /** Parse hex or decimal string to BigInt */
   private def parseBigInt(value: String): BigInt =
-    if (value.startsWith("0x")) {
+    if value.startsWith("0x") then {
       BigInt(value.substring(2), 16)
     } else {
       BigInt(value)

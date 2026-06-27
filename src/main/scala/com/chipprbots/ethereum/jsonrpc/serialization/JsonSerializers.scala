@@ -34,10 +34,8 @@ object JsonSerializers {
         (
           PartialFunction.empty,
           { case n: BigInt =>
-            if (n == 0)
-              JString("0x0")
-            else
-              JString(s"0x${Hex.toHexString(n.toByteArray).dropWhile(_ == '0')}")
+            if n == 0 then JString("0x0")
+            else JString(s"0x${Hex.toHexString(n.toByteArray).dropWhile(_ == '0')}")
           }
         )
       )

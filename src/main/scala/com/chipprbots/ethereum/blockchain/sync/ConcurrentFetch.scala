@@ -123,7 +123,7 @@ object ConcurrentFetch {
       label: String,
       log: LoggingAdapter
   ): Seq[(PeerWithInfo, Req)] = {
-    if (queue.pending == 0) return Seq.empty
+    if queue.pending == 0 then return Seq.empty
 
     val idlePeers = availablePeers
       .filterNot(p => queue.inFlightPeers.contains(p.peer.id))
@@ -138,13 +138,13 @@ object ConcurrentFetch {
       targetRttMs
     )
 
-    if (idlePeers.isEmpty) return Seq.empty
+    if idlePeers.isEmpty then return Seq.empty
 
     // Sort by descending capacity — highest-throughput peers get first pick.
     val sorted = idlePeers.sortBy(p => -queue.capacity(p, targetRttMs))
 
     val assignments = scala.collection.mutable.Buffer[(PeerWithInfo, Req)]()
-    for (peer <- sorted if queue.pending > 0) {
+    for peer <- sorted if queue.pending > 0 do {
       val items = queue.capacity(peer, targetRttMs).max(1)
       queue.reserve(peer, items).foreach { req =>
         log.debug(

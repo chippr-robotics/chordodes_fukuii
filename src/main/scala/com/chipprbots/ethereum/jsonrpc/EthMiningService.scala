@@ -128,7 +128,7 @@ class EthMiningService(
             val blockNumber = pb.block.header.number
             val workResponse = GetWorkResponse(powHeaderHash, dagSeed, target, blockNumber)
             val notifyUrls = ethash.config.generic.notifyUrls
-            if (notifyUrls.nonEmpty) {
+            if notifyUrls.nonEmpty then {
               WorkNotifier.notify(
                 notifyUrls,
                 WorkNotifier.WorkPackage(powHeaderHash, dagSeed, target, blockNumber)
@@ -151,7 +151,7 @@ class EthMiningService(
             val bestBlockNum = blockchainReader.getBestBlockNumber
             val staleThreshold = ethash.config.generic.staleThreshold
             // core-geth reference: consensus/ethash/sealer.go staleThreshold check
-            if (bestBlockNum - pendingBlock.block.header.number > staleThreshold) {
+            if bestBlockNum - pendingBlock.block.header.number > staleThreshold then {
               log.debug(
                 "Rejecting stale work submission for block {}, current best {}, threshold {}",
                 pendingBlock.block.header.number,

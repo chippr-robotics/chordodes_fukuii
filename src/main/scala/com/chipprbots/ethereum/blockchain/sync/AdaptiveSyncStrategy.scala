@@ -87,7 +87,7 @@ class AdaptiveSyncController extends Logger {
   def selectStrategy(conditions: NetworkConditions): SyncStrategy = {
     val candidates = getRemainingStrategies
 
-    if (candidates.isEmpty) {
+    if candidates.isEmpty then {
       log.warn("All sync strategies exhausted, resetting and trying FullSync")
       reset()
       FullSync
@@ -134,7 +134,7 @@ class AdaptiveSyncController extends Logger {
       case SyncResult.Failure(reason, canRetry) =>
         attemptCount = attemptCount.updated(strategy, attemptCount(strategy) + 1)
 
-        if (!canRetry || attemptCount(strategy) >= getMaxAttempts(strategy)) {
+        if !canRetry || attemptCount(strategy) >= getMaxAttempts(strategy) then {
           log.warn(s"Sync strategy ${strategy.name} failed (attempt ${attemptCount(strategy)}): $reason")
           failedStrategies = failedStrategies + strategy
           Some(selectFallback(strategy))
@@ -150,7 +150,7 @@ class AdaptiveSyncController extends Logger {
   /** Select fallback strategy after failure */
   private def selectFallback(failed: SyncStrategy): SyncStrategy = {
     val remaining = getRemainingStrategies
-    if (remaining.isEmpty) {
+    if remaining.isEmpty then {
       log.warn(s"No fallback strategy available after ${failed.name} failed, resetting to FullSync")
       reset()
       FullSync

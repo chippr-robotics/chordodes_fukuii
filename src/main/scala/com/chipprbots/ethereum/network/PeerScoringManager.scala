@@ -60,7 +60,7 @@ class PeerScoringManager extends Logger {
     val currentScore = getScore(peerId)
     val updatedScore = currentScore.recordResponse(bytes, latencyMs)
     scores.put(peerId, updatedScore)
-    if (log.underlying.isDebugEnabled) {
+    if log.underlying.isDebugEnabled then {
       logScoreUpdate(peerId, currentScore, updatedScore, s"response (${bytes}B, ${latencyMs}ms)")
     }
   }
@@ -102,7 +102,7 @@ class PeerScoringManager extends Logger {
 
     ScoringStatistics(
       totalPeers = allScores.size,
-      averageScore = if (scoreValues.nonEmpty) scoreValues.sum / scoreValues.size else 0.0,
+      averageScore = if scoreValues.nonEmpty then scoreValues.sum / scoreValues.size else 0.0,
       highScoringPeers = allScores.count(_.score >= 0.7),
       mediumScoringPeers = allScores.count(s => s.score >= 0.4 && s.score < 0.7),
       lowScoringPeers = allScores.count(_.score < 0.4)
@@ -111,7 +111,7 @@ class PeerScoringManager extends Logger {
 
   private def logScoreUpdate(peerId: PeerId, oldScore: PeerScore, newScore: PeerScore, event: String): Unit = {
     val scoreDiff = newScore.score - oldScore.score
-    val direction = if (scoreDiff > 0) "↑" else if (scoreDiff < 0) "↓" else "→"
+    val direction = if scoreDiff > 0 then "↑" else if scoreDiff < 0 then "↓" else "→"
     log.debug(
       s"Peer ${peerId.value} score ${direction} ${f"${oldScore.score}%.3f"} → ${f"${newScore.score}%.3f"} after $event"
     )

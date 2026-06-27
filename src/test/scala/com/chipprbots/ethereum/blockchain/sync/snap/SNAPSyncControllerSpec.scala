@@ -481,7 +481,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     shouldSkip shouldBe true
 
     // Consume on use (one-shot semantics).
-    if (shouldSkip) healingValidatedRoot = None
+    if shouldSkip then healingValidatedRoot = None
     healingValidatedRoot shouldBe None
   }
 
@@ -504,7 +504,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     val rootA = ByteString("root-a".getBytes)
 
     val totalFound = 87901 // round-1 healing case: not yet clean
-    if (totalFound == 0) healingValidatedRoot = Some(rootA)
+    if totalFound == 0 then healingValidatedRoot = Some(rootA)
     // else: signal NOT set; another healing round will run.
 
     healingValidatedRoot shouldBe None
@@ -533,7 +533,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     // First call: matches, skip, consume.
     val first = healingValidatedRoot.contains(rootA)
     first shouldBe true
-    if (first) healingValidatedRoot = None
+    if first then healingValidatedRoot = None
 
     // Second call (e.g. validation retry path) — signal already consumed, full validation must run.
     val second = healingValidatedRoot.contains(rootA)
@@ -829,7 +829,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
 
     // nodeId-based selection (the fix): finds the peer regardless of remotePort
     val foundByNodeId =
-      if (snapServerNodeIds.nonEmpty)
+      if snapServerNodeIds.nonEmpty then
         Seq(besuPeer).find(p => p.supportsSnap && p.nodeId.exists(snapServerNodeIds.contains))
       else None
 
@@ -894,13 +894,12 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     val MaxConsecutivePivotRefreshes = 3
     var criticalFailureCount = 0
 
-    for (_ <- 1 to MaxConsecutivePivotRefreshes)
-      consecutivePivotRefreshes += 1
+    for _ <- 1 to MaxConsecutivePivotRefreshes do consecutivePivotRefreshes += 1
 
     (consecutivePivotRefreshes >= MaxConsecutivePivotRefreshes) shouldBe true
 
     // Each time threshold is reached, record a critical failure and reset
-    if (consecutivePivotRefreshes >= MaxConsecutivePivotRefreshes) {
+    if consecutivePivotRefreshes >= MaxConsecutivePivotRefreshes then {
       criticalFailureCount += 1
       consecutivePivotRefreshes = 0
     }
@@ -920,7 +919,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
 
     // ...then a successful refresh (count > 0 means some peer served the root)
     val peerCount = 1
-    if (peerCount > 0) consecutivePivotRefreshes = 0
+    if peerCount > 0 then consecutivePivotRefreshes = 0
 
     consecutivePivotRefreshes shouldBe 0
     // The next 3 stateless refreshes would again be needed to reach the threshold
@@ -931,7 +930,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     var criticalFailureCount = 0
     val maxSnapSyncFailures = 5
 
-    for (_ <- 1 until maxSnapSyncFailures) {
+    for _ <- 1 until maxSnapSyncFailures do {
       criticalFailureCount += 1
       // recordCriticalFailure returns false (not yet at threshold)
       (criticalFailureCount >= maxSnapSyncFailures) shouldBe false
@@ -978,7 +977,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
 
     // Controller passes savedProgress to the new coordinator unchanged
     val resumeProgress =
-      if (drift <= MaxPreservedPivotDistance) savedProgress
+      if drift <= MaxPreservedPivotDistance then savedProgress
       else Map.empty[ByteString, ByteString]
     resumeProgress shouldBe savedProgress
   }
@@ -997,7 +996,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
 
     // Controller discards progress — coordinator restarts each range from its start
     val resumeProgress =
-      if (drift <= MaxPreservedPivotDistance) savedProgress
+      if drift <= MaxPreservedPivotDistance then savedProgress
       else Map.empty[ByteString, ByteString]
     resumeProgress shouldBe Map.empty[ByteString, ByteString]
   }
@@ -1228,14 +1227,14 @@ class FakeStateValidator(
 
   override def validateAccountTrie(stateRoot: ByteString): Either[String, Seq[ByteString]] = {
     accountCallCount += 1
-    if (accountSleepMs > 0) Thread.sleep(accountSleepMs)
+    if accountSleepMs > 0 then Thread.sleep(accountSleepMs)
     throwOnAccount.foreach(t => throw t)
     accountResult
   }
 
   override def validateAllStorageTries(stateRoot: ByteString): Either[String, Seq[ByteString]] = {
     storageCallCount += 1
-    if (storageSleepMs > 0) Thread.sleep(storageSleepMs)
+    if storageSleepMs > 0 then Thread.sleep(storageSleepMs)
     throwOnStorage.foreach(t => throw t)
     storageResult
   }

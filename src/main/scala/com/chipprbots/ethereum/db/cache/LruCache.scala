@@ -24,7 +24,7 @@ class LruCache[K <: AnyRef, V <: AnyRef](
       .maximumSize(config.maxSize)
       .removalListener(new cache.RemovalListener[K, V] {
         def onRemoval(notification: RemovalNotification[K, V]): Unit =
-          if (notification.wasEvicted()) {
+          if notification.wasEvicted() then {
             notificationHandler.foreach(handler => handler(notification))
           }
       })

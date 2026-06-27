@@ -15,10 +15,10 @@ class ResilientRollingFileAppender[E] extends RollingFileAppender[E] {
 
   override def subAppend(event: E): Unit = {
     checkCounter += 1
-    if (checkCounter >= CheckInterval) {
+    if checkCounter >= CheckInterval then {
       checkCounter = 0
       val f = new File(getFile)
-      if (!f.exists()) {
+      if !f.exists() then {
         // File was deleted — reopen to recreate it
         openFile(getFile)
       }

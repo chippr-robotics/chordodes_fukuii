@@ -31,10 +31,8 @@ object BloomFilter {
     */
   def create(logs: Seq[TxLogEntry]): ByteString = {
     val bloomFilters = logs.map(createBloomFilterForLogEntry)
-    if (bloomFilters.isEmpty)
-      EmptyBloomFilter
-    else
-      ByteString(or(bloomFilters*))
+    if bloomFilters.isEmpty then EmptyBloomFilter
+    else ByteString(or(bloomFilters*))
   }
 
   // Bloom filter function that reduces a log to a single 256-byte hash based on equation 24 from the YP

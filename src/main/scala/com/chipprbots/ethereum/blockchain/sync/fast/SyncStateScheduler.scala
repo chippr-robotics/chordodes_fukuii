@@ -65,7 +65,7 @@ class SyncStateScheduler(
   val loadFilterFromBlockchain: IO[BloomFilterLoadingResult] = bloomFilter.loadFromSource
 
   def initState(targetRootHash: ByteString): Option[SchedulerState] =
-    if (targetRootHash == emptyStateRootHash) {
+    if targetRootHash == emptyStateRootHash then {
       None
     } else {
       // Always schedule the root for download even if it exists locally.
@@ -92,7 +92,7 @@ class SyncStateScheduler(
         currentStatistics: ProcessingStatistics,
         remaining: Seq[SyncResponse]
     ): Either[CriticalError, (SchedulerState, ProcessingStatistics)] =
-      if (remaining.isEmpty) {
+      if remaining.isEmpty then {
         Right((currentState, currentStatistics))
       } else {
         val responseToProcess = remaining.head
@@ -145,7 +145,7 @@ class SyncStateScheduler(
   ): Either[ResponseProcessingError, StateNodeRequest] =
     for {
       activeRequest <- state.getPendingRequestByHash(response.hash).toRight(NotRequestedItem)
-      _ <- if (activeRequest.resolvedData.isDefined) Left(AlreadyProcessedItem) else Right(())
+      _ <- if activeRequest.resolvedData.isDefined then Left(AlreadyProcessedItem) else Right(())
     } yield activeRequest
 
   private def processActiveResponse(
@@ -162,7 +162,7 @@ class SyncStateScheduler(
         } yield {
           val childWithoutAlreadyKnown =
             possibleChildRequests.filterNot(req => isRequestedHashAlreadyCommitted(state, req))
-          if (childWithoutAlreadyKnown.isEmpty && activeRequest.dependencies == 0) {
+          if childWithoutAlreadyKnown.isEmpty && activeRequest.dependencies == 0 then {
             state.commit(activeRequest.copy(resolvedData = Some(response.data)))
           } else {
             state.resolveRequest(activeRequest, response.data, childWithoutAlreadyKnown)
@@ -191,13 +191,13 @@ class SyncStateScheduler(
           Account(n.value).toEither.left.map(_ => NotAccountLeafNode).map { account =>
             // We are scheduling both storage trie and code requests with highest priority to be sure that leaf nodes completed
             // as fast as possible
-            val evmRequests = if (account.codeHash != emptyCodeHash) {
+            val evmRequests = if account.codeHash != emptyCodeHash then {
               Seq(StateNodeRequest(account.codeHash, None, Code, Seq(parentRequest.nodeHash), maxMptTrieDepth, 0))
             } else {
               Seq()
             }
 
-            val storageRequests = if (account.storageRoot != emptyStateRootHash) {
+            val storageRequests = if account.storageRoot != emptyStateRootHash then {
               // Compute the full account hash from the leaf's nibble path + leaf key.
               // This is needed for GetTrieNodes storage requests: [accountHash, storagePath].
               val leafKeyNibbles = n.key.toArray.toSeq
@@ -371,9 +371,9 @@ object SyncStateScheduler {
           remaining: Int,
           got: List[ByteString]
       ): (PriorityQueue[StateNodeRequest], List[ByteString]) =
-        if (remaining == 0) {
+        if remaining == 0 then {
           (currentQueue, got.reverse)
-        } else if (currentQueue.isEmpty) {
+        } else if currentQueue.isEmpty then {
           (currentQueue, got.reverse)
         } else {
           val (elem, newQueue) = currentQueue.dequeue().asScala()
@@ -399,7 +399,7 @@ object SyncStateScheduler {
           currentBatch: Map[ByteString, (ByteString, RequestType)],
           parentsToCheck: Seq[ByteString]
       ): (Map[ByteString, StateNodeRequest], Map[ByteString, (ByteString, RequestType)]) =
-        if (parentsToCheck.isEmpty) {
+        if parentsToCheck.isEmpty then {
           (currentRequests, currentBatch)
         } else {
           val parent = parentsToCheck.head
@@ -413,7 +413,7 @@ object SyncStateScheduler {
             )
           )
           val newParentDeps = parentRequest.dependencies - 1
-          if (newParentDeps == 0) {
+          if newParentDeps == 0 then {
             // we can always call `parentRequest.resolvedData.get` on parent node, as to even have children parent data
             // needs to be provided
             go(

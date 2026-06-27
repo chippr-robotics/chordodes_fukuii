@@ -46,9 +46,9 @@ object TestJsonMethodsImplicits extends JsonMethodsImplicits {
           }
           balance = UInt256(decode(Extraction.extract[String](accountJson \ "balance")))
           code = decode(Extraction.extract[String](accountJson \ "code"))
-          codeOpt = if (code.isEmpty) None else Some(ByteString(code))
+          codeOpt = if code.isEmpty then None else Some(ByteString(code))
           nonce = decode(Extraction.extract[String](accountJson \ "nonce"))
-          nonceOpt = if (nonce.isEmpty || UInt256(nonce) == UInt256.Zero) None else Some(UInt256(nonce))
+          nonceOpt = if nonce.isEmpty || UInt256(nonce) == UInt256.Zero then None else Some(UInt256(nonce))
         } yield GenesisAccount(
           None,
           balance,

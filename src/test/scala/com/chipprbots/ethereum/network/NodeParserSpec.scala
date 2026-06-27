@@ -66,11 +66,9 @@ class NodeParserSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyCh
       val node = NodeParser.parseNode(nodeString)
       node.isRight shouldEqual valid
 
-      if (valid && !hasCustomUdp)
-        node.toOption.get.toUri.toString shouldBe nodeString + "?discport=30303"
+      if valid && !hasCustomUdp then node.toOption.get.toUri.toString shouldBe nodeString + "?discport=30303"
 
-      if (valid && hasCustomUdp)
-        node.toOption.get.toUri.toString shouldBe nodeString
+      if valid && hasCustomUdp then node.toOption.get.toUri.toString shouldBe nodeString
     }
   }
 
@@ -104,7 +102,7 @@ class NodeParserSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyCh
     forAll(testVectors) { case (nodeString, maybeExpectedOutput) =>
       val node = NodeParser.parseNode(nodeString)
       node.isRight shouldEqual maybeExpectedOutput.nonEmpty
-      if (maybeExpectedOutput.nonEmpty)
+      if maybeExpectedOutput.nonEmpty then
         node.toOption.get.toUri.toString shouldBe maybeExpectedOutput.get + "?discport=30303"
     }
   }

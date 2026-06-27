@@ -53,7 +53,7 @@ class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[Get
       .max(1)
 
   def reserve(peer: PeerWithInfo, items: Int): Option[GetReceipts] = synchronized {
-    if (pendingQueue.isEmpty) return None
+    if pendingQueue.isEmpty then return None
 
     val count = items.min(MaxReceiptsPerRequest).min(pendingQueue.size)
     val taken = (0 until count).map(_ => pendingQueue.dequeue()).toVector

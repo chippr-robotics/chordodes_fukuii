@@ -96,9 +96,9 @@ object TransactionHistoryService {
     def asSigned(tx: PendingTransaction): SignedTransaction = tx.stx.tx
 
     def checkTx(tx: PendingTransaction, address: Address): Option[ExtendedTransactionData] =
-      if (isSender(tx, address)) {
+      if isSender(tx, address) then {
         Some(ExtendedTransactionData(asSigned(tx), isOutgoing = true, None))
-      } else if (isReceiver(tx, address)) {
+      } else if isReceiver(tx, address) then {
         Some(ExtendedTransactionData(asSigned(tx), isOutgoing = false, None))
       } else {
         None
@@ -117,9 +117,9 @@ object TransactionHistoryService {
     )(implicit
         blockchainConfig: BlockchainConfig
     ): Option[(SignedTransaction, MinedTransactionData => ExtendedTransactionData)] =
-      if (isSender(tx, address)) {
+      if isSender(tx, address) then {
         Some((tx, data => ExtendedTransactionData(tx, isOutgoing = true, Some(data))))
-      } else if (isReceiver(tx, address)) {
+      } else if isReceiver(tx, address) then {
         Some((tx, data => ExtendedTransactionData(tx, isOutgoing = false, Some(data))))
       } else {
         None
@@ -139,7 +139,7 @@ object TransactionHistoryService {
         txReceipt <- blockReceipts.lift(index)
       } yield {
         val previousCumulativeGas: BigInt =
-          (if (index > 0) blockReceipts.lift(index - 1) else None).map(_.cumulativeGasUsed).getOrElse(0)
+          (if index > 0 then blockReceipts.lift(index - 1) else None).map(_.cumulativeGasUsed).getOrElse(0)
 
         txReceipt.cumulativeGasUsed - previousCumulativeGas
       }

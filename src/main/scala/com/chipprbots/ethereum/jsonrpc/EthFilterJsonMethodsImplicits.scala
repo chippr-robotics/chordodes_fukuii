@@ -122,7 +122,7 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
 
   private def extractFilter(obj: JObject): Either[JsonRpcError, Filter] = {
     def allSuccess[T](eithers: Seq[Either[JsonRpcError, T]]): Either[JsonRpcError, Seq[T]] =
-      if (eithers.forall(_.isRight)) {
+      if eithers.forall(_.isRight) then {
         val values = eithers.collect { case Right(v) => v }
         Right(values)
       } else {
@@ -164,7 +164,7 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
           case JString(s) => extractAddress(JString(s)).map(a => Some(Seq(a)))
           case JArray(arr) =>
             val addrs = arr.map { case JString(s) => extractAddress(JString(s)); case _ => Left(InvalidParams()) }
-            if (addrs.forall(_.isRight)) Right(Some(addrs.collect { case Right(a) => a }))
+            if addrs.forall(_.isRight) then Right(Some(addrs.collect { case Right(a) => a }))
             else Left(InvalidParams("Invalid address in array"))
           case _ => Right(None)
         }

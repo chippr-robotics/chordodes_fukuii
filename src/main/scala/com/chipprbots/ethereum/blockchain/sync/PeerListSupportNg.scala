@@ -60,7 +60,7 @@ trait PeerListSupportNg { self: Actor with ActorLogging =>
       .filter { case (_, p) => p.peerInfo.forkAccepted }
       .filterNot { case (peerId, _) =>
         val isBlacklisted = blacklist.isBlacklisted(peerId)
-        if (isBlacklisted) {
+        if isBlacklisted then {
           log.debug("Peer {} is blacklisted and excluded from download peers", peerId)
         }
         isBlacklisted
@@ -90,10 +90,11 @@ trait PeerListSupportNg { self: Actor with ActorLogging =>
           maintainedNodeIdHexes.contains(Hex.toHexString(nodeId.toArray))
         }
         val skipBlacklist = isMaintained && !reason.isInstanceOf[BlacklistReason.RegularSyncRequestFailed]
-        if (skipBlacklist) {
+        if skipBlacklist then {
           log.debug("Skipping blacklist for maintained peer {} (reason: {})", peerId, reason)
         } else {
-          if (isMaintained) log.warning("Blacklisting maintained peer {} (will reconnect). Reason: {}", peerId, reason)
+          if isMaintained then
+            log.warning("Blacklisting maintained peer {} (will reconnect). Reason: {}", peerId, reason)
           else
             log.debug(
               "Blacklisting peer {} ({}) for {} ms. Reason: {}",
@@ -114,7 +115,7 @@ trait PeerListSupportNg { self: Actor with ActorLogging =>
     }
 
     val newPeers = updated.filterNot(p => handshakedPeers.keySet.contains(p._1))
-    if (newPeers.nonEmpty) {
+    if newPeers.nonEmpty then {
       log.debug("Adding {} new handshaked peers", newPeers.size)
       newPeers.foreach { case (peerId, peerWithInfo) =>
         log.debug(
@@ -129,7 +130,7 @@ trait PeerListSupportNg { self: Actor with ActorLogging =>
       }
     }
 
-    if (handshakedPeers.size != updated.size) {
+    if handshakedPeers.size != updated.size then {
       log.debug("Handshaked peers changed: {} -> {} peers", handshakedPeers.size, updated.size)
     }
 
@@ -148,7 +149,7 @@ trait PeerListSupportNg { self: Actor with ActorLogging =>
   protected def onPeerListUpdated(currentPeers: Iterable[PeerListSupportNg.PeerWithInfo]): Unit = ()
 
   private def removePeerById(peerId: PeerId): Unit =
-    if (handshakedPeers.keySet.contains(peerId)) {
+    if handshakedPeers.keySet.contains(peerId) then {
       val peerInfo = handshakedPeers(peerId)
       log.debug("Removing disconnected peer {} ({})", peerId, peerInfo.peer.remoteAddress)
       peerEventBus ! Unsubscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peerId)))

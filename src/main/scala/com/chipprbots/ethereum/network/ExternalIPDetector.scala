@@ -69,11 +69,10 @@ object ExternalIPDetector {
           // Walk a device tree looking for a WANIPConnection or WANPPPConnection service and
           // execute GetExternalIP as soon as one is found.
           private def walkDevice(d: RemoteDevice): Unit = {
-            for (svc <- d.getServices())
-              if (
-                svc.getServiceType.getType == "WANIPConnection" ||
+            for svc <- d.getServices() do
+              if svc.getServiceType.getType == "WANIPConnection" ||
                 svc.getServiceType.getType == "WANPPPConnection"
-              )
+              then
                 upnpSvc
                   .getControlPoint()
                   .execute(new GetExternalIP(svc) {
@@ -85,8 +84,7 @@ object ExternalIPDetector {
                     // Don't completeExceptionally here — on multi-IGD networks a later device may
                     // succeed. Total UPnP failure is handled by the ipFuture.get() timeout below.
                   })
-            for (sub <- d.getEmbeddedDevices())
-              walkDevice(sub)
+            for sub <- d.getEmbeddedDevices() do walkDevice(sub)
           }
 
           def remoteDeviceAdded(r: Registry, d: RemoteDevice): Unit = walkDevice(d)
@@ -138,27 +136,27 @@ object ExternalIPDetector {
   private def parseXorMappedAddress(buf: Array[Byte], len: Int, txId: Array[Byte]): InetAddress = {
     val resp = ByteBuffer.wrap(buf, 0, len)
     val msgType = resp.getShort() & 0xffff
-    if (msgType != 0x0101)
+    if msgType != 0x0101 then
       throw new IllegalStateException(s"Expected Binding Response (0x0101), got 0x${msgType.toHexString}")
     val msgLen = resp.getShort() & 0xffff
     resp.position(4) // skip type(2) + length(2), land at magic cookie
-    if ((resp.getInt() & 0xffffffffL) != 0x2112a442L)
+    if (resp.getInt() & 0xffffffffL) != 0x2112a442L then
       throw new IllegalStateException("STUN response: unexpected magic cookie")
     val echoed = new Array[Byte](12)
     resp.get(echoed)
-    if (!java.util.Arrays.equals(echoed, txId))
+    if !java.util.Arrays.equals(echoed, txId) then
       throw new IllegalStateException("STUN response transaction ID mismatch — possible spoofing or server reuse")
     // position is now at 20 — start of attribute section
     val bodyEnd = 20 + msgLen
     var result: Option[InetAddress] = None
-    while (resp.position() < bodyEnd && result.isEmpty) {
+    while resp.position() < bodyEnd && result.isEmpty do {
       val attrType = resp.getShort() & 0xffff
       val attrLen = resp.getShort() & 0xffff
       val attrStart = resp.position() // start of attribute VALUE (after type+length headers)
-      if (attrType == 0x0020) { // XOR-MAPPED-ADDRESS
+      if attrType == 0x0020 then { // XOR-MAPPED-ADDRESS
         resp.get() // reserved byte
         val family = resp.get() & 0xff
-        if (family == 0x01) { // IPv4
+        if family == 0x01 then { // IPv4
           resp.getShort() // xor-port (unused — we only need the IP)
           val xorAddr = resp.getInt() ^ 0x2112a442
           result = Some(InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(xorAddr).array()))
@@ -186,8 +184,7 @@ object ExternalIPDetector {
             )
           try {
             val line = reader.readLine()
-            if (line == null || line.trim.isEmpty)
-              throw new IllegalStateException(s"Empty response from $url")
+            if line == null || line.trim.isEmpty then throw new IllegalStateException(s"Empty response from $url")
             InetAddress.getByName(line.trim)
           } finally reader.close()
         }.toOption

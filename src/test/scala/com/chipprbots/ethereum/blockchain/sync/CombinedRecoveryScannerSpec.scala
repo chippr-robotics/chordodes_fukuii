@@ -62,7 +62,9 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
 
     /** Account key with an explicit first nibble (to force two accounts into different shards). */
     def acctWithNibble(nibble: Int, tag: Int): ByteString =
-      ByteString(Array.tabulate[Byte](32)(i => if (i == 0) (nibble << 4).toByte else if (i == 1) tag.toByte else 0))
+      ByteString(
+        Array.tabulate[Byte](32)(i => if i == 0 then (nibble << 4).toByte else if i == 1 then tag.toByte else 0)
+      )
 
     def stateRootOf(accounts: Seq[(ByteString, Account)]): ByteString =
       ByteString(
@@ -145,7 +147,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
         () => f.handle(),
         f.evm,
         app,
-        onShardPersisted = n => if (n == 1) throw new RuntimeException("boom")
+        onShardPersisted = n => if n == 1 then throw new RuntimeException("boom")
       )
     intercept[RuntimeException](crashing.run())
 

@@ -32,7 +32,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
 
   /** Emit the invalid-proof counter for any verification failure surfaced to callers. */
   private def counted(result: Either[String, Unit]): Either[String, Unit] = {
-    if (result.isLeft) SNAPSyncMetrics.incrementInvalidProof()
+    if result.isLeft then SNAPSyncMetrics.incrementInvalidProof()
     result
   }
 
@@ -42,10 +42,10 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
       startHash: ByteString,
       endHash: ByteString
   ): Either[String, Unit] = {
-    if (proof.isEmpty && accounts.isEmpty) return Right(())
+    if proof.isEmpty && accounts.isEmpty then return Right(())
     try {
       val leaves = accounts.map { case (h, a) => h -> ByteString(Account.accountSerializer.toBytes(a)) }
-      if (proof.isEmpty) {
+      if proof.isEmpty then {
         // Nil proof: full trie response, verify by streaming hash (geth: StackTrie path)
         return counted(verifyCompleteRange(leaves))
       }
@@ -66,9 +66,9 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
       startHash: ByteString,
       endHash: ByteString
   ): Either[String, Unit] = {
-    if (proof.isEmpty && slots.isEmpty) return Right(())
+    if proof.isEmpty && slots.isEmpty then return Right(())
     try {
-      if (proof.isEmpty) {
+      if proof.isEmpty then {
         return counted(verifyCompleteRange(slots))
       }
       val proofRawMap = buildProofRawMap(proof)
@@ -86,7 +86,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
     val snapTrie = new SnapHashTrie(_ => ())
     leaves.foreach { case (k, v) => snapTrie.update(k.toArray, v.toArray) }
     val computed = snapTrie.commit()
-    if (computed == rootHash) Right(())
+    if computed == rootHash then Right(())
     else Left(s"complete-range hash mismatch")
   }
 
@@ -97,13 +97,12 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
       proofRawMap: Map[ByteString, Array[Byte]]
   ): Either[String, Unit] = {
     // Validate: monotonically strictly increasing keys, no empty values
-    if ((0 until leaves.length - 1).exists(i => cmpBytes(leaves(i)._1, leaves(i + 1)._1) >= 0))
+    if (0 until leaves.length - 1).exists(i => cmpBytes(leaves(i)._1, leaves(i + 1)._1) >= 0) then
       return Left("range is not monotonically increasing")
-    if (leaves.exists(_._2.isEmpty))
-      return Left("range contains deletion (empty value)")
+    if leaves.exists(_._2.isEmpty) then return Left("range contains deletion (empty value)")
 
     // Edge case B: proof present, zero leaves — proof of absence
-    if (leaves.isEmpty) {
+    if leaves.isEmpty then {
       val rootNode = decodeProofNode(proofRawMap, rootHash) match {
         case None    => return Left("root node missing from proof")
         case Some(n) => n
@@ -113,17 +112,16 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
         case Left(err) => return Left(err)
         case Right(()) => ()
       }
-      return if (hasRightElement(trie.root, hashToNibbles(firstKey)))
-        Left("more entries available")
+      return if hasRightElement(trie.root, hashToNibbles(firstKey)) then Left("more entries available")
       else Right(())
     }
 
     // Validate: firstKey <= leaves.head
-    if (cmpBytes(firstKey, leaves.head._1) > 0)
+    if cmpBytes(firstKey, leaves.head._1) > 0 then
       return Left("unexpected key-value pairs preceding the requested range")
 
     // Special case: single element where firstKey == lastKey (existent proof)
-    if (leaves.length == 1 && firstKey == lastKey) {
+    if leaves.length == 1 && firstKey == lastKey then {
       val rootNode = decodeProofNode(proofRawMap, rootHash) match {
         case None    => return Left("root node missing from proof")
         case Some(n) => n
@@ -135,12 +133,12 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
       }
       trie.insertLeaf(hashToNibbles(leaves.head._1), leaves.head._2)
       val computed = trie.computeHash()
-      return if (computed == rootHash) Right(())
+      return if computed == rootHash then Right(())
       else Left(s"single-element range proof hash mismatch")
     }
 
-    if (cmpBytes(firstKey, lastKey) >= 0) return Left("invalid edge keys")
-    if (firstKey.length != lastKey.length) return Left("inconsistent edge key lengths")
+    if cmpBytes(firstKey, lastKey) >= 0 then return Left("invalid edge keys")
+    if firstKey.length != lastKey.length then return Left("inconsistent edge key lengths")
 
     val firstNibbles = hashToNibbles(firstKey)
     val lastNibbles = hashToNibbles(lastKey)
@@ -175,7 +173,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
     // Phase 4: verify root hash
     log.debug(s"[PROOF] Phase 4: computing root hash")
     val computed = trie.computeHash()
-    if (computed == rootHash) Right(())
+    if computed == rootHash then Right(())
     else Left(s"range proof hash mismatch")
   }
 
@@ -252,7 +250,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
       }
       resolved match {
         case NullNode =>
-          if (allowNonExistent) Right(NullNode)
+          if allowNonExistent then Right(NullNode)
           else Left("node not in trie (null at boundary)")
 
         case leaf: LeafNode => Right(leaf)
@@ -273,11 +271,11 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
 
         case ext: ExtensionNode =>
           val sharedNibbles = toNibbleSeq(ext.sharedKey)
-          if (remaining.startsWith(sharedNibbles)) {
+          if remaining.startsWith(sharedNibbles) then {
             resolveEdgePath(ext.next, remaining.drop(sharedNibbles.length), allowNonExistent).map { newNext =>
               ExtensionNode(ext.sharedKey, newNext)
             }
-          } else if (allowNonExistent) {
+          } else if allowNonExistent then {
             Right(ext)
           } else {
             Left("extension key mismatch in proof")
@@ -295,7 +293,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
           val sharedNibbles = toNibbleSeq(ext.sharedKey)
           val forkLeft = comparePrefix(left, pos, sharedNibbles)
           val forkRight = comparePrefix(right, pos, sharedNibbles)
-          if (forkLeft == 0 && forkRight == 0) {
+          if forkLeft == 0 && forkRight == 0 then {
             findForkAndPrune(ext.next, left, right, pos + sharedNibbles.length).map { newNext =>
               ExtensionNode(ext.sharedKey, newNext)
             }
@@ -304,7 +302,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
           }
 
         case branch: BranchNode =>
-          if (left(pos) == right(pos)) {
+          if left(pos) == right(pos) then {
             val nibble = left(pos)
             findForkAndPrune(branch.children(nibble), left, right, pos + 1).map { newChild =>
               branch.updateChild(nibble, newChild)
@@ -326,8 +324,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
       val rightNibble = right(pos)
       // Null out all children strictly between the two boundary nibbles
       var b = branch
-      for (i <- leftNibble + 1 until rightNibble)
-        b = b.updateChild(i, NullNode)
+      for i <- leftNibble + 1 until rightNibble do b = b.updateChild(i, NullNode)
       for {
         newLeftChild <- pruneOneSide(b.children(leftNibble), left, pos + 1, removeLeft = false)
         b2 = b.updateChild(leftNibble, newLeftChild)
@@ -359,7 +356,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
             case _: LeafNode => Right(NullNode)
             case _ =>
               pruneOneSide(ext.next, left, pos + sharedNibbles.length, removeLeft = false).map { newNext =>
-                if (newNext.isNull) NullNode else ExtensionNode(ext.sharedKey, newNext)
+                if newNext.isNull then NullNode else ExtensionNode(ext.sharedKey, newNext)
               }
           }
 
@@ -369,7 +366,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
             case _: LeafNode => Right(NullNode)
             case _ =>
               pruneOneSide(ext.next, right, pos + sharedNibbles.length, removeLeft = true).map { newNext =>
-                if (newNext.isNull) NullNode else ExtensionNode(ext.sharedKey, newNext)
+                if newNext.isNull then NullNode else ExtensionNode(ext.sharedKey, newNext)
               }
           }
 
@@ -386,13 +383,13 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
           // go-ethereum unset() equivalent: clear children on one side then recurse.
           // Bounds check: pos must be within the key (64 nibbles). At pos >= key.length
           // we've consumed the full path — no more children to prune.
-          if (pos >= key.length) return Right(branch)
+          if pos >= key.length then return Right(branch)
           // Null children on the side being removed
           var b = branch
-          if (removeLeft) {
-            for (i <- 0 until key(pos)) b = b.updateChild(i, NullNode)
+          if removeLeft then {
+            for i <- 0 until key(pos) do b = b.updateChild(i, NullNode)
           } else {
-            for (i <- key(pos) + 1 until 16) b = b.updateChild(i, NullNode)
+            for i <- key(pos) + 1 until 16 do b = b.updateChild(i, NullNode)
           }
           pruneOneSide(b.children(key(pos)), key, pos + 1, removeLeft).map { newKeyChild =>
             b.updateChild(key(pos), newKeyChild)
@@ -401,13 +398,13 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
         case ext: ExtensionNode =>
           val sharedNibbles = toNibbleSeq(ext.sharedKey)
           val keySlice = key.drop(pos).take(sharedNibbles.length)
-          if (keySlice != sharedNibbles) {
+          if keySlice != sharedNibbles then {
             // Extension's path diverges from boundary key: sibling check
             val cmp = compareNibbleSeqs(sharedNibbles, keySlice)
-            Right(if ((removeLeft && cmp < 0) || (!removeLeft && cmp > 0)) NullNode else child)
+            Right(if (removeLeft && cmp < 0) || (!removeLeft && cmp > 0) then NullNode else child)
           } else {
             pruneOneSide(ext.next, key, pos + sharedNibbles.length, removeLeft).map { newNext =>
-              if (newNext.isNull) NullNode else ExtensionNode(ext.sharedKey, newNext)
+              if newNext.isNull then NullNode else ExtensionNode(ext.sharedKey, newNext)
             }
           }
 
@@ -415,11 +412,11 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
           // Either the boundary leaf itself (remove → will be re-inserted) or a sibling
           val leafNibbles = toNibbleSeq(leaf.key)
           val remaining = key.drop(pos)
-          if (leafNibbles == remaining) {
+          if leafNibbles == remaining then {
             Right(NullNode) // boundary leaf: remove and re-insert in phase 3
           } else {
             val cmp = compareNibbleSeqs(leafNibbles, remaining)
-            Right(if ((removeLeft && cmp < 0) || (!removeLeft && cmp > 0)) NullNode else child)
+            Right(if (removeLeft && cmp < 0) || (!removeLeft && cmp > 0) then NullNode else child)
           }
 
         case NullNode => Right(NullNode)
@@ -438,12 +435,12 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
     var current = node
     var remaining = keyNibbles
     var found = false
-    while (current != null && !found)
+    while current != null && !found do
       current match {
         case branch: BranchNode =>
-          if (remaining.nonEmpty) {
+          if remaining.nonEmpty then {
             val n = remaining.head
-            if ((n + 1 until 16).exists(!branch.children(_).isNull)) {
+            if (n + 1 until 16).exists(!branch.children(_).isNull) then {
               found = true
             } else {
               current = branch.children(n)
@@ -455,7 +452,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
 
         case ext: ExtensionNode =>
           val sharedNibbles = toNibbleSeq(ext.sharedKey)
-          if (!remaining.startsWith(sharedNibbles)) {
+          if !remaining.startsWith(sharedNibbles) then {
             found = compareNibbleSeqs(sharedNibbles, remaining.take(sharedNibbles.length)) > 0
             current = null
           } else {
@@ -482,10 +479,10 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
   // Returns 0 if equal, negative if key-slice < ref or too short, positive if key-slice > ref.
   private def comparePrefix(key: Seq[Int], pos: Int, ref: Seq[Int]): Int = {
     val slice = key.drop(pos).take(ref.length)
-    if (slice.length < ref.length) {
+    if slice.length < ref.length then {
       // Truncated slice — compare what we have then treat as smaller
       val partial = compareNibbleSeqs(slice, ref.take(slice.length))
-      if (partial != 0) partial else -1
+      if partial != 0 then partial else -1
     } else {
       compareNibbleSeqs(slice, ref)
     }
@@ -494,9 +491,9 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
   private def compareNibbleSeqs(a: Seq[Int], b: Seq[Int]): Int = {
     val len = math.min(a.length, b.length)
     var i = 0
-    while (i < len) {
+    while i < len do {
       val d = a(i) - b(i)
-      if (d != 0) return d
+      if d != 0 then return d
       i += 1
     }
     a.length - b.length
@@ -506,9 +503,9 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
     val aa = a.toArray
     val bb = b.toArray
     var i = 0
-    while (i < math.min(aa.length, bb.length)) {
+    while i < math.min(aa.length, bb.length) do {
       val d = (aa(i) & 0xff) - (bb(i) & 0xff)
-      if (d != 0) return d
+      if d != 0 then return d
       i += 1
     }
     aa.length - bb.length
@@ -523,9 +520,9 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
     }.toMap
 
   @unused private def verifyProofRoot(proofNodes: Seq[MptNode]): Either[String, Unit] = {
-    if (proofNodes.isEmpty) return Left("Empty proof")
+    if proofNodes.isEmpty then return Left("Empty proof")
     val firstNodeHash = ByteString(proofNodes.head.hash)
-    if (firstNodeHash != rootHash)
+    if firstNodeHash != rootHash then
       Left(
         s"Proof root mismatch: got ${firstNodeHash.take(4).toArray.map("%02x".format(_)).mkString}... expected ${rootHash.take(4).toArray.map("%02x".format(_)).mkString}..."
       )
@@ -549,13 +546,13 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
       case None =>
         Right(())
       case Some(leafNode: LeafNode) =>
-        if (leafNode.value == expectedValue) Right(())
+        if leafNode.value == expectedValue then Right(())
         else Left(s"Storage value mismatch")
       case Some(branchNode: BranchNode) =>
-        if (path.isEmpty) {
+        if path.isEmpty then {
           branchNode.terminator match {
             case Some(value) =>
-              if (value == expectedValue) Right(()) else Left("Storage value mismatch at branch terminator")
+              if value == expectedValue then Right(()) else Left("Storage value mismatch at branch terminator")
             case None => Left("Path ended at branch without terminator")
           }
         } else {
@@ -570,7 +567,7 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
         }
       case Some(extensionNode: ExtensionNode) =>
         val sharedNibbles = extensionNode.sharedKey.map(_.toInt)
-        if (path.startsWith(sharedNibbles)) {
+        if path.startsWith(sharedNibbles) then {
           extensionNode.next match {
             case hashNode: HashNode =>
               traverseStoragePath(ByteString(hashNode.hash), path.drop(sharedNibbles.length), proofMap, expectedValue)
@@ -587,8 +584,8 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
       @unused endHash: ByteString
   ): Either[String, Unit] = {
     var i = 1
-    while (i < slots.size) {
-      if (cmpBytes(slots(i - 1)._1, slots(i)._1) >= 0) return Left("Storage slots not monotonically increasing")
+    while i < slots.size do {
+      if cmpBytes(slots(i - 1)._1, slots(i)._1) >= 0 then return Left("Storage slots not monotonically increasing")
       i += 1
     }
     Right(())

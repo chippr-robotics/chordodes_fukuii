@@ -130,7 +130,7 @@ class SyncController(
 
   override def preStart(): Unit = {
     super.preStart()
-    if (clPivotEnabled) {
+    if clPivotEnabled then {
       forkChoiceManagerOpt.foreach { fcm =>
         fcm.setListener(self)
         log.info(
@@ -189,7 +189,7 @@ class SyncController(
     val nowMillis = System.currentTimeMillis()
     val cooldownUntil = appStateStorage.getFastSyncCooldownUntilMillis()
 
-    if (cooldownUntil > nowMillis) {
+    if cooldownUntil > nowMillis then {
       val delay = (cooldownUntil - nowMillis).millis
       log.warning(
         "RestartFastSync requested but circuit-breaker is open (cool-off {} remaining); scheduling restart",
@@ -273,7 +273,7 @@ class SyncController(
       snapFastCycleCount += 1
       appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
       log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
-      if (!checkSnapFastEscapeHatch()) {
+      if !checkSnapFastEscapeHatch() then {
         startSnapSync()
       }
 
@@ -375,7 +375,7 @@ class SyncController(
       snapFastCycleCount += 1
       appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
       log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
-      if (!checkSnapFastEscapeHatch()) {
+      if !checkSnapFastEscapeHatch() then {
         startFastSync()
       }
 
@@ -402,7 +402,7 @@ class SyncController(
     // root. Fetch a recent header via a DEDICATED bootstrap slot (never the storage-recovery `recentRootRequester`)
     // and reply HealingServeRoot to the child. Run inline — no transition into the deadlock-prone bootstrap state.
     case SNAPSyncController.RequestHealingServeRoot =>
-      if (healingServeRootRequester.isEmpty && healingServeRootBootstrap.isEmpty) {
+      if healingServeRootRequester.isEmpty && healingServeRootBootstrap.isEmpty then {
         healingServeRootRequester = Some(sender())
         log.info("[HEAL-SERVE-ROOT] Healing requested a newest-servable root. Polling peers for the network head.")
         networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
@@ -494,7 +494,7 @@ class SyncController(
     * current serve root (U2), retrying on a later healing tick. Safe no-op when nothing is in flight.
     */
   private def abortHealingServeRootRequest(reason: String): Unit =
-    if (healingServeRootRequester.isDefined || healingServeRootBootstrap.isDefined) {
+    if healingServeRootRequester.isDefined || healingServeRootBootstrap.isDefined then {
       log.info(s"[HEAL-SERVE-ROOT] Aborting in-flight serve-root request ($reason) — replying None (serve root kept).")
       stopHealingServeRootBootstrap()
       // A HealingServeRootTimeout self-message scheduled by maybeStartHealingServeRootBootstrap may still be in
@@ -537,7 +537,7 @@ class SyncController(
         //   Tier 1 (peerTD > 0, peerMaxBlock > 0): exact interpolation from NewBlock TD+blockNum
         //   Tier 2 (peerTD > 0, peerMaxBlock = 0): ETH68 STATUS only — peerTD direct (<0.05% over)
         //   Tier 3 (peerTD = 0): pure ETH69 sentinel — compute from local chain DB via parentHash traversal
-        if (peerTD > BigInt(0)) {
+        if peerTD > BigInt(0) then {
           // Tier 1 or 2: ETH68 peer TD available
           blockchainReader.getBestBlock.foreach { bestBlock =>
             val genesisWeight = blockchainReader
@@ -545,11 +545,9 @@ class SyncController(
               .map(_.totalDifficulty)
               .getOrElse(blockchainReader.genesisHeader.difficulty)
             val calibratedTD =
-              if (peerMaxBlock > BigInt(0))
-                peerTD * bestBlock.header.number / peerMaxBlock
-              else
-                peerTD
-            if (calibratedTD > genesisWeight * BigInt(1000)) {
+              if peerMaxBlock > BigInt(0) then peerTD * bestBlock.header.number / peerMaxBlock
+              else peerTD
+            if calibratedTD > genesisWeight * BigInt(1000) then {
               val storedTD = blockchainReader
                 .getChainWeightByHash(bestBlock.header.hash)
                 .map(_.totalDifficulty)
@@ -562,7 +560,7 @@ class SyncController(
                 .commit()
               networkBestTD = peerTD
               calibrationSucceeded = true
-              lastCalibrationSource = if (peerMaxBlock > BigInt(0)) "NEWBLOCK_EXACT" else "ETH68_STATUS"
+              lastCalibrationSource = if peerMaxBlock > BigInt(0) then "NEWBLOCK_EXACT" else "ETH68_STATUS"
               log.info(
                 "CHAIN_WEIGHT_CALIBRATED_ON_RESUME: bestBlock={} storedTD={} calibratedTD={} source={}",
                 bestBlock.header.number,
@@ -570,7 +568,7 @@ class SyncController(
                 calibratedTD,
                 lastCalibrationSource
               )
-              val ratio = if (storedTD > BigInt(0)) (calibratedTD / storedTD).toString else "∞"
+              val ratio = if storedTD > BigInt(0) then (calibratedTD / storedTD).toString else "∞"
               log.info(
                 s"TD_CALIBRATION_SUMMARY: block=${bestBlock.header.number} before=$storedTD after=$calibratedTD ratio=$ratio source=$lastCalibrationSource attempt=$tdCalibrationAttempt"
               )
@@ -582,7 +580,7 @@ class SyncController(
           // accumulate forward. Retry every 30min until success or ETH68 peers appear.
           tdCalibrationAttempt += 1
           val succeeded = calibrateTDFromLocalChain()
-          if (succeeded) {
+          if succeeded then {
             calibrationSucceeded = true
             lastCalibrationSource = "LOCAL_CHAIN"
           } else {
@@ -655,7 +653,7 @@ class SyncController(
     case RegularSync.ProgressProtocol.ImportedBlock(blockNumber, _) =>
       log.debug(s"Bootstrap progress: block $blockNumber / $targetBlock")
 
-      if (blockNumber >= targetBlock) {
+      if blockNumber >= targetBlock then {
         log.info(s"Bootstrap target ${targetBlock} reached - transitioning to SNAP sync")
 
         // Stop regular sync
@@ -756,7 +754,7 @@ class SyncController(
       snapFastCycleCount += 1
       appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
       log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
-      if (!checkSnapFastEscapeHatch()) {
+      if !checkSnapFastEscapeHatch() then {
         startFastSync()
       }
 
@@ -807,10 +805,10 @@ class SyncController(
       bh: ForkChoiceManager.BeaconHead,
       snapSyncOpt: Option[ActorRef]
   ): Unit = {
-    if (!clPivotEnabled) return
+    if !clPivotEnabled then return
     val isNew = !latestBeaconHead.exists(_.headHash == bh.headHash)
     latestBeaconHead = Some(bh)
-    if (isNew)
+    if isNew then
       log.info(
         "Received CL-driven beacon head {} (knownHeader={})",
         com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(bh.headHash),
@@ -831,7 +829,7 @@ class SyncController(
     */
   private def checkSnapFastEscapeHatch(): Boolean = {
     val threshold = syncConfig.maxSnapFastCycleTransitions
-    if (threshold > 0 && snapFastCycleCount >= threshold) {
+    if threshold > 0 && snapFastCycleCount >= threshold then {
       log.warning(
         "SNAP<->Fast sync bounce cycle count ({}) reached threshold ({}). " +
           "Escaping to regular sync — missing state will be fetched on-demand via GetTrieNodes.",
@@ -866,7 +864,7 @@ class SyncController(
     // node resumes fast sync to finish state download, then on next normal restart the
     // flag is back to its real value (set by FastSync.finish()). Cheap, surgical recovery
     // that doesn't touch chain data.
-    if (System.getProperty("fukuii.reset-fast-sync-done", "false").equalsIgnoreCase("true")) {
+    if System.getProperty("fukuii.reset-fast-sync-done", "false").equalsIgnoreCase("true") then {
       log.warning(
         "System property fukuii.reset-fast-sync-done=true — clearing FastSyncDone flag on this startup"
       )
@@ -886,7 +884,7 @@ class SyncController(
     // genesis re-sync. Trie nodes are content-addressed, so leftover state from the prior run
     // is automatically reused as SNAP fills in the gaps.
     val persistedBest = appStateStorage.getBestBlockNumber()
-    if (persistedBest > 0 && blockchainReader.getBlockHeaderByNumber(persistedBest).isEmpty) {
+    if persistedBest > 0 && blockchainReader.getBlockHeaderByNumber(persistedBest).isEmpty then {
       log.warning(
         "Persisted best block {} not found in storage — clearing sync-done flags so SNAP can resume from persisted progress",
         persistedBest
@@ -905,11 +903,11 @@ class SyncController(
     // prematurely. Clear the flag so this start() routes back to fast sync and finishes
     // the missing nodes. Without this auto-recovery, the only fix is a manual re-pivot or
     // wipe — neither of which the node can do "in the wild".
-    if (appStateStorage.isFastSyncDone()) {
+    if appStateStorage.isFastSyncDone() then {
       fastSyncStateStorage.getSyncState().foreach { ss =>
         val saved = ss.downloadedNodesCount
         val peak = ss.maxTotalNodesCount
-        if (peak > 1000L && saved.toDouble / peak.toDouble < 0.90) {
+        if peak > 1000L && saved.toDouble / peak.toDouble < 0.90 then {
           val pct = (saved.toDouble / peak.toDouble * 100).toInt
           log.warning(
             "FastSyncDone is set but persisted SyncState shows trie incomplete: " +
@@ -929,12 +927,12 @@ class SyncController(
     // Load bootstrap checkpoints if enabled and DB is fresh (best block = 0).
     // The highest checkpoint becomes the bootstrap pivot — SNAPSyncController uses it
     // for peer filtering and pivot selection, bypassing the peer discovery delay.
-    if (syncConfig.useBootstrapCheckpoints && appStateStorage.getBestBlockNumber() == 0) {
+    if syncConfig.useBootstrapCheckpoints && appStateStorage.getBestBlockNumber() == 0 then {
       val checkpoints = syncConfig.bootstrapCheckpoints
-      if (checkpoints.nonEmpty) {
+      if checkpoints.nonEmpty then {
         val (highestBlock, highestHash) = checkpoints.maxBy(_._1)
         val existingPivot = appStateStorage.getBootstrapPivotBlock()
-        if (existingPivot == 0 || highestBlock > existingPivot) {
+        if existingPivot == 0 || highestBlock > existingPivot then {
           import org.apache.pekko.util.ByteString
           val hashBytes = ByteString(com.chipprbots.ethereum.utils.Hex.decode(highestHash.stripPrefix("0x")))
           appStateStorage.putBootstrapPivotBlock(highestBlock, hashBytes).commit()
@@ -956,7 +954,7 @@ class SyncController(
     //      (resumable via HTTP Range) and import.
     // On success the importer marks SNAP/bytecode/storage as done; the match below routes to
     // RegularSync. On failure we log and fall through to the normal SNAP/Fast/Regular path.
-    if (appStateStorage.getBestBlockNumber() == 0 && !appStateStorage.isSnapSyncDone()) {
+    if appStateStorage.getBestBlockNumber() == 0 && !appStateStorage.isSnapSyncDone() then {
       val fileOpt: Option[java.nio.file.Path] = syncConfig.checkpointSyncFile.orElse {
         syncConfig.checkpointSyncUrl.flatMap { url =>
           val datadir = java.nio.file.Paths.get(System.getProperty("fukuii.datadir", "."))
@@ -993,7 +991,7 @@ class SyncController(
             log.error("[CHECKPOINT IMPORT] failed: {} — falling through to SNAP/Fast/Regular", err)
         }
       }
-    } else if (syncConfig.checkpointSyncFile.isDefined || syncConfig.checkpointSyncUrl.isDefined) {
+    } else if syncConfig.checkpointSyncFile.isDefined || syncConfig.checkpointSyncUrl.isDefined then {
       log.info(
         "Checkpoint sync configured but DB already initialized (bestBlock={}, snapDone={}); skipping import",
         appStateStorage.getBestBlockNumber(),
@@ -1003,7 +1001,7 @@ class SyncController(
 
     // If fast sync is desired but the circuit-breaker is open, start regular sync for now and
     // schedule an in-process restart of fast sync once the cool-off expires.
-    if (doFastSync && appStateStorage.isFastSyncCoolingOff(nowMillis)) {
+    if doFastSync && appStateStorage.isFastSyncCoolingOff(nowMillis) then {
       val until = appStateStorage.getFastSyncCooldownUntilMillis()
       val delay = (until - nowMillis).millis
       log.warning(
@@ -1018,8 +1016,8 @@ class SyncController(
 
     // Recovery flag: -Dfukuii.snap.clearDoneOnStart=true clears SnapSyncDone to re-enter healing.
     // Use when healing completed prematurely (BUG-006: root mismatch) to resume without a full re-sync.
-    if (doSnapSync && System.getProperty("fukuii.snap.clearDoneOnStart", "false").toBoolean) {
-      if (appStateStorage.isSnapSyncDone()) {
+    if doSnapSync && System.getProperty("fukuii.snap.clearDoneOnStart", "false").toBoolean then {
+      if appStateStorage.isSnapSyncDone() then {
         log.warning("fukuii.snap.clearDoneOnStart=true: clearing SnapSyncDone to re-enter SNAP healing")
         appStateStorage.clearSnapSyncDone().commit()
       }
@@ -1056,9 +1054,9 @@ class SyncController(
           log.info(
             "State root availability check: pivotRoot({})={}",
             header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString,
-            if (pivotRootExists) "EXISTS" else "MISSING"
+            if pivotRootExists then "EXISTS" else "MISSING"
           )
-          if (!pivotRootExists) {
+          if !pivotRootExists then {
             val finalizedRoot = appStateStorage.getSnapSyncFinalizedRoot()
             finalizedRoot match {
               case Some(fRoot) =>
@@ -1068,9 +1066,9 @@ class SyncController(
                 log.info(
                   "Finalized trie root {} availability: {}",
                   fRoot.take(8).toArray.map("%02x".format(_)).mkString,
-                  if (fRootExists) "EXISTS" else "MISSING"
+                  if fRootExists then "EXISTS" else "MISSING"
                 )
-                if (fRootExists) {
+                if fRootExists then {
                   log.warning(
                     "Substituting finalized trie root {} into pivot block header (replacing missing root {})",
                     fRoot.take(8).toArray.map("%02x".format(_)).mkString,
@@ -1091,16 +1089,16 @@ class SyncController(
             // The downloaded account trie is stored under snapStateRoot; update the pivot header
             // to match so the startup diagnostic passes and regular sync reads the correct trie.
             snapStateRoot.foreach { snapRoot =>
-              if (snapRoot != header.stateRoot) {
+              if snapRoot != header.stateRoot then {
                 val snapRootExists =
                   try { mptStorage.get(snapRoot.toArray); true }
                   catch { case _: Exception => false }
                 log.info(
                   "snapStateRoot({}) availability: {}",
                   snapRoot.take(8).toArray.map("%02x".format(_)).mkString,
-                  if (snapRootExists) "EXISTS" else "MISSING"
+                  if snapRootExists then "EXISTS" else "MISSING"
                 )
-                if (snapRootExists) {
+                if snapRootExists then {
                   log.warning(
                     "snapStateRoot({}) differs from pivotHeader.stateRoot({}) — " +
                       "updating pivot block header to use downloaded state root.",
@@ -1116,7 +1114,7 @@ class SyncController(
         }
         val needBytecode = !appStateStorage.isBytecodeRecoveryDone()
         val needStorage = !appStateStorage.isStorageRecoveryDone()
-        if (needBytecode || needStorage) {
+        if needBytecode || needStorage then {
           startRecovery(needBytecode, needStorage)
         } else {
           startRegularSync()
@@ -1129,11 +1127,10 @@ class SyncController(
       case (_, true, false, false) =>
         startRegularSync()
       case (_, false, false, false) =>
-        if (fastSyncStateStorage.getSyncState().isDefined) {
+        if fastSyncStateStorage.getSyncState().isDefined then {
           log.warning("do-fast-sync is false but fast sync hasn't completed")
           startFastSync()
-        } else
-          startRegularSync()
+        } else startRegularSync()
     }
   }
 
@@ -1197,7 +1194,7 @@ class SyncController(
 
     // If a CL-driven head arrived before SNAP started (post-merge chains), prime the new
     // SNAP actor with it so pivot selection skips the TD-based path entirely.
-    if (clPivotEnabled) {
+    if clPivotEnabled then {
       latestBeaconHead.foreach { bh =>
         log.info(
           "Priming SNAP sync with buffered CL beacon head {} (knownHeader={})",
@@ -1294,7 +1291,7 @@ class SyncController(
     // far it got — spawn a standalone ChainDownloader to finish the job alongside regular sync.
     // Suppressed when called from the SnapSyncFinalized path: SNAPSyncController already owns
     // the live backfill actor in that flow.
-    if (resumeBackfill) maybeStartBackfillResume(regularSync)
+    if resumeBackfill then maybeStartBackfillResume(regularSync)
     regularSync
   }
 
@@ -1303,7 +1300,7 @@ class SyncController(
     * Issues #1162 (background backfill) + #1169 (resume across restarts).
     */
   private def maybeStartBackfillResume(regularSync: ActorRef): Unit =
-    if (appStateStorage.needsBackfillResume()) {
+    if appStateStorage.needsBackfillResume() then {
       val target = appStateStorage.getBackfillTarget()
       val headerCursor = appStateStorage.getBackfillBestHeader()
       val bodyCursor = appStateStorage.getBackfillBestBody()
@@ -1390,17 +1387,17 @@ class SyncController(
 
         val snapSyncConfig = loadSnapSyncConfig()
 
-        if (snapSyncConfig.parallelRecoveryScan) {
+        if snapSyncConfig.parallelRecoveryScan then {
           // Combined path: ONE parallel, resumable single-pass scan finds both gap sets; downloads start
           // once it reports (in `runningCombinedScan`).
           log.info("Recovery: combined parallel scan enabled — one pass finds bytecode + storage gaps.")
           // Phase gauges are need-aware: a phase already done in a prior run shows Complete (not idle) while the
           // combined scan re-verifies it in the same pass.
           RecoveryMetrics.setBytecodePhase(
-            if (needBytecode) RecoveryMetrics.PhaseScanning else RecoveryMetrics.PhaseComplete
+            if needBytecode then RecoveryMetrics.PhaseScanning else RecoveryMetrics.PhaseComplete
           )
           RecoveryMetrics.setStoragePhase(
-            if (needStorage) RecoveryMetrics.PhaseScanning else RecoveryMetrics.PhaseComplete
+            if needStorage then RecoveryMetrics.PhaseScanning else RecoveryMetrics.PhaseComplete
           )
           context.spawn(
             CombinedRecoveryScanActor(
@@ -1419,7 +1416,7 @@ class SyncController(
         } else {
           // Legacy path: each phase scans the full trie independently, then downloads.
           val bytecodeActor =
-            if (needBytecode)
+            if needBytecode then
               Some(
                 context
                   .spawn(
@@ -1440,7 +1437,7 @@ class SyncController(
               )
             else None
           val storageActor =
-            if (needStorage)
+            if needStorage then
               Some(
                 context
                   .spawn(
@@ -1470,8 +1467,8 @@ class SyncController(
 
       case _ =>
         log.warning("Cannot run recovery: missing stateRoot or pivotBlock. Marking done and proceeding.")
-        if (needBytecode) appStateStorage.bytecodeRecoveryDone().commit()
-        if (needStorage) appStateStorage.storageRecoveryDone().commit()
+        if needBytecode then appStateStorage.bytecodeRecoveryDone().commit()
+        if needStorage then appStateStorage.storageRecoveryDone().commit()
         startRegularSync()
     }
   }
@@ -1487,15 +1484,15 @@ class SyncController(
       snapSyncConfig: com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
   ): Receive = {
     case CombinedRecoveryScanActor.CombinedScanComplete(byteGaps, storGaps) =>
-      val effByte = if (needBytecode) byteGaps else Nil
-      val effStor = if (needStorage) storGaps else Nil
+      val effByte = if needBytecode then byteGaps else Nil
+      val effStor = if needStorage then storGaps else Nil
       log.info(s"Combined recovery scan reported ${effByte.size} bytecode gaps, ${effStor.size} storage gaps.")
       // Phases the combined scan found complete (no gaps) are done right now.
-      if (needBytecode && effByte.isEmpty) appStateStorage.bytecodeRecoveryDone().commit()
-      if (needStorage && effStor.isEmpty) appStateStorage.storageRecoveryDone().commit()
+      if needBytecode && effByte.isEmpty then appStateStorage.bytecodeRecoveryDone().commit()
+      if needStorage && effStor.isEmpty then appStateStorage.storageRecoveryDone().commit()
 
       val bytecodeActor =
-        if (needBytecode && effByte.nonEmpty)
+        if needBytecode && effByte.nonEmpty then
           Some(
             context
               .spawn(
@@ -1517,7 +1514,7 @@ class SyncController(
           )
         else None
       val storageActor =
-        if (needStorage && effStor.nonEmpty)
+        if needStorage && effStor.nonEmpty then
           Some(
             context
               .spawn(
@@ -1540,8 +1537,8 @@ class SyncController(
         else None
       // A phase with no download actor is finished (no gaps / already done) — show Complete, not idle. Phases that
       // will download have their phase set to Downloading by the recovery actor.
-      if (bytecodeActor.isEmpty) RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseComplete)
-      if (storageActor.isEmpty) RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
+      if bytecodeActor.isEmpty then RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseComplete)
+      if storageActor.isEmpty then RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
       beginRecoveryDownloads(
         bytecodeActor,
         storageActor,
@@ -1565,7 +1562,7 @@ class SyncController(
       bytecodeComplete: Boolean,
       storageComplete: Boolean
   ): Unit =
-    if (bytecodeActor.isEmpty && storageActor.isEmpty) {
+    if bytecodeActor.isEmpty && storageActor.isEmpty then {
       log.info("Recovery: no gaps to download. Transitioning to regular sync.")
       appStateStorage.clearRecoveryProgress().commit()
       startRegularSync()
@@ -1599,7 +1596,7 @@ class SyncController(
   ): Receive = {
     case BytecodeRecoveryActor.RecoveryComplete =>
       log.info(s"[SNAP-RECOVERY] bytecode recovery complete (storage done: $storageComplete)")
-      if (storageComplete) {
+      if storageComplete then {
         completeRecovery(peerPoller)
       } else {
         context.become(
@@ -1609,7 +1606,7 @@ class SyncController(
 
     case StorageRecoveryActor.RecoveryComplete =>
       log.info(s"[SNAP-RECOVERY] storage recovery complete (bytecode done: $bytecodeComplete)")
-      if (bytecodeComplete) {
+      if bytecodeComplete then {
         completeRecovery(peerPoller)
       } else {
         context.become(
@@ -1622,7 +1619,7 @@ class SyncController(
 
     case com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers(peers) =>
       val snapPeers = peers.filter { case (_, peerInfo) => peerInfo.remoteStatus.supportsSnap && peerInfo.forkAccepted }
-      if (snapPeers.nonEmpty) {
+      if snapPeers.nonEmpty then {
         snapPeers.foreach { case (peer, _) =>
           bytecodeActor.foreach(_ ! snap.actors.Messages.ByteCodePeerAvailable(peer))
           storageActor.foreach(_ ! snap.actors.Messages.StoragePeerAvailable(peer))
@@ -1630,14 +1627,14 @@ class SyncController(
       }
       // If storage recovery is waiting for a recent root and no header fetch is in flight, start one
       // now using the freshest peer height in this snapshot.
-      if (recentRootRequester.isDefined && recentRootBootstrap.isEmpty) {
+      if recentRootRequester.isDefined && recentRootBootstrap.isEmpty then {
         maybeStartRecentRootBootstrap(peers)
       }
 
     // Storage recovery: the saved pivot root has aged out of every peer's serve window. Fetch a recent
     // canonical root so the download can roll onto something peers can still serve, instead of wedging.
     case StorageRecoveryActor.RequestRecentRoot =>
-      if (recentRootRequester.isEmpty && recentRootBootstrap.isEmpty) {
+      if recentRootRequester.isEmpty && recentRootBootstrap.isEmpty then {
         recentRootRequester = Some(sender())
         log.info("Recovery requested a recent root to roll off the aged pivot. Polling peers for the network head.")
         networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
@@ -1666,7 +1663,7 @@ class SyncController(
 
     case Terminated(actor) if bytecodeActor.contains(actor) =>
       log.error("BytecodeRecoveryActor terminated unexpectedly. Treating as complete to unblock sync.")
-      if (storageComplete) {
+      if storageComplete then {
         completeRecovery(peerPoller)
       } else {
         context.become(
@@ -1676,7 +1673,7 @@ class SyncController(
 
     case Terminated(actor) if storageActor.contains(actor) =>
       log.error("StorageRecoveryActor terminated unexpectedly. Treating as complete to unblock sync.")
-      if (bytecodeComplete) {
+      if bytecodeComplete then {
         completeRecovery(peerPoller)
       } else {
         context.become(
@@ -1767,7 +1764,7 @@ class SyncController(
         var anchorFound = false
         var abort = false
 
-        while (!anchorFound && !abort)
+        while !anchorFound && !abort do
           blockchainReader.getChainWeightByHash(cur.hash) match {
             case Some(cw) if cw.totalDifficulty > cur.number * MinTDPerBlock =>
               anchorTD = cw.totalDifficulty
@@ -1779,7 +1776,7 @@ class SyncController(
                 headersAboveAnchor.size
               )
             case _ =>
-              if (headersAboveAnchor.size >= MaxWalkBlocks) {
+              if headersAboveAnchor.size >= MaxWalkBlocks then {
                 abort = true
               } else {
                 headersAboveAnchor += cur
@@ -1797,7 +1794,7 @@ class SyncController(
               }
           }
 
-        if (abort) {
+        if abort then {
           log.warning(
             "TIMED_CALIBRATION_LOCAL: no plausible anchor within {} blocks of bestBlock={} — deferring (attempt={})",
             MaxWalkBlocks,
@@ -1816,7 +1813,7 @@ class SyncController(
             .map(_.totalDifficulty)
             .getOrElse(blockchainReader.genesisHeader.difficulty)
 
-          if (td > genesisWeight * BigInt(1000)) {
+          if td > genesisWeight * BigInt(1000) then {
             val storedTD = blockchainReader
               .getChainWeightByHash(bestHeader.hash)
               .map(_.totalDifficulty)
@@ -1831,7 +1828,7 @@ class SyncController(
               td,
               tdCalibrationAttempt
             )
-            val tdRatio = if (storedTD > BigInt(0)) (td / storedTD).toString else "∞"
+            val tdRatio = if storedTD > BigInt(0) then (td / storedTD).toString else "∞"
             log.info(
               s"TD_CALIBRATION_SUMMARY: block=${bestHeader.number} before=$storedTD after=$td ratio=$tdRatio source=LOCAL_CHAIN attempt=$tdCalibrationAttempt"
             )

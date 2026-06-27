@@ -53,7 +53,7 @@ class TrieNodeHealingScopeCaptureSpec
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
+    if gauge == null then Double.NaN else gauge.value()
   }
 
   /** Build a storage-trie leaf so the heal site's `discoverMissingChildren` takes the no-children `case _` arm

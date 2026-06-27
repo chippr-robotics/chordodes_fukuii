@@ -23,7 +23,7 @@ case class IrregularStateChangeDaoForkBlockExchangeState(
 
   def nextMessage: NextMessage = {
     val getBlockHeadersMsg: MessageSerializable =
-      if (Capability.usesRequestId(remoteStatus.capability))
+      if Capability.usesRequestId(remoteStatus.capability) then
         ETHPackets.GetBlockHeaders(
           ETHPackets.nextRequestId,
           Left(forkResolver.forkBlockNumber),
@@ -55,7 +55,7 @@ case class IrregularStateChangeDaoForkBlockExchangeState(
 
         log.debug("Peer is running the {} fork", fork)
 
-        if (forkResolver.isAccepted(fork)) {
+        if forkResolver.isAccepted(fork) then {
           log.debug("Fork is accepted")
           // setting maxBlockNumber to 0, as we do not know best block number yet
           ConnectedState(PeerInfo.withForkAccepted(remoteStatus))

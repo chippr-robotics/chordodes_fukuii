@@ -130,8 +130,8 @@ object RLPxConnectionHandler {
     val peerEthWireSize = ethWireSizeFor(negotiatedEth)
 
     val peerSnapBase: Option[Int] =
-      if (!supportsSnap) None
-      else if (snapOnlyPeer) Some(CanonicalEthBase)
+      if !supportsSnap then None
+      else if snapOnlyPeer then Some(CanonicalEthBase)
       else Some(CanonicalEthBase + peerEthWireSize)
 
     CapabilityOffsets(peerEthBase = CanonicalEthBase, peerEthWireSize, peerSnapBase)
@@ -147,7 +147,7 @@ object RLPxConnectionHandler {
   ): MessageCodec = {
     val ethDecoder = EthereumMessageDecoder.ethMessageDecoder(negotiated)
     val decoderWithSnap =
-      if (supportsSnap) NetworkMessageDecoder.orElse(ethDecoder).orElse(SNAPMessageDecoder)
+      if supportsSnap then NetworkMessageDecoder.orElse(ethDecoder).orElse(SNAPMessageDecoder)
       else NetworkMessageDecoder.orElse(ethDecoder)
     new MessageCodec(frameCodec, decoderWithSnap, p2pVersion, clientId, compressionPolicy)
   }
@@ -177,7 +177,7 @@ object RLPxConnectionHandler {
     }
 
     private def extractHello(frame: Frame): Option[Hello] =
-      if (frame.`type` == Hello.code)
+      if frame.`type` == Hello.code then
         NetworkMessageDecoder.fromBytes(frame.`type`, frame.payload.toArray) match {
           case Left(err)  => throw err
           case Right(msg) => Some(msg.asInstanceOf[Hello])
@@ -321,7 +321,7 @@ object RLPxConnectionHandler {
     private def bridgeWrite(bridge: ClassicActorRef, data: ByteString): Unit =
       bridge.tell(Tcp.Write(data, Ack), context.self.toClassic)
 
-    private def increaseSeqNumber(n: Int): Int = if (n == Int.MaxValue) 0 else n + 1
+    private def increaseSeqNumber(n: Int): Int = if n == Int.MaxValue then 0 else n + 1
 
     private def writeUncompressedHello(hello: HelloEnc, messageCodec: MessageCodec): ByteString = {
       import MessageCodec.MaxFramePayloadSize
@@ -356,23 +356,23 @@ object RLPxConnectionHandler {
         peerSnapBase: Option[Int]
     ) {
       def translateType(messageType: Int): Int =
-        if (messageType < CanonicalEthBase) {
+        if messageType < CanonicalEthBase then {
           messageType
         } else {
           peerSnapBase match {
             case Some(snapBase) if messageType >= snapBase && messageType < snapBase + CanonicalSnapSize =>
               CanonicalSnapBase + (messageType - snapBase)
             case _ =>
-              if (messageType >= peerEthBase && messageType < peerEthBase + peerEthSize)
+              if messageType >= peerEthBase && messageType < peerEthBase + peerEthSize then
                 CanonicalEthBase + (messageType - peerEthBase)
               else messageType
           }
         }
 
       def toPeerWireType(canonicalType: Int): Int =
-        if (canonicalType < CanonicalEthBase) {
+        if canonicalType < CanonicalEthBase then {
           canonicalType
-        } else if (canonicalType >= CanonicalSnapBase && canonicalType < CanonicalSnapBase + CanonicalSnapSize) {
+        } else if canonicalType >= CanonicalSnapBase && canonicalType < CanonicalSnapBase + CanonicalSnapSize then {
           peerSnapBase match {
             case Some(snapBase) => snapBase + (canonicalType - CanonicalSnapBase)
             case None =>
@@ -383,22 +383,22 @@ object RLPxConnectionHandler {
               )
               canonicalType
           }
-        } else if (canonicalType >= CanonicalEthBase && canonicalType < CanonicalEthBase + CanonicalEthSize) {
+        } else if canonicalType >= CanonicalEthBase && canonicalType < CanonicalEthBase + CanonicalEthSize then {
           peerEthBase + (canonicalType - CanonicalEthBase)
         } else {
           canonicalType
         }
 
       def translateFrames(frames: Seq[Frame]): Seq[Frame] =
-        if (frames.isEmpty) frames
+        if frames.isEmpty then frames
         else {
-          if (log.isDebugEnabled) {
+          if log.isDebugEnabled then {
             val translations = frames.flatMap { frame =>
               val t = translateType(frame.`type`)
-              if (t == frame.`type`) None
+              if t == frame.`type` then None
               else Some(s"0x${frame.`type`.toHexString}->0x${t.toHexString}")
             }
-            if (translations.nonEmpty)
+            if translations.nonEmpty then
               log.debug(
                 "INBOUND_WIRE_TRANSLATE: peer={}, count={}, mappings={}",
                 peerId,
@@ -408,7 +408,7 @@ object RLPxConnectionHandler {
           }
           frames.map { frame =>
             val t = translateType(frame.`type`)
-            if (t == frame.`type`) frame else frame.copy(`type` = t)
+            if t == frame.`type` then frame else frame.copy(`type` = t)
           }
         }
     }
@@ -443,14 +443,14 @@ object RLPxConnectionHandler {
         val isDecompressionFailure = MessageDecoder.isDecompressionFailure(ex)
         val isUnknownMessageType = ex.isInstanceOf[UnknownMessageTypeError]
 
-        if (isDecompressionFailure) {
+        if isDecompressionFailure then {
           log.warn(
             "DECODE_ERROR: Peer {} sent message that failed to decompress. " +
               "Skipping this message but keeping connection alive. Error: {}",
             peerId,
             ex.getMessage
           )
-        } else if (isUnknownMessageType) {
+        } else if isUnknownMessageType then {
           val msgCode = ex.asInstanceOf[UnknownMessageTypeError].messageType
           log.warn(
             "DECODE_ERROR: Peer {} sent unknown message type: 0x{} ({}). " +
@@ -461,7 +461,7 @@ object RLPxConnectionHandler {
             ex.getMessage
           )
         } else {
-          val errMsg = Option(ex.getMessage).map(m => if (m.length > 80) m.take(80) + "…" else m).getOrElse("null")
+          val errMsg = Option(ex.getMessage).map(m => if m.length > 80 then m.take(80) + "…" else m).getOrElse("null")
           log.warn("DECODE_ERROR: Cannot decode message from {} - disconnecting. Error: {}", peerId, errMsg)
           parent ! com.chipprbots.ethereum.network.PeerActor.DisconnectPeer(
             com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.Reasons.BreachOfProtocol
@@ -474,7 +474,7 @@ object RLPxConnectionHandler {
         messageCodec: MessageCodec,
         inboundTranslator: InboundTranslator
     ): Unit =
-      if (frames.nonEmpty) {
+      if frames.nonEmpty then {
         val translatedFrames = inboundTranslator.translateFrames(frames)
         messageCodec.readFrames(translatedFrames).foreach(processMessage)
       }
@@ -492,7 +492,7 @@ object RLPxConnectionHandler {
           CompressionPolicy.fromHandshake(HelloExchangeState.P2pVersion, hello.p2pVersion)
         val supportsSnap =
           capabilities.contains(Capability.SNAP1) && hello.capabilities.contains(Capability.SNAP1)
-        if (supportsSnap) log.debug("[RLPx] SNAP/1 capability enabled for peer {}", peerId)
+        if supportsSnap then log.debug("[RLPx] SNAP/1 capability enabled for peer {}", peerId)
         val inboundTranslator = computeInboundTranslator(hello, negotiated, supportsSnap)
         (
           messageCodecFactory(
@@ -513,17 +513,17 @@ object RLPxConnectionHandler {
     // -----------------------------------------------------------------------
 
     private def decodeV4Packet(data: ByteString): (ByteString, ByteString) = {
-      if (data.length < 2) {
+      if data.length < 2 then {
         val headHex = Hex.toHexString(data.toArray)
         throw new RuntimeException(s"EIP-8 packet too short for size prefix: len=${data.length} headHex=${headHex}")
       }
       val encryptedPayloadSize = ByteUtils.bigEndianToShort(data.take(2).toArray)
-      if (encryptedPayloadSize > 2048)
+      if encryptedPayloadSize > 2048 then
         throw new RuntimeException(
           s"EIP-8 handshake packet too large: sizePrefix=${encryptedPayloadSize} max=2048"
         )
       val totalFrameSize = encryptedPayloadSize + 2
-      if (encryptedPayloadSize <= 0 || totalFrameSize > data.length) {
+      if encryptedPayloadSize <= 0 || totalFrameSize > data.length then {
         val headHex = Hex.toHexString(data.take(Math.min(32, data.length)).toArray)
         throw new RuntimeException(
           s"EIP-8 frame size mismatch: sizePrefix=${encryptedPayloadSize} totalFrameSize=${totalFrameSize} bufferLen=${data.length} headHex=${headHex}"
@@ -601,7 +601,7 @@ object RLPxConnectionHandler {
               parent ! InitialHelloReceived(hello, negotiated)
               processFrames(restFrames, messageCodec, inboundTranslator)
               // Enable inbound compression after full Hello exchange (mirrors core-geth SetSnappy timing)
-              if (helloWriteAcknowledged) {
+              if helloWriteAcknowledged then {
                 messageCodec.enableInboundCompression("handshake-complete")
                 log.debug("[RLPx] Enabled inbound compression for peer {} after handshake complete", peerId)
               }
@@ -860,7 +860,7 @@ object RLPxConnectionHandler {
       case TcpAckReceived if cancellableAckTimeout.nonEmpty =>
         cancellableAckTimeout.foreach(_.cancellable.cancel())
         val (newPending, newAcknowledged) =
-          if (helloAckPending) {
+          if helloAckPending then {
             log.debug("[RLPx] Hello write acknowledged for peer {} - deferring compression enable", peerId)
             (false, true)
           } else {
@@ -932,7 +932,7 @@ object RLPxConnectionHandler {
         )
 
       case sm: SendMessage =>
-        if (cancellableAckTimeout.isEmpty)
+        if cancellableAckTimeout.isEmpty then
           sendMessage(messageCodec, inboundTranslator, bridge, sm.serializable, seqNumber, messagesNotSent)
         else
           handshaked(
@@ -959,7 +959,7 @@ object RLPxConnectionHandler {
                 msg.getClass.getSimpleName,
                 msg.code.toHexString
               )
-              if (msg.code >= CanonicalSnapBase && msg.code < CanonicalSnapBase + CanonicalSnapSize)
+              if msg.code >= CanonicalSnapBase && msg.code < CanonicalSnapBase + CanonicalSnapSize then
                 log.info("RECV_SNAP_MSG: peer={}, msg[{}] {}", peerId, idx, msg.toShortString)
             case Left(err) =>
               log.debug("RECV_MSG: peer={}, msg[{}] DECODE_ERROR: {}", peerId, idx, err.getMessage)
@@ -971,10 +971,9 @@ object RLPxConnectionHandler {
       case TcpAckReceived if cancellableAckTimeout.nonEmpty =>
         log.debug("SEND_MSG_ACK: peer={}, seqNum={}", peerId, cancellableAckTimeout.map(_.seqNumber).getOrElse(-1))
         cancellableAckTimeout.foreach(_.cancellable.cancel())
-        if (messagesNotSent.nonEmpty)
+        if messagesNotSent.nonEmpty then
           sendMessage(messageCodec, inboundTranslator, bridge, messagesNotSent.head, seqNumber, messagesNotSent.tail)
-        else
-          handshaked(messageCodec, inboundTranslator, bridge, Queue.empty, None, seqNumber)
+        else handshaked(messageCodec, inboundTranslator, bridge, Queue.empty, None, seqNumber)
 
       case AckTimeout(n) if cancellableAckTimeout.exists(_.seqNumber == n) =>
         cancellableAckTimeout.foreach(_.cancellable.cancel())
@@ -1008,7 +1007,7 @@ object RLPxConnectionHandler {
       val wireCode = inboundTranslator.toPeerWireType(canonicalCode)
 
       val serializableToEncode: MessageSerializable =
-        if (wireCode == canonicalCode) messageToSend
+        if wireCode == canonicalCode then messageToSend
         else
           new MessageSerializable {
             override def code: Int = wireCode

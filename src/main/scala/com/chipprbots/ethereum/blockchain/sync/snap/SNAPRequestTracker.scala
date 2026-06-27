@@ -62,10 +62,10 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
   private def compareUnsignedLexicographically(a: ByteString, b: ByteString): Int = {
     val minLen = math.min(a.length, b.length)
     var i = 0
-    while (i < minLen) {
+    while i < minLen do {
       val av = java.lang.Byte.toUnsignedInt(a(i))
       val bv = java.lang.Byte.toUnsignedInt(b(i))
-      if (av != bv) return av - bv
+      if av != bv then return av - bv
       i += 1
     }
     a.length - b.length
@@ -109,7 +109,7 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
       requestType: RequestType,
       timeout: FiniteDuration = Duration.Zero // Zero = use adaptive
   )(onTimeout: => Unit): PendingRequest = synchronized {
-    val effectiveTimeout = if (timeout == Duration.Zero) rateTracker.targetTimeout() else timeout
+    val effectiveTimeout = if timeout == Duration.Zero then rateTracker.targetTimeout() else timeout
     recordDispatchMetric(requestType)
     val request = PendingRequest(
       requestId = requestId,
@@ -201,13 +201,13 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     */
   def validateAccountRange(response: AccountRange): Either[String, AccountRange] =
     // Check if request is pending
-    if (!isPending(response.requestId)) {
+    if !isPending(response.requestId) then {
       Left(s"No pending request for ID ${response.requestId}")
     } else {
       val pending = getPendingRequest(response.requestId).get
 
       // Verify it's the expected type
-      if (pending.requestType != RequestType.GetAccountRange) {
+      if pending.requestType != RequestType.GetAccountRange then {
         SNAPSyncMetrics.incrementMalformedResponse()
         Left(s"Expected ${RequestType.GetAccountRange} but got response for ${pending.requestType}")
       } else {
@@ -234,11 +234,11 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     *   validation result
     */
   def validateStorageRanges(response: StorageRanges): Either[String, StorageRanges] =
-    if (!isPending(response.requestId)) {
+    if !isPending(response.requestId) then {
       Left(s"No pending request for ID ${response.requestId}")
     } else {
       val pending = getPendingRequest(response.requestId).get
-      if (pending.requestType != RequestType.GetStorageRanges) {
+      if pending.requestType != RequestType.GetStorageRanges then {
         SNAPSyncMetrics.incrementMalformedResponse()
         Left(s"Expected ${RequestType.GetStorageRanges} but got response for ${pending.requestType}")
       } else {
@@ -269,12 +269,12 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     *   validation result
     */
   def validateByteCodes(response: ByteCodes): Either[String, ByteCodes] = {
-    if (!isPending(response.requestId)) {
+    if !isPending(response.requestId) then {
       return Left(s"No pending request for ID ${response.requestId}")
     }
 
     val pending = getPendingRequest(response.requestId).get
-    if (pending.requestType != RequestType.GetByteCodes) {
+    if pending.requestType != RequestType.GetByteCodes then {
       SNAPSyncMetrics.incrementMalformedResponse()
       return Left(s"Expected ${RequestType.GetByteCodes} but got response for ${pending.requestType}")
     }
@@ -290,12 +290,12 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     *   validation result
     */
   def validateTrieNodes(response: TrieNodes): Either[String, TrieNodes] = {
-    if (!isPending(response.requestId)) {
+    if !isPending(response.requestId) then {
       return Left(s"No pending request for ID ${response.requestId}")
     }
 
     val pending = getPendingRequest(response.requestId).get
-    if (pending.requestType != RequestType.GetTrieNodes) {
+    if pending.requestType != RequestType.GetTrieNodes then {
       SNAPSyncMetrics.incrementMalformedResponse()
       return Left(s"Expected ${RequestType.GetTrieNodes} but got response for ${pending.requestType}")
     }

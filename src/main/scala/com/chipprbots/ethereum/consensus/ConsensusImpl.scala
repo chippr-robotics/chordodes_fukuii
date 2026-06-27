@@ -73,7 +73,7 @@ class ConsensusImpl(
   ): IO[ConsensusResult] = {
 
     val consensusResult: IO[ConsensusResult] =
-      if (currentBestHeader.hash == branch.head.header.parentHash) {
+      if currentBestHeader.hash == branch.head.header.parentHash then {
         IO.delay(importToTop(branch, currentBestBlockWeight)).evalOn(blockExecutionScheduler.compute)
       } else {
         IO
@@ -95,7 +95,7 @@ class ConsensusImpl(
 
     blockchainReader.getChainWeightByHash(parentHash) match {
       case Some(parentWeight) =>
-        if (newBranchWeight(branch, parentWeight) > currentBestBlockWeight) {
+        if newBranchWeight(branch, parentWeight) > currentBestBlockWeight then {
           reorganise(currentBestBlockNumber, branch, parentWeight, parentHash)
         } else {
           KeptCurrentBestBranch

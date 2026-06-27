@@ -48,13 +48,13 @@ class StructLogTracer(
       prevState: ProgramState[W, S],
       nextState: ProgramState[W, S]
   ): Unit = {
-    if (limit > 0 && steps.size >= limit) return
+    if limit > 0 && steps.size >= limit then return
 
     val gasCost = prevState.gas - nextState.gas
 
-    val memorySnapshot = if (enableMemory) {
+    val memorySnapshot = if enableMemory then {
       val mem = prevState.memory
-      if (mem.size > 0) {
+      if mem.size > 0 then {
         val words = (0 until mem.size by 32).map { offset =>
           val word = mem.load(UInt256(offset), UInt256(32))._1
           word.toArray.map("%02x".format(_)).mkString
@@ -63,7 +63,7 @@ class StructLogTracer(
       } else Some(Seq.empty)
     } else None
 
-    val storageSnapshot = if (enableStorage) {
+    val storageSnapshot = if enableStorage then {
       opCode match {
         case SLOAD if prevState.stack.size >= 1 =>
           val slot = prevState.stack.toSeq.head.toBigInt

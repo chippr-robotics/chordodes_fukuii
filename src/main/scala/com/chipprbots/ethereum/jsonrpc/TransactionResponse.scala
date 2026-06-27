@@ -69,7 +69,7 @@ object TransactionResponse {
       stx.tx match {
         case _: LegacyTransaction =>
           // EIP-155: extract chainId from v value for replay-protected legacy txs
-          val legacyChainId = if (stx.signature.v > 35) Some((stx.signature.v - 35) / 2) else None
+          val legacyChainId = if stx.signature.v > 35 then Some((stx.signature.v - 35) / 2) else None
           (BigInt(0), legacyChainId, None, None, None, None, None, None)
         case tx: TransactionWithAccessList =>
           (BigInt(1), Some(tx.chainId), None, None, Some(encodeAccessList(tx.accessList)), None, None, None)
@@ -131,7 +131,7 @@ object TransactionResponse {
       blobVersionedHashes = txBlobHashes,
       authorizationList = txAuthList,
       // yParity only for typed transactions (type >= 1), not legacy
-      yParity = if (txType > 0) Some(stx.signature.v) else None,
+      yParity = if txType > 0 then Some(stx.signature.v) else None,
       v = Some(stx.signature.v),
       r = Some(stx.signature.r),
       s = Some(stx.signature.s),

@@ -381,7 +381,7 @@ class AccountRangeCoordinatorSpec
     // Route failures through the worker so it properly transitions to idle before each re-dispatch.
     // The worker (Typed) is resolved via selection; WorkerPeerDisconnected skips cooldown and stateless
     // marking, allowing immediate re-dispatch each iteration.
-    for (_ <- 1 to (AccountRangeCoordinator.MaxRequeuesPerTask + 1)) {
+    for _ <- 1 to (AccountRangeCoordinator.MaxRequeuesPerTask + 1) do {
       networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
       val workerRef = resolveWorkerChild(coordinator)
       workerRef ! Messages.WorkerPeerDisconnected(peer.id.value)

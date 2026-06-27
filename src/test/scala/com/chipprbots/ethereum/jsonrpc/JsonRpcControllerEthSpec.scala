@@ -345,7 +345,7 @@ class JsonRpcControllerEthSpec
     val headerPowHash: String = "02" * 32
 
     blockGenerator.getPreparedFn = { hash =>
-      if (hash == ByteString(Hex.decode(headerPowHash)))
+      if hash == ByteString(Hex.decode(headerPowHash)) then
         Some(PendingBlock(Block(blockHeader, BlockBody(Nil, Nil)), Nil))
       else None
     }

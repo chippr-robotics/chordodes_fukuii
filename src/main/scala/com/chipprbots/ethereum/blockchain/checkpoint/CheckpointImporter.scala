@@ -53,10 +53,10 @@ final class CheckpointImporter(
         path.toString.endsWith(".gz") ||
           (b0 == 0x1f && b1 == 0x8b)
       // Put the two peeked bytes back so the decoder sees them.
-      if (b1 >= 0) pushback.unread(b1)
-      if (b0 >= 0) pushback.unread(b0)
+      if b1 >= 0 then pushback.unread(b1)
+      if b0 >= 0 then pushback.unread(b0)
       val in: InputStream =
-        if (isGzipped) new GZIPInputStream(pushback, 65536)
+        if isGzipped then new GZIPInputStream(pushback, 65536)
         else pushback
       try importFromStream(in, expectedChainId)
       finally in.close()
@@ -101,16 +101,16 @@ final class CheckpointImporter(
     )
 
     def flushNodes(): Unit =
-      if (nodeBuf.nonEmpty) {
+      if nodeBuf.nonEmpty then {
         mpt.storeRawNodes(nodeBuf.toSeq)
         nodeBuf.clear()
       }
 
     def flushCodes(): Unit =
-      if (codeBuf.nonEmpty) {
+      if codeBuf.nonEmpty then {
         var batch = evmCodeStorage.emptyBatchUpdate
         var i = 0
-        while (i < codeBuf.length) {
+        while i < codeBuf.length do {
           val (h, code) = codeBuf(i)
           batch = batch.and(evmCodeStorage.put(h, ByteString(code)))
           i += 1
@@ -120,7 +120,7 @@ final class CheckpointImporter(
       }
 
     var done = false
-    while (!done)
+    while !done do
       reader.nextEntry() match {
         case Left(err) =>
           flushNodes(); flushCodes()
@@ -129,9 +129,9 @@ final class CheckpointImporter(
           nodeBuf += ((hash, rlpBytes))
           totalNodes += 1
           nodeBytes += rlpBytes.length
-          if (nodeBuf.size >= NodeBatchSize) {
+          if nodeBuf.size >= NodeBatchSize then {
             flushNodes()
-            if (totalNodes % LogInterval == 0)
+            if totalNodes % LogInterval == 0 then
               log.info(
                 "[CHECKPOINT IMPORT] nodes={} ({} MiB), bytecodes={}",
                 totalNodes,
@@ -143,7 +143,7 @@ final class CheckpointImporter(
           codeBuf += ((hash, code))
           totalBytecodes += 1
           codeBytes += code.length
-          if (codeBuf.size >= BytecodeBatchSize) flushCodes()
+          if codeBuf.size >= BytecodeBatchSize then flushCodes()
         case Right(CheckpointArchive.EndOfStream) =>
           flushNodes(); flushCodes()
           done = true

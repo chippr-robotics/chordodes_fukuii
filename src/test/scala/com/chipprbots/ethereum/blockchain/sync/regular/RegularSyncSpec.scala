@@ -292,7 +292,7 @@ class RegularSyncSpec
           val importerSupervisor: TestProbe = TestProbe("importerSupervisor")
           val importerBroadcaster: TestProbe = TestProbe("importerBroadcaster")
 
-          for (depth <- List(1, 5, 64, 128)) {
+          for depth <- List(1, 5, 64, 128) do {
             val lca = BigInt(depth)
             val importer = system.actorOf(
               org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
@@ -440,10 +440,9 @@ class RegularSyncSpec
 
           private def handleForkLogic(hashes: Seq[ByteString], req: Any, sender: ActorRef): Option[AutoPilot] = {
             val defaultResult = defaultHandlers(sender)(req)
-            if (forkedBlocks.nonEmpty && hashes.contains(blocksToRespond.last.hash)) {
+            if forkedBlocks.nonEmpty && hashes.contains(blocksToRespond.last.hash) then {
               Some(new ForkingAutoPilot(forkedBlocks.get, None))
-            } else
-              defaultResult
+            } else defaultResult
           }
         }
 

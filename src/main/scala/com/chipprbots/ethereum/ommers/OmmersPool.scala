@@ -77,7 +77,7 @@ object OmmersPool {
   ): List[BlockHeader] = {
     @tailrec
     def rec(hash: ByteString, limit: Int, acc: List[BlockHeader]): List[BlockHeader] =
-      if (limit > 0) {
+      if limit > 0 then {
         blockchainReader.getBlockHeaderByHash(hash) match {
           case Some(bh) => rec(bh.parentHash, limit - 1, acc :+ bh)
           case None     => acc

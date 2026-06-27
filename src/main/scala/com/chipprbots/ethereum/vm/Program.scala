@@ -34,7 +34,7 @@ case class Program(code: ByteString) {
     */
   @tailrec
   private def validJumpDestinationsAfterPosition(pos: Int, accum: Set[Int] = Set.empty): Set[Int] =
-    if (pos < 0 || pos >= length) accum
+    if pos < 0 || pos >= length then accum
     else {
       val byte = code(pos)
       val opCode = EvmConfig.FrontierOpCodes.byteToOpCode.get(

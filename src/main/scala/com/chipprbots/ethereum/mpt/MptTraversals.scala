@@ -40,10 +40,10 @@ object MptTraversals {
     rawDecode(nodeEncoded)
 
   private def parseMpt(nodeEncoded: RLPEncodeable): MptNode = nodeEncoded match {
-    case list @ RLPList(items @ _*) if items.size == MerklePatriciaTrie.ListSize =>
+    case list @ RLPList(items*) if items.size == MerklePatriciaTrie.ListSize =>
       var i = 0
       val children = new Array[MptNode](BranchNode.numberOfChildren)
-      while (i < BranchNode.numberOfChildren) {
+      while i < BranchNode.numberOfChildren do {
         children(i) = parseMpt(items(i))
         i = i + 1
       }
@@ -56,16 +56,16 @@ object MptTraversals {
       }
       BranchNode(
         children = children,
-        terminator = if (terminatorAsArray.isEmpty) None else Some(terminatorAsArray),
+        terminator = if terminatorAsArray.isEmpty then None else Some(terminatorAsArray),
         parsedRlp = Some(list)
       )
 
-    case list @ RLPList(items @ _*) if items.size == MerklePatriciaTrie.PairSize =>
+    case list @ RLPList(items*) if items.size == MerklePatriciaTrie.PairSize =>
       val (key, isLeaf) = HexPrefix.decode(items.head match {
         case RLPValue(bytes) => bytes
         case _               => throw new MPTException("Invalid node key: expected RLPValue in Pair node")
       })
-      if (isLeaf)
+      if isLeaf then
         LeafNode(
           ByteString(key),
           items.last match {
@@ -94,7 +94,7 @@ object MptTraversals {
       case branch: BranchNode =>
         val branchVisitor = visitor.visitBranch(branch)
         var i = 0
-        while (i < BranchNode.numberOfChildren) {
+        while i < BranchNode.numberOfChildren do {
           val subVisitor = branchVisitor.visitChild()
           branchVisitor.visitChild(dispatch(branch.children(i), subVisitor))
           i = i + 1

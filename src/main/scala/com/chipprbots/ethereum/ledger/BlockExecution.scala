@@ -46,7 +46,7 @@ class BlockExecution(
       alreadyValidated: Boolean = false
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, (Seq[Receipt], Seq[ByteString])] = {
     val preExecValidationResult =
-      if (alreadyValidated) Right(block) else blockValidation.validateBlockBeforeExecution(block)
+      if alreadyValidated then Right(block) else blockValidation.validateBlockBeforeExecution(block)
 
     val blockExecResult =
       for {
@@ -60,7 +60,7 @@ class BlockExecution(
         )
       } yield (result.receipts, result.executionRequests)
 
-    if (blockExecResult.isRight) {
+    if blockExecResult.isRight then {
       log.debug(s"Block ${block.header.number} (with hash: ${block.header.hashAsHexString}) executed correctly")
     }
 
@@ -220,7 +220,7 @@ class BlockExecution(
           .getAccount(BeaconRootContractAddress)
           .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
 
-        val w1 = if (!world.getAccount(BeaconRootContractAddress).isDefined) {
+        val w1 = if !world.getAccount(BeaconRootContractAddress).isDefined then {
           world.saveAccount(BeaconRootContractAddress, account)
         } else world
 
@@ -248,9 +248,9 @@ class BlockExecution(
     val pragueActive = blockchainConfig.isPragueTimestamp(block.header.unixTimestamp)
     val etcOlympiaActive = blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC &&
       blockNumber >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-    if (!pragueActive && !etcOlympiaActive) return world
+    if !pragueActive && !etcOlympiaActive then return world
     // Only deploy at the FIRST block where it activates
-    val isActivationBlock = if (pragueActive) {
+    val isActivationBlock = if pragueActive then {
       blockchainReader
         .getBlockHeaderByHash(block.header.parentHash)
         .exists(parent => !blockchainConfig.isPragueTimestamp(parent.unixTimestamp))
@@ -260,7 +260,7 @@ class BlockExecution(
 
     // At the fork block, deploy the history storage contract
     // Deploy history storage contract only if not already deployed (genesis may pre-deploy it)
-    val w1 = if (isActivationBlock && world.getCode(HistoryStorageAddress).isEmpty) {
+    val w1 = if isActivationBlock && world.getCode(HistoryStorageAddress).isEmpty then {
       val account = world
         .getAccount(HistoryStorageAddress)
         .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
@@ -324,7 +324,7 @@ class BlockExecution(
         remainingBlocksIncOrder: List[Block],
         parentWeight: ChainWeight
     ): (List[BlockData], Option[BlockExecutionError]) =
-      if (remainingBlocksIncOrder.isEmpty) {
+      if remainingBlocksIncOrder.isEmpty then {
         (executedBlocksDecOrder.reverse, None)
       } else {
         val blockToExecute = remainingBlocksIncOrder.head
@@ -362,7 +362,7 @@ class BlockExecution(
           // EIP-4895: amount-0 withdrawals must NOT touch the target account —
           // creating/saving an empty account here diverges from every other EL
           // client's state root for any block containing a zero-amount withdrawal.
-          if (withdrawal.amount == 0) w
+          if withdrawal.amount == 0 then w
           else {
             val weiAmount = UInt256(withdrawal.amount * GweiToWei)
             val address = withdrawal.address
@@ -384,7 +384,7 @@ class BlockExecution(
       block: Block,
       world: InMemoryWorldStateProxy
   )(implicit blockchainConfig: BlockchainConfig): (InMemoryWorldStateProxy, Seq[ByteString]) = {
-    if (!blockchainConfig.isPragueTimestamp(block.header.unixTimestamp)) return (world, Nil)
+    if !blockchainConfig.isPragueTimestamp(block.header.unixTimestamp) then return (world, Nil)
 
     import BlockExecution.*
     val evmConfig = EvmConfig.forBlock(block.header.number, block.header.unixTimestamp, blockchainConfig)
@@ -394,14 +394,13 @@ class BlockExecution(
     // EIP-7685: Execute system calls to request contracts and collect output.
     // EIP-6110 DEPOSIT contract has no system call — deposits are parsed from logs.
     // Only EIP-7002 (withdrawals) and EIP-7251 (consolidations) do a SYSTEM_ADDRESS call.
-    for (
-      (queueAddr, requestType) <- Seq(
+    for (queueAddr, requestType) <- Seq(
         (WithdrawalQueueAddress, WithdrawalRequestType),
         (ConsolidationQueueAddress, ConsolidationRequestType)
       )
-    ) {
+    do {
       val code = w.getCode(queueAddr)
-      if (code.nonEmpty) {
+      if code.nonEmpty then {
         val context = ProgramContext[InMemoryWorldStateProxy, InMemoryWorldStateProxyStorage](
           callerAddr = SystemAddress,
           originAddr = SystemAddress,
@@ -426,7 +425,7 @@ class BlockExecution(
         w = InMemoryWorldStateProxy.persistState(result.world)
         // EIP-7685 request bytes = single-byte type prefix || raw system-call returndata.
         // Empty returndata (no queued requests) means no bytes are emitted for this type.
-        if (result.returnData.nonEmpty) {
+        if result.returnData.nonEmpty then {
           outputs += ByteString(Array(requestType.toByte)) ++ result.returnData
         }
       }
@@ -459,7 +458,7 @@ class BlockExecution(
       //   index:  32-byte length (=8)  + 8-byte body + 24-byte pad       = 64 bytes
       // Total = 160 + 96 + 64 + 64 + 160 + 64 = 608 bytes. We slice the raw bodies.
       val d = log.data
-      if (d.length >= 608) {
+      if d.length >= 608 then {
         // skip 5x32 offsets = 160
         val pubkey = d.slice(160 + 32, 160 + 32 + 48) // 48
         val wc = d.slice(160 + 96 + 32, 160 + 96 + 32 + 32) // 32
@@ -469,7 +468,7 @@ class BlockExecution(
         buf ++= pubkey ++= wc ++= amountLE ++= signature ++= indexLE
       }
     }
-    if (buf.isEmpty) None
+    if buf.isEmpty then None
     else Some(ByteString(Array(DepositRequestType.toByte)) ++ ByteString(buf.toArray))
   }
 

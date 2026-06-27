@@ -103,7 +103,7 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
     val uint = getUInt256Gen(max = Two ** 32)
     forAll(uint, uint, uint) { (memSize, offset, dataSize) =>
-      val memNeeded: UInt256 = if (dataSize > 0) offset + dataSize else 0
+      val memNeeded: UInt256 = if dataSize > 0 then offset + dataSize else 0
 
       def c(ms: UInt256): BigInt = {
         val a = wordsForBytes(ms)
@@ -111,12 +111,9 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       }
 
       val expectedCost: BigInt =
-        if (memNeeded > EvmConfig.MaxMemory)
-          UInt256.MaxValue / 2
-        else if (memSize > memNeeded)
-          0
-        else
-          c(memNeeded) - c(memSize)
+        if memNeeded > EvmConfig.MaxMemory then UInt256.MaxValue / 2
+        else if memSize > memNeeded then 0
+        else c(memNeeded) - c(memSize)
 
       config.calcMemCost(memSize, offset, dataSize) shouldEqual expectedCost
     }
@@ -465,12 +462,12 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
       val (Seq(offset, value), _) = stateIn.stack.pop(2)
       val oldValue = stateIn.storage.load(offset)
-      val expectedGas: BigInt = if (UInt256(oldValue).isZero && !value.isZero) G_sset else G_sreset
-      val expectedRefund: BigInt = if (value.isZero && !UInt256(oldValue).isZero) R_sclear else Zero
+      val expectedGas: BigInt = if UInt256(oldValue).isZero && !value.isZero then G_sset else G_sreset
+      val expectedRefund: BigInt = if value.isZero && !UInt256(oldValue).isZero then R_sclear else Zero
 
       verifyGas(expectedGas, stateIn, stateOut)
 
-      if (expectedGas <= stateIn.gas) {
+      if expectedGas <= stateIn.gas then {
         stateOut.gasRefund shouldEqual (stateIn.gasRefund + expectedRefund)
       }
     }

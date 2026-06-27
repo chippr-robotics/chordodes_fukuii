@@ -82,7 +82,7 @@ class PeersClient(
       case RecordNodeDataFailure(peerId) =>
         val count = nodeDataConsecutiveFailures.getOrElse(peerId, 0) + 1
         nodeDataConsecutiveFailures(peerId) = count
-        val cooldownMs = if (count >= 3) 3_600_000L else count * 30_000L
+        val cooldownMs = if count >= 3 then 3_600_000L else count * 30_000L
         nodeDataCooldownUntilMs(peerId) = System.currentTimeMillis() + cooldownMs
         log.debug("Peer {} GetNodeData failure #{} — cooldown {}ms", peerId, count, cooldownMs)
       case Request(message, peerSelector, toSerializable) =>
@@ -98,7 +98,7 @@ class PeersClient(
           peersToDownloadFrom.size
         )
 
-        if (peersToDownloadFrom.isEmpty && handshakedPeers.nonEmpty) {
+        if peersToDownloadFrom.isEmpty && handshakedPeers.nonEmpty then {
           log.debug("All {} handshaked peers are blacklisted", handshakedPeers.size)
           handshakedPeers.foreach { case (peerId, peerInfo) =>
             log.debug(
@@ -143,7 +143,7 @@ class PeersClient(
           case ETHPackets.Receipts68(_, receipts)  => (PeerRateTracker.MsgGetReceipts, receipts.items.size)
           case _                                   => (-1, 0)
         }
-        if (msgType >= 0) ethRateTracker.update(peer.id.value, msgType, timeTaken, itemCount)
+        if msgType >= 0 then ethRateTracker.update(peer.id.value, msgType, timeTaken, itemCount)
         handleResponse(requesters, Response(peer, message.asInstanceOf[Message]))
       case PeerRequestHandler.RequestFailed(peer, reason) =>
         log.warning(s"Request to peer ${peer.remoteAddress} failed - reason: $reason")
@@ -225,7 +225,7 @@ class PeersClient(
         val knownAheadPeers = peersToDownloadFrom.filter { case (_, peerWithInfo) =>
           peerWithInfo.peerInfo.maxBlockNumber >= minBlock
         }
-        if (knownAheadPeers.nonEmpty) {
+        if knownAheadPeers.nonEmpty then {
           log.debug(
             "BestPeerWithMinBlock({}): {} peers have known maxBlockNumber >= target",
             minBlock,
@@ -248,7 +248,7 @@ class PeersClient(
         val knownAheadPeers = eligible.filter { case (_, peerWithInfo) =>
           peerWithInfo.peerInfo.maxBlockNumber >= minBlock
         }
-        if (knownAheadPeers.nonEmpty) {
+        if knownAheadPeers.nonEmpty then {
           log.debug(
             "BestPeerWithMinBlockExcluding({}): {} eligible after excluding {} tried peer(s)",
             minBlock,
@@ -286,7 +286,7 @@ class PeersClient(
         val knownAheadPeers = eligible.filter { case (_, peerWithInfo) =>
           peerWithInfo.peerInfo.maxBlockNumber >= minBlock
         }
-        if (knownAheadPeers.nonEmpty) {
+        if knownAheadPeers.nonEmpty then {
           log.debug(
             "BestSnapPeerWithMinBlockExcluding({}): {} SNAP peers at target after excluding {} tried",
             minBlock,
@@ -325,7 +325,7 @@ class PeersClient(
     */
   private def adaptMessageForPeer[RequestMsg <: Message](message: RequestMsg): Message = message
 
-  private def responseClassTag[RequestMsg <: Message](requestMsg: RequestMsg): ClassTag[_ <: Message] =
+  private def responseClassTag[RequestMsg <: Message](requestMsg: RequestMsg): ClassTag[? <: Message] =
     requestMsg match {
       case _: ETHPackets.GetBlockHeaders       => implicitly[ClassTag[ETHPackets.BlockHeaders]]
       case _: ETHPackets.GetBlockBodies        => implicitly[ClassTag[ETHPackets.BlockBodies]]
@@ -398,7 +398,7 @@ object PeersClient {
     override def toString: String =
       s"PeerNetworkStatus {" +
         s" RemotePeerAddress: ${peer.remoteAddress}," +
-        s" ConnectionDirection: ${if (peer.incomingConnection) "Incoming" else "Outgoing"}," +
+        s" ConnectionDirection: ${if peer.incomingConnection then "Incoming" else "Outgoing"}," +
         s" Is blacklisted?: $isBlacklisted" +
         s" }"
   }
@@ -475,7 +475,7 @@ object PeersClient {
         (peer, peerInfo.chainWeight)
       }
 
-    if (peersToUse.nonEmpty) {
+    if peersToUse.nonEmpty then {
       val (peer, chainWeight) = peersToUse.maxBy(_._2)
       log.debug("Selected best peer {} with chainWeight {}", peer.id, chainWeight)
       Some(peer)
@@ -497,7 +497,7 @@ object PeersClient {
           (peer, peerInfo.chainWeight)
       }
 
-    if (peersToUse.nonEmpty) {
+    if peersToUse.nonEmpty then {
       val (peer, _) = peersToUse.maxBy(_._2)
       Some(peer)
     } else {
@@ -513,7 +513,7 @@ object PeersClient {
     val knownAheadPeers = peersToDownloadFrom.filter { case (_, peerWithInfo) =>
       peerWithInfo.peerInfo.maxBlockNumber >= minBlock
     }
-    if (knownAheadPeers.nonEmpty) bestPeer(knownAheadPeers)
+    if knownAheadPeers.nonEmpty then bestPeer(knownAheadPeers)
     else
       bestPeer(peersToDownloadFrom.filter { case (_, peerWithInfo) =>
         peerWithInfo.peerInfo.maxBlockNumber == 0
@@ -530,7 +530,7 @@ object PeersClient {
     val knownAheadPeers = eligible.filter { case (_, peerWithInfo) =>
       peerWithInfo.peerInfo.maxBlockNumber >= minBlock
     }
-    if (knownAheadPeers.nonEmpty) bestPeer(knownAheadPeers)
+    if knownAheadPeers.nonEmpty then bestPeer(knownAheadPeers)
     else bestPeer(eligible.filter { case (_, peerWithInfo) => peerWithInfo.peerInfo.maxBlockNumber == 0 })
   }
 }

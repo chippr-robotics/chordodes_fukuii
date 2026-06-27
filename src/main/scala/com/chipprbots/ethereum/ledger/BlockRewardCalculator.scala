@@ -90,11 +90,10 @@ class BlockRewardCalculator(
   def calculateOmmerRewardForInclusion(blockNumber: BigInt, ommerNumber: BigInt): BigInt = {
     val era = eraNumber(blockNumber)
 
-    if (era == 0) {
+    if era == 0 then {
       val number = firstEraOmmerMiningRewardMaxNumer - (blockNumber - ommerNumber - 1)
       (newBlockReward(blockNumber) * number) / firstEraOmmerMiningRewardDenom
-    } else
-      calculateMiningRewardForBlock(blockNumber) * ommerMiningRewardNumer / ommerMiningRewardDenom
+    } else calculateMiningRewardForBlock(blockNumber) * ommerMiningRewardNumer / ommerMiningRewardDenom
   }
 
   /** Calculates reward given to the miner for each ommer included in the block
@@ -116,7 +115,7 @@ class BlockRewardCalculator(
     * https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1234.md
     */
   private def newBlockReward(blockNumber: BigInt): BigInt =
-    if (blockNumber >= constantinopleBlockNumber) newRewardAfterConstantinople
-    else if (blockNumber >= byzantiumBlockNumber) newRewardAfterByzantium
+    if blockNumber >= constantinopleBlockNumber then newRewardAfterConstantinople
+    else if blockNumber >= byzantiumBlockNumber then newRewardAfterByzantium
     else firstEraBlockReward
 }

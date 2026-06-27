@@ -98,11 +98,11 @@ final class SnapHashTrie(
     // StackTrie blob-ownership contract. So we can retain the blob directly without a defensive copy.
     pending += hash -> blob
     pendingBytes += blob.length
-    if (pendingBytes >= batchSizeThreshold) flush()
+    if pendingBytes >= batchSizeThreshold then flush()
   }
 
   private def flush(): Unit =
-    if (pending.nonEmpty) {
+    if pending.nonEmpty then {
       // toSeq creates an immutable snapshot before clearing.
       writeBatch(pending.toSeq)
       pending.clear()

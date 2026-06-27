@@ -48,13 +48,13 @@ final case class PeerScore(
 
   private def calculateHandshakeScore: Double = {
     val total = successfulHandshakes + failedHandshakes
-    if (total == 0) 0.5 // neutral score for new peers
+    if total == 0 then 0.5 // neutral score for new peers
     else successfulHandshakes.toDouble / total
   }
 
   private def calculateResponseScore: Double = {
     val total = responsesReceived + requestsTimedOut
-    if (total == 0) 0.5 // neutral score for new peers
+    if total == 0 then 0.5 // neutral score for new peers
     else responsesReceived.toDouble / total
   }
 

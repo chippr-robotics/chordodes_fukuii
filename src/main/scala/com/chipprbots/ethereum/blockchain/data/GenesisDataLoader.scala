@@ -139,7 +139,7 @@ class GenesisDataLoader(
 
     genesisData.alloc.zipWithIndex.foldLeft(initalRootHash) { case (rootHash, ((address, genesisAccount), _)) =>
       val mpt = MerklePatriciaTrie[Array[Byte], Account](rootHash, storage)
-      val cleanAddress = if (address.startsWith("0x") || address.startsWith("0X")) address.substring(2) else address
+      val cleanAddress = if address.startsWith("0x") || address.startsWith("0X") then address.substring(2) else address
       val paddedAddress = cleanAddress.reverse.padTo(addressLength, "0").reverse.mkString
 
       // Store contract code in EVM code storage if present
@@ -193,7 +193,7 @@ class GenesisDataLoader(
     // Empty trie root = keccak256(RLP("")) = keccak256(0x80) — NOT keccak of empty list
     val emptyWithdrawalsRoot = ByteString(crypto.kec256(rlp.encode(RLPValue(Array.empty[Byte]))))
 
-    val extraFields = if (blockchainConfig.isPragueTimestamp(genesisTimestamp)) {
+    val extraFields = if blockchainConfig.isPragueTimestamp(genesisTimestamp) then {
       val emptyRequestsHash = ByteString(java.security.MessageDigest.getInstance("SHA-256").digest(Array.empty[Byte]))
       BlockHeader.HeaderExtraFields.HefPostPrague(
         baseFee,
@@ -203,7 +203,7 @@ class GenesisDataLoader(
         zeros(hashLength),
         emptyRequestsHash
       )
-    } else if (blockchainConfig.isCancunTimestamp(genesisTimestamp)) {
+    } else if blockchainConfig.isCancunTimestamp(genesisTimestamp) then {
       BlockHeader.HeaderExtraFields.HefPostCancun(
         baseFee,
         emptyWithdrawalsRoot,
@@ -211,9 +211,9 @@ class GenesisDataLoader(
         parseOptQuantity(genesisData.excessBlobGas),
         zeros(hashLength)
       )
-    } else if (blockchainConfig.isShanghaiTimestamp(genesisTimestamp)) {
+    } else if blockchainConfig.isShanghaiTimestamp(genesisTimestamp) then {
       BlockHeader.HeaderExtraFields.HefPostShanghai(baseFee, emptyWithdrawalsRoot)
-    } else if (blockchainConfig.forkBlockNumbers.olympiaBlockNumber == 0) {
+    } else if blockchainConfig.forkBlockNumbers.olympiaBlockNumber == 0 then {
       BlockHeader.HeaderExtraFields.HefPostOlympia(baseFee)
     } else {
       BlockHeader.HeaderExtraFields.HefEmpty
@@ -241,14 +241,14 @@ class GenesisDataLoader(
 
   /** Ethereum block header nonce is always 8 bytes (uint64). Pad short nonces with leading zeros. */
   private def padToEightBytes(bs: ByteString): ByteString =
-    if (bs.length >= 8) bs
+    if bs.length >= 8 then bs
     else ByteString(new Array[Byte](8 - bs.length) ++ bs.toArray)
 
   /** Parse an optional hex-prefixed quantity (per eth_getBlockByNumber spec). */
   private def parseOptQuantity(v: Option[String]): BigInt = v match {
     case Some(s) =>
       val stripped = s.replace("0x", "")
-      if (stripped.isEmpty) BigInt(0) else BigInt(stripped, 16)
+      if stripped.isEmpty then BigInt(0) else BigInt(stripped, 16)
     case None => BigInt(0)
   }
 
@@ -264,7 +264,7 @@ object GenesisDataLoader {
       case JString(s) =>
         val noPrefix = s.replace("0x", "")
         val inp =
-          if (noPrefix.length % 2 == 0) noPrefix
+          if noPrefix.length % 2 == 0 then noPrefix
           else "0" ++ noPrefix
         Try(ByteString(Hex.decode(inp))) match {
           case Success(bs) => bs
@@ -283,7 +283,7 @@ object GenesisDataLoader {
 
     def deserializeUint256String(jv: JValue): UInt256 = jv match {
       case JString(s) =>
-        val parsed = if (s.startsWith("0x") || s.startsWith("0X")) {
+        val parsed = if s.startsWith("0x") || s.startsWith("0X") then {
           Try(UInt256(BigInt(s.substring(2), 16)))
         } else {
           Try(UInt256(BigInt(s)))

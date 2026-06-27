@@ -88,7 +88,7 @@ object PrecompiledContracts {
 
   /** Checks whether `ProgramContext#recipientAddr` points to a precompiled contract
     */
-  def isDefinedAt(context: ProgramContext[_, _]): Boolean =
+  def isDefinedAt(context: ProgramContext[?, ?]): Boolean =
     getContract(context).isDefined
 
   /** Runs a contract for address provided in `ProgramContext#recipientAddr` Will throw an exception if the address does
@@ -101,13 +101,13 @@ object PrecompiledContracts {
       )
       .run(context)
 
-  private def getContract(context: ProgramContext[_, _]): Option[PrecompiledContract] =
+  private def getContract(context: ProgramContext[?, ?]): Option[PrecompiledContract] =
     context.recipientAddr.flatMap { addr =>
       val baseContracts = getContracts(context)
       val relocations = context.precompileRelocations
-      if (relocations.isEmpty) {
+      if relocations.isEmpty then {
         baseContracts.get(addr)
-      } else if (relocations.contains(addr)) {
+      } else if relocations.contains(addr) then {
         // Address was a precompile source (moved away) — no longer a precompile
         None
       } else {
@@ -121,10 +121,10 @@ object PrecompiledContracts {
     }
 
   /** Check if an address is a known precompile address (without relocation) */
-  def isPrecompileAddress(addr: Address, context: ProgramContext[_, _]): Boolean =
+  def isPrecompileAddress(addr: Address, context: ProgramContext[?, ?]): Boolean =
     getContracts(context).contains(addr)
 
-  def getContracts(context: ProgramContext[_, _]): Map[Address, PrecompiledContract] = {
+  def getContracts(context: ProgramContext[?, ?]): Map[Address, PrecompiledContract] = {
     val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number)
     val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number)
     // Post-Cancun detection: check if block header has blob gas fields
@@ -134,23 +134,22 @@ object PrecompiledContracts {
     // EIP-7951 P256VERIFY activates at Osaka timestamp on ETH chains
     val isOsaka = context.evmConfig.blockchainConfig.isOsakaTimestamp(context.blockHeader.unixTimestamp)
 
-    if (isOsaka) {
+    if isOsaka then {
       osakaContracts
-    } else if (etcFork >= EtcForks.Olympia) {
+    } else if etcFork >= EtcForks.Olympia then {
       // ETC Olympia activates BLS12-381 + P256VERIFY (ECIP-1121). Same set as ETH Osaka.
       osakaContracts
-    } else if (isPrague) {
+    } else if isPrague then {
       // ETH Prague activates BLS12-381 (EIP-2537) but NOT P256VERIFY (that is Osaka-only).
       olympiaContracts
-    } else if (isCancun) {
+    } else if isCancun then {
       cancunContracts
-    } else if (ethFork >= EthForks.Istanbul || etcFork >= EtcForks.Phoenix) {
+    } else if ethFork >= EthForks.Istanbul || etcFork >= EtcForks.Phoenix then {
       istanbulPhoenixContracts
-    } else if (ethFork >= EthForks.Byzantium || etcFork >= EtcForks.Atlantis) {
+    } else if ethFork >= EthForks.Byzantium || etcFork >= EtcForks.Atlantis then {
       // byzantium and atlantis hard fork introduce the same set of precompiled contracts
       byzantiumAtlantisContracts
-    } else
-      contracts
+    } else contracts
   }
 
   sealed trait PrecompiledContract {
@@ -165,13 +164,12 @@ object PrecompiledContracts {
       val g = gas(context.inputData, etcFork, ethFork)
 
       val (result, error, gasRemaining): (ByteString, Option[ProgramError], BigInt) = (
-        if (g <= context.startGas)
+        if g <= context.startGas then
           exec(context.inputData) match {
             case Some(returnData) => (returnData, None, context.startGas - g)
             case None             => (ByteString.empty, Some(PreCompiledContractFail), BigInt(0))
           }
-        else
-          (ByteString.empty, Some(OutOfGas), BigInt(0))
+        else (ByteString.empty, Some(OutOfGas), BigInt(0))
       ): @unchecked
 
       ProgramResult(
@@ -197,7 +195,7 @@ object PrecompiledContracts {
       val r = data.slice(64, 96)
       val s = data.slice(96, 128)
 
-      if (hasOnlyLastByteSet(v)) {
+      if hasOnlyLastByteSet(v) then {
         val recovered = Try(ECDSASignature(r, s, v.last).publicKey(h)).getOrElse(None)
         Some(
           recovered
@@ -207,8 +205,7 @@ object PrecompiledContracts {
             }
             .getOrElse(ByteString.empty)
         )
-      } else
-        Some(ByteString.empty)
+      } else Some(ByteString.empty)
 
     }
 
@@ -266,11 +263,11 @@ object PrecompiledContracts {
       val useEip7823 = isOsaka || (etcFork >= EtcForks.Olympia && !isEthereum)
 
       // EIP-7823: reject inputs with operand lengths > 1024 bytes
-      if (useEip7823) {
+      if useEip7823 then {
         val baseLength = getLength(context.inputData, 0)
         val expLength = getLength(context.inputData, 1)
         val modLength = getLength(context.inputData, 2)
-        if (baseLength > maxOperandLength || expLength > maxOperandLength || modLength > maxOperandLength) {
+        if baseLength > maxOperandLength || expLength > maxOperandLength || modLength > maxOperandLength then {
           return ProgramResult(
             ByteString.empty,
             BigInt(0),
@@ -292,13 +289,12 @@ object PrecompiledContracts {
       // EIP-7883 pre-Osaka.
       val g = gasWithOsaka(context.inputData, etcFork, ethFork, isOsaka, isEthereum)
       val (result, error, gasRemaining): (ByteString, Option[ProgramError], BigInt) = (
-        if (g <= context.startGas)
+        if g <= context.startGas then
           exec(context.inputData) match {
             case Some(returnData) => (returnData, None, context.startGas - g)
             case None             => (ByteString.empty, Some(PreCompiledContractFail), BigInt(0))
           }
-        else
-          (ByteString.empty, Some(OutOfGas), BigInt(0))
+        else (ByteString.empty, Some(OutOfGas), BigInt(0))
       ): @unchecked
 
       ProgramResult(
@@ -321,12 +317,11 @@ object PrecompiledContracts {
       val modLength = getLength(inputData, 2)
 
       val result =
-        if (baseLength == 0 && modLength == 0)
-          BigInt(0)
+        if baseLength == 0 && modLength == 0 then BigInt(0)
         else {
           val mod = getNumber(inputData, safeAdd(totalLengthBytes, safeAdd(baseLength, expLength)), modLength)
 
-          if (mod == 0) {
+          if mod == 0 then {
             BigInt(0)
           } else {
             val base = getNumber(inputData, totalLengthBytes, baseLength)
@@ -365,12 +360,10 @@ object PrecompiledContracts {
 
       val useEip7883 = eip7883Active || (etcFork >= EtcForks.Olympia && !isEthereum)
 
-      if (useEip7883)
-        PostEIP7883Cost.calculate(baseLength, modLength, expLength, expBytes)
-      else if (ethFork >= EthForks.Berlin || etcFork >= EtcForks.Magneto)
+      if useEip7883 then PostEIP7883Cost.calculate(baseLength, modLength, expLength, expBytes)
+      else if ethFork >= EthForks.Berlin || etcFork >= EtcForks.Magneto then
         PostEIP2565Cost.calculate(baseLength, modLength, expLength, expBytes)
-      else
-        PostEIP198Cost.calculate(baseLength, modLength, expLength, expBytes)
+      else PostEIP198Cost.calculate(baseLength, modLength, expLength, expBytes)
     }
 
     // Spec: https://eips.ethereum.org/EIPS/eip-198
@@ -385,12 +378,9 @@ object PrecompiledContracts {
 
       private def getMultComplexity(x: BigInt): BigInt = {
         val x2 = x * x
-        if (x <= 64)
-          x2
-        else if (x <= 1024)
-          x2 / 4 + 96 * x - 3072
-        else
-          x2 / 16 + 480 * x - 199680
+        if x <= 64 then x2
+        else if x <= 1024 then x2 / 4 + 96 * x - 3072
+        else x2 / 16 + 480 * x - 199680
       }
     }
 
@@ -402,7 +392,7 @@ object PrecompiledContracts {
         val multComplexity = getMultComplexity(math.max(baseLength, modLength))
         val adjusted = adjustExpLength(expBytes, expLength)
         val r = multComplexity * math.max(adjusted, 1) / GQUADDIVISOR
-        if (r <= 200) 200
+        if r <= 200 then 200
         else r
       }
 
@@ -419,7 +409,7 @@ object PrecompiledContracts {
         val multComplexity = getMultComplexity(math.max(baseLength, modLength))
         val adjusted = adjustExpLength7883(expBytes, expLength)
         val r = multComplexity * math.max(adjusted, 1)
-        if (r < 500) 500
+        if r < 500 then 500
         else r
       }
 
@@ -427,7 +417,7 @@ object PrecompiledContracts {
       // For maxLen <= 32: 16 (flat constant)
       // For maxLen > 32: 2 * ceiling(maxLen/8)^2
       private def getMultComplexity(x: BigInt): BigInt =
-        if (x <= 32) BigInt(16)
+        if x <= 32 then BigInt(16)
         else {
           val words = (x + 7) / 8
           2 * words.pow(2)
@@ -436,14 +426,12 @@ object PrecompiledContracts {
       // EIP-7883 adjusted exponent length uses multiplier 16 (not 8 like EIP-2565)
       private def adjustExpLength7883(expBytes: ByteString, expLength: Int): Long = {
         val expHead =
-          if (expLength <= lengthBytes)
-            expBytes.padToByteString(expLength, 0.toByte)
-          else
-            expBytes.take(lengthBytes).padToByteString(lengthBytes, 0.toByte)
+          if expLength <= lengthBytes then expBytes.padToByteString(expLength, 0.toByte)
+          else expBytes.take(lengthBytes).padToByteString(lengthBytes, 0.toByte)
 
         val highestBitIndex = math.max(ByteUtils.toBigInt(expHead).bitLength - 1, 0)
 
-        if (expLength <= lengthBytes) {
+        if expLength <= lengthBytes then {
           highestBitIndex
         } else {
           16L * (expLength - lengthBytes) + highestBitIndex
@@ -460,10 +448,8 @@ object PrecompiledContracts {
       safeInt(BigInt(a) + BigInt(b))
 
     private def safeInt(value: BigInt): Int =
-      if (value.isValidInt)
-        value.toInt
-      else
-        Integer.MAX_VALUE
+      if value.isValidInt then value.toInt
+      else Integer.MAX_VALUE
 
     private def getLength(bytes: ByteString, position: Int): Int = {
       val start = position * lengthBytes
@@ -472,14 +458,12 @@ object PrecompiledContracts {
 
     private def adjustExpLength(expBytes: ByteString, expLength: Int): Long = {
       val expHead =
-        if (expLength <= lengthBytes)
-          expBytes.padToByteString(expLength, 0.toByte)
-        else
-          expBytes.take(lengthBytes).padToByteString(lengthBytes, 0.toByte)
+        if expLength <= lengthBytes then expBytes.padToByteString(expLength, 0.toByte)
+        else expBytes.take(lengthBytes).padToByteString(lengthBytes, 0.toByte)
 
       val highestBitIndex = math.max(ByteUtils.toBigInt(expHead).bitLength - 1, 0)
 
-      if (expLength <= lengthBytes) {
+      if expLength <= lengthBytes then {
         highestBitIndex
       } else {
         8L * (expLength - lengthBytes) + highestBitIndex
@@ -509,10 +493,9 @@ object PrecompiledContracts {
     }
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
-      if (etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul)
+      if etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul then
         BigInt(150) // https://eips.ethereum.org/EIPS/eip-1108
-      else
-        BigInt(500)
+      else BigInt(500)
 
     private def getCurvePointsBytes(input: ByteString): (ByteString, ByteString, ByteString, ByteString) =
       (input.slice(0, 32), input.slice(32, 64), input.slice(64, 96), input.slice(96, 128))
@@ -532,7 +515,7 @@ object PrecompiledContracts {
 
       val result = for {
         p <- BN128Fp.createPoint(x1, y1)
-        s <- if (scalar <= maxScalar) Some(scalar) else None
+        s <- if scalar <= maxScalar then Some(scalar) else None
         p3 = BN128Fp.toEthNotation(BN128Fp.mul(p, s))
       } yield p3
 
@@ -544,10 +527,9 @@ object PrecompiledContracts {
     }
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
-      if (etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul)
+      if etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul then
         BigInt(6000) // https://eips.ethereum.org/EIPS/eip-1108
-      else
-        BigInt(40000)
+      else BigInt(40000)
 
     private def getCurvePointsBytes(input: ByteString): (ByteString, ByteString, ByteString) =
       (input.slice(0, 32), input.slice(32, 64), input.slice(64, 96))
@@ -563,20 +545,18 @@ object PrecompiledContracts {
     val negativeResult: ByteString = ByteString(Seq.fill(wordLength)(0.toByte).toArray)
 
     def exec(inputData: ByteString): Option[ByteString] =
-      if (inputData.length % inputLength != 0) {
+      if inputData.length % inputLength != 0 then {
         None
       } else {
         getPairs(inputData.grouped(inputLength)).map { pairs =>
-          if (PairingCheck.pairingCheck(pairs))
-            positiveResult
-          else
-            negativeResult
+          if PairingCheck.pairingCheck(pairs) then positiveResult
+          else negativeResult
         }
       }
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = {
       val k = inputData.length / inputLength
-      if (etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul) { // https://eips.ethereum.org/EIPS/eip-1108
+      if etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul then { // https://eips.ethereum.org/EIPS/eip-1108
         BigInt(34000) * k + BigInt(45000)
       } else {
         BigInt(80000) * k + BigInt(100000)
@@ -587,7 +567,7 @@ object PrecompiledContracts {
     // BN128 curve
     private def getPairs(bytes: Iterator[ByteString]): Option[Seq[G1G2Pair]] = {
       var accum = List.empty[G1G2Pair]
-      while (bytes.hasNext)
+      while bytes.hasNext do
         getPair(bytes.next()) match {
           case Some(part) => accum = part :: accum
           case None       => return None // scalafix:ok DisableSyntax.return
@@ -620,7 +600,7 @@ object PrecompiledContracts {
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = {
       val inputArray = inputData.toArray
-      if (Blake2bCompression.isValidInput(inputArray)) {
+      if Blake2bCompression.isValidInput(inputArray) then {
         // Each round costs 1gas
         BigInt(Blake2bCompression.parseNumberOfRounds(inputArray))
       } else {
@@ -636,7 +616,7 @@ object PrecompiledContracts {
     private val expectedInputLength = 160 // hash(32) + r(32) + s(32) + x(32) + y(32)
 
     def exec(inputData: ByteString): Option[ByteString] =
-      if (inputData.length < expectedInputLength) {
+      if inputData.length < expectedInputLength then {
         Some(ByteString.empty) // Invalid input — return empty (failure)
       } else {
         val hash = inputData.slice(0, 32).toArray
@@ -645,7 +625,7 @@ object PrecompiledContracts {
         val x = inputData.slice(96, 128).toArray
         val y = inputData.slice(128, 160).toArray
 
-        if (Secp256r1.verify(hash, r, s, x, y)) {
+        if Secp256r1.verify(hash, r, s, x, y) then {
           // Valid signature: return 0x01 left-padded to 32 bytes
           Some(ByteUtils.padLeft(ByteString(1), 32))
         } else {
@@ -666,7 +646,7 @@ object PrecompiledContracts {
     */
   private def blsNativeOp(opByte: Byte, inputData: ByteString): Option[ByteString] = {
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
-    if (!LibEthPairings.ENABLED) return None
+    if !LibEthPairings.ENABLED then return None
     try {
       val resultBuf = new Array[Byte](LibEthPairings.EIP2537_PREALLOCATE_FOR_RESULT_BYTES)
       val errorBuf = new Array[Byte](LibEthPairings.EIP2537_PREALLOCATE_FOR_ERROR_BYTES)
@@ -682,7 +662,7 @@ object PrecompiledContracts {
         errorBuf,
         errorLen
       )
-      if (ret == 0) Some(ByteString(resultBuf.take(resultLen.getValue)))
+      if ret == 0 then Some(ByteString(resultBuf.take(resultLen.getValue)))
       else None
     } catch {
       case _: Exception => None
@@ -770,7 +750,7 @@ object PrecompiledContracts {
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = KZG_GAS
 
     def exec(inputData: ByteString): Option[ByteString] = {
-      if (inputData.length != 192) return None
+      if inputData.length != 192 then return None
 
       val versionedHash = inputData.slice(0, 32)
       val z = inputData.slice(32, 64)
@@ -779,17 +759,17 @@ object PrecompiledContracts {
       val proof = inputData.slice(144, 192)
 
       // Verify the versioned hash matches commitment via SHA256
-      if (versionedHash(0) != VERSIONED_HASH_VERSION_KZG) return None
+      if versionedHash(0) != VERSIONED_HASH_VERSION_KZG then return None
 
       // Verify z < BLS_MODULUS and y < BLS_MODULUS
       val zBigInt = BigInt(1, z.toArray)
       val yBigInt = BigInt(1, y.toArray)
-      if (zBigInt >= BLS_MODULUS || yBigInt >= BLS_MODULUS) return None
+      if zBigInt >= BLS_MODULUS || yBigInt >= BLS_MODULUS then return None
 
       // Verify the versioned hash matches SHA256(commitment)[1:] with version prefix
       val commitmentHash = java.security.MessageDigest.getInstance("SHA-256").digest(commitment.toArray)
       commitmentHash(0) = VERSIONED_HASH_VERSION_KZG
-      if (ByteString(commitmentHash) != versionedHash) return None
+      if ByteString(commitmentHash) != versionedHash then return None
 
       // Verify the KZG proof using c-kzg-4844
       try {
@@ -799,7 +779,7 @@ object PrecompiledContracts {
           y.toArray,
           proof.toArray
         )
-        if (!isValid) return None
+        if !isValid then return None
       } catch {
         case _: Exception =>
         // If KZG library not loaded or verification fails, try without native library
@@ -827,8 +807,8 @@ object PrecompiledContracts {
       553, 552, 551, 550, 549, 548, 547, 546, 545, 544, 543, 542, 541, 540, 539, 538, 537, 536, 535, 534, 533, 532, 531,
       530, 529, 528, 527, 526, 525, 524, 523, 522, 521, 520, 519, 519, 519
     )
-    if (k <= 0) 1000
-    else if (k <= table.length) table(k - 1)
+    if k <= 0 then 1000
+    else if k <= table.length then table(k - 1)
     else 519 // for k > 128
   }
 
@@ -842,8 +822,8 @@ object PrecompiledContracts {
       554, 553, 552, 551, 550, 549, 548, 547, 547, 546, 545, 544, 543, 543, 542, 541, 540, 540, 539, 538, 537, 537, 536,
       535, 535, 534, 533, 533, 532, 531, 531, 530, 530, 529, 528, 528, 527
     )
-    if (k <= 0) 1000
-    else if (k <= table.length) table(k - 1)
+    if k <= 0 then 1000
+    else if k <= table.length then table(k - 1)
     else 524 // for k > 128
   }
 }

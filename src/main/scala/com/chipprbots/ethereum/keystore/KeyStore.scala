@@ -64,10 +64,8 @@ class KeyStoreImpl(keyStoreConfig: KeyStoreConfig, secureRandom: SecureRandom) e
       trimmedPassphraseLength >= keyStoreConfig.minimalPassphraseLength ||
         (keyStoreConfig.allowNoPassphrase && trimmedPassphraseLength == 0)
 
-    if (isValid)
-      Right(())
-    else
-      Left(PassPhraseTooShort(keyStoreConfig.minimalPassphraseLength))
+    if isValid then Right(())
+    else Left(PassPhraseTooShort(keyStoreConfig.minimalPassphraseLength))
   }
 
   def importPrivateKey(prvKey: ByteString, passphrase: String): Either[KeyStoreError, Address] = for {
@@ -79,8 +77,7 @@ class KeyStoreImpl(keyStoreConfig: KeyStoreConfig, secureRandom: SecureRandom) e
   def listAccounts: Either[KeyStoreError, List[Address]] = {
     val dir = new File(keyStoreConfig.keyStoreDir)
     Try {
-      if (!dir.exists() || !dir.isDirectory())
-        Left(IOError(s"Could not read $keyStoreConfig.keyStoreDir"))
+      if !dir.exists() || !dir.isDirectory() then Left(IOError(s"Could not read $keyStoreConfig.keyStoreDir"))
       else
         listFiles().map { files =>
           sortKeyFilesByDate(files)
@@ -115,8 +112,7 @@ class KeyStoreImpl(keyStoreConfig: KeyStoreConfig, secureRandom: SecureRandom) e
     val path = Paths.get(keyStoreConfig.keyStoreDir, name)
 
     containsAccount(encKey).flatMap { alreadyInKeyStore =>
-      if (alreadyInKeyStore)
-        Left(DuplicateKeySaved)
+      if alreadyInKeyStore then Left(DuplicateKeySaved)
       else {
         Try {
           Files.write(path, json.getBytes(StandardCharsets.UTF_8))
@@ -157,10 +153,8 @@ class KeyStoreImpl(keyStoreConfig: KeyStoreConfig, secureRandom: SecureRandom) e
   private def listFiles(): Either[KeyStoreError, List[String]] = {
     val dir = new File(keyStoreConfig.keyStoreDir)
     Try {
-      if (!dir.exists || !dir.isDirectory)
-        Left(IOError(s"Could not read $keyStoreConfig.keyStoreDir"))
-      else
-        Right(dir.listFiles().toList.map(_.getName))
+      if !dir.exists || !dir.isDirectory then Left(IOError(s"Could not read $keyStoreConfig.keyStoreDir"))
+      else Right(dir.listFiles().toList.map(_.getName))
     }.toEither.left.map(ioError).flatMap(identity)
   }
 

@@ -53,7 +53,7 @@ class BodiesFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBl
       .max(1)
 
   def reserve(peer: PeerWithInfo, items: Int): Option[GetBlockBodies] = synchronized {
-    if (pendingQueue.isEmpty) return None
+    if pendingQueue.isEmpty then return None
 
     val count = items.min(MaxBodiesPerRequest).min(pendingQueue.size)
     val taken = (0 until count).map(_ => pendingQueue.dequeue()).toVector

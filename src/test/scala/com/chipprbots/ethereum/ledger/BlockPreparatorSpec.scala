@@ -305,7 +305,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
               upfrontGasCost: UInt256,
               accumGasUsed: BigInt
           )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
-            if (stx.tx.receivingAddress.contains(Address(42))) {
+            if stx.tx.receivingAddress.contains(Address(42)) then {
               Right(SignedTransactionValid)
             } else {
               Left(TransactionSignatureError)

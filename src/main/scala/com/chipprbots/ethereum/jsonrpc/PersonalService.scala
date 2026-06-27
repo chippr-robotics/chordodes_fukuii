@@ -127,10 +127,8 @@ class PersonalService(
       .map(handleError)
       .map { wallet =>
         request.duration.fold(unlockedWallets.add(request.address, wallet))(duration =>
-          if (duration.isZero)
-            unlockedWallets.addForever(request.address, wallet)
-          else
-            unlockedWallets.add(request.address, wallet, duration)
+          if duration.isZero then unlockedWallets.addForever(request.address, wallet)
+          else unlockedWallets.add(request.address, wallet, duration)
         )
 
         UnlockAccountResponse(true)
@@ -212,7 +210,7 @@ class PersonalService(
         request.gasPrice.getOrElse(ethTxService.suggestGasPrice())
       )
 
-      val stx = if (blockchainReader.getBestBlockNumber >= blockchainConfig.forkBlockNumbers.eip155BlockNumber) {
+      val stx = if blockchainReader.getBestBlockNumber >= blockchainConfig.forkBlockNumbers.eip155BlockNumber then {
         wallet.signTx(tx, Some(blockchainConfig.chainId))
       } else {
         wallet.signTx(tx, None)

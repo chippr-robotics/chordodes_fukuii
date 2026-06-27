@@ -282,7 +282,7 @@ trait BinarySimulationChopSetup {
   val testGasValues: List[BigInt] = minimalGas.to(maximalGas, stepGas).toList
 
   val mockTransaction: BigInt => BigInt => Option[TxError] =
-    minimalWorkingGas => gasLimit => if (gasLimit >= minimalWorkingGas) None else Some(TxError)
+    minimalWorkingGas => gasLimit => if gasLimit >= minimalWorkingGas then None else Some(TxError)
 }
 
 trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
@@ -325,7 +325,7 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
     )
 
   def getChain(from: BigInt, to: BigInt, parent: ByteString = randomHash(), difficulty: BigInt = 100): List[Block] =
-    if (from > to) {
+    if from > to then {
       Nil
     } else {
       val block = getBlock(number = from, difficulty = difficulty, parent = parent)

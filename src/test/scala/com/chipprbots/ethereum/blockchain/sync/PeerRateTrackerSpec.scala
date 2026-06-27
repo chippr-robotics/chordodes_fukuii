@@ -55,7 +55,7 @@ class PeerRateTrackerSpec extends AnyFlatSpec with Matchers with ScalaCheckPrope
     val tracker = new PeerRateTracker()
     tracker.addPeer("p1")
     tracker.addPeer("p2") // 2 peers → confidence detunes to 0.5
-    for (_ <- 1 to 10) {
+    for _ <- 1 to 10 do {
       tracker.update("p1", MsgGetBlockHeaders, 2000L, 10)
       tracker.update("p2", MsgGetBlockHeaders, 2000L, 10)
       tracker.tune()
@@ -80,8 +80,7 @@ class PeerRateTrackerSpec extends AnyFlatSpec with Matchers with ScalaCheckPrope
   it should "converge capacity within 50% of expected after 20 identical updates" taggedAs UnitTest in {
     forAll(Gen.choose(1, 100), Gen.choose(10, 5000)) { (items: Int, elapsed: Int) =>
       val tracker = new PeerRateTracker()
-      for (_ <- 1 to 20)
-        tracker.update("p1", MsgGetBlockHeaders, elapsed.toLong, items)
+      for _ <- 1 to 20 do tracker.update("p1", MsgGetBlockHeaders, elapsed.toLong, items)
       val targetRttMs = 10000L
       val got = tracker.capacity("p1", MsgGetBlockHeaders, targetRttMs)
       val throughput = items.toDouble / (elapsed.toDouble / 1000.0)

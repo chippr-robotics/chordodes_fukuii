@@ -63,7 +63,7 @@ object MiningConfig extends Logger {
 
     // If the mining protocol is not a known one, then it is a fatal error
     // and the application must exit.
-    if (!AllowedProtocols(protocol)) {
+    if !AllowedProtocols(protocol) then {
       val error = AllowedProtocolsError(protocol)
       throw new RuntimeException(error)
     }
@@ -82,16 +82,16 @@ object MiningConfig extends Logger {
     val blockCacheSize = config.getInt(Keys.BlockCacheSize)
     val miningEnabled = config.getBoolean(Keys.MiningEnabled)
     val gasLimitTarget =
-      if (config.hasPath(Keys.GasLimitTarget)) BigInt(config.getLong(Keys.GasLimitTarget))
+      if config.hasPath(Keys.GasLimitTarget) then BigInt(config.getLong(Keys.GasLimitTarget))
       else BigInt(8_000_000) // ETC mainnet default
     val notifyUrls =
-      if (config.hasPath(Keys.NotifyUrls)) config.getStringList(Keys.NotifyUrls).asScala.toSeq
+      if config.hasPath(Keys.NotifyUrls) then config.getStringList(Keys.NotifyUrls).asScala.toSeq
       else Seq.empty
     val staleThreshold =
-      if (config.hasPath(Keys.StaleThreshold)) config.getInt(Keys.StaleThreshold)
+      if config.hasPath(Keys.StaleThreshold) then config.getInt(Keys.StaleThreshold)
       else 7 // core-geth default
     val recommitInterval =
-      if (config.hasPath(Keys.RecommitInterval))
+      if config.hasPath(Keys.RecommitInterval) then
         FiniteDuration(config.getDuration(Keys.RecommitInterval).toNanos, "nanos")
       else FiniteDuration(0, "seconds")
 

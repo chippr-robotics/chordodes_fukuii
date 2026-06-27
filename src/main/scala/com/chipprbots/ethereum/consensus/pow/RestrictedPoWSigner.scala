@@ -28,7 +28,7 @@ object RestrictedPoWSigner {
 
   def hashHeaderForSigning(blockHeader: BlockHeader): ByteString = {
     val blockHeaderWithoutSig =
-      if (blockHeader.extraData.length >= ECDSASignature.EncodedLength)
+      if blockHeader.extraData.length >= ECDSASignature.EncodedLength then
         blockHeader.dropRightNExtraDataBytes(ECDSASignature.EncodedLength)
       else blockHeader
     val encodedBlockHeader = getEncodedWithoutNonce(blockHeaderWithoutSig)

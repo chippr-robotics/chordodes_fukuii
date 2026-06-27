@@ -67,7 +67,7 @@ class NetworkPeerManagerFake(
       val headersFromPeers = headersFromPeersChunk.toList
       val (headers, respondedPeers) = headersFromPeers.unzip
 
-      if (headers.distinct.size == 1 && respondedPeers.toSet == peers.keySet.map(_.id)) {
+      if headers.distinct.size == 1 && respondedPeers.toSet == peers.keySet.map(_.id) then {
         Stream.emit(headers.head)
       } else {
         Stream.empty
@@ -145,9 +145,9 @@ object NetworkPeerManagerFake {
         reverse: Boolean
     ): Seq[BlockHeader] = {
       val startIndex = blocks.indexWhere(blockMatchesStart(_, startingBlock))
-      if (startIndex < 0) Seq.empty
+      if startIndex < 0 then Seq.empty
       else {
-        val orderedBlocks = if (reverse) blocks.take(startIndex + 1).reverse else blocks.drop(startIndex)
+        val orderedBlocks = if reverse then blocks.take(startIndex + 1).reverse else blocks.drop(startIndex)
         val step = (skip + 1).toInt
         orderedBlocks.zipWithIndex
           .collect { case (block, index) if index % step == 0 => block }

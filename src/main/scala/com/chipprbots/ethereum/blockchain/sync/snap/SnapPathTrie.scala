@@ -96,20 +96,20 @@ final class SnapPathTrie(
     // Skip nodes that are on the left boundary of a resumed range.  A node is "on the left boundary" if it is the
     // first node ever emitted (first == null) or if its path is a prefix of (i.e., is an ancestor of) the first node.
     // go-ethereum equivalent: pathTrie.onTrieNode, condition `t.skipLeftBoundary && (t.first == nil || HasPrefix(t.first, path))`
-    if (skipLeft) {
-      if (first == null) {
+    if skipLeft then {
+      if first == null then {
         // Record the left-boundary anchor (deep-copy: StackTrie reuses buffers).
         first = path.clone()
         // Delete any stale ancestor stubs at depths 0 .. len-1 left by the prior interrupted run.
         // (Depth len = the first node itself; it's a sibling anchor, not an ancestor stub.)
         var i = 0
-        while (i < first.length) {
+        while i < first.length do {
           deleteExact(first.slice(0, i))
           i += 1
         }
       }
       // Skip writing if `path` is a prefix of `first` (path is an ancestor of first, or IS first).
-      if (hasPrefix(first, path)) return
+      if hasPrefix(first, path) then return
       // This node is not on the left boundary — disable the filter for all subsequent callbacks.
       skipLeft = false
     }
@@ -119,9 +119,9 @@ final class SnapPathTrie(
     // spans that gap. Intermediate path slots at depths (len(path)+1 .. len(last)−1) may hold stale nodes from a
     // prior run; delete them.
     // go-ethereum equivalent: `last != nil && HasPrefix(last, path) && len(last)-len(path) > 1`
-    if (last != null && hasPrefix(last, path) && last.length - path.length > 1) {
+    if last != null && hasPrefix(last, path) && last.length - path.length > 1 then {
       var i = path.length + 1
-      while (i < last.length) {
+      while i < last.length do {
         deleteExact(last.slice(0, i))
         i += 1
       }
@@ -133,15 +133,15 @@ final class SnapPathTrie(
 
     // Update `last` (reuse the existing allocation if lengths match to avoid GC churn).
     last =
-      if (last == null || last.length != path.length) path.clone()
+      if last == null || last.length != path.length then path.clone()
       else { System.arraycopy(path, 0, last, 0, path.length); last }
   }
 
   /** Delete ancestor paths of `last` at depths 0 through `len(last)−1`. */
   private def deleteRightBoundary(): Unit =
-    if (last != null) {
+    if last != null then {
       var i = 0
-      while (i < last.length) {
+      while i < last.length do {
         deleteExact(last.slice(0, i))
         i += 1
       }

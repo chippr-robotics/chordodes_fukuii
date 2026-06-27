@@ -27,7 +27,7 @@ final case class DownloaderState(
 
   def scheduleNewNodesForRetrieval(nodes: Seq[ByteString]): DownloaderState = {
     val newNodesToGet = nodes.foldLeft(nodesToGet) { case (map, node) =>
-      if (map.contains(node)) {
+      if map.contains(node) then {
         map
       } else {
         map + (node -> None)
@@ -84,7 +84,7 @@ final case class DownloaderState(
     activeRequests
       .get(from.id)
       .map { requestedHashes =>
-        if (receivedMessage.values.isEmpty) {
+        if receivedMessage.values.isEmpty then {
           val rescheduleRequestedHashes = requestedHashes.foldLeft(nodesToGet) { case (map, hash) =>
             map + (hash -> None)
           }
@@ -95,7 +95,7 @@ final case class DownloaderState(
         } else {
           val (notReceived, received) =
             process(requestedHashes, NonEmptyList.fromListUnsafe(receivedMessage.values.toList))
-          if (received.isEmpty) {
+          if received.isEmpty then {
             val rescheduleRequestedHashes = notReceived.foldLeft(nodesToGet) { case (map, hash) =>
               map + (hash -> None)
             }
@@ -124,7 +124,7 @@ final case class DownloaderState(
         createdRequests: List[PeerRequest],
         currentState: DownloaderState
     ): (Seq[PeerRequest], DownloaderState) =
-      if (peersRemaining.isEmpty || nodesRemaining.isEmpty) {
+      if peersRemaining.isEmpty || nodesRemaining.isEmpty then {
         (createdRequests.reverse, currentState.scheduleNewNodesForRetrieval(nodesRemaining))
       } else {
         val nextPeer = peersRemaining.head
@@ -139,7 +139,7 @@ final case class DownloaderState(
       }
 
     val currentNodesToDeliver = newNodes.map(nodes => nonDownloadedNodes ++ nodes).getOrElse(nonDownloadedNodes)
-    if (currentNodesToDeliver.isEmpty) {
+    if currentNodesToDeliver.isEmpty then {
       (Seq(), this)
     } else {
       go(peers.toList, currentNodesToDeliver, List.empty, this)

@@ -52,13 +52,12 @@ case class ConnectedPeers(
   def getPeer(peerId: PeerId): Option[Peer] = peers.get(peerId)
 
   def addNewPendingPeer(pendingPeer: Peer): ConnectedPeers =
-    if (pendingPeer.incomingConnection)
+    if pendingPeer.incomingConnection then
       copy(incomingPendingPeers = incomingPendingPeers + (pendingPeer.id -> pendingPeer))
-    else
-      copy(outgoingPendingPeers = outgoingPendingPeers + (pendingPeer.id -> pendingPeer))
+    else copy(outgoingPendingPeers = outgoingPendingPeers + (pendingPeer.id -> pendingPeer))
 
   def promotePeerToHandshaked(peerAfterHandshake: Peer): ConnectedPeers =
-    if (peerAfterHandshake.incomingConnection)
+    if peerAfterHandshake.incomingConnection then
       copy(
         incomingPendingPeers = incomingPendingPeers - PeerId.fromRef(peerAfterHandshake.ref),
         handshakedPeers = handshakedPeers + (peerAfterHandshake.id -> peerAfterHandshake)
@@ -93,7 +92,7 @@ case class ConnectedPeers(
       excludedNodeIds: Set[ByteString] = Set.empty
   ): (Seq[Peer], ConnectedPeers) = {
     val ageThreshold = currentTimeMillis - minAge.toMillis
-    if (lastPruneTimestamp > ageThreshold || numPeers == 0) {
+    if lastPruneTimestamp > ageThreshold || numPeers == 0 then {
       // Protect against hostile takeovers by limiting the frequency of pruning.
       (Seq.empty, this)
     } else {
@@ -105,7 +104,7 @@ case class ConnectedPeers(
         pruningPeers = toPrune.foldLeft(pruningPeers) { case (acc, peer) =>
           acc + (peer.id -> peer)
         },
-        lastPruneTimestamp = if (toPrune.nonEmpty) currentTimeMillis else lastPruneTimestamp
+        lastPruneTimestamp = if toPrune.nonEmpty then currentTimeMillis else lastPruneTimestamp
       )
 
       (toPrune, pruned)

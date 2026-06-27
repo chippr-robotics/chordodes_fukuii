@@ -90,7 +90,7 @@ class BlockchainImpl(
   ): ByteString = {
     val storage = stateStorage.getBackingStorage(0)
     val mpt =
-      if (ethCompatibleStorage) domain.EthereumUInt256Mpt.storageMpt(rootHash, storage)
+      if ethCompatibleStorage then domain.EthereumUInt256Mpt.storageMpt(rootHash, storage)
       else domain.ArbitraryIntegerMpt.storageMpt(rootHash, storage)
 
     val bigIntValue = mpt.get(position).getOrElse(BigInt(0))
@@ -99,10 +99,8 @@ class BlockchainImpl(
     // BigInt.toArray actually might return one more byte than necessary because it adds a sign bit, which in our case
     // will always be 0. This would add unwanted 0 bytes and might cause the value to be 33 byte long while an EVM
     // word is 32 byte long.
-    if (bigIntValue != 0)
-      ByteString(byteArrayValue.dropWhile(_ == 0))
-    else
-      ByteString(byteArrayValue)
+    if bigIntValue != 0 then ByteString(byteArrayValue.dropWhile(_ == 0))
+    else ByteString(byteArrayValue)
   }
 
   override def getStorageProofAt(
@@ -112,7 +110,7 @@ class BlockchainImpl(
   ): StorageProof = {
     val storage: MptStorage = stateStorage.getBackingStorage(0)
     val mpt: MerklePatriciaTrie[BigInt, BigInt] =
-      if (ethCompatibleStorage) domain.EthereumUInt256Mpt.storageMpt(rootHash, storage)
+      if ethCompatibleStorage then domain.EthereumUInt256Mpt.storageMpt(rootHash, storage)
       else domain.ArbitraryIntegerMpt.storageMpt(rootHash, storage)
     val value: Option[BigInt] = mpt.get(position)
     val proof: Option[Vector[MptNode]] = mpt.getProof(position)
@@ -147,7 +145,7 @@ class BlockchainImpl(
     val txList = block.body.transactionList
 
     val blockNumberMappingUpdates =
-      if (blockchainReader.getHashByBlockNumber(blockchainReader.getBestBranch, block.number).contains(blockHash))
+      if blockchainReader.getHashByBlockNumber(blockchainReader.getBestBranch, block.number).contains(blockHash) then
         removeBlockNumberMapping(block.number)
       else blockNumberMappingStorage.emptyBatchUpdate
 
@@ -155,7 +153,7 @@ class BlockchainImpl(
     val potentialNewBestBlockHash: ByteString = block.header.parentHash
 
     val bestBlockNumberUpdates =
-      if (appStateStorage.getBestBlockNumber() > potentialNewBestBlockNumber)
+      if appStateStorage.getBestBlockNumber() > potentialNewBestBlockNumber then
         appStateStorage.putBestBlockInfo(BlockInfo(potentialNewBestBlockHash, potentialNewBestBlockNumber))
       else appStateStorage.emptyBatchUpdate
 

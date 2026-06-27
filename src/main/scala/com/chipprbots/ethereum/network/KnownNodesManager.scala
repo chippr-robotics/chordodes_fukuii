@@ -43,7 +43,7 @@ object KnownNodesManager {
   ): Behavior[Command] =
     Behaviors.receiveMessage {
       case AddKnownNode(uri) =>
-        if (!state.knownNodes.contains(uri))
+        if !state.knownNodes.contains(uri) then
           running(
             ctx,
             config,
@@ -57,7 +57,7 @@ object KnownNodesManager {
         else Behaviors.same
 
       case RemoveKnownNode(uri) =>
-        if (state.knownNodes.contains(uri))
+        if state.knownNodes.contains(uri) then
           running(
             ctx,
             config,
@@ -86,11 +86,11 @@ object KnownNodesManager {
   ): State = {
     ctx.log.debug(s"Persisting ${state.knownNodes.size} known nodes.")
     val pruned =
-      if (state.knownNodes.size > config.maxPersistedNodes) {
+      if state.knownNodes.size > config.maxPersistedNodes then {
         val toAbandon = state.knownNodes.take(state.knownNodes.size - config.maxPersistedNodes)
         state.copy(toRemove = state.toRemove ++ toAbandon, toAdd = state.toAdd -- toAbandon)
       } else state
-    if (pruned.toAdd.nonEmpty || pruned.toRemove.nonEmpty) {
+    if pruned.toAdd.nonEmpty || pruned.toRemove.nonEmpty then {
       knownNodesStorage.updateKnownNodes(toAdd = pruned.toAdd, toRemove = pruned.toRemove).commit()
       pruned.copy(toAdd = Set.empty, toRemove = Set.empty)
     } else pruned

@@ -7,7 +7,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
 
 object ExecEnv {
-  def apply(context: ProgramContext[_, _], code: ByteString, ownerAddr: Address): ExecEnv = {
+  def apply(context: ProgramContext[?, ?], code: ByteString, ownerAddr: Address): ExecEnv = {
     import context.*
 
     ExecEnv(

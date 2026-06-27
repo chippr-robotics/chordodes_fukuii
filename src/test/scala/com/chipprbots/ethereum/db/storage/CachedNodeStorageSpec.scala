@@ -38,7 +38,7 @@ class CachedNodeStorageSpec
 
     val cachedValuesSize = cachedNodeStorage.cache.getValues.size
 
-    if (cachedNodeStorage.persist()) {
+    if cachedNodeStorage.persist() then {
       cachedNodeStorage.cache.getValues shouldBe empty
       dataSource.storage.size shouldEqual cachedValuesSize
     } else {
@@ -50,8 +50,7 @@ class CachedNodeStorageSpec
     forAll(keyValueByteStringGen(kvSize)) { keyvalues =>
       cachedNodeStorage.update(Nil, keyvalues)
 
-      if (underLying.size > testCapacityCacheConfig.maxSize)
-        assert(cachedNodeStorage.persist())
+      if underLying.size > testCapacityCacheConfig.maxSize then assert(cachedNodeStorage.persist())
 
       keyvalues.foreach(elem => assert(cachedNodeStorage.get(elem._1).get.sameElements(elem._2)))
     }

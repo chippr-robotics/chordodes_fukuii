@@ -317,7 +317,7 @@ class DebugTracingService(
           .toRight(JsonRpcError.InvalidParams("Parent block header not found"))
         stxs = SignedTransactionWithSender.getSignedTransactions(block.body.transactionList)
         roots =
-          if (stxs.isEmpty) Seq.empty
+          if stxs.isEmpty then Seq.empty
           else {
             // Chain world states tx-by-tx and capture state root after each finalization.
             // On tx error: return partial result (same as core-geth — errors on canon blocks are rare).

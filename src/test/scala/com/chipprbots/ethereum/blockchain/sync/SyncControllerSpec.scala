@@ -198,7 +198,7 @@ class SyncControllerSpec
             blockHeader: BlockHeader,
             getBlockHeaderByHash: GetBlockHeaderByHash
         )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-          if (blockHeader.number == invalidBlockNNumber) {
+          if blockHeader.number == invalidBlockNNumber then {
             Left(HeaderParentNotFoundError)
           } else {
             Right(BlockHeaderValid)
@@ -284,7 +284,7 @@ class SyncControllerSpec
             blockHeader: BlockHeader,
             getBlockHeaderByHash: GetBlockHeaderByHash
         )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-          if (blockHeader.number != 399500 + 10) {
+          if blockHeader.number != 399500 + 10 then {
             Right(BlockHeaderValid)
           } else {
             Left(HeaderParentNotFoundError)
@@ -542,9 +542,9 @@ class SyncControllerSpec
       withStateRoot: Boolean = true
   ): Unit = {
     appState.snapSyncDone().commit()
-    if (!needBytecode) appState.bytecodeRecoveryDone().commit()
-    if (!needStorage) appState.storageRecoveryDone().commit()
-    if (withStateRoot) {
+    if !needBytecode then appState.bytecodeRecoveryDone().commit()
+    if !needStorage then appState.storageRecoveryDone().commit()
+    if withStateRoot then {
       appState.putSnapSyncStateRoot(recoveryFakeStateRoot).commit()
       appState.putSnapSyncPivotBlock(BigInt(100)).commit()
     }
@@ -866,7 +866,7 @@ class SyncControllerSpec
             val underlyingMessage = msg.underlyingMsg
             val requestId = underlyingMessage.requestId
             val requestedBlockNumber = underlyingMessage.block.swap.toOption.get
-            if (requestedBlockNumber == pivotHeader.number) {
+            if requestedBlockNumber == pivotHeader.number then {
               // pivot block
               sender ! MessageFromPeer(ETHPackets.BlockHeaders(requestId, Seq(pivotHeader)), peer)
             } else {
@@ -878,7 +878,7 @@ class SyncControllerSpec
           // Handle ETH68/69 GetReceipts (with requestId)
           case SendMessage(msg: ETHPackets.GetReceipts.GetReceiptsEnc, peer) if !onlyPivot =>
             val requestId = msg.underlyingMsg.requestId
-            if (failedReceiptsTries > 0) {
+            if failedReceiptsTries > 0 then {
               sender ! MessageFromPeer(ETHPackets.Receipts68(requestId, RLPList()), peer)
               this.copy(failedReceiptsTries = failedReceiptsTries - 1)
             } else {
@@ -891,7 +891,7 @@ class SyncControllerSpec
 
           case SendMessage(msg: ETHPackets.GetBlockBodies.GetBlockBodiesEnc, peer) if !onlyPivot =>
             val requestId = msg.underlyingMsg.requestId
-            if (failedBodiesTries > 0) {
+            if failedBodiesTries > 0 then {
               sender ! MessageFromPeer(ETHPackets.BlockBodies(requestId, Seq.empty), peer)
               this.copy(failedBodiesTries = failedBodiesTries - 1)
             } else {
@@ -902,7 +902,7 @@ class SyncControllerSpec
 
           case SendMessage(msg: GetBlockBodiesEnc, peer) if !onlyPivot =>
             val requestId = msg.underlyingMsg.requestId
-            if (failedBodiesTries > 0) {
+            if failedBodiesTries > 0 then {
               sender ! MessageFromPeer(BlockBodies(requestId, Seq.empty), peer)
               this.copy(failedBodiesTries = failedBodiesTries - 1)
             } else {
@@ -914,13 +914,13 @@ class SyncControllerSpec
           // Handle GetNodeData (EIP-4938: rejected in ETH68, but still handled for legacy)
           case SendMessage(_: ETHPackets.GetNodeData.GetNodeDataEnc, peer) if !onlyPivot =>
             stateDownloadStarted = true
-            if (!failedNodeRequest) {
+            if !failedNodeRequest then {
               sender ! MessageFromPeer(
                 ETHPackets.NodeData(Seq(ByteString(defaultStateMptLeafWithAccount.toArray))),
                 peer
               )
             }
-            if (!failedNodeRequest) {
+            if !failedNodeRequest then {
               sender ! MessageFromPeer(ETH63NodeData(Seq(defaultStateMptLeafWithAccount)), peer)
             }
             this
@@ -1050,8 +1050,7 @@ class SyncControllerSpec
           headers: Seq[BlockHeader],
           result: Seq[BlockHeader] = Seq.empty
       ): Seq[BlockHeader] =
-        if (headers.isEmpty)
-          result
+        if headers.isEmpty then result
         else {
           val header = headers.head
           val newHeader = header.copy(parentHash = parenthash)

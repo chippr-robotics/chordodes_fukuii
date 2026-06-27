@@ -81,17 +81,16 @@ object BlockResponse {
       pendingBlock: Boolean = false
   ): BlockResponse = {
     val transactions =
-      if (fullTxs)
+      if fullTxs then
         Right(block.body.transactionList.zipWithIndex.map { case (stx, transactionIndex) =>
           TransactionResponse(stx = stx, blockHeader = Some(block.header), transactionIndex = Some(transactionIndex))
         })
-      else
-        Left(block.body.transactionList.map(_.hash))
+      else Left(block.body.transactionList.map(_.hash))
 
     val td = weight.map(_.totalDifficulty)
 
     val signature =
-      if (block.header.extraData.length >= ECDSASignature.EncodedLength)
+      if block.header.extraData.length >= ECDSASignature.EncodedLength then
         ECDSASignature.fromBytes(block.header.extraData.takeRight(ECDSASignature.EncodedLength))
       else None
 
@@ -112,15 +111,15 @@ object BlockResponse {
 
     BlockResponse(
       number = block.header.number,
-      hash = if (pendingBlock) None else Some(block.header.hash),
+      hash = if pendingBlock then None else Some(block.header.hash),
       parentHash = block.header.parentHash,
-      nonce = if (pendingBlock) None else Some(block.header.nonce),
+      nonce = if pendingBlock then None else Some(block.header.nonce),
       sha3Uncles = block.header.ommersHash,
       logsBloom = block.header.logsBloom,
       transactionsRoot = block.header.transactionsRoot,
       stateRoot = block.header.stateRoot,
       receiptsRoot = block.header.receiptsRoot,
-      miner = if (pendingBlock) None else Some(block.header.beneficiary),
+      miner = if pendingBlock then None else Some(block.header.beneficiary),
       difficulty = block.header.difficulty,
       totalDifficulty = td,
       extraData = block.header.extraData,

@@ -30,7 +30,7 @@ class BlockValidation(
 
   private def getNBlocksBackFromChainOrQueue(hash: ByteString, n: Int): List[Block] = {
     val queuedBlocks = blockQueue.getBranch(hash, dequeue = false).takeRight(n)
-    if (queuedBlocks.length == n) {
+    if queuedBlocks.length == n then {
       queuedBlocks
     } else {
       val chainedBlockHash = queuedBlocks.headOption.map(_.header.parentHash).getOrElse(hash)

@@ -168,7 +168,7 @@ class EngineApiController(
           case _ => None
         }
 
-        if (versionError.isDefined) {
+        if versionError.isDefined then {
           val (code, msg) = versionError.get
           IO.pure(
             JsonRpcResponse("2.0", None, Some(JsonRpcError(code, msg, None)), reqId(request))
@@ -178,7 +178,7 @@ class EngineApiController(
           // Previously we skipped params[1] entirely, which silently dropped the EIP-4844
           // versioned-hash check the CL relies on — every "NewPayloadV3 Versioned Hashes"
           // hive test passed the payload regardless of what the CL claimed to have seen.
-          if (version >= 3) {
+          if version >= 3 then {
             val expectedBlobVersionedHashes = params.lift(1).collect { case JArray(items) =>
               items.collect { case JString(hex) => hexToByteString(hex) }
             }
@@ -190,7 +190,7 @@ class EngineApiController(
           }
 
           // V4: fourth param is executionRequests (EIP-7685)
-          if (version >= 4) {
+          if version >= 4 then {
             val executionRequests = params.lift(3).collect { case JArray(items) =>
               items.collect { case JString(hex) => hexToByteString(hex) }
             }
@@ -288,7 +288,7 @@ class EngineApiController(
           case _ => None
         }
 
-        if (versionError.isDefined) {
+        if versionError.isDefined then {
           val (code, msg) = versionError.get
           // Per engine-API step ordering (apply forkchoiceState, THEN validate attrs):
           // InvalidAttrs errors STILL require the forkchoice to be applied first. Hive
@@ -296,7 +296,7 @@ class EngineApiController(
           // the new head even on -38003. Forward an attrs-less FCU to the service, then
           // overlay the version error. UnsupportedFork (-38005) does not apply forkchoice —
           // the CL called the wrong method entirely.
-          if (code == InvalidAttrs) {
+          if code == InvalidAttrs then {
             // If head is unknown (syncing), return SYNCING payload status without the
             // attrs error — validation presupposes a known head. Hive's 'Invalid
             // PayloadAttributes, Missing BeaconRoot, Syncing=True' expects no error.
@@ -445,7 +445,7 @@ class EngineApiController(
       case BlockHeader.HeaderExtraFields.HefPostPrague(bf, _, _, _, _, _) => bf
       case _                                                              => BigInt(0)
     }
-    if (receipts.isEmpty) return "0x0"
+    if receipts.isEmpty then return "0x0"
     val txs = block.body.transactionList
     // derive per-tx gas used from cumulative deltas
     val gasUsedPerTx: Seq[BigInt] = receipts
@@ -582,20 +582,20 @@ class EngineApiController(
     val params = request.params.map(_.arr).getOrElse(Nil)
     val start = params.headOption
       .collect {
-        case JString(hex) => val c = hex.stripPrefix("0x"); if (c.isEmpty) BigInt(0) else BigInt(c, 16)
+        case JString(hex) => val c = hex.stripPrefix("0x"); if c.isEmpty then BigInt(0) else BigInt(c, 16)
         case JInt(n)      => n
       }
       .getOrElse(BigInt(0))
     val count = params
       .lift(1)
       .collect {
-        case JString(hex) => val c = hex.stripPrefix("0x"); if (c.isEmpty) BigInt(0) else BigInt(c, 16)
+        case JString(hex) => val c = hex.stripPrefix("0x"); if c.isEmpty then BigInt(0) else BigInt(c, 16)
         case JInt(n)      => n
       }
       .getOrElse(BigInt(0))
 
     // Spec: start<1 or count<1 → -32602 invalid params.
-    if (start < 1 || count < 1) {
+    if start < 1 || count < 1 then {
       IO.pure(
         JsonRpcResponse(
           "2.0",
@@ -609,7 +609,7 @@ class EngineApiController(
       // trailing nulls for numbers past the tip. Hive's GetPayloadBodiesByRange test
       // checks the array length against min(count, latest-start+1).
       val latest = engineApiService.getLatestBlockNumber
-      if (start > latest) {
+      if start > latest then {
         IO.pure(JsonRpcResponse("2.0", Some(JArray(Nil)), None, reqId(request)))
       } else {
         val effectiveCount = count.min(latest - start + 1).min(1024)
@@ -632,7 +632,7 @@ class EngineApiController(
 
   private def hexToByteString(hex: String): ByteString = {
     val clean = hex.stripPrefix("0x")
-    if (clean.isEmpty) ByteString.empty
+    if clean.isEmpty then ByteString.empty
     else ByteString(org.bouncycastle.util.encoders.Hex.decode(clean))
   }
 
@@ -728,7 +728,7 @@ class EngineApiController(
       .collect {
         case JString(hex) =>
           val clean = hex.stripPrefix("0x")
-          if (clean.isEmpty) BigInt(0) else BigInt(clean, 16)
+          if clean.isEmpty then BigInt(0) else BigInt(clean, 16)
         case JInt(n) => n
       }
       .getOrElse(BigInt(0))

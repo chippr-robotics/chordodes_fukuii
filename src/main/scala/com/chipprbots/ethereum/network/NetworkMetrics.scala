@@ -35,14 +35,14 @@ case object NetworkMetrics extends MetricsContainer {
     metrics.registry.gauge("network.tried.peers.gauge", new AtomicLong(0L))
 
   def registerAddHandshakedPeer(peer: Peer): Unit =
-    if (peer.incomingConnection) {
+    if peer.incomingConnection then {
       HandshakedIncomingPeersGauge.incrementAndGet()
     } else {
       HandshakedOutgoingPeersGauge.incrementAndGet()
     }
 
   def registerRemoveHandshakedPeer(peer: Peer): Unit =
-    if (peer.incomingConnection) {
+    if peer.incomingConnection then {
       HandshakedIncomingPeersGauge.decrementAndGet()
     } else {
       HandshakedOutgoingPeersGauge.decrementAndGet()

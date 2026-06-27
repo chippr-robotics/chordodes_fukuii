@@ -76,7 +76,7 @@ object FukuiiRuntime extends Logger {
         val rawInstanceConf = instancesConfig.getConfig(instanceId)
         // Each instance block wraps config in a `fukuii { ... }` section — extract it
         val instanceConf =
-          if (rawInstanceConf.hasPath("fukuii")) rawInstanceConf.getConfig("fukuii") else rawInstanceConf
+          if rawInstanceConf.hasPath("fukuii") then rawInstanceConf.getConfig("fukuii") else rawInstanceConf
         val ic = new InstanceConfig(instanceConf, instanceId)
         log.info(s"Parsed chain instance: $instanceId (network=${ic.blockchains.network})")
         instanceId -> new ChainInstance(instanceId, ic)

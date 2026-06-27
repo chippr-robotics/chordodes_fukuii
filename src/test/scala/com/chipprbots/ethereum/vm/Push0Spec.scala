@@ -22,7 +22,7 @@ class Push0Spec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaC
       val stateOut = PUSH0.execute(stateIn)
 
       // Should not error if stack has room
-      if (stateIn.stack.size < stateIn.stack.maxSize) {
+      if stateIn.stack.size < stateIn.stack.maxSize then {
         stateOut.error shouldBe None
         stateOut.stack.size shouldEqual stateIn.stack.size + 1
         val (top, _) = stateOut.stack.pop()
@@ -35,7 +35,7 @@ class Push0Spec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaC
   test("PUSH0 should use 2 gas (G_base)", UnitTest, VMTest) {
     forAll(Generators.getProgramStateGen()) { stateIn =>
       // Only test when we have enough gas
-      if (stateIn.gas >= 2 && stateIn.stack.size < stateIn.stack.maxSize) {
+      if stateIn.gas >= 2 && stateIn.stack.size < stateIn.stack.maxSize then {
         val stateOut = PUSH0.execute(stateIn)
         stateOut.error shouldBe None
         stateOut.gas shouldEqual (stateIn.gas - 2)

@@ -173,7 +173,7 @@ object StorageRecoveryActor {
       }
       Behaviors.receiveMessage {
         case ScanResult(missing) =>
-          if (missing.isEmpty) {
+          if missing.isEmpty then {
             ctx.log.info("Storage recovery: all contract storage tries present. Marking recovery complete.")
             RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
             appStateStorage.storageRecoveryDone().commit()
@@ -318,8 +318,8 @@ object StorageRecoveryActor {
           lastStorageRecoveryMilestone = newM
           crossed.foreach { m =>
             val elapsedSecs = (System.nanoTime() - lastRateNanos) / 1e9
-            val rate = if (elapsedSecs > 0) ((recoveredCount - lastRateRecovered) / elapsedSecs).toLong else 0L
-            if (m % 10 == 0 || m <= 5 || m >= 95) {
+            val rate = if elapsedSecs > 0 then ((recoveredCount - lastRateRecovered) / elapsedSecs).toLong else 0L
+            if m % 10 == 0 || m <= 5 || m >= 95 then {
               lastRateNanos = System.nanoTime()
               lastRateRecovered = recoveredCount
             }
@@ -331,7 +331,7 @@ object StorageRecoveryActor {
 
         case _: SNAPSyncController.PivotStateUnservable =>
           unservableCount += 1
-          if (unservableCount <= 3 || unservableCount % 100 == 0) {
+          if unservableCount <= 3 || unservableCount % 100 == 0 then {
             ctx.log.info(
               "Storage recovery: coordinator reports root {} unservable ({} events, no progress for {}s).",
               currentRoot.take(4).toArray.map("%02x".format(_)).mkString,
@@ -339,8 +339,8 @@ object StorageRecoveryActor {
               (System.nanoTime() - lastProgressNanos) / 1_000_000_000L
             )
           }
-          if (!timers.isTimerActive("abandon")) scheduleAbandonCheck()
-          if (!awaitingRoot && rollsAttempted < maxRolls) {
+          if !timers.isTimerActive("abandon") then scheduleAbandonCheck()
+          if !awaitingRoot && rollsAttempted < maxRolls then {
             awaitingRoot = true
             ctx.log.info(
               "Storage recovery: requesting a recent root to roll off the aged pivot (roll {} of {}).",
@@ -349,7 +349,7 @@ object StorageRecoveryActor {
             )
             // Two-arg tell: sets ctx.self.toClassic as sender so SyncController's sender() captures this actor's ref
             syncController.tell(RequestRecentRoot, ctx.self.toClassic)
-          } else if (rollsAttempted >= maxRolls) {
+          } else if rollsAttempted >= maxRolls then {
             ctx.log.info(
               "Storage recovery: exhausted {} recent-root rolls; letting the abandon timer run for the residue.",
               maxRolls
@@ -388,7 +388,7 @@ object StorageRecoveryActor {
           Behaviors.same
 
         case CheckAbandon(progressAtSchedule) =>
-          if (progressAtSchedule == progressSeq) {
+          if progressAtSchedule == progressSeq then {
             ctx.log.warn(
               "Storage recovery abandoning download: no slot progress for {}s after {} unservable events and {} " +
                 "root roll(s). Remaining contract storage will be fetched on-demand via GetTrieNodes during regular sync.",
@@ -429,8 +429,7 @@ object StorageRecoveryActor {
         case _: MerklePatriciaTrie.MPTException => true
       }
     }
-    if (residual == 0)
-      log.info(s"Storage recovery: all ${missing.size} contract storage tries present on disk.")
+    if residual == 0 then log.info(s"Storage recovery: all ${missing.size} contract storage tries present on disk.")
     else
       log.warn(
         s"Storage recovery finishing: ${missing.size - residual} of ${missing.size} storage gaps filled, " +
@@ -457,10 +456,10 @@ object StorageRecoveryActor {
 
     val onLeaf: (ByteString, LeafNode) => Unit = { (accountHash, leafNode) =>
       accountCount += 1
-      if (accountCount % 100_000 == 0) {
+      if accountCount % 100_000 == 0 then {
         RecoveryMetrics.setStorageScanProgress(accountCount, contractCount, missing.size.toLong)
       }
-      if (accountCount % 1_000_000 == 0) {
+      if accountCount % 1_000_000 == 0 then {
         log.info(
           s"Storage recovery scan: $accountCount accounts, $contractCount contracts, " +
             s"$checkedCount checked, ${missing.size} missing"
@@ -469,9 +468,9 @@ object StorageRecoveryActor {
 
       Account(leafNode.value) match {
         case Success(account) =>
-          if (account.storageRoot != Account.EmptyStorageRootHash) {
+          if account.storageRoot != Account.EmptyStorageRootHash then {
             contractCount += 1
-            if (!seenRoots.contains(account.storageRoot)) {
+            if !seenRoots.contains(account.storageRoot) then {
               seenRoots += account.storageRoot
               checkedCount += 1
               try

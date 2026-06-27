@@ -35,9 +35,9 @@ object Fukuii extends Logger {
     val enableConsoleUI = args.contains("--tui")
 
     // Initialize TUI if enabled (using new TUI module)
-    val tui = if (enableConsoleUI) {
+    val tui = if enableConsoleUI then {
       val tuiInstance = Tui.getInstance(TuiConfig.default)
-      if (tuiInstance.initialize()) {
+      if tuiInstance.initialize() then {
         Some(tuiInstance)
       } else {
         None
@@ -48,7 +48,7 @@ object Fukuii extends Logger {
     }
 
     // Display Fukuii ASCII art on startup (only if TUI is not enabled)
-    if (tui.isEmpty) {
+    if tui.isEmpty then {
       printBanner()
     }
 
@@ -59,13 +59,13 @@ object Fukuii extends Logger {
     MilestoneLog.logMilestones(Config.blockchains.blockchainConfig.forkBlockNumbers)
 
     val configErrors = ConfigValidator.validate(Config.config)
-    if (configErrors.nonEmpty) {
+    if configErrors.nonEmpty then {
       configErrors.foreach(err => log.error("Configuration error: {}", err))
       System.exit(1)
     }
 
     val node =
-      if (Config.testmode) {
+      if Config.testmode then {
         log.info("Starting Fukuii in test mode")
         deleteRocksDBFiles()
         new TestNode
@@ -96,7 +96,7 @@ object Fukuii extends Logger {
     )
 
     paths.foreach { path =>
-      if (Files.exists(path)) {
+      if Files.exists(path) then {
         Try(Files.write(path, Array.emptyByteArray, StandardOpenOption.TRUNCATE_EXISTING)).failed.foreach(e =>
           log.warn("Failed to truncate log file {}: {}", path, e.getMessage)
         )

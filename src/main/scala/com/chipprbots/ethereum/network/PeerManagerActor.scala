@@ -393,7 +393,7 @@ object PeerManagerActor {
         * admin_maxPeers overrides take effect.
         */
       def outgoingConnectionDemand: Int =
-        if (connectedPeers.outgoingHandshakedPeersCount >= peerConfiguration.minOutgoingPeers) 0
+        if connectedPeers.outgoingHandshakedPeersCount >= peerConfiguration.minOutgoingPeers then 0
         else effectiveMaxOutgoing - connectedPeers.outgoingPeersCount
 
       def canConnectTo(node: Node): Boolean = {
@@ -460,7 +460,7 @@ object PeerManagerActor {
       msg match {
         case KnownNodesReceived(nodes) =>
           val nodesToConnect = nodes.take(peerConfiguration.maxOutgoingPeers)
-          if (nodesToConnect.nonEmpty) {
+          if nodesToConnect.nonEmpty then {
             log.debug("Trying to connect to {} known nodes", nodesToConnect.size)
             nodesToConnect.foreach(n => context.self ! ConnectToPeerCmd(n))
           } else {
@@ -487,8 +487,8 @@ object PeerManagerActor {
       }
 
     private def maybeConnectToRandomNode(connectedPeers: ConnectedPeers, node: Node): Unit =
-      if (connectedPeers.outgoingConnectionDemand > 0) {
-        if (connectedPeers.canConnectTo(node)) {
+      if connectedPeers.outgoingConnectionDemand > 0 then {
+        if connectedPeers.canConnectTo(node) then {
           log.debug(
             "Random node candidate {} accepted (outgoing demand: {}, tried: {}, pending: {})",
             formatNodeForLogs(node),
@@ -538,7 +538,7 @@ object PeerManagerActor {
           s"Trying to connect to ${nodesToConnect.size} more nodes."
       )
 
-      if (nodesToConnect.nonEmpty) {
+      if nodesToConnect.nonEmpty then {
         log.debug("Trying to connect to {} nodes", nodesToConnect.size)
         nodesToConnect.foreach { n =>
           triedNodes.add(n.id)
@@ -552,7 +552,7 @@ object PeerManagerActor {
       // nodes to connect to until the next discovery scan loop. Only sending 1
       // request so we don't rack up too many pending futures, just trigger a
       // search if needed.
-      if (connectedPeers.outgoingConnectionDemand > nodesToConnect.size) {
+      if connectedPeers.outgoingConnectionDemand > nodesToConnect.size then {
         requestRandomNode()
       }
       Behaviors.same
@@ -567,7 +567,7 @@ object PeerManagerActor {
       msg match {
         case PeerClosedConnectionCmd(peerAddress, reason) =>
           val isMaintainedPeer = maintainedPeersByNodeId.values.exists(_.getHost == peerAddress)
-          if (!isMaintainedPeer) {
+          if !isMaintainedPeer then {
             blacklist.add(
               PeerAddress(peerAddress),
               getBlacklistDuration(reason, peerAddress),
@@ -633,9 +633,9 @@ object PeerManagerActor {
       // misbehaving peer from flap-looping. Permanent (BreachOfProtocol-tier) bans are left untouched — the exemption
       // must never swallow a genuine breach.
       val isSoftTier = baseDuration == peerConfiguration.shortBlacklistDuration
-      if (isSoftTier && snapCapableHosts.contains(peerAddress)) {
+      if isSoftTier && snapCapableHosts.contains(peerAddress) then {
         val lenientCount = snapLenientBlacklists.getOrElse(peerAddress, 0)
-        if (lenientCount < PeerManagerActor.MaxSnapLenientBlacklists) {
+        if lenientCount < PeerManagerActor.MaxSnapLenientBlacklists then {
           snapLenientBlacklists(peerAddress) = lenientCount + 1
           val snapBackoff = PeerManagerActor.SnapPeerSoftBlacklistDuration
           log.debug(
@@ -729,7 +729,7 @@ object PeerManagerActor {
         case Right(address) =>
           val (peer, newConnectedPeers) = createPeer(address, incomingConnection = false, connectedPeers)
           peer.ref.tell(PeerActor.ConnectTo(uri), peerEventAdapter)
-          if (maintainedPeersByNodeId.values.exists(_ == uri)) {
+          if maintainedPeersByNodeId.values.exists(_ == uri) then {
             pendingMaintainedConnections(peer.ref) = uri
           }
           listening(newConnectedPeers)
@@ -816,7 +816,7 @@ object PeerManagerActor {
       pendingMaintainedConnections.remove(ref).foreach { uri =>
         val nodeIdHex = uri.getUserInfo.toLowerCase
         val nodeIdBytes = ByteString(Hex.decode(nodeIdHex))
-        if (connectedPeers.hasHandshakedWith(nodeIdBytes)) {
+        if connectedPeers.hasHandshakedWith(nodeIdBytes) then {
           log.debug("Maintained peer {} already connected via inbound — skipping pre-handshake reconnect", uri)
         } else {
           log.debug(
@@ -832,17 +832,17 @@ object PeerManagerActor {
       // peer still in outgoingPendingPeers here is a non-maintained discovery peer that failed
       // before the ETH handshake completed (TCP unreachable, TLS failure, etc.).
       connectedPeers.peers.get(PeerId.fromRef(ref)).foreach { peer =>
-        if (!peer.incomingConnection) {
+        if !peer.incomingConnection then {
           val ip = peer.remoteAddress.getHostString
           val count = consecutiveTcpFailures.getOrElse(ip, 0) + 1
           consecutiveTcpFailures(ip) = count
-          if (count >= 5) {
+          if count >= 5 then {
             // Peer-retention: a previously snap-capable host that now flaps at the TCP layer (NAT churn, transient
             // unreachability) must NOT be exiled for 5-30 min — on a 2-snap-peer pool that drops state capacity to
             // zero. Cap its backoff to a short fixed duration so it re-enters the dial rotation quickly. Non-snap
             // hosts keep the full exponential escalation.
             val backoff: FiniteDuration =
-              if (snapCapableHosts.contains(ip)) PeerManagerActor.SnapPeerSoftBlacklistDuration
+              if snapCapableHosts.contains(ip) then PeerManagerActor.SnapPeerSoftBlacklistDuration
               else math.min(30, 5 * (1 << (count - 5))).minutes
             log.info("TCP failure #{} for {} — blacklisting for {}", count, ip, backoff)
             blacklist.add(PeerAddress(ip), backoff, Blacklist.BlacklistReason.TcpSubsystemError)
@@ -865,7 +865,7 @@ object PeerManagerActor {
           .Try(ByteString(Hex.decode(peerId.value)))
           .map(newConnectedPeers.hasHandshakedWith)
           .getOrElse(false)
-        if (stillConnected) {
+        if stillConnected then {
           log.info(
             "DUPLICATE_TERMINATED: suppressing PeerDisconnected for {} — winner still connected, loser ref={} dropped",
             peerId,
@@ -876,7 +876,7 @@ object PeerManagerActor {
           peerEventBus ! Publish(PeerEvent.PeerDisconnected(peerId))
         }
         maintainedPeersByNodeId.get(peerId.value).foreach { uri =>
-          if (stillConnected) {
+          if stillConnected then {
             log.debug("Maintained peer {} already connected via winner — skipping reconnect", uri)
           } else {
             log.debug("Maintained peer {} disconnected — scheduling reconnect in 5s", uri)
@@ -885,7 +885,7 @@ object PeerManagerActor {
         }
       }
       // Try to replace a lost connection with another one.
-      if (newConnectedPeers.outgoingConnectionDemand > 0) {
+      if newConnectedPeers.outgoingConnectionDemand > 0 then {
         requestRandomNode()
       }
       // watchWith death-watch is one-shot per spawned ref; no explicit unwatch needed (the ref is terminated).
@@ -909,9 +909,8 @@ object PeerManagerActor {
       }
       val isMaintained =
         handshakedPeer.nodeId.exists(nid => maintainedPeersByNodeId.contains(Hex.toHexString(nid.toArray)))
-      if (
-        handshakedPeer.incomingConnection && connectedPeers.incomingHandshakedPeersCount >= peerConfiguration.maxIncomingPeers && !isMaintained
-      ) {
+      if handshakedPeer.incomingConnection && connectedPeers.incomingHandshakedPeersCount >= peerConfiguration.maxIncomingPeers && !isMaintained
+      then {
         handshakedPeer.ref ! PeerActor.DisconnectPeer(Disconnect.Reasons.TooManyPeers)
 
         // It looks like all incoming slots are taken; try to make some room.
@@ -919,11 +918,11 @@ object PeerManagerActor {
 
         listening(connectedPeers)
 
-      } else if (handshakedPeer.nodeId.exists(connectedPeers.hasHandshakedWith)) {
+      } else if handshakedPeer.nodeId.exists(connectedPeers.hasHandshakedWith) then {
         val nodeId = handshakedPeer.nodeId.get
         val existingOutboundOpt = connectedPeers.peers.values
           .find(p => p.nodeId.contains(nodeId) && !p.incomingConnection)
-        if (handshakedPeer.incomingConnection && isMaintained && existingOutboundOpt.isDefined) {
+        if handshakedPeer.incomingConnection && isMaintained && existingOutboundOpt.isDefined then {
           // Inbound wins for maintained peers — drop the outbound, keep the inbound.
           // Mirrors go-ethereum's static-pool removal when a peer connects either direction,
           // preventing core-geth's static-dial timer from firing a new outbound every 30-45s.
@@ -1152,7 +1151,7 @@ object PeerManagerActor {
   private[network] def sanitizeActorPathElement(raw: String): String = {
     val validSymbols = "-_.*$+:@&=,!~';"
     raw.filterNot(_ == '/').map { c =>
-      if (c.isLetterOrDigit || validSymbols.contains(c)) c else '_'
+      if c.isLetterOrDigit || validSymbols.contains(c) then c else '_'
     }
   }
 
@@ -1330,7 +1329,7 @@ object PeerManagerActor {
       connectedPeers: ConnectedPeers,
       peerConfiguration: PeerConfiguration.ConnectionLimits
   ): Int =
-    if (connectedPeers.outgoingHandshakedPeersCount >= peerConfiguration.minOutgoingPeers)
+    if connectedPeers.outgoingHandshakedPeersCount >= peerConfiguration.minOutgoingPeers then
       // We have established at least the minimum number of working connections.
       0
     else

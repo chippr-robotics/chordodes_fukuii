@@ -38,14 +38,14 @@ case class ByteCodeTask(
   /** Get task identifier for logging */
   def taskString: String = {
     val hashesStr = codeHashes.take(3).map(_.take(4).toArray.map("%02x".format(_)).mkString).mkString(", ")
-    val suffix = if (codeHashes.size > 3) s", ... (${codeHashes.size} total)" else ""
+    val suffix = if codeHashes.size > 3 then s", ... (${codeHashes.size} total)" else ""
     s"[$hashesStr$suffix]"
   }
 
   /** Calculate progress based on downloaded bytecodes */
   def progress: Double =
-    if (done) 1.0
-    else if (bytecodes.isEmpty) 0.0
+    if done then 1.0
+    else if bytecodes.isEmpty then 0.0
     else bytecodes.size.toDouble / codeHashes.size
 
   /** Get number of hashes in this task */
@@ -79,7 +79,7 @@ object ByteCodeTask {
   ): Seq[ByteCodeTask] = {
     require(batchSize > 0, "Batch size must be positive")
 
-    if (contractAccounts.isEmpty) {
+    if contractAccounts.isEmpty then {
       return Seq.empty
     }
 
@@ -121,7 +121,7 @@ object ByteCodeTask {
   ): Seq[ByteCodeTask] = {
     require(batchSize > 0, "Batch size must be positive")
 
-    if (codeHashes.isEmpty) {
+    if codeHashes.isEmpty then {
       return Seq.empty
     }
 

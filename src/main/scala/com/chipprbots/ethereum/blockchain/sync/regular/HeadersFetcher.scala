@@ -59,7 +59,7 @@ class HeadersFetcher(
           headers.headOption.map(_.number),
           peer.id
         )
-        if (headers.isEmpty) {
+        if headers.isEmpty then {
           log.debug("Received empty headers response from peer {}", peer.id)
         } else {
           log.debug("Headers range: {} to {}", headers.headOption.map(_.number), headers.lastOption.map(_.number))

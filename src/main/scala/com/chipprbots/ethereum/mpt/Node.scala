@@ -30,7 +30,7 @@ sealed abstract class MptNode {
 
   // Overriding equals is necessery to avoid array comparisons.
   override def equals(obj: Any): Boolean =
-    if (!obj.isInstanceOf[MptNode]) {
+    if !obj.isInstanceOf[MptNode] then {
       false
     } else {
       val compared = obj.asInstanceOf[MptNode]

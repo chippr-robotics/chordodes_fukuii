@@ -106,7 +106,8 @@ object SyncStatusResource {
         val bestBlock = deps.blockchainReader.getBestBlockNumber
         status match {
           case SyncProtocol.Status.Syncing(start, blocks, stateNodes) =>
-            val pct = if (blocks.target > 0) f"${(blocks.current.toDouble / blocks.target.toDouble * 100)}%.2f" else "0"
+            val pct =
+              if blocks.target > 0 then f"${(blocks.current.toDouble / blocks.target.toDouble * 100)}%.2f" else "0"
             val stateJson = stateNodes
               .filter(_.nonEmpty)
               .map(s => s""", "stateNodes": {"current": ${s.current}, "target": ${s.target}}""")
@@ -152,7 +153,7 @@ object ConnectedPeersResource {
       }
       .map { peers =>
         val peerEntries = peers.peers.toList.sortBy(_._1.id.value).map { case (peer, status) =>
-          val direction = if (peer.incomingConnection) "inbound" else "outbound"
+          val direction = if peer.incomingConnection then "inbound" else "outbound"
           val addr = peer.remoteAddress.toString
           val statusStr = status match {
             case com.chipprbots.ethereum.network.PeerActor.Status.Handshaked     => "handshaked"
@@ -274,7 +275,7 @@ object TransactionByHashResource {
   def read(hashStr: String, deps: McpDependencies): IO[String] = IO {
     val hashBytes =
       Try(org.bouncycastle.util.encoders.Hex.decode(hashStr.stripPrefix("0x"))).getOrElse(Array.empty[Byte])
-    if (hashBytes.length != 32) {
+    if hashBytes.length != 32 then {
       s"""{"error": "Invalid transaction hash: $hashStr"}"""
     } else {
       deps.transactionMappingStorage.get(hashBytes.toIndexedSeq) match {

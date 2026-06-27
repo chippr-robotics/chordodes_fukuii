@@ -43,7 +43,7 @@ object ArtificialFinality {
     *   numerator value (denominator is always 128)
     */
   def polynomialV(timeDelta: BigInt): BigInt = {
-    val x = if (timeDelta > Xcap) Xcap else timeDelta
+    val x = if timeDelta > Xcap then Xcap else timeDelta
 
     // 3 * x^2
     val term1 = x.pow(2) * 3

@@ -13,6 +13,6 @@ object ValidationUtils {
     */
   def combineValidations[A, B](obj: B, eithers: Either[A, B]*): Either[Set[A], B] = {
     val errors = eithers.collect { case Left(e) => e }
-    if (errors.isEmpty) Right(obj) else Left(errors.toSet)
+    if errors.isEmpty then Right(obj) else Left(errors.toSet)
   }
 }

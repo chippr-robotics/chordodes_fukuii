@@ -44,7 +44,7 @@ class DecoupledHealObservabilitySpec
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
+    if gauge == null then Double.NaN else gauge.value()
   }
 
   private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessage): SNAP.GetTrieNodes =
@@ -58,7 +58,7 @@ class DecoupledHealObservabilitySpec
     var acc = 0L
     val n = root.length.min(8)
     var i = 0
-    while (i < n) {
+    while i < n do {
       acc = (acc << 8) | (root(i) & 0xffL)
       i += 1
     }

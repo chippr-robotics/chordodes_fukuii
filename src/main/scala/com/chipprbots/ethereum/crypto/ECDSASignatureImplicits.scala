@@ -14,7 +14,7 @@ object ECDSASignatureImplicits {
         // Empty v component represents yParity=0 in EIP-2930 transaction RLP encoding
         // In RLP, the integer 0 is encoded as an empty byte string (0x80)
         ECDSASignature(BigInt(1, r.toArray), BigInt(1, s.toArray), BigInt(0))
-      case RLPList(items @ _*) =>
+      case RLPList(items*) =>
         throw new RuntimeException(
           s"Cannot decode ECDSASignature: expected 3 RLPValue items (r, s, v), got ${items.length} items"
         )

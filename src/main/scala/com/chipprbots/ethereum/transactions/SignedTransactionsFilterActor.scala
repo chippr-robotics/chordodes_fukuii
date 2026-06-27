@@ -90,7 +90,7 @@ object SignedTransactionsFilterActor {
       }.attempt
         .map {
           case Right(correctTransactions) =>
-            if (correctTransactions.nonEmpty)
+            if correctTransactions.nonEmpty then
               pendingTransactionsManager ! ProperSignedTransactions(correctTransactions, peerId)
           case Left(reason) =>
             context.log.debug(
@@ -138,10 +138,10 @@ object SignedTransactionsFilterActor {
       recoveries.get(recoveryId).foreach { initialState =>
         var state = initialState
         var keepGoing = true
-        while (keepGoing)
+        while keepGoing do
           state.bufferedChunks.get(state.nextChunkToEmit) match {
             case Some(transactions) =>
-              if (transactions.nonEmpty)
+              if transactions.nonEmpty then
                 pendingTransactionsManager ! ProperSignedTransactions(transactions, state.peerId)
               state = state.copy(
                 nextChunkToEmit = state.nextChunkToEmit + 1,
@@ -151,16 +151,15 @@ object SignedTransactionsFilterActor {
               keepGoing = false
           }
 
-        if (state.nextChunkToEmit >= state.totalChunks) recoveries -= recoveryId
+        if state.nextChunkToEmit >= state.totalChunks then recoveries -= recoveryId
         else recoveries = recoveries.updated(recoveryId, state)
       }
 
     Behaviors.receiveMessage {
       case PeerSignedTransactions(SignedTransactions(newTransactions), peerId) =>
-        if (newTransactions.size >= chunkedRecoveryThreshold) {
+        if newTransactions.size >= chunkedRecoveryThreshold then {
           val statelessValid = SignedTransactionWithSender.getStatelessValidTransactions(newTransactions)
-          if (statelessValid.nonEmpty)
-            pendingTransactionsManager ! AnnounceTransactions(statelessValid, peerId)
+          if statelessValid.nonEmpty then pendingTransactionsManager ! AnnounceTransactions(statelessValid, peerId)
           recoverLargeBatch(statelessValid, peerId)
         } else {
           recoverSmallBatch(newTransactions, peerId)

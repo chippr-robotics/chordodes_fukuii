@@ -55,7 +55,7 @@ class HeadersFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetB
       .max(1)
 
   def reserve(peer: PeerWithInfo, items: Int): Option[GetBlockHeaders] = synchronized {
-    if (pendingQueue.isEmpty) return None
+    if pendingQueue.isEmpty then return None
 
     val count = items.min(MaxHeadersPerRequest).min(pendingQueue.size)
     val taken = (0 until count).map(_ => pendingQueue.dequeue()).toVector

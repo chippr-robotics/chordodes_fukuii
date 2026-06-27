@@ -148,7 +148,7 @@ class SpiralToOlympiaGasTransitionSpec
     "operator has gasLimitTarget = 8M (legacy Spiral node config)" should {
 
       "keep gas flat at 8M for all pre-Olympia Spiral blocks" taggedAs (UnitTest, OlympiaTest, ConsensusTest) in {
-        for (blockNum <- Seq(BigInt(0), olympiaBlock - 10, olympiaBlock - 2, olympiaBlock - 1))
+        for blockNum <- Seq(BigInt(0), olympiaBlock - 10, olympiaBlock - 2, olympiaBlock - 1) do
           withClue(s"block $blockNum: ") {
             legacyMiner.calcGasLimit(SpiralGasLimit, blockNum) shouldBe SpiralGasLimit
           }
@@ -172,7 +172,7 @@ class SpiralToOlympiaGasTransitionSpec
         val threshold = OlympiaGasTarget * 99 / 100
         var gas = SpiralGasLimit
         var blocks = 0
-        while (gas < threshold && blocks < 10_000) {
+        while gas < threshold && blocks < 10_000 do {
           gas = legacyMiner.calcGasLimit(gas, olympiaBlock + blocks)
           blocks += 1
         }

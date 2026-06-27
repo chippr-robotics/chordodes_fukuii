@@ -276,7 +276,7 @@ class TestService(
         }
 
     def doNTimesF(n: Int)(fn: IO[Unit]): IO[Unit] = fn.flatMap { _ =>
-      if (n <= 1) IO.unit
+      if n <= 1 then IO.unit
       else doNTimesF(n - 1)(fn)
     }
 
@@ -383,7 +383,7 @@ class TestService(
         blockHash => blockchainReader.getBlockByHash(blockHash)
       )
 
-    if (blockOpt.isEmpty) {
+    if blockOpt.isEmpty then {
       AccountsInRangeResponse(Map(), ByteString(0)).rightNow
     } else {
       val blockNumber: BigInt = blockOpt.map(_.header.number).getOrElse(BigInt(0))
@@ -405,8 +405,7 @@ class TestService(
       AccountsInRangeResponse(
         addressMap = addressMap,
         nextKey =
-          if (accountBatch.size > request.parameters.maxResults)
-            accountBatch.last._1
+          if accountBatch.size > request.parameters.maxResults then accountBatch.last._1
           else UInt256(0).bytes
       ).rightNow
     }

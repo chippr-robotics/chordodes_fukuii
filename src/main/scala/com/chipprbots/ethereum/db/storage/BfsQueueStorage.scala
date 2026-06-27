@@ -60,13 +60,13 @@ object BfsQueueStorage {
     val buf = ByteBuffer.allocate(payloadSize)
     val hashLen = math.min(hash.length, 32)
     buf.put(hash, 0, hashLen)
-    if (hashLen < 32) buf.position(32) // zero-pad if truncated (should not happen)
+    if hashLen < 32 then buf.position(32) // zero-pad if truncated (should not happen)
     buf.put(pathset.length.toByte)
     pathset.foreach { p =>
       buf.putShort(p.length.toShort)
       buf.put(p)
     }
-    buf.put(if (isStorage) 1.toByte else 0.toByte)
+    buf.put(if isStorage then 1.toByte else 0.toByte)
     buf.array()
   }
 
@@ -97,7 +97,7 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
   def counter: Long = writeCounter.get()
 
   def enqueueBatch(entries: Seq[(Array[Byte], Seq[Array[Byte]], Boolean)]): Unit = {
-    if (entries.isEmpty) return
+    if entries.isEmpty then return
     val upserts = entries.map { case (hash, pathset, isStorage) =>
       val key = longToBytes(writeCounter.getAndIncrement())
       val value = encodeEntry(hash, pathset, isStorage)
@@ -137,7 +137,7 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
     // implementation expanded the range into 10K-key point-delete batches; clearing the
     // ~140M-entry queue after a full ETC-mainnet walk wrote ~140M tombstones over ~30 minutes
     // at full CPU (observed live 2026-06-12) while the next walk waited.
-    if (from < to) dataSource.deleteRange(namespace, longToBytes(from), longToBytes(to))
+    if from < to then dataSource.deleteRange(namespace, longToBytes(from), longToBytes(to))
 
   def clear(): Unit = {
     // Tombstone the ENTIRE keyspace, not just [0, counter): the counter is in-memory only, so

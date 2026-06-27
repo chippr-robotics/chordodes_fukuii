@@ -45,7 +45,7 @@ trait Miner extends Logger {
     }
 
   def submitHashRate(ethMiningService: EthMiningService, time: Long, mineResult: MiningResult): Unit = {
-    val hashRate = if (time > 0) (mineResult.triedHashes.toLong * 1000000000) / time else Long.MaxValue
+    val hashRate = if time > 0 then (mineResult.triedHashes.toLong * 1000000000) / time else Long.MaxValue
     ethMiningService.submitHashRate(SubmitHashRateRequest(hashRate, ByteString("fukuii-miner")))
   }
 }

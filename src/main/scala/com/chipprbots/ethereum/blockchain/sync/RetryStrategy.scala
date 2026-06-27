@@ -42,8 +42,7 @@ final case class RetryStrategy(
 
     val jitterRange = (baseDelay * jitterFactor).toInt
     val jitterMs =
-      if (jitterFactor > 0.0 && jitterRange > 0)
-        ThreadLocalRandom.current().nextInt(jitterRange + 1)
+      if jitterFactor > 0.0 && jitterRange > 0 then ThreadLocalRandom.current().nextInt(jitterRange + 1)
       else 0
 
     (baseDelay.toLong + jitterMs).millis

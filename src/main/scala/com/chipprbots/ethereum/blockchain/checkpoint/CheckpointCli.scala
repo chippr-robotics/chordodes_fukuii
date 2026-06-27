@@ -97,11 +97,10 @@ object CheckpointCli extends Logger {
     // The CheckpointImporter also magic-byte-sniffs, but the conventional extension
     // makes the file self-describing for ops tooling.
     val output =
-      if (args.gzip && !args.output.toString.endsWith(".gz"))
+      if args.gzip && !args.output.toString.endsWith(".gz") then
         args.output.resolveSibling(args.output.getFileName.toString + ".gz")
       else args.output
-    if (output != args.output)
-      log.info(s"--gzip set, appending .gz: writing to $output")
+    if output != args.output then log.info(s"--gzip set, appending .gz: writing to $output")
     exporter.exportArchive(blockNumber, output, gzip = args.gzip)
   }
 

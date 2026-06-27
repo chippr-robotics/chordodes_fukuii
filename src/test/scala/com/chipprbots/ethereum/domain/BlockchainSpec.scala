@@ -204,7 +204,7 @@ class BlockchainSpec
         .onBlockSave(_: BigInt, _: BigInt)(_: () => Unit))
         .when(*, *, *)
         .onCall { (bn, _, persistFn) =>
-          if (blockImportToPersist.exists(_.number == bn)) persistFn()
+          if blockImportToPersist.exists(_.number == bn) then persistFn()
         }
 
       blocksToImport.foreach { block =>
@@ -220,12 +220,12 @@ class BlockchainSpec
 
       // Randomly select the block rollback to persist (empty means no persistence)
       val blockRollbackToPersist =
-        if (blocksToRollback.isEmpty) None else Gen.option(Gen.oneOf(blocksToRollback)).sample.get
+        if blocksToRollback.isEmpty then None else Gen.option(Gen.oneOf(blocksToRollback)).sample.get
       (stubStateStorage
         .onBlockRollback(_: BigInt, _: BigInt)(_: () => Unit))
         .when(*, *, *)
         .onCall { (bn, _, persistFn) =>
-          if (blockRollbackToPersist.exists(_.number == bn)) persistFn()
+          if blockRollbackToPersist.exists(_.number == bn) then persistFn()
         }
 
       blocksToRollback.reverse.foreach { block =>

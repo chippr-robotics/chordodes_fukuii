@@ -530,7 +530,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
     def buildParentHashChain(startNum: Int, length: Int): Vector[BlockHeader] = {
       var prev = Fixtures.Blocks.Genesis.header
       val buf = scala.collection.mutable.ArrayBuffer.empty[BlockHeader]
-      for (i <- 0 until length) {
+      for i <- 0 until length do {
         val n = startNum + i
         val h = Fixtures.Blocks.Genesis.header.copy(
           number = BigInt(n),

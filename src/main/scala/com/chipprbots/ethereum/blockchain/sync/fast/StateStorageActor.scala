@@ -91,7 +91,7 @@ object StateStorageActor {
 
     val persistingQueues: IO[Try[FastSyncStateStorage]] = IO {
       lazy val result = Try(storage.putSyncState(syncState))
-      if (log.isDebugEnabled) {
+      if log.isDebugEnabled then {
         val now = System.currentTimeMillis()
         result
         val end = System.currentTimeMillis()

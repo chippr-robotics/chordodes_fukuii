@@ -75,7 +75,7 @@ class BodiesSliceFetcher(
 
   private def requestSlice(hashes: Seq[ByteString], triedPeers: Set[PeerId], retryCount: Int): Unit = {
     val msg = ETHPackets.GetBlockBodies(ETHPackets.nextRequestId, hashes)
-    val peerSelector = if (triedPeers.nonEmpty) ExcludingPeers(triedPeers) else BestPeer
+    val peerSelector = if triedPeers.nonEmpty then ExcludingPeers(triedPeers) else BestPeer
     val fallback: SliceCommand = RetrySliceRequest(None, hashes, triedPeers, retryCount)
     val resp = makeRequest(Request.create(msg, peerSelector), fallback, triedPeers, retryCount)
     context.pipeToSelf(resp.unsafeToFuture()) {

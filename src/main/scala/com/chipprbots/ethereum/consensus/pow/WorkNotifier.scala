@@ -37,7 +37,7 @@ object WorkNotifier extends Logger {
   /** Posts the work package to every configured URL. Each POST is independent; one failure does not affect others.
     */
   def notify(urls: Seq[String], work: WorkPackage)(implicit system: ActorSystem): Unit = {
-    if (urls.isEmpty) return
+    if urls.isEmpty then return
     implicit val ec: ExecutionContext = system.dispatcher
     val body = buildJsonBody(work)
     urls.foreach { url =>
