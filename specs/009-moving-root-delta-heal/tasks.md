@@ -82,7 +82,7 @@ Single SBT `main` module. Heal logic: `src/main/scala/com/chipprbots/ethereum/bl
 - [ ] T018 [P] No-op verification tests: ETH/Sepolia sync unaffected; flag OFF byte-identical to spec-004 (FR-008).
 - [ ] T019 Consensus parity gate: `sbt testCrypto testMPT` + `sbt testEthereum` green with the flag ON (SC-005) — run by `eye`.
 - [ ] T020 `sbt formatAll` + `sbt compile-all`; `wraith` clears compile fallout without altering consensus semantics; `eye` runs `testStandard`.
-- [ ] T021 Fresh-Mordor A/B E2E per `quickstart.md` (deferred=false, flag ON, `-Xmx ≥ 6g`, WIPED rocksdb): assert heal seeds the served root → missing-node count SHRINKS → re-peg RETAINS progress → pruned descent → SNAP Completed → block-import past pivot, no re-snap loop, no O(total) BFS; plus the peers-stop-mid-heal behavior and the A/B replay (off vs on → identical/canonical finalized root) (SC-001/002/004/005).
+- [X] T021 Fresh-Mordor A/B E2E per `quickstart.md` (deferred=false, flag ON, `-Xmx ≥ 6g`, WIPED rocksdb): assert heal seeds the served root → missing-node count SHRINKS → re-peg RETAINS progress → pruned descent → SNAP Completed → block-import past pivot, no re-snap loop, no O(total) BFS; plus the peers-stop-mid-heal behavior and the A/B replay (off vs on → identical/canonical finalized root) (SC-001/002/004/005).
 - [ ] T022 [P] Characterize heal throughput (nodes/s, delta size) + the non-deferred inline-build CPU/GC on the i5-4430 host (SC-006); note the spec-007 hot-path interaction (report-and-record).
 
 ---
