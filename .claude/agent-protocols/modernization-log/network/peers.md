@@ -193,3 +193,15 @@ Note: `ServerActor` and `RLPxConnectionHandler` intentionally remain Classic TCP
 - **Finding:** `PeerClosedConnection` remains defined in the companion object but is sent nowhere in the current codebase. No new notification mechanism exists for pre-handshake disconnects — termination is the signal.
 - **Verification:** 15/15 `PeerActorSpec` pass; `testEssential` baseline restored to 0 failures.
 - **Cross-refs:** `completed/CHASE-QUEUE.md §8k-CQ2`, `completed/DEFERRED-BACKLOG.md §8k-CQ2`
+
+---
+
+## Test Fix — §8a-E6-PeerActor: PeerActorSpec 15/15 — Classic ActorSystem removed, stop() crash fixed
+
+#### `189e413c9` — fix(§8a-E6): PeerActorSpec 15/15 — remove Classic ActorSystem, fix stop() crash (2026-06-27)
+- **What:** Two independent bugs both caused `cannot create children while terminating or terminated` on `testKit.createTestProbe()`.
+  - **Bug 1 — cake chain leak:** `NodeStatusSetup extends EphemBlockchainTestSetup → ScenarioSetup → StdTestMiningBuilder → ActorSystemBuilder` materialised a Classic `ActorSystem` as a side effect. Its teardown raced with the `ScalaTestWithActorTestKit`-managed system and killed it after the first test's setup, leaving 13/15 tests unable to create probes.
+  - **Bug 2 — stop() routing:** Test 3 called `testKit.stop(conn1Probe.ref)` on a `TestProbe` living under `/system/testProbe-N`. `ActorTestKit.stop()` routes through the `/user` guardian which can only stop its direct children; stopping a `/system` actor threw `IllegalArgumentException`, crashed the guardian, and terminated the `ActorTestKit` for all subsequent tests.
+- **Fixes:** `NodeStatusSetup` rewritten — `EphemDataSourceComponent` + `Storages.DefaultStorages` inlined directly, no `EphemBlockchainTestSetup` in the chain. `implicit override lazy val classicSystem` deleted from `TestSetup`. Test 3 rewrote `conn1`/`conn2` from raw `TestProbe` to user-actor proxies (`testKit.spawn(Behaviors.receiveMessage{...})`) with spy probes capturing forwarded messages.
+- **Verification:** PeerActorSpec 15/15 ✅ · `scalafmtAll` clean · zero Classic imports
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8a-E6-PeerActor`, `working-docs/DEFERRED-BACKLOG.md §8a-E6 PeerActorSpec ✅`

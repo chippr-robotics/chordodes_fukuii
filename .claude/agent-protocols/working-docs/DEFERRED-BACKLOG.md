@@ -716,25 +716,11 @@ See `completed/DEFERRED-BACKLOG.md §8a-E6` for full write-up.
 
 ---
 
-### §8a-E6 PeerActorSpec — remove Classic system dependency (13/15 tests failing)
+### §8a-E6 PeerActorSpec — 15/15 restored ✅ DONE `189e413c9` 2026-06-27
 
-**File:** `src/test/scala/com/chipprbots/ethereum/network/p2p/PeerActorSpec.scala`
-**Compile baseline:** 0 errors (migration complete, imports clean).
-**Test result:** 2/15 pass, 13/15 fail with `IllegalStateException: cannot create children while terminating or terminated` at `ActorTestKit.createTestProbe`.
-
-**Root cause:** `NodeStatusSetup extends EphemBlockchainTestSetup`, which creates or terminates a Classic `ActorSystem` during test lifecycle. This kills the shared `ScalaTestWithActorTestKit` system after the first test, breaking all subsequent `testKit.createTestProbe()` calls.
-
-**Fix — rewrite `NodeStatusSetup` to remove the `EphemBlockchainTestSetup` dependency:**
-
-1. Read `EphemBlockchainTestSetup` to understand what it provides: it is almost certainly just storage fixtures (ephem RocksDB/in-memory `DataSource`, `StoragesInstance`, `BlockchainWriter`, `BlockchainReader`). These do NOT require a Classic `ActorSystem` — the Classic system was a historical artefact.
-
-2. Rewrite `NodeStatusSetup` to instantiate the storage fixtures directly (same ephem/in-memory backing, same `StoragesInstance` wiring) WITHOUT extending `EphemBlockchainTestSetup`. Remove the `classicSystem` field entirely from the test file. `testKit` is the only system.
-
-3. If `EphemBlockchainTestSetup` has useful helper methods (`saveEtcChainAtDaoFork`, fixture blocks, etc.) copy those inline into `TestSetup` or `NodeStatusSetup` — do not pull in the Classic system lifecycle to get them.
-
-4. `implicit override lazy val classicSystem` in `TestSetup` — delete it. Nothing in PeerActorSpec should reference Classic after this rewrite.
-
-**Goal:** zero `classicSystem`, zero `toClassic`, zero Classic imports in PeerActorSpec. Only `testKit`, `ManualTime`, Typed probes, Typed `ActorRef`.
-
-**Verify:** `fukuii-test only "*PeerActorSpec"` → 15/15 pass. Then `sbt scalafmtAll` and commit referencing §8a-E6.
+`NodeStatusSetup` decoupled from `EphemBlockchainTestSetup`; storage fixtures inlined directly.
+`testKit.stop(probe.ref)` guardian crash fixed via user-actor proxy pattern for conn1/conn2 in test 3.
+`implicit override lazy val classicSystem` deleted from `TestSetup` — `testKit` is the only system.
+VERIFY: PeerActorSpec 15/15 ✅ · `scalafmtAll` clean
+See `completed/DEFERRED-BACKLOG.md §8a-E6-PeerActor` for full write-up.
 

@@ -2872,3 +2872,87 @@ with `IllegalStateException: cannot create children while terminating or termina
   Pekko Typed TCP bindings or a redesigned Classic bridge actor
 
 VERIFY: `RLPxCapabilityOffsetsSpec` 7/7 ✅ · `RLPxConnectionHandlerSpec` 9/9 ✅
+
+---
+
+## §8a-E6-PeerActor: PeerActorSpec — remove Classic ActorSystem, restore 15/15
+
+**Commit:** `189e413c9` · 2026-06-27
+**File:** `src/test/scala/com/chipprbots/ethereum/network/p2p/PeerActorSpec.scala`
+**Starting state:** 2/15 pass; 13/15 fail with `IllegalStateException: cannot create children while terminating or terminated` at `ActorTestKit.createTestProbe`
+
+### Bug 1 — Classic ActorSystem leaked via cake chain
+
+**Root cause:** `NodeStatusSetup extends EphemBlockchainTestSetup → ScenarioSetup → StdTestMiningBuilder → ActorSystemBuilder`
+where `ActorSystemBuilder.classicSystem: lazy val = org.apache.pekko.actor.ActorSystem(...)` constructed
+a separate Classic system. Its lifecycle conflicted with the `ScalaTestWithActorTestKit`-managed system,
+killing the shared `testKit` after the first test suite initialisation. Every subsequent
+`testKit.createTestProbe()` then threw `cannot create children while terminating or terminated`.
+
+**Fix:** Rewrote `NodeStatusSetup` from scratch — no `EphemBlockchainTestSetup` dependency.
+Storage fixtures inlined directly:
+```scala
+trait NodeStatusSetup extends SecureRandomBuilder:
+  lazy val nodeKey: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
+
+  private trait LocalPruningConfigBuilder extends PruningConfigBuilder with TestInstanceConfigProvider:
+    override val pruningMode: PruningMode = ArchivePruning
+
+  lazy val storagesInstance: EphemDataSourceComponent & Storages.DefaultStorages =
+    new EphemDataSourceComponent
+      with LocalPruningConfigBuilder
+      with Storages.DefaultStorages
+      with TestInstanceConfigProvider
+
+  lazy val blockchainReader: BlockchainReader = BlockchainReader(storagesInstance.storages)
+  lazy val blockchainWriter: BlockchainWriter = BlockchainWriter(storagesInstance.storages)
+  lazy val blockchain: BlockchainImpl         = BlockchainImpl(storagesInstance.storages, blockchainReader)
+  val blockchainConfig: BlockchainConfig      = Config.blockchains.blockchainConfig
+  // ... nodeStatus, nodeStatusHolder, genesisBlock, peerConf unchanged
+```
+
+`LocalPruningConfigBuilder` declared `private` — must not appear in `storagesInstance` type annotation
+(Scala 3 visibility error: _"non-private lazy value refers to private trait in its type signature"_).
+Return type narrowed to `EphemDataSourceComponent & Storages.DefaultStorages`; callers only use `.storages`.
+
+`implicit override lazy val classicSystem` deleted from `TestSetup` — `testKit` is the only system.
+
+### Bug 2 — `testKit.stop(probe.ref)` crashes user guardian
+
+**Root cause:** Test 3 ("try to reconnect on broken rlpx connection") called `testKit.stop(conn1)` where
+`conn1` was a `TestProbe[RLPxConnectionHandler.Command]`. `ActorTestKit.stop()` routes through the `/user`
+guardian via `context.stop(childRef)` — which can only stop **direct children of `/user`**. Test probes
+live under `/system/testProbe-N`, not `/user`. This caused:
+```
+IllegalArgumentException: Only direct children of an actor can be stopped through the actor context,
+but [Actor[pekko://PeerActorSpec/system/testProbe-6#...]] is not a child of
+[Actor[pekko://PeerActorSpec/user#0]]
+```
+The exception crashed the user guardian, which terminated the entire `ActorTestKit`. All tests run after
+test 3 then failed with `cannot create children while terminating or terminated`.
+
+**Fix:** User-actor proxy pattern — spawn real user actors (`testKit.spawn(Behaviors.receiveMessage{...})`)
+under `/user` that forward to spy test probes. `testKit.stop()` can stop user actors correctly; spy probes
+capture messages sent to the proxied refs:
+
+```scala
+val conn1Spy = testKit.createTestProbe[RLPxConnectionHandler.Command]()
+val conn1: ActorRef[RLPxConnectionHandler.Command] = testKit.spawn(
+  Behaviors.receiveMessage[RLPxConnectionHandler.Command] { msg => conn1Spy.ref ! msg; Behaviors.same },
+  s"rlpx-conn-1-${java.util.UUID.randomUUID()}"
+)
+// ... conn2 same pattern
+testKit.stop(conn1)          // stops /user child — safe
+manualTime.timePasses(2.seconds)
+conn2Spy.expectMessageType[RLPxConnectionHandler.ConnectTo]
+```
+
+### Compile errors encountered
+
+1. `non-private lazy value storagesInstance refers to private trait LocalPruningConfigBuilder` —
+   removed `LocalPruningConfigBuilder` from type annotation (use `EphemDataSourceComponent & Storages.DefaultStorages`).
+2. `lazy value nodeKey overrides nothing` — removed spurious `override` keyword.
+
+### Result
+
+VERIFY: PeerActorSpec 15/15 ✅ · `scalafmtAll` clean · zero Classic imports in file
