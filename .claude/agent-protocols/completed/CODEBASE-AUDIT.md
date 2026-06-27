@@ -897,3 +897,32 @@ grep -rn "extends Actor\b\|extends ClassicActor\b" src/main/ --include="*.scala"
 
 ---
 
+## Resolution Prompt Series — June 2026 sprint (all DONE)
+
+**Branch:** `scala3-cleanup-june`  
+**Closed:** 2026-06-27
+
+| # | Prompt | Owner | Commit | Status |
+|---|--------|-------|--------|--------|
+| 1 | FastSync critical fixes (C1 + C3 + W8) | MITHRIL | — | ✅ DONE |
+| 2 | SyncController EC.global (C2) | WRAITH | `a5132aa80` | ✅ DONE |
+| 3 | NPMA Command sealing + W1/W16/W17 | MITHRIL | — | ✅ DONE |
+| 4 | NPMA scheduler thread fix + W9 | LOOM | `5e33435c8`, `8bd4ed3f1` | ✅ DONE |
+| 5 | SyncController HandshakedPeers fallthrough + INFO-5/6 | WRAITH | `8a65bbdb7`, `a73ce7922` | ✅ DONE |
+| 6 | HERALD: verify W5 + W11 caller intent | HERALD | — | ✅ DONE |
+| 6b | W5 comment + W11 dead arm deletion | MITHRIL | `13aa7585e` | ✅ DONE |
+| 7 | FastSync docs + emoji cleanup (INFO-3, INFO-12) | MITHRIL | `3c6be4512` | ✅ DONE |
+| 7b | WormToBrainBar shared utility + sync integration | MITHRIL | `c37154287`–`c8a1ddbfc` | ✅ DONE |
+| 8 | EngineApi null guard + var fields (S3-A, S3-D, S3-F) | BEACON | `89d6aadb2` | ✅ DONE |
+| 9 | JwtAuthenticator return → §8e (S3-C) | FORGE | `6c8a07725` | ✅ DONE |
+| 10 | JsonRpcIpcServer var serverSocket lifecycle (S3-G) | CONDUIT | `8ef187dfb` | ✅ DONE |
+| G1 | Behavior[Any] narrowing sprint | MITHRIL | — | ✅ DONE 2026-06-26 |
+| G2 | SNAP cleanup sprint (S3-B, S3-E, INFO-8) | MITHRIL | — | ✅ DONE 2026-06-26 |
+| D1 | INFO-13: RegularSync LoggingAdapter | LOOM | `913c22363` | ✅ DONE |
+| D2 | SNAP S3-E task types | LOOM | — | ✅ DONE 2026-06-26 |
+| §8e-SNAP1 | SNAPSyncController return clearout (62 sites) | MITHRIL | `ca1446e49` | ✅ DONE |
+| POST-MIGRATION-SWEEP | Final Classic residue + AkkaTaskOps deletion | MITHRIL | `82a1e3a43` | ✅ DONE 2026-06-27 |
+
+**Final state:** Zero Classic residue outside TCP floor (`RLPxConnectionHandler:197,235` — permanent, `ClassicActor` alias). `AkkaTaskOps` Classic extension block deleted. All BRIDGE-A/B/C categories resolved for this sprint scope. BRIDGE-E (RegularSync logging) deferred to Wave 3 Network/P2P sprint.
+
+---

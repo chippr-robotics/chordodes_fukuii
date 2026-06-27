@@ -2,6 +2,8 @@
 
 **Branch:** `scala3-cleanup-june`
 **Scope:** Code evolution from Pekko Classic + Scala 2 idioms → Pekko Typed + Scala 3 LTS
+**Status:** ✅ All tracked subsystems Typed — june-sprint complete 2026-06-27
+**Next:** Wave 3 Network/P2P (35 Classic actors in devp2p/rlpx — see `SPRINT-QUEUE.md`)
 
 ---
 
