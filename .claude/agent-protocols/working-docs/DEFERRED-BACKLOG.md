@@ -222,6 +222,14 @@ Summary:
 
 **Files:** `.claude/agent-protocols/alert-wrapper-protocol.md` (new) | **Agent:** Main session | **Gate:** None — do first.
 
+**Note:** The entire §7c sprint (P0 → D → A → B → E1 → C → E3) runs in one shared worktree. Create it once before P0, then run each sub-prompt sequentially in that same worktree. Merge back only after E3 (the final prompt).
+
+**Worktree setup (before P0, run from main checkout):**
+```bash
+git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/7c-sprint -b wt/7c-sprint scala3-cleanup-june
+cd /media/dev/2tb/dev/fukuii/.claude/worktrees/7c-sprint
+```
+
 **Prompt:**
 ```
 Write `.claude/agent-protocols/alert-wrapper-protocol.md` to standardise the
@@ -497,6 +505,14 @@ sbt compile-all — must be clean.
 git commit -m "feat(7c-E3): restartWithBackoff for SyncStateSchedulerActor (bounded storm)"
 ```
 
+**§7c sprint — merge back + teardown (after E3 commit, from /media/dev/2tb/dev/fukuii):**
+```bash
+cd /media/dev/2tb/dev/fukuii
+git merge --no-ff wt/7c-sprint
+git worktree remove .claude/worktrees/7c-sprint
+git branch -d wt/7c-sprint
+```
+
 ---
 
 ### 7e-P2 — HealingState Extraction (SSC)
@@ -573,6 +589,10 @@ Use MITHRIL to implement `opaque type Difficulty = BigInt`, then ask FORGE and B
 Context: `BlockHeader.difficulty` is PoW-specific on ETC. Post-merge ETH stores the field as prevRandao — not used for PoW. Cross-chain field on BlockHeader. ~24 files.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H3.
 
+Step 0 — Worktree setup (run from main checkout — parallel-safe, starts immediately):
+  git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/8b-h3 -b wt/8b-h3 scala3-cleanup-june
+  cd /media/dev/2tb/dev/fukuii/.claude/worktrees/8b-h3
+
 Pre-flight: confirm `sbt compile-all` is clean.
 
 Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/Difficulty.scala`:
@@ -594,6 +614,11 @@ Step 5 — FORGE review: confirm ETC Ethash difficulty calculation semantics pre
 Step 6 — BEACON review: confirm ETH post-merge `difficulty=0` / prevRandao not broken.
 Step 7 — `sbt "testOnly *BlockHeader* *Ethash* *Difficulty*"`.
 Step 8 — `git commit -m "feat(8b-H3): Difficulty opaque type (BigInt) — BlockHeader + Ethash sites, FORGE+BEACON reviewed"`
+Step 9 — Merge back (from /media/dev/2tb/dev/fukuii):
+  cd /media/dev/2tb/dev/fukuii
+  git merge --no-ff wt/8b-h3
+  git worktree remove .claude/worktrees/8b-h3
+  git branch -d wt/8b-h3
 ```
 
 ---
@@ -610,7 +635,11 @@ Use MITHRIL to implement `opaque type TotalDifficulty = BigInt`, then ask FORGE 
 Context: `ChainWeight.totalDifficulty` drives MESS (Modified Exponential Subjective Scoring) on ETC — consensus-critical for ETC chain-selection. ETH stores TD for historical sync only.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H4.
 
-Pre-flight: confirm H3 committed — `grep "opaque type Difficulty" src/main/scala/.../Difficulty.scala`.
+Step 0 — Gate check + worktree setup (H3 must be merged to scala3-cleanup-june first):
+  grep "opaque type Difficulty" /media/dev/2tb/dev/fukuii/src/main/scala/com/chipprbots/ethereum/domain/Difficulty.scala
+  # If grep succeeds, H3 is merged. Create worktree:
+  git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/8b-h4 -b wt/8b-h4 scala3-cleanup-june
+  cd /media/dev/2tb/dev/fukuii/.claude/worktrees/8b-h4
 
 Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/TotalDifficulty.scala`:
   opaque type TotalDifficulty = BigInt
@@ -632,6 +661,11 @@ Step 6 — FORGE review: confirm MESS weight comparison semantics preserved (cri
 Step 7 — BEACON review: confirm ETH total-difficulty storage + terminal TD semantics unchanged.
 Step 8 — `sbt "testOnly *ChainWeight* *MESS* *BlockchainReader*"`.
 Step 9 — `git commit -m "feat(8b-H4): TotalDifficulty opaque type (BigInt) — ChainWeight + MESS sites, FORGE+BEACON reviewed"`
+Step 10 — Merge back (from /media/dev/2tb/dev/fukuii):
+  cd /media/dev/2tb/dev/fukuii
+  git merge --no-ff wt/8b-h4
+  git worktree remove .claude/worktrees/8b-h4
+  git branch -d wt/8b-h4
 ```
 
 ---
@@ -648,7 +682,10 @@ Use MITHRIL to implement `opaque type GasAmount = BigInt` for gasLimit/gasUsed f
 Context: `gasLimit`/`gasUsed` on BlockHeader and `gasLimit` on Transaction are consensus-critical. EIP-1559 adjusts gasTarget on ETH (gasLimit/2); ETC uses a fixed gas model. STOP at `ProgramState.scala` — VM gas counter stays as BigInt.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H5.
 
-Pre-flight: confirm H4 committed.
+Step 0 — Gate check + worktree setup (H4 must be merged to scala3-cleanup-june first):
+  grep "opaque type TotalDifficulty" /media/dev/2tb/dev/fukuii/src/main/scala/com/chipprbots/ethereum/domain/TotalDifficulty.scala
+  git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/8b-h5 -b wt/8b-h5 scala3-cleanup-june
+  cd /media/dev/2tb/dev/fukuii/.claude/worktrees/8b-h5
 
 Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/GasAmount.scala`:
   opaque type GasAmount = BigInt
@@ -673,6 +710,11 @@ Step 6 — FORGE review: confirm ETC block gas limit and transaction gas semanti
 Step 7 — BEACON review: confirm ETH EIP-1559 gasTarget computation (`gasLimit / 2`) still correct after wrapping.
 Step 8 — `sbt "testOnly *BlockHeader* *Transaction* *Gas*"`.
 Step 9 — `git commit -m "feat(8b-H5): GasAmount opaque type (BigInt) — BlockHeader.gasLimit/gasUsed + Transaction.gasLimit, FORGE+BEACON reviewed"`
+Step 10 — Merge back (from /media/dev/2tb/dev/fukuii):
+  cd /media/dev/2tb/dev/fukuii
+  git merge --no-ff wt/8b-h5
+  git worktree remove .claude/worktrees/8b-h5
+  git branch -d wt/8b-h5
 ```
 
 ---
@@ -689,7 +731,10 @@ Use MITHRIL to implement `opaque type GasPrice = BigInt` for gas price and EIP-1
 Context: `gasPrice` (legacy/EIP-2930), `maxFeePerGas`/`maxPriorityFeePerGas` (EIP-1559 ETH), `BlockHeader.baseFeePerGas` (EIP-1559 ETH). ETC uses legacy gasPrice only. Fee burn on ETH is consensus-critical.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H6.
 
-Pre-flight: confirm H5 committed.
+Step 0 — Gate check + worktree setup (H5 must be merged first):
+  grep "opaque type GasAmount" /media/dev/2tb/dev/fukuii/src/main/scala/com/chipprbots/ethereum/domain/GasAmount.scala
+  git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/8b-h6 -b wt/8b-h6 scala3-cleanup-june
+  cd /media/dev/2tb/dev/fukuii/.claude/worktrees/8b-h6
 
 Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/GasPrice.scala`:
   opaque type GasPrice = BigInt
@@ -711,6 +756,11 @@ Step 5 — FORGE review: confirm ETC legacy transaction fee unchanged; `baseFeeP
 Step 6 — BEACON review: confirm ETH EIP-1559 baseFee burn byte-perfect: `baseFeePerGas.value * gasUsed.value`.
 Step 7 — `sbt "testOnly *Transaction* *GasPrice* *BaseFee*"`.
 Step 8 — `git commit -m "feat(8b-H6): GasPrice opaque type (BigInt) — Transaction fee fields + BlockHeader.baseFeePerGas, FORGE+BEACON reviewed"`
+Step 9 — Merge back (from /media/dev/2tb/dev/fukuii):
+  cd /media/dev/2tb/dev/fukuii
+  git merge --no-ff wt/8b-h6
+  git worktree remove .claude/worktrees/8b-h6
+  git branch -d wt/8b-h6
 ```
 
 ---
@@ -727,7 +777,12 @@ Use MITHRIL to implement `opaque type BlockNumber = BigInt`, then ask FORGE and 
 Context: `BlockHeader.number` and ETC `forBlock(blockNumber: BigInt)` fork-dispatch calls are consensus-critical. DO NOT change `forBlock()`/`forTimestamp()` signatures — wrap only the stored `number` field; pass `.value` at fork-dispatch call sites.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H7.
 
-Pre-flight: confirm H6 committed. Read §8b-H7 in analysis doc for the full 124-file site inventory.
+Step 0 — Gate check + worktree setup (H6 must be merged first; largest sweep — allocate full session):
+  grep "opaque type GasPrice" /media/dev/2tb/dev/fukuii/src/main/scala/com/chipprbots/ethereum/domain/GasPrice.scala
+  git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/8b-h7 -b wt/8b-h7 scala3-cleanup-june
+  cd /media/dev/2tb/dev/fukuii/.claude/worktrees/8b-h7
+
+Read §8b-H7 in analysis doc for the full 124-file site inventory.
 
 Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/BlockNumber.scala`:
   opaque type BlockNumber = BigInt
@@ -761,6 +816,11 @@ Step 6 — BEACON review: confirm ETH BlockHeader.number field encoding unchange
 Step 7 — `sbt "testOnly *BlockHeader* *Block*"`.
 Step 8 — `sbt testVM testCrypto` — VM opcode block-number reads.
 Step 9 — `git commit -m "feat(8b-H7): BlockNumber opaque type (BigInt) — BlockHeader + all callers (~124 files), FORGE+BEACON reviewed"`
+Step 10 — Merge back (from /media/dev/2tb/dev/fukuii):
+  cd /media/dev/2tb/dev/fukuii
+  git merge --no-ff wt/8b-h7
+  git worktree remove .claude/worktrees/8b-h7
+  git branch -d wt/8b-h7
 ```
 
 ---
@@ -777,7 +837,12 @@ Use MITHRIL to implement `opaque type ChainId = BigInt`, then get mandatory FORG
 Context: EIP-155 recovery: `v = 2 * chainId + 35 or 36`. ETC chainId=61, ETH chainId=1/11155111.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H8.
 
-Pre-flight: confirm H7 committed. Read `ECDSASignature.scala` + Transaction EIP-155 signing paths in full before touching any file.
+Step 0 — Gate check + worktree setup (H7 must be merged first; HIGHEST RISK — allocate dedicated session):
+  grep "opaque type BlockNumber" /media/dev/2tb/dev/fukuii/src/main/scala/com/chipprbots/ethereum/domain/BlockNumber.scala
+  git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/8b-h8 -b wt/8b-h8 scala3-cleanup-june
+  cd /media/dev/2tb/dev/fukuii/.claude/worktrees/8b-h8
+
+Read `ECDSASignature.scala` + Transaction EIP-155 signing paths in full before touching any file.
 
 Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/ChainId.scala`:
   opaque type ChainId = BigInt
@@ -801,6 +866,11 @@ Step 7 — BEACON review (mandatory): verify ETH EIP-155 and EIP-2718 typed tx c
 Step 8 — `sbt "testOnly *Transaction* *ECDSA* *ChainId* *Sign*"`.
 Step 9 — `sbt testVM testCrypto` — full crypto stack.
 Step 10 — `git commit -m "feat(8b-H8): ChainId opaque type (BigInt) — EIP-155 signing layer, FORGE+BEACON reviewed"`
+Step 11 — Merge back (from /media/dev/2tb/dev/fukuii):
+  cd /media/dev/2tb/dev/fukuii
+  git merge --no-ff wt/8b-h8
+  git worktree remove .claude/worktrees/8b-h8
+  git branch -d wt/8b-h8
 ```
 
 ---
@@ -851,6 +921,10 @@ Use the BEACON agent to clear 2 remaining `noReturns` violations in `consensus/e
 
 Context: Both are early-`return IO.pure(Left(...))` decode-error guards. BEACON previously reviewed 3 ETH Engine API sites (`d78177bda`). These 2 remained because removing `return` requires wrapping the remaining ~90 lines of each method body into a `Right` else branch.
 
+Step 0 — Worktree setup (run from main checkout):
+  git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/8e-s3d -b wt/8e-s3d scala3-cleanup-june
+  cd /media/dev/2tb/dev/fukuii/.claude/worktrees/8e-s3d
+
 Step 1 — Read `EngineApiController.scala` lines :80–:150 (site at :96) and :210–:280 (site at :226) to understand each guard's structure.
 Step 2 — BEACON: confirm the refactored guard preserves semantics — same Left payload on decode error, same IO chain on success.
 Step 3 — Apply refactoring for each site:
@@ -862,6 +936,11 @@ Step 5 — `sbt "testOnly *EngineApi*"`.
 Step 6 — `git commit -m "fix(8e-S3-D): remove early-return guards in EngineApiController — BEACON reviewed"`
 Step 7 — Verify: `grep -c "return" src/main/.../EngineApiController.scala` drops by 2.
 Step 8 — `sbt scalafixAll` — confirm these 2 sites no longer block the ratchet.
+Step 9 — Merge back (from /media/dev/2tb/dev/fukuii):
+  cd /media/dev/2tb/dev/fukuii
+  git merge --no-ff wt/8e-s3d
+  git worktree remove .claude/worktrees/8e-s3d
+  git branch -d wt/8e-s3d
 ```
 
 ---
@@ -969,4 +1048,4 @@ Test failures that exist independently of any ongoing migration. Not caused by r
 | Spec | Issue | Mitigation / Gate |
 |------|-------|-------------------|
 | `KzgPointEvaluationSpec` | JVM SIGSEGV at `__libc_free` (`libc.so.6`) via KZG JNI (`ethereum-consensus:kzg4844`, EIP-4844 blob point evaluation). Crashes testEssential at ~737 s. First confirmed in §8b-H2 testEssential run 2026-06-26 — pre-existing, unrelated to TrieRoot opaque type. Solo run with `sbt "testOnly *KzgPointEvaluation*"` confirms reproduction. | Research: JDK 25 vs JDK 21 native compat; bump native `ethereum-consensus:kzg4844` lib version. Mitigation: run solo in CI, add `@NativeTest` tag to skip in testEssential. |
-| **Post-rebase SNAP/heal test compilation failures** | `sbt compile-all` fails on test sources (confirmed 2026-06-26). Two categories: (1) Wildcard `_` imports needing `*` in 8 spec files (`snap/actors/`, `mpt/StackTrieSpec`). (2) Deeper SNAP1 migration debt: `TrieNodeHealingCoordinatorSpec`, `PrunedHeal*Spec`, `CleanRebuildEarlyCompletionSpec`, `SubtreeCompleteSeedingSpec` still reference removed Classic API (`Messages.StartTrieNodeHealing`, `TrieNodeHealingCoordinator.props`, `system.actorOf`, `TestProbe`, `expectMsgType`, `awaitAssert`) — these spec files were not updated when production code was migrated to Typed in SNAP1. Also: `SNAPSyncControllerSpec` 4 call sites missing `storagePhaseForceCompleted` param; `HealingFrontierResumeSpec`/`ScopedVerificationFallbackSpec` call `spawnCoordinator` with removed `frontierPersistenceEnabled` param; `HealingFrontierStorageSubtreeSpec` wildcard import. | **Prompt:** Fix post-rebase test compilation failures in SNAP/heal spec files. Step 1: fix all `_` → `*` wildcard imports across the 8 affected spec files (`grep -rn "import .*\._" src/test/ --include="*.scala"`). Step 2: update `SNAPSyncControllerSpec` — add missing `storagePhaseForceCompleted = false` arg to 4 call sites. Step 3: update `HealingFrontierResumeSpec` + `ScopedVerificationFallbackSpec` — remove `frontierPersistenceEnabled` param from `spawnCoordinator` calls. Step 4: update `PrunedHeal*Spec`, `CleanRebuildEarlyCompletionSpec`, `SubtreeCompleteSeedingSpec`, `TrieNodeHealingCoordinatorSpec` — migrate from Classic `TrieNodeHealingCoordinator.props` + `system.actorOf` + `TestProbe` + `expectMsgType` to ActorTestKit pattern (see completed §8a batch examples). Step 5: `sbt compile-all` — must be green. Step 6: `git commit -m "fix(test): update SNAP/heal spec files after rebase — wildcard imports + SNAP1 API alignment"`. **Agent:** MITHRIL. **Gate:** None — unblocked. |
+| **Post-rebase SNAP/heal test compilation failures** | `sbt compile-all` fails on test sources (confirmed 2026-06-26). Two categories: (1) Wildcard `_` imports needing `*` in 8 spec files (`snap/actors/`, `mpt/StackTrieSpec`). (2) Deeper SNAP1 migration debt: `TrieNodeHealingCoordinatorSpec`, `PrunedHeal*Spec`, `CleanRebuildEarlyCompletionSpec`, `SubtreeCompleteSeedingSpec` still reference removed Classic API (`Messages.StartTrieNodeHealing`, `TrieNodeHealingCoordinator.props`, `system.actorOf`, `TestProbe`, `expectMsgType`, `awaitAssert`) — these spec files were not updated when production code was migrated to Typed in SNAP1. Also: `SNAPSyncControllerSpec` 4 call sites missing `storagePhaseForceCompleted` param; `HealingFrontierResumeSpec`/`ScopedVerificationFallbackSpec` call `spawnCoordinator` with removed `frontierPersistenceEnabled` param; `HealingFrontierStorageSubtreeSpec` wildcard import. | **Prompt:** Fix post-rebase test compilation failures in SNAP/heal spec files. Step 0 — Worktree setup (run from main checkout): `git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/snap-spec-fix -b wt/snap-spec-fix scala3-cleanup-june && cd /media/dev/2tb/dev/fukuii/.claude/worktrees/snap-spec-fix`. Step 1: fix all `_` → `*` wildcard imports across the 8 affected spec files (`grep -rn "import .*\._" src/test/ --include="*.scala"`). Step 2: update `SNAPSyncControllerSpec` — add missing `storagePhaseForceCompleted = false` arg to 4 call sites. Step 3: update `HealingFrontierResumeSpec` + `ScopedVerificationFallbackSpec` — remove `frontierPersistenceEnabled` param from `spawnCoordinator` calls. Step 4: update `PrunedHeal*Spec`, `CleanRebuildEarlyCompletionSpec`, `SubtreeCompleteSeedingSpec`, `TrieNodeHealingCoordinatorSpec` — migrate from Classic `TrieNodeHealingCoordinator.props` + `system.actorOf` + `TestProbe` + `expectMsgType` to ActorTestKit pattern (see completed §8a batch examples). Step 5: `sbt compile-all` — must be green. Step 6: `git commit -m "fix(test): update SNAP/heal spec files after rebase — wildcard imports + SNAP1 API alignment"`. Step 7 — Merge back (from /media/dev/2tb/dev/fukuii): `git merge --no-ff wt/snap-spec-fix && git worktree remove .claude/worktrees/snap-spec-fix && git branch -d wt/snap-spec-fix`. **Agent:** MITHRIL. **Gate:** None — unblocked. |

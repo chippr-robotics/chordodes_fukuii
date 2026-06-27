@@ -49,6 +49,7 @@ Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 - Logging standards: `~/.claude/agent-protocols/logging-standards.md`
 - Opaque type propagation patterns (full catalogue for S11): `.local/best-practices/scala/type-safety.md`
 - Codebase audit (52 S11 and Pekko violations with file:line): `.local/best-practices/codebase-audit.md`
+- Worktree discipline (sprint vs task patterns, naming, lifecycle, agent rules): `~/.claude/agent-protocols/worktree-protocol.md`
 
 ## Operating rules
 
