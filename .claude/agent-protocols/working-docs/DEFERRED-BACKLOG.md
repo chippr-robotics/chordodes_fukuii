@@ -52,7 +52,7 @@ Active sprint plan: `/home/dev/.claude/plans/we-are-working-on-noble-whisper.md`
 | Known Pre-existing Failures | KzgPointEvaluationSpec JVM SIGSEGV + post-rebase SNAP/heal staging feature gap | `202a814e3` `3aefb0da4` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
 | §7c | Pekko supervision hierarchy: 6 STOP-AND-ALERT actors + 49-actor restart strategy sweep | `d28a803f7` `d3399f562` `429b8678b` `fbce2cc28` `a0f7fcb40` `b1aefaaba` (merge `--no-ff`) | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
 | §7f | ForkChoiceManager.setListener — TypedActorRef narrow adapter; last non-TCP `.toClassic` removed | `456f12499` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
-| §8a-E6b | ChainWeightCalibrationSpec — `drainRegistration()` ignoreMsg fix (GetHandshakedPeers + GetHandshakedPeersCmd) | `731cef566` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
+| §8a-E6b | ChainWeightCalibrationSpec — Typed rewrite: `GetHandshakedPeersCmd` + `CalibrateChainWeightNowCmd`; all Classic imports replaced | `3c4b15543` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
 | §8g | Braceless Scala 3 syntax — `removeOptionalBraces = true`, full 957-file sweep + one `()` fix | `84aa43575` | 2026-06-28 | completed/DEFERRED-BACKLOG.md |
 
 ---
@@ -267,7 +267,6 @@ Last non-TCP `.toClassic` removed.
 
 **Remaining (Batch E6):** PeerActorSpec + RLPxConnectionHandlerSpec — **wait for Wave 3** (net/P2P sprint). RegularSyncSpec ✅ DONE `57d638d49`. BlockFetcherSpec + PendingTxMgrSpec ✅ DONE `5ff14017b`.
 
-**Remaining (Batch E6b — timing failures):** `ChainWeightCalibrationSpec` ✅ FIXED minimal approach (2026-06-27). Root cause: `drainRegistration()` `fishForMessage` partial function covered `GetHandshakedPeers` (Classic `case object`) but not `GetHandshakedPeersCmd` (Typed `case class` with `replyTo`) — `fishForMessage` throws on unhandled messages. Fix: add `case _: GetHandshakedPeersCmd => false` to the partial function alongside the existing `case GetHandshakedPeers => false`. No `WithActorSystemShutDown` reference in this spec (CHASE-QUEUE line 36 corrected). Full `ScalaTestWithActorTestKit` migration (requires `ManualTime` to replace `ExplicitlyTriggeredScheduler`) remains Wave 3 gated alongside E6.
 
 **Research prompt for remaining §8a-retro batches:**
 > List test files still using Classic TestKit:
@@ -681,7 +680,6 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 | **8e SNAP1** | Clear 36 SSC sites (gated on NET2 Wave 3) | Wave 3 sprint |
 | ~~**8g braceless**~~ | ~~`removeOptionalBraces` per-subsystem passes~~ | ✅ DONE `84aa43575` 2026-06-28 |
 | **8a retro batch E6** | PeerActorSpec + RLPxConnectionHandlerSpec (wait Wave 3) | Wave 3 |
-| ~~**8a retro batch E6b**~~ | ~~ChainWeightCalibrationSpec — fixed with `ignoreMsg` (2026-06-27)~~ | ✅ DONE |
 | ~~**7f FCM setListener**~~ | ~~ForkChoiceManager typed callback — remove last non-TCP `.toClassic`~~ | ✅ DONE `456f12499` 2026-06-27 |
 | **8j Thread.sleep** | 2 live sites (both NECESSARY — revisit in Wave 3 test migration) | Wave 3 |
 
@@ -702,7 +700,6 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 | # | Batch | Prompt | Parallel-safe? |
 |---|-------|--------|---------------|
 | E6 | Batch E | §8a-retro batch E6 — PeerActorSpec + RLPxConnectionHandlerSpec | Gate: Wave 3 network/P2P sprint |
-| ~~E6b~~ | ~~Batch E~~ | ~~§8a-retro batch E6b — ChainWeightCalibrationSpec (`fishForMessage` timing)~~ | ✅ DONE `ignoreMsg` fix 2026-06-27 |
 | ~~7f~~ | ~~—~~ | ~~§7f — ForkChoiceManager.setListener typed callback (MITHRIL)~~ | ✅ DONE `456f12499` 2026-06-27 |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.

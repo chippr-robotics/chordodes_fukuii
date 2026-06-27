@@ -86,7 +86,8 @@ All 5 ETH coverage gaps closed:
 - `RegularSyncSpec` — `Resource[IO, ActorSystem]` lifecycle is load-bearing; migrate when `RegularSync` itself is Typed. See `sync/regular.md`.
 - `PeerActorSpec`, `PeerActorHandshakingSpec` — `TestActorRef` is Classic-only; migrate when `PeerActor` is Typed (Wave 3 network sprint). See `network/peers.md`.
 - `RLPxConnectionHandlerSpec` — Classic parent-injection (`TestActorRef(Props, parent.ref)`); Wave 3 gate.
-- `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec` — `TestActorRef`-based lifecycle; Wave 3 gate.
+- `CalibratePivotTDSpec` — `TestActorRef`-based lifecycle; Wave 3 gate.
+- `ChainWeightCalibrationSpec` — `TestActorRef`-based lifecycle; Wave 3 gate. Classic message types (`GetHandshakedPeers`, `CalibrateChainWeightNow`) replaced with Typed (`GetHandshakedPeersCmd`, `CalibrateChainWeightNowCmd`) in `3c4b15543` (§8a-E6b); timing failures resolved. Full `ManualTime` migration remains Wave 3.
 - `SyncControllerSpec` — deferred comment added; migrate when full sync actor hierarchy is Typed. See `sync/controller.md`.
 - `WithActorSystemShutDown.scala` — left in place; still referenced by the 8 deferred specs.
 
@@ -216,4 +217,17 @@ All 5 ETH coverage gaps closed:
 - ~~**E5d** — TestProbe narrowing~~ — ✅ DONE 2026-06-23 (`a193bc794`) — 141/141; E165 floor 92→65
 - ~~**E5e** — `actorSelection` worker-ref cleanup~~ — ✅ DONE 2026-06-23 (`5f28e8ae6`) — 40/40
 - `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred (DEFERRED-BACKLOG Part 1 warnings)
-- Wave 3 deferred specs (8): `RegularSyncSpec`, `PeerActorSpec`, `PeerActorHandshakingSpec`, `RLPxConnectionHandlerSpec`, `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec`, `SyncControllerSpec` — all gated on respective actor migrations in Wave 3 network sprint (DEFERRED-BACKLOG §8a "Remaining (blocked)")
+- ~~**§8a-E6b** — `ChainWeightCalibrationSpec` Typed message rewrite~~ — ✅ DONE 2026-06-27 (`3c4b15543`) — see section below
+
+---
+
+## §8a-E6b — ChainWeightCalibrationSpec Typed message rewrite (COMPLETE 2026-06-27)
+
+#### `3c4b15543` — fix(8a-E6b): ChainWeightCalibrationSpec — rewrite drain to Typed message types
+
+- **Root cause:** Spec imported Classic `GetHandshakedPeers` + `CalibrateChainWeightNow`; SyncController sends only Typed `GetHandshakedPeersCmd` + `CalibrateChainWeightNowCmd`. `fishForMessage` throws on any message not in its partial function — all 18 tests failed.
+- **Fix:** Dropped Classic imports; `fishForMessage` updated to `CalibrateChainWeightNowCmd` (done) and `_: GetHandshakedPeersCmd` (skip); all 10 `expectMsg(CalibrateChainWeightNow)` → `expectMsg(CalibrateChainWeightNowCmd)`.
+- **Note on approach:** `ignoreMsg` (permanent probe filter) was rejected in favour of fixing the `fishForMessage` partial function — more targeted, more intentional, correct direction for Typed migration.
+- **Result:** 18/18 pass.
+- **Still deferred (Wave 3):** Full `ScalaTestWithActorTestKit` + `ManualTime` migration (replacing `ExplicitlyTriggeredScheduler`), alongside E6 (PeerActorSpec + RLPxConnectionHandlerSpec).
+- Wave 3 deferred specs (7): `RegularSyncSpec`, `PeerActorSpec`, `PeerActorHandshakingSpec`, `RLPxConnectionHandlerSpec`, `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec`, `SyncControllerSpec` — all gated on respective actor migrations in Wave 3 network sprint (DEFERRED-BACKLOG §8a "Remaining (blocked)"). Note: `ChainWeightCalibrationSpec` timing failures resolved in `3c4b15543` (§8a-E6b) — still deferred for `ManualTime` / `ScalaTestWithActorTestKit` migration.

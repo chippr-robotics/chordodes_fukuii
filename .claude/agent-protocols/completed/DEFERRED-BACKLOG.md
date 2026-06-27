@@ -2736,3 +2736,95 @@ catch case NonFatal(_) => () // Ignore non-fatal cleanup errors
 ### Result
 
 `sbt compile-all` — 0 errors, 65 warnings (all pre-existing). Zero logic changes.
+
+---
+
+## §7f — ForkChoiceManager.setListener TypedActorRef ✅ DONE 2026-06-27
+
+**Branch:** `scala3-cleanup-june`
+**Commit:** `456f12499` (as part of §8k-G4a classic bridge elimination)
+
+### What
+
+`ForkChoiceManager` is a plain Scala class with an `AtomicReference` listener API. Its
+`setListener(ref: ActorRef)` stored a Classic untyped `ActorRef`. The sole call site in
+`SyncController` converted a Typed adapter to Classic via `.toClassic` — the last non-TCP
+Classic residue after the §8k bridge-elimination sprint.
+
+### Fix applied (§8k-G4a)
+
+`ForkChoiceManager.listenerRef` changed from `AtomicReference[ActorRef]` to
+`AtomicReference[Option[TypedActorRef[ForkChoiceManager.BeaconHead]]]`.
+
+`SyncController` now passes a narrow typed adapter:
+```scala
+// §8k-G4a: narrow typed adapter for ForkChoiceManager's single reply type.
+val fcmAdapter: TypedActorRef[ForkChoiceManager.BeaconHead] =
+  ctx.messageAdapter[ForkChoiceManager.BeaconHead](WrappedExternal.apply)
+```
+
+No `.toClassic` in this call chain. TCP bridge floor unchanged (Pekko TCP is Classic-only by design).
+
+### Result
+
+Last non-TCP `.toClassic` removed. Zero non-TCP Classic residue remains.
+
+---
+
+## §8a-E6b — ChainWeightCalibrationSpec — Typed message rewrite ✅ DONE 2026-06-27
+
+**Branch:** `scala3-cleanup-june`
+**Commit:** `3c4b15543`
+
+### Root cause
+
+All 18 `ChainWeightCalibrationSpec` tests failed because the spec was written against Classic
+message types while production now sends only Typed forms:
+
+| Site | Classic (spec expected) | Typed (SyncController sends) |
+|------|------------------------|------------------------------|
+| `drainRegistration` fish | `GetHandshakedPeers` | `GetHandshakedPeersCmd(replyTo)` |
+| `drainRegistration` fish | `CalibrateChainWeightNow` | `CalibrateChainWeightNowCmd` |
+| all `expectMsg` assertions | `CalibrateChainWeightNow` | `CalibrateChainWeightNowCmd` |
+
+`fishForMessage` throws `AssertionError` on any message not covered by its partial function, so
+receiving either unhandled Typed type caused immediate test failure.
+
+### Fix
+
+Replaced all Classic imports and assertions with their Typed equivalents:
+
+```scala
+// Before
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
+
+// After
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNowCmd
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd
+```
+
+`fishForMessage` partial function extended for the Typed forms:
+
+```scala
+networkPeerManager.fishForMessage(3.seconds) {
+  case CalibrateChainWeightNowCmd => true  // consumed; done
+  case _: GetHandshakedPeersCmd   => false // skip — periodic peer-list poll
+}
+```
+
+All 10 `expectMsg(CalibrateChainWeightNow)` call sites updated to
+`expectMsg(CalibrateChainWeightNowCmd)`.
+
+**Result:** 18/18 pass (2 consecutive runs). VERIFY: `sbt "testOnly *ChainWeightCalibrationSpec"`.
+
+### CHASE-QUEUE correction
+
+`ChainWeightCalibrationSpec` was incorrectly listed in the `WithActorSystemShutDown` entry
+(CHASE-QUEUE line 36) as one of 8 Wave-3-deferred specs. Grep confirmed it does not reference
+`WithActorSystemShutDown`. Entry corrected; count adjusted.
+
+### Note on remaining migration
+
+Full `ScalaTestWithActorTestKit` migration (replacing `ExplicitlyTriggeredScheduler` with
+`ManualTime`) remains Wave 3 gated alongside E6 (PeerActorSpec + RLPxConnectionHandlerSpec).

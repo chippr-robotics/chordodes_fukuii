@@ -926,3 +926,22 @@ grep -rn "extends Actor\b\|extends ClassicActor\b" src/main/ --include="*.scala"
 **Final state:** Zero Classic residue outside TCP floor (`RLPxConnectionHandler:197,235` — permanent, `ClassicActor` alias). `AkkaTaskOps` Classic extension block deleted. All BRIDGE-A/B/C categories resolved for this sprint scope. BRIDGE-E (RegularSync logging) deferred to Wave 3 Network/P2P sprint.
 
 ---
+
+## §8a-E6b — ChainWeightCalibrationSpec test rewrite ✅ DONE 2026-06-27
+
+**Commit:** `3c4b15543`
+
+**Audit finding:** `ChainWeightCalibrationSpec` imported and asserted on Classic-layer message
+types (`GetHandshakedPeers`, `CalibrateChainWeightNow`) but the production path now sends only
+Typed commands (`GetHandshakedPeersCmd`, `CalibrateChainWeightNowCmd`). The mismatch was masked
+until the Typed actor rollout completed. `fishForMessage` throws `AssertionError` on any message
+not in its partial function — all 18 tests failed.
+
+**Fix scope:**
+- Dropped Classic imports; added `GetHandshakedPeersCmd` + `CalibrateChainWeightNowCmd`
+- `fishForMessage` partial function updated to Typed cases
+- All 10 `expectMsg(CalibrateChainWeightNow)` → `expectMsg(CalibrateChainWeightNowCmd)`
+
+**Result:** 18/18 pass.
+
+---
