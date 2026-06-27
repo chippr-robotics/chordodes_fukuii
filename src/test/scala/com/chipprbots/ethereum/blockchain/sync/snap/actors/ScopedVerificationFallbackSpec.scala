@@ -136,7 +136,6 @@ class ScopedVerificationFallbackSpec
       batchSize = 64,
       snapSyncController = controller.ref,
       healingFrontierStorage = Some(store),
-      frontierPersistenceEnabled = true,
       healingWriterEcOverride = Some(ec),
       scopedHealVerification = scoped,
       scopedHealMaxPaths = maxPaths

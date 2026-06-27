@@ -1,25 +1,25 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem}
-import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.FishingOutcomes
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
 import com.chipprbots.ethereum.db.storage.{HealingFrontierStorage, Namespaces}
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.mpt.{BranchNode, HashNode, LeafNode, MptNode, NullNode}
 import com.chipprbots.ethereum.testing.TestMptStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 import java.io.File
 import java.nio.file.Files
@@ -39,18 +39,14 @@ import java.util.concurrent.{Executors, TimeUnit}
   * work, and the very first thing it does is `StartTrieNodeHealing(root)` → the verification pass. Any pruning observed
   * is therefore on the first walk. Harness mirrors [[PrunedHealVerificationSpec]] / [[HealingFrontierResumeSpec]].
   */
-class SubtreeCompleteSeedingSpec
-    extends TestKit(ActorSystem("SubtreeCompleteSeedingSpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class SubtreeCompleteSeedingSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
+    if gauge == null then Double.NaN else gauge.value()
   }
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
@@ -61,11 +57,13 @@ class SubtreeCompleteSeedingSpec
     ()
   }
 
-  private def awaitStateHealingComplete(controller: TestProbe): Unit =
+  private def awaitStateHealingComplete(
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ): Unit =
     controller.fishForMessage(10.seconds) {
-      case SNAPSyncController.StateHealingComplete   => true
-      case _: SNAPSyncController.ProgressNodesHealed => false
-      case _                                         => false
+      case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+      case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+      case _                                         => FishingOutcomes.continueAndIgnore
     }
 
   /** Read-counting storage so we can prove a seeded subtree root's bytes are NOT fetched on the first verification. */
@@ -109,7 +107,13 @@ class SubtreeCompleteSeedingSpec
   private def withFreshNode(
       stateRoot: ByteString,
       storage: TestMptStorage
-  )(body: (ActorRef, HealingFrontierStorage, TestProbe) => Unit): Unit = {
+  )(
+      body: (
+          ActorRef[TrieNodeHealingCoordinator.Command],
+          HealingFrontierStorage,
+          org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+      ) => Unit
+  ): Unit = {
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("subtree-seeding-rocksdb").toAbsolutePath.toString
@@ -132,26 +136,21 @@ class SubtreeCompleteSeedingSpec
     // and only walk this fresh node runs).
     store.markComplete()
 
-    val controller = TestProbe()
-    val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controller.ref,
-        healingFrontierStorage = Some(store),
-        healingWriterEcOverride = Some(ec),
-        frontierPersistenceEnabled = true
-      )
+    val controller = testKit.createTestProbe[SNAPSyncController.Command]()
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = stateRoot,
+      networkPeerManager =
+        testKit.createTestProbe[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command]().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controller.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec)
     )
-    val death = TestProbe()
-    death.watch(coordinator)
     try body(coordinator, store, controller)
     finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+      testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
@@ -175,7 +174,7 @@ class SubtreeCompleteSeedingSpec
         SNAPSyncMetrics.setHealingPrunedVerification(-1L)
         SNAPSyncMetrics.setHealingPrunedSubtrees(-1L)
         // FIRST verification — the only walk this fresh node has run.
-        coordinator ! Messages.StartTrieNodeHealing(root)
+        coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
         awaitStateHealingComplete(controller)
 
         // Both seeded subtrees pruned on the first pass; pruned path engaged.

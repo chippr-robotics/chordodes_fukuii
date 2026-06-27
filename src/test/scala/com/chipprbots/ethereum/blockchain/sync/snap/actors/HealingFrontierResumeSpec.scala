@@ -99,8 +99,8 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
-    if (prePopulate.nonEmpty) store.update(Nil, prePopulate).commit()
-    if (markComplete) store.markComplete() // simulate a prior rebuild DFS that ran to completion
+    if prePopulate.nonEmpty then store.update(Nil, prePopulate).commit()
+    if markComplete then store.markComplete() // simulate a prior rebuild DFS that ran to completion
 
     val controllerProbe = testKit.createTestProbe[SNAPSyncController.Command]()
     val storage = new TestMptStorage()
@@ -113,7 +113,6 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
       batchSize = 16,
       snapSyncController = controllerProbe.ref,
       healingFrontierStorage = if persistence then Some(store) else None,
-      frontierPersistenceEnabled = persistence,
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, root, store, controllerProbe)
