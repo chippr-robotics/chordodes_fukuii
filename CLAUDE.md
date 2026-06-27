@@ -141,17 +141,23 @@ Read it before planning or implementing. Highlights:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/007-hotpath-alloc-reduction/plan.md` (reduce hot-path CPU allocations on the
-keccak-256 + SNAP inline-merkleization paths to cut GC/allocation pressure and return CPU
-to sync — PURE PERFORMANCE, byte-for-byte identical consensus output. P1: replace per-call
-`new KeccakDigest(256)` with a thread-confined `ThreadLocal[KeccakDigest]` reset-on-entry
-(the load-bearing parity mechanism — guards the aborted-mid-update window). P2: reuse
-StackTrie transient scratch but NEVER the aliased final node blob (chain-split risk). P3:
-single-`Array[Byte]` `kec256` overload, `SnapHashTrie.emit` clone elision, `RLP.encode`
-O(n²)→O(n) — each FR-010-gated on proven parity + measured win. forge protocol; byte-for-byte
-gate via crypto/MPT/ethereum-tests + dedicated keccak vector/reset-after-abort/concurrency
-spec + A/B replay; perf is report-and-record, parity is the hard gate. Honest expectation:
-low single-digit to low-double-digit % throughput; the real CPU fix remains more cores.)
-Prior plans: `specs/004-decoupled-heal-serve-root/plan.md`,
-`specs/003-scoped-heal-verification/plan.md`.
+`specs/009-moving-root-delta-heal/plan.md` (complete fresh ETC SNAP-from-scratch against
+snapshot-root-only peers like core-geth by adopting go-ethereum/besu's healing architecture —
+established this session via a source comparison + a GetTrieNodes-retention probe (GREEN: hash-scheme
+core-geth serves GetTrieNodes for recent+committed roots, BROADER retention than GetAccountRange).
+Three coupled changes: (1) build the trie during download (deferred-merkleization=false); (2) heal
+against a SINGLE root used for BOTH completeness and fetch, re-pegged to a served head-64 root on
+stale-move — replacing spec-004's wrong-axis fixed-walk/advancing-serve split (differing node hashes
+→ content gate drops all → healed=0); (3) delta-only top-down discovery (discoverMissingChildren,
+already geth-equivalent) — retire the O(total) rebuildFrontierBFS. forge Phase-0 = GREEN with one
+constraint, correcting 2 spec premises: FR-001 needs NO local coherent root — the heal walks the
+SERVED root and FETCHES the root node if absent (fukuii already seeds-from-absent-root on the re-peg
+path at :943-947; the bug is StartTrieNodeHealing:632 hands off instead); FR-003/SC-003 MUST keep a
+PRUNED O(delta) final descent for completion soundness (download pre-populates mosaic fragments, so
+"present on disk" ≠ "subtree complete" — unsafe to drop). Content-hash gate + anchor guard
+byte-untouched (gate now MATCHES by construction). Supersedes spec-004; retires spec-008 freeze-re-fetch
+(PR #1372 US3). forge protocol; parity (finalized root == canonical header) is the hard gate; fresh-sync
+only; needs -Xmx>=6g for the non-deferred build.)
+Prior plans: `specs/008-flat-account-merkleize/plan.md`,
+`specs/007-hotpath-alloc-reduction/plan.md`.
 <!-- SPECKIT END -->
