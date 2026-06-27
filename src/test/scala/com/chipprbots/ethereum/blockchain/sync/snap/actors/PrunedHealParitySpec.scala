@@ -1,24 +1,24 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem}
-import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
+import org.apache.pekko.actor.testkit.typed.scaladsl.{ActorTestKit, FishingOutcomes, ScalaTestWithActorTestKit}
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
 import com.chipprbots.ethereum.db.storage.{HealingFrontierStorage, Namespaces}
-import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.mpt.{LeafNode, MptTraversals}
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.{PeerTestHelpers, TestMptStorage}
 
 import java.io.File
@@ -46,19 +46,9 @@ import java.util.concurrent.{Executors, TimeUnit}
   * completeness marker + an empty emitted-missing-node set in both modes, and that verification never rewrites the
   * root.
   */
-class PrunedHealParitySpec
-    extends TestKit(ActorSystem("PrunedHealParitySpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class PrunedHealParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
-
-  private def gaugeValue(name: String): Double = {
-    val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
-  }
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   /** A present, complete root: a childless leaf in storage (full-walk verification finds 0 missing and completes). */
   private def storedRoot(storage: TestMptStorage): ByteString = {
@@ -82,23 +72,26 @@ class PrunedHealParitySpec
     ()
   }
 
-  private def awaitStateHealingComplete(controller: TestProbe): Unit =
+  private def awaitStateHealingComplete(
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ): Unit =
     controller.fishForMessage(10.seconds) {
-      case SNAPSyncController.StateHealingComplete   => true
-      case _: SNAPSyncController.ProgressNodesHealed => false
-      case _                                         => false
+      case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+      case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+      case _                                         => FishingOutcomes.continueAndIgnore
     }
 
   /** The observable completeness state after one run. */
   final private case class CompletionOutcome(
       reachedComplete: Boolean, // StateHealingComplete observed
       markerComplete: Boolean, // CF 'g' completeness marker (isComplete)
-      prunedGauge: Double, // 1 = pruned path engaged, 0 = full-trie walk
       rootUnchanged: Boolean // the state root the harness fed in equals the recomputed fixture root
   )
 
-  /** Drive the SAME healed state to completion with the given `prunedHealVerification` setting. */
-  private def runToCompletion(pruned: Boolean): CompletionOutcome = {
+  /** Drive the SAME healed state to completion. The prunedHealVerification flag was removed from the production API;
+    * this helper now drives a single canonical run and confirms completion + parity invariants hold.
+    */
+  private def runToCompletion()(implicit tk: ActorTestKit): CompletionOutcome = {
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("pruned-parity-rocksdb").toAbsolutePath.toString
@@ -121,38 +114,33 @@ class PrunedHealParitySpec
     val storage = new TestMptStorage()
     val root = storedRoot(storage)
     val nodes = (0 until 3).map(cleanLeaf)
-    val controller = TestProbe()
-    val coordinator: ActorRef = system.actorOf(
-      TrieNodeHealingCoordinator.props(
-        stateRoot = root,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controller.ref,
-        healingFrontierStorage = Some(store),
-        healingWriterEcOverride = Some(ec),
-        prunedHealVerification = pruned
-      )
+    val controller = tk.createTestProbe[SNAPSyncController.Command]()
+    val coordinator: ActorRef[TrieNodeHealingCoordinator.Command] = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = root,
+      networkPeerManager = tk.createTestProbe[NetworkPeerManagerActor.Command]().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controller.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec)
     )
-    val death = TestProbe()
-    death.watch(coordinator)
     try {
       SNAPSyncMetrics.setHealingPrunedVerification(-1L)
-      val peer = PeerTestHelpers.createTestPeer(s"parity-peer-$pruned", TestProbe().ref)
-      coordinator ! Messages.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-      coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-      coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
+      val peer = PeerTestHelpers.createTestPeer("parity-peer", tk.createTestProbe[Any]().ref.toClassic)
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
+      )
       awaitStateHealingComplete(controller)
       CompletionOutcome(
         reachedComplete = true,
         markerComplete = store.isComplete,
-        prunedGauge = gaugeValue("snapsync.healing.pruned_verification.gauge"),
         rootUnchanged = root == storedRoot(new TestMptStorage())
       )
     } finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+      tk.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
@@ -161,31 +149,21 @@ class PrunedHealParitySpec
   }
 
   "Pruned vs full-trie completion (T-4)" should
-    "reach an identical completion (StateHealingComplete + same marker state + unchanged root) under both settings" taggedAs UnitTest in {
-      val prunedRun = runToCompletion(pruned = true)
-      val fullRun = runToCompletion(pruned = false)
+    "reach StateHealingComplete, leave the completeness marker unset (persistence off), and not rewrite the state root" taggedAs UnitTest in {
+      // prunedHealVerification was removed from the production API (the flag has been unified into a single path).
+      // We now verify the completion invariants hold for the canonical run.
+      implicit val tk: ActorTestKit = testKit
+      val run = runToCompletion()
 
-      // Both reach completion through the single chokepoint.
-      prunedRun.reachedComplete shouldBe true
-      fullRun.reachedComplete shouldBe true
+      run.reachedComplete shouldBe true
 
-      // The terminal completeness MARKER state is identical across the flag flip. With frontier persistence OFF
-      // (default), neither path sets the spec-002 snapshot marker, so both observe isComplete == false — identical.
-      prunedRun.markerComplete shouldBe fullRun.markerComplete
+      // With frontier persistence OFF (default), neither path sets the spec-002 snapshot marker.
+      run.markerComplete shouldBe false
 
-      // Verification never recomputes/rewrites the state root in either mode — it is a pure local read.
-      prunedRun.rootUnchanged shouldBe true
-      fullRun.rootUnchanged shouldBe true
+      // Verification never recomputes/rewrites the state root — it is a pure local read.
+      run.rootUnchanged shouldBe true
 
-      // The mode gauge distinguishes the two paths: pruned run engaged (1), full-walk run did not (0). This proves
-      // the two DIFFERENT verification paths were genuinely taken yet produced the SAME completion outcome.
-      prunedRun.prunedGauge shouldBe 1.0 +- 1e-9
-      fullRun.prunedGauge shouldBe 0.0 +- 1e-9
-
-      // LIVE-ONLY: literal byte-for-byte STATE-ROOT parity (recompute the multi-million-node trie root after each
-      // completion and assert bit-equality) and "no MissingRootNode at the first post-completion block import" are
-      // not feasible in this in-memory unit harness — they require a real persisted multi-MB trie and the block
-      // import path. They are asserted by the quickstart §Validation 4 live run. Here we assert the strongest
-      // in-harness equivalence: same completion signal, same marker state, root never rewritten.
+      // LIVE-ONLY: literal byte-for-byte STATE-ROOT parity and "no MissingRootNode at first block import" are
+      // not feasible in the in-memory unit harness; they are asserted by the quickstart §Validation 4 live run.
     }
 }

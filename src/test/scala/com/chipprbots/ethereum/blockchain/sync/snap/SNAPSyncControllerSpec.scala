@@ -175,6 +175,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
 
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
+      storagePhaseForceCompleted = false,
       resumedStaleCursors = false
     ) shouldBe true
   }
@@ -190,6 +191,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     // force-completed flag is therefore no longer a routing input (the caller keeps it for logging).
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
+      storagePhaseForceCompleted = false,
       resumedStaleCursors = false
     ) shouldBe true
   }
@@ -201,6 +203,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
 
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
+      storagePhaseForceCompleted = false,
       resumedStaleCursors = false
     ) shouldBe false
   }
@@ -213,6 +216,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     // silent state corruption. The healing walk from the new root re-fetches the delta.
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
+      storagePhaseForceCompleted = false,
       resumedStaleCursors = true
     ) shouldBe false
   }

@@ -1,25 +1,27 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem}
-import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
+import org.apache.pekko.actor.testkit.typed.scaladsl.{FishingOutcomes, ScalaTestWithActorTestKit}
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
 import com.chipprbots.ethereum.db.storage.{HealingFrontierStorage, Namespaces}
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.mpt.{BranchNode, HashNode, LeafNode, MptNode, MptTraversals, NullNode}
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.{PeerTestHelpers, TestMptStorage}
 
 import java.io.File
@@ -47,17 +49,17 @@ import java.util.concurrent.{Executors, TimeUnit}
   * `awaitAssert` / `fishForMessage` / `expectMsg` only.
   */
 class PrunedHealVerificationSpec
-    extends TestKit(ActorSystem("PrunedHealVerificationSpec"))
-    with ImplicitSender
+    extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfterAll {
+    with Eventually {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
+    if gauge == null then Double.NaN else gauge.value()
   }
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
@@ -68,33 +70,29 @@ class PrunedHealVerificationSpec
     ()
   }
 
-  private def awaitStateHealingComplete(controller: TestProbe): Unit =
+  private def awaitStateHealingComplete(
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ): Unit =
     controller.fishForMessage(10.seconds) {
-      case SNAPSyncController.StateHealingComplete   => true
-      case _: SNAPSyncController.ProgressNodesHealed => false
-      case _                                         => false
+      case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+      case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+      case _                                         => FishingOutcomes.continueAndIgnore
     }
 
   /** Assert StateHealingComplete is NOT sent within `window` (ProgressNodesHealed is allowed). */
-  private def assertNoCompletion(controller: TestProbe, window: FiniteDuration): Unit = {
-    val deadline = window.fromNow
-    while (deadline.hasTimeLeft())
-      controller.receiveOne(deadline.timeLeft) match {
-        case SNAPSyncController.StateHealingComplete =>
-          fail(
-            "StateHealingComplete was declared while a present-but-unrecorded node had a missing descendant (FR-002)"
-          )
-        case _ => () // ProgressNodesHealed or nothing — keep watching
-      }
-  }
+  private def assertNoCompletion(
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command],
+      window: FiniteDuration
+  ): Unit =
+    controller.expectNoMessage(window)
 
   /** Open frontier = pending (queued) + active (in-flight). See the same helper in
     * TrieNodeHealingScopedVerificationSpec.
     */
-  private def openFrontier(coordinator: ActorRef): Int = {
-    val probe = TestProbe()
-    coordinator.tell(Messages.HealingGetProgress, probe.ref)
-    val stats = probe.expectMsgType[HealingStatistics](2.seconds)
+  private def openFrontier(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
+    val probe = testKit.createTestProbe[HealingStatistics]()
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
+    val stats = probe.expectMessageType[HealingStatistics]
     stats.pendingTasks + stats.activeTasks
   }
 
@@ -117,13 +115,18 @@ class PrunedHealVerificationSpec
   /** Build a verification-driving fixture and run `body`. `frontierPersistenceEnabled = true` + `markComplete()` is the
     * resume precondition that routes `StartTrieNodeHealing(root)` through `startVerificationBFS` (see class doc). The
     * spec-005 subtree-complete records are gated on `prunedEnabled`, NOT on `frontierPersistenceEnabled`, so pruning is
-    * live here regardless. `prunedHealVerification` defaults true; pass false to take the full-trie walk.
+    * live here regardless.
     */
   private def withVerificationFixture(
       stateRoot: ByteString,
-      storage: TestMptStorage,
-      prunedHealVerification: Boolean = true
-  )(body: (ActorRef, HealingFrontierStorage, TestProbe) => Unit): Unit = {
+      storage: TestMptStorage
+  )(
+      body: (
+          ActorRef[TrieNodeHealingCoordinator.Command],
+          HealingFrontierStorage,
+          org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+      ) => Unit
+  ): Unit = {
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("pruned-verify-rocksdb").toAbsolutePath.toString
@@ -144,27 +147,20 @@ class PrunedHealVerificationSpec
     val store = new HealingFrontierStorage(dataSource)
     store.markComplete() // complete snapshot + empty frontier ⇒ StartTrieNodeHealing routes to verification
 
-    val controller = TestProbe()
-    val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controller.ref,
-        healingFrontierStorage = Some(store),
-        healingWriterEcOverride = Some(ec),
-        prunedHealVerification = prunedHealVerification,
-        frontierPersistenceEnabled = true
-      )
+    val controller = testKit.createTestProbe[SNAPSyncController.Command]()
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = stateRoot,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controller.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec)
     )
-    val death = TestProbe()
-    death.watch(coordinator)
     try body(coordinator, store, controller)
     finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+      testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
@@ -235,7 +231,7 @@ class PrunedHealVerificationSpec
 
         SNAPSyncMetrics.setHealingPrunedVerification(-1L)
         SNAPSyncMetrics.setHealingPrunedSubtrees(-1L)
-        coordinator ! Messages.StartTrieNodeHealing(stateRoot)
+        coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
         awaitStateHealingComplete(controller)
 
         // The pruned (descend-and-stop) path engaged on this verification.
@@ -267,11 +263,11 @@ class PrunedHealVerificationSpec
         // Seed the gauge to a sentinel so "0" can only come from THIS walk's startVerificationBFS reset, not a
         // leftover from another test (the gauge is a static global).
         SNAPSyncMetrics.setHealingPrunedSubtrees(-1L)
-        coordinator ! Messages.StartTrieNodeHealing(stateRoot)
+        coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
 
         // The walk descends X and discovers the missing grandchild — it must surface in the open frontier
         // (queued via FrontierRebuilt → queueNodes), keeping the round open.
-        awaitAssert(openFrontier(coordinator) should be >= 1, 5.seconds, 100.millis)
+        eventually(timeout(5.seconds), interval(100.millis))(openFrontier(coordinator) should be >= 1)
         // No completion may be declared while a missing descendant exists below a present-but-unrecorded node.
         assertNoCompletion(controller, 1.second)
         // Nothing was pruned: the present node above the gap was descended, not skipped.
@@ -289,7 +285,7 @@ class PrunedHealVerificationSpec
     withVerificationFixture(root, storage) { (coordinator, store, controller) =>
       store.isSubtreeComplete(subtreeRoot) shouldBe false
       SNAPSyncMetrics.setHealingPrunedSubtrees(-1L)
-      coordinator ! Messages.StartTrieNodeHealing(root)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
       awaitStateHealingComplete(controller)
       // Descended everything; pruned nothing.
       gaugeValue("snapsync.healing.pruned_subtrees.gauge") shouldBe 0.0 +- 1e-9
@@ -317,14 +313,16 @@ class PrunedHealVerificationSpec
         corruptedBytes(corruptedBytes.length - 1) = (corruptedBytes(corruptedBytes.length - 1) ^ 0xff).toByte
         val corrupted = ByteString(corruptedBytes)
 
-        val peer = PeerTestHelpers.createTestPeer("guardrail-peer", TestProbe().ref)
-        coordinator ! Messages.QueueMissingNodes(Seq((pathset, requestedHash)))
-        coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-        coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(corrupted)))
+        val peer = PeerTestHelpers.createTestPeer("guardrail-peer", testKit.createTestProbe[Any]().ref.toClassic)
+        coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((pathset, requestedHash)))
+        coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+        coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+          SNAP.TrieNodes(requestId = 1, nodes = Seq(corrupted))
+        )
 
         // The corrupted node is rejected: the task is NOT healed, so it remains in the open frontier and no
         // completion is declared. (A matching node would have healed it and emptied the frontier.)
-        awaitAssert(openFrontier(coordinator) should be >= 1, 5.seconds, 100.millis)
+        eventually(timeout(5.seconds), interval(100.millis))(openFrontier(coordinator) should be >= 1)
         assertNoCompletion(controller, 1.second)
         kec256(corrupted) should not be requestedHash // sanity: the payload really mismatches
       }
@@ -338,7 +336,7 @@ class PrunedHealVerificationSpec
         store.markSubtreeComplete(subtreeRoot)
         SNAPSyncMetrics.setHealingPrunedVerification(-1L)
         SNAPSyncMetrics.setHealingPrunedSubtrees(-1L)
-        coordinator ! Messages.StartTrieNodeHealing(root)
+        coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
         awaitStateHealingComplete(controller)
 
         // Engagement flag = 1 (pruned path), pruned-subtree count > 0, duration recorded, and the shared
