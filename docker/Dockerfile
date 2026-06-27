@@ -50,7 +50,7 @@ COPY . /build
 RUN --mount=type=cache,target=/root/.ivy2 \
     --mount=type=cache,target=/root/.sbt \
     --mount=type=cache,target=/root/.cache \
-    sbt assembly dist
+    sbt "assembly; dist"
 
 # Extract the distribution zip and drop the assembly JAR alongside the dist
 # libs so the runtime stage has both layouts available under /fukuii-dist.
