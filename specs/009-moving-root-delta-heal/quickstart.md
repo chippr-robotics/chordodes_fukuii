@@ -10,6 +10,8 @@ Validation runbook (not implementation). See [data-model.md](./data-model.md) an
 - Clean compile (`sbt compile-all`) + format (`sbt formatCheck`). **Stop both barad-dûr sync nodes before any `sbt` build** (host-freeze risk).
 - Validation host: barad-dûr Mordor secondary (`fukuii-secondary`, RPC 8547), **fresh rocksdb** (preserve `node.key`; mosaic datadirs are out of scope). `mordor.conf`: `checkpoint-sync-file=""`, `do-snap-sync=true`, `deferred-merkleization=false`, gate on. Provision `-Xmx ≥ 6g`.
 
+> **T002 ops note (out of PR scope).** The base default `src/main/resources/conf/base/sync.conf:74` is already `deferred-merkleization = false` (authoritative for ETC SNAP runtime) and the new `moving-root-delta-heal = true` ships on by default. The ONLY operator action for the live A/B is to flip the ops override file `ops/barad-dur/fukuii-conf-1/base.conf:354` from `deferred-merkleization = true` → `false` (it currently overrides the base default). This is an ops-config change applied on the host, NOT part of this code PR — do not commit it here.
+
 ## Unit / integration validation (before deploy)
 
 ```bash

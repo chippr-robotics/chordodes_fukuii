@@ -3480,7 +3480,8 @@ class SNAPSyncController(
               // store presence so the store may exist (for subtree records) while these stay dark by default (FR-005).
               frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
               decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
-              decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
+              decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh,
+              movingRootDeltaHeal = snapSyncConfig.movingRootDeltaHeal
             )
             .withDispatcher("sync-dispatcher"),
           s"trie-node-healing-coordinator-$coordinatorGeneration"
@@ -3551,7 +3552,8 @@ class SNAPSyncController(
                   // spec-005 store presence so the store may exist (for subtree records) while these stay dark (FR-005).
                   frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
                   decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
-                  decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
+                  decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh,
+                  movingRootDeltaHeal = snapSyncConfig.movingRootDeltaHeal
                 )
                 .withDispatcher("sync-dispatcher"),
               s"trie-node-healing-coordinator-$coordinatorGeneration"
@@ -5011,6 +5013,12 @@ case class SNAPSyncConfig(
     // FR-006 surfacing threshold: after this many unsatisfied heal attempts with no serve-root advance in
     // between, the coordinator surfaces the stuck task (log + metric). NEVER force-completes.
     decoupledHealMaxAttemptsNoRefresh: Int = 12,
+    // Moving-root delta heal (spec 009). When true (ETC SNAP default), the heal completes toward AND fetches
+    // against ONE current served root: the fetch root is collapsed to `stateRoot` (the spec-004 wrong-axis
+    // fix), an absent heal root is seeded+fetched instead of handed off, and `discoverMissingChildren` is the
+    // sole discovery seed. Off ⇒ the spec-004 walk/serve split (byte-identical to today). Consensus-safe: the
+    // content-hash store gate and the finalizeSnapSync anchor guard are byte-untouched.
+    movingRootDeltaHeal: Boolean = true,
     stateValidationEnabled: Boolean = true,
     maxRetries: Int = 3,
     timeout: FiniteDuration = 30.seconds,
@@ -5160,6 +5168,10 @@ object SNAPSyncConfig {
         if (snapConfig.hasPath("decoupled-heal-max-attempts-no-refresh"))
           snapConfig.getInt("decoupled-heal-max-attempts-no-refresh")
         else 12,
+      movingRootDeltaHeal =
+        if (snapConfig.hasPath("moving-root-delta-heal"))
+          snapConfig.getBoolean("moving-root-delta-heal")
+        else true,
       stateValidationEnabled = snapConfig.getBoolean("state-validation-enabled"),
       maxRetries = snapConfig.getInt("max-retries"),
       timeout = snapConfig.getDuration("timeout").toMillis.millis,
