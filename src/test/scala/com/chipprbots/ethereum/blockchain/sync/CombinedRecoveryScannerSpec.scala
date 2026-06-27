@@ -95,8 +95,14 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
         f.acct(1) -> acc(TrieRoot(f.presentStorageRoot(1)), CodeHash(f.presentCode(1))), // all present
         f.acct(2) -> acc(Account.EmptyStorageRootHash, CodeHash(f.missingCodeHash(2))), // missing code
         f.acct(3) -> acc(TrieRoot(f.missingStorageRoot(3)), Account.EmptyCodeHash), // missing storage
-        f.acct(4) -> acc(TrieRoot(f.missingStorageRoot(4)), CodeHash(f.presentCode(4))), // missing storage, present code
-        f.acct(5) -> acc(TrieRoot(f.presentStorageRoot(5)), CodeHash(f.missingCodeHash(5))), // present storage, missing code
+        f.acct(4) -> acc(
+          TrieRoot(f.missingStorageRoot(4)),
+          CodeHash(f.presentCode(4))
+        ), // missing storage, present code
+        f.acct(5) -> acc(
+          TrieRoot(f.presentStorageRoot(5)),
+          CodeHash(f.missingCodeHash(5))
+        ), // present storage, missing code
         f.acct(6) -> acc(TrieRoot(f.presentStorageRoot(6)), Account.EmptyCodeHash), // present
         f.acct(7) -> Account.empty() // EOA
       )
@@ -138,7 +144,9 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
     val f = new Fixture
     // One account per nibble 1..8 → 8 shards, each with a missing storage gap.
     val root =
-      f.stateRootOf((1 to 8).map(n => f.acctWithNibble(n, 0) -> acc(TrieRoot(f.missingStorageRoot(n)), Account.EmptyCodeHash)))
+      f.stateRootOf(
+        (1 to 8).map(n => f.acctWithNibble(n, 0) -> acc(TrieRoot(f.missingStorageRoot(n)), Account.EmptyCodeHash))
+      )
     val (refCode, refStorage) = referenceGaps(f, root)
 
     val app = new AppStateStorage(EphemDataSource())

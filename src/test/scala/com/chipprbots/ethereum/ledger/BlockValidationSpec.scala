@@ -89,7 +89,8 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
         ommersHash = BlockHash(hash2ByteString("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
         beneficiary = hash2ByteString("df7d7e053933b5cc24372f878c90e62dadad5d42"),
         stateRoot = TrieRoot(hash2ByteString("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67")),
-        transactionsRoot = TrieRoot(hash2ByteString("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac")),
+        transactionsRoot =
+          TrieRoot(hash2ByteString("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac")),
         receiptsRoot = TrieRoot(hash2ByteString("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d")),
         logsBloom = bloomFilter,
         difficulty = BigInt("14005986920576"),

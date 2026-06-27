@@ -35,9 +35,12 @@ object Fixtures {
         ommersHash =
           BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("df7d7e053933b5cc24372f878c90e62dadad5d42")),
-        stateRoot = TrieRoot(ByteString(Hex.decode("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67"))),
-        transactionsRoot = TrieRoot(ByteString(Hex.decode("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac"))),
-        receiptsRoot = TrieRoot(ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d"))),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
         difficulty = BigInt("14005986920576"),
         number = 3125369,
@@ -128,9 +131,12 @@ object Fixtures {
         ommersHash =
           BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("0000000000000000000000000000000000000000")),
-        stateRoot = TrieRoot(ByteString(Hex.decode("d7f8974fb5ac78d9ac099b9ad5018bedc2ce0a72dad1827a1709da30580f0544"))),
-        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
-        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("d7f8974fb5ac78d9ac099b9ad5018bedc2ce0a72dad1827a1709da30580f0544"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
         difficulty = BigInt("17179869184"),
         number = 0,
@@ -158,9 +164,12 @@ object Fixtures {
         ommersHash =
           BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("61c808d82a3ac53231750dadc13c777b59310bd9")),
-        stateRoot = TrieRoot(ByteString(Hex.decode("614d7d358b03cbdaf0343529673be20ad45809d02487f023e047efdce9da8aff"))),
-        transactionsRoot = TrieRoot(ByteString(Hex.decode("d33068a7f21bff5018a00ca08a3566a06be4196dfe9e39f96e431565a619d455"))),
-        receiptsRoot = TrieRoot(ByteString(Hex.decode("7bda9aa65977800376129148cbfe89d35a016dd51c95d6e6dc1e76307d315468"))),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("614d7d358b03cbdaf0343529673be20ad45809d02487f023e047efdce9da8aff"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("d33068a7f21bff5018a00ca08a3566a06be4196dfe9e39f96e431565a619d455"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("7bda9aa65977800376129148cbfe89d35a016dd51c95d6e6dc1e76307d315468"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
         difficulty = BigInt("62413376722602"),
         number = 1920000,
@@ -250,9 +259,12 @@ object Fixtures {
         ommersHash =
           BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("bcdfc35b86bedf72f0cda046a3c16829a2ef41d1 ")),
-        stateRoot = TrieRoot(ByteString(Hex.decode("c5e389416116e3696cce82ec4533cce33efccb24ce245ae9546a4b8f0d5e9a75"))),
-        transactionsRoot = TrieRoot(ByteString(Hex.decode("7701df8e07169452554d14aadd7bfa256d4a1d0355c1d174ab373e3e2d0a3743"))),
-        receiptsRoot = TrieRoot(ByteString(Hex.decode("26cf9d9422e9dd95aedc7914db690b92bab6902f5221d62694a2fa5d065f534b"))),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("c5e389416116e3696cce82ec4533cce33efccb24ce245ae9546a4b8f0d5e9a75"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("7701df8e07169452554d14aadd7bfa256d4a1d0355c1d174ab373e3e2d0a3743"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("26cf9d9422e9dd95aedc7914db690b92bab6902f5221d62694a2fa5d065f534b"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
         difficulty = BigInt("62413376722602"),
         number = 1920000,
@@ -341,9 +353,12 @@ object Fixtures {
         ommersHash =
           BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("2a65aca4d5fc5b5c859090a6c34d164135398226")),
-        stateRoot = TrieRoot(ByteString(Hex.decode("fdf2fc04580b95ca15defc639080b902e93892dcce288be0c1f7a7bbc778248b"))),
-        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
-        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("fdf2fc04580b95ca15defc639080b902e93892dcce288be0c1f7a7bbc778248b"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
         difficulty = BigInt("62382916183238"),
         number = 1919999,

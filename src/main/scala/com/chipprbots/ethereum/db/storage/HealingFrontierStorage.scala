@@ -97,7 +97,7 @@ class HealingFrontierStorage(val dataSource: DataSource)
     * single round trip instead of one point-get per child.
     */
   def multiIsSubtreeComplete(hashes: Seq[ByteString]): Set[ByteString] =
-    if (hashes.isEmpty) Set.empty
+    if hashes.isEmpty then Set.empty
     else
       hashes
         .grouped(HealingFrontierStorage.MultiReadChunkSize)

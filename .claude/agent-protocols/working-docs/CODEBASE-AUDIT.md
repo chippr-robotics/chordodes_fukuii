@@ -17,10 +17,9 @@ The following findings are tracked but blocked on external conditions. No prompt
 
 | Finding | Gate | When to action |
 |---------|------|----------------|
-| **INFO-13** — Classic `LoggingAdapter` in `RegularSync.scala:69` | §7c supervision sprint or next inline opportunity | Address inline when RegularSync is open |
 | **AkkaTaskOps dead methods** — `askFor`/`askForVia` (Classic) have zero callers; only `askForTyped` used | Minor cleanup; safe to delete now | Any sprint |
 
-*(W7 ✅ DONE — NPMA restructured to top-level class by LOOM migration, no inner class to extract. INFO-14 ✅ DONE — BlockImporter clean. S3-B/S3-E/INFO-8 ✅ DONE — see D2 gate note.)*
+*(W7 ✅ DONE. INFO-13 ✅ DONE `913c22363`. INFO-14 ✅ DONE. S3-B/S3-E/INFO-8 ✅ DONE.)*
 
 ---
 
@@ -54,12 +53,12 @@ Every prompt that touches source files must apply this before committing:
 |---|--------|--------|
 | ~~G1~~ | ~~Behavior[Any] narrowing sprint~~ | ✅ DONE 2026-06-26 — zero `Behavior[Any]` confirmed in main sources |
 | ~~G2~~ | ~~SNAP S3-E: mutable task types → immutable~~ | ✅ DONE 2026-06-26 — S3-B/S3-E/INFO-8 all resolved |
-| D1 | INFO-13 only: `RegularSync.scala:69` Classic `LoggingAdapter` | Open — address inline during §7c supervision sprint |
+| ~~D1~~ | ~~INFO-13: RegularSync LoggingAdapter~~ | ✅ DONE `913c22363` |
 | ~~D2~~ | ~~SNAP S3-E conversion~~ | ✅ DONE 2026-06-26 — task classes all `val` |
 | §8e-SNAP1 | SNAPSyncController return clearout (62 sites) | UNBLOCKED — gate lifted (SNAP1 migration done) — see prompt below |
 | POST-MIGRATION-SWEEP | Final Classic residue sweep | Gate: D1 (INFO-13) + AkkaTaskOps deletion |
 
-**Final gate**: **POST-MIGRATION-SWEEP** — confirm zero non-TCP Classic residue; delete AkkaTaskOps dead methods; fix INFO-13.
+**Final gate**: **POST-MIGRATION-SWEEP** — confirm zero non-TCP Classic residue; delete AkkaTaskOps dead methods.
 
 ---
 
@@ -112,6 +111,13 @@ S3-B ✅ DONE 2026-06-22. INFO-8 ✅ DONE (resolved during SNAP1 migration). S3-
 
 **Finding:** 62 non-annotated `return` statements remain in `SNAPSyncController.scala` after SNAP1 migration. The `noReturns` scalafix rule is ratcheted; these sites must be cleared to eliminate suppressions.
 
+**Step 0 — Worktree setup (run from main checkout before anything else):**
+```bash
+git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/8e-snap1 -b wt/8e-snap1 scala3-cleanup-june
+# All remaining steps run in: /media/dev/2tb/dev/fukuii/.claude/worktrees/8e-snap1
+cd /media/dev/2tb/dev/fukuii/.claude/worktrees/8e-snap1
+```
+
 **Pre-flight:**
 ```bash
 grep -c "\breturn\b" src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala
@@ -151,6 +157,13 @@ Must complete without `noReturns` violations.
 4. `SHA=$(git rev-parse --short HEAD)`
 5. Update run-order table: `~~§8e-SNAP1~~ ✅ DONE $SHA`
 6. `git add .claude/` → `git commit -m "docs(8e-snap1): clearout — $SHA"`
+7. **Merge back + teardown (from `/media/dev/2tb/dev/fukuii`):**
+   ```bash
+   cd /media/dev/2tb/dev/fukuii
+   git merge --no-ff wt/8e-snap1
+   git worktree remove .claude/worktrees/8e-snap1
+   git branch -d wt/8e-snap1
+   ```
 
 **Rejection criteria:** Changing SNAP protocol message types or coordinator logic; leaving any `return` in place without `@nowarn` + DEFERRED rationale.
 
@@ -158,17 +171,20 @@ Must complete without `noReturns` violations.
 
 #### POST-MIGRATION-SWEEP — Final Classic Residue Verification
 
-**Gate:** D1 (INFO-13) resolved + AkkaTaskOps deleted.
-**Agent:** MITHRIL + WRAITH
-**Status (verified 2026-06-26):** BRIDGE-A (`toClassic.sender`) ✅ zero sites. BRIDGE-B (`ctx.self.toClassic`) ✅ one site — `RLPxConnectionHandler:323` (TCP floor, permanent). BRIDGE-C (untyped ActorRef constructor params) ✅ remaining sites are TCP-layer connection refs in PeerManagerActor (intentional). `Behavior[Any]` ✅ zero. W7 ✅ DONE. INFO-14/BlockImporter ✅ DONE. **INFO-13/RegularSync** ❌ open (`LoggingAdapter:69`). **AkkaTaskOps** ❌ open (`askFor`/`askForVia` dead methods).
+**Gate:** AkkaTaskOps deleted.
+**Agent:** MITHRIL
+**Status (verified 2026-06-26):** BRIDGE-A ✅ zero. BRIDGE-B ✅ one TCP-floor site (`RLPxConnectionHandler:323`, permanent). BRIDGE-C ✅ TCP-layer refs only. `Behavior[Any]` ✅ zero. W7 ✅ DONE. INFO-13 ✅ DONE `913c22363`. INFO-14 ✅ DONE. **AkkaTaskOps** ❌ open (`askFor`/`askForVia` dead methods).
 
-**Remaining work:**
+**Step 0 — Worktree setup:**
+```bash
+git -C /media/dev/2tb/dev/fukuii worktree add .claude/worktrees/akka-dead -b wt/akka-dead scala3-cleanup-june
+cd /media/dev/2tb/dev/fukuii/.claude/worktrees/akka-dead
+```
 
-1. **Delete AkkaTaskOps Classic dead methods** — `askFor` at `:15` and `askForVia` at `:24` have zero callers. Only `askForTyped` is used. Delete the two Classic extension methods and their imports (`org.apache.pekko.pattern.ask`, `ActorRef.noSender`). `sbt compile-all` — must be clean. Commit: `chore: delete AkkaTaskOps Classic dead methods (askFor/askForVia)`
+**Step 1 — Delete AkkaTaskOps Classic dead methods:**
+`askFor` at `:15` and `askForVia` at `:24` have zero callers. Delete both extension methods and their imports (`org.apache.pekko.pattern.ask`, `ActorRef.noSender`). `sbt compile-all` — must be clean.
 
-2. **Fix INFO-13** — see D1 prompt above (`RegularSync.scala:69` LoggingAdapter).
-
-3. **Final sweep greps** (run after INFO-13 fixed + AkkaTaskOps deleted):
+**Step 2 — Final sweep greps:**
 ```bash
 grep -rn "toClassic\.sender()" src/main/ --include="*.scala" | grep -v "//"          # must be 0
 grep -rn "ctx\.self\.toClassic" src/main/ --include="*.scala" | grep -v "RLPxConn"   # must be 0
@@ -177,6 +193,18 @@ grep -rn "extends Actor\b" src/main/ --include="*.scala"                        
 grep -rn "LoggingAdapter\|classicSystem" src/main/ --include="*.scala"                # must be 0
 ```
 
-4. **Archive** this prompt to `completed/CODEBASE-AUDIT.md` when all greps pass.
-
-**Commit:** `chore(post-migration-sweep): zero non-TCP Classic residue confirmed — $SHA`
+**Step 3 — Commit + merge:**
+```bash
+sbt scalafmtAll
+git add src/main/scala/com/chipprbots/ethereum/jsonrpc/AkkaTaskOps.scala
+git commit -m "chore: delete AkkaTaskOps Classic dead methods (askFor/askForVia)"
+SHA=$(git rev-parse --short HEAD)
+# Update POST-MIGRATION-SWEEP status in this file; archive to completed/CODEBASE-AUDIT.md
+git add .claude/
+git commit -m "docs(post-migration-sweep): Classic residue confirmed zero — $SHA"
+# Merge back (from /media/dev/2tb/dev/fukuii):
+cd /media/dev/2tb/dev/fukuii
+git merge --no-ff wt/akka-dead
+git worktree remove .claude/worktrees/akka-dead
+git branch -d wt/akka-dead
+```

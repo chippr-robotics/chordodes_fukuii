@@ -1077,7 +1077,10 @@ class SyncControllerSpec
     val defaultStateRoot = "deae1dfad5ec8dcef15915811e1f044d2543674fd648f94345231da9fc2646cc"
 
     val defaultPivotBlockHeader: BlockHeader =
-      baseBlockHeader.copy(number = defaultExpectedPivotBlock, stateRoot = TrieRoot(ByteString(Hex.decode(defaultStateRoot))))
+      baseBlockHeader.copy(
+        number = defaultExpectedPivotBlock,
+        stateRoot = TrieRoot(ByteString(Hex.decode(defaultStateRoot)))
+      )
 
     val defaultState: SyncState =
       SyncState(

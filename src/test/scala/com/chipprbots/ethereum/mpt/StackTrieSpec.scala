@@ -8,7 +8,7 @@ import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
 
 import org.scalatest.flatspec.AnyFlatSpec
@@ -85,7 +85,7 @@ class StackTrieSpec extends AnyFlatSpec with Matchers {
   private def toNibbles(key: Array[Byte]): Array[Byte] = {
     val out = new Array[Byte](key.length * 2)
     var i = 0
-    while (i < key.length) {
+    while i < key.length do {
       val b = key(i) & 0xff
       out(2 * i) = ((b >>> 4) & 0x0f).toByte
       out(2 * i + 1) = (b & 0x0f).toByte

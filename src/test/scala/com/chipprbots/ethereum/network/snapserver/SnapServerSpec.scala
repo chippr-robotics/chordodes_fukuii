@@ -188,7 +188,8 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
   it should "not slim-encode accounts that have non-default storageRoot or codeHash" taggedAs UnitTest in {
     val fakeStorageRoot = kec256(ByteString("some storage"))
     val fakeCodeHash = kec256(ByteString("some code"))
-    val account = Account(nonce = 1, balance = 0, storageRoot = TrieRoot(fakeStorageRoot), codeHash = CodeHash(fakeCodeHash))
+    val account =
+      Account(nonce = 1, balance = 0, storageRoot = TrieRoot(fakeStorageRoot), codeHash = CodeHash(fakeCodeHash))
 
     val slim = SnapServer.toSlimAccountRlp(account)
     val fields = slim.items

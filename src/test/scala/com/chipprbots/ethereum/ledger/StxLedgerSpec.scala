@@ -102,7 +102,8 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
         None
       )
     val preparedWorld: InMemoryWorldStateProxy = preparedBlock.updatedWorld
-    val header: BlockHeader = preparedBlock.block.header.copy(number = 1, stateRoot = TrieRoot(preparedBlock.stateRootHash))
+    val header: BlockHeader =
+      preparedBlock.block.header.copy(number = 1, stateRoot = TrieRoot(preparedBlock.stateRootHash))
 
     /** All operations in `ledger.prepareBlock` are performed on ReadOnlyWorldStateProxy so there are no updates in
       * underlying storages, but StateRootHash returned by it `expect` this updates to be in storages. It leads to

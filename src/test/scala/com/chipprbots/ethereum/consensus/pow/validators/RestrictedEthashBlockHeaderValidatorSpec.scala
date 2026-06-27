@@ -124,10 +124,12 @@ class RestrictedEthashBlockHeaderValidatorSpec
       ommersHash =
         BlockHash(ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
       beneficiary = ByteStringUtils.string2hash("0011223344556677889900112233445566778899"),
-      stateRoot = TrieRoot(ByteStringUtils.string2hash("e3a3e62598cdb02a3551f9e932ed248a741ca174c00d977a56d9bb2c6473dd34")),
+      stateRoot =
+        TrieRoot(ByteStringUtils.string2hash("e3a3e62598cdb02a3551f9e932ed248a741ca174c00d977a56d9bb2c6473dd34")),
       transactionsRoot =
         TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      receiptsRoot = TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      receiptsRoot =
+        TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
       logsBloom = BloomFilter(ByteStringUtils.string2hash("00" * 256)),
       difficulty = BigInt("131520"),
       number = 10,
@@ -148,10 +150,12 @@ class RestrictedEthashBlockHeaderValidatorSpec
       ommersHash =
         BlockHash(ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
       beneficiary = ByteStringUtils.string2hash("0011223344556677889900112233445566778899"),
-      stateRoot = TrieRoot(ByteStringUtils.string2hash("a485afd5bfcef9da8df9c0fe4315e1f4bc2c96eb34920eeaddf534b807cd71e6")),
+      stateRoot =
+        TrieRoot(ByteStringUtils.string2hash("a485afd5bfcef9da8df9c0fe4315e1f4bc2c96eb34920eeaddf534b807cd71e6")),
       transactionsRoot =
         TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      receiptsRoot = TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      receiptsRoot =
+        TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
       logsBloom = BloomFilter(ByteStringUtils.string2hash("00" * 256)),
       difficulty = BigInt("131584"),
       number = 11,
