@@ -54,6 +54,7 @@ Active sprint plan: `/home/dev/.claude/plans/we-are-working-on-noble-whisper.md`
 | §7f | ForkChoiceManager.setListener — TypedActorRef narrow adapter; last non-TCP `.toClassic` removed | `456f12499` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
 | §8a-E6b | ChainWeightCalibrationSpec — Typed rewrite: `GetHandshakedPeersCmd` + `CalibrateChainWeightNowCmd`; all Classic imports replaced | `3c4b15543` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
 | §8g | Braceless Scala 3 syntax — `removeOptionalBraces = true`, full 957-file sweep + one `()` fix | `84aa43575` | 2026-06-28 | completed/DEFERRED-BACKLOG.md |
+| §8a-E6 | PeerActorSpec → ActorTestKit + ManualTime (Classic TestKit removed); RLPxCapabilityOffsetsSpec extracted (7 pure tests); RLPxConnectionHandlerSpec TCP tests Wave 3 gated | `ec00775b6` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
 
 ---
 
@@ -679,7 +680,7 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 |------|------|--------|
 | **8e SNAP1** | Clear 36 SSC sites (gated on NET2 Wave 3) | Wave 3 sprint |
 | ~~**8g braceless**~~ | ~~`removeOptionalBraces` per-subsystem passes~~ | ✅ DONE `84aa43575` 2026-06-28 |
-| **8a retro batch E6** | PeerActorSpec + RLPxConnectionHandlerSpec (wait Wave 3) | Wave 3 |
+| ~~**8a retro batch E6**~~ | ~~PeerActorSpec + RLPxConnectionHandlerSpec (wait Wave 3)~~ | ✅ DONE `ec00775b6` 2026-06-27 (PeerActorSpec migrated; RLPxCapabilityOffsetsSpec extracted; TCP tests Wave 3) |
 | ~~**7f FCM setListener**~~ | ~~ForkChoiceManager typed callback — remove last non-TCP `.toClassic`~~ | ✅ DONE `456f12499` 2026-06-27 |
 | **8j Thread.sleep** | 2 live sites (both NECESSARY — revisit in Wave 3 test migration) | Wave 3 |
 
@@ -699,40 +700,19 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 **Run order — this file:**
 | # | Batch | Prompt | Parallel-safe? |
 |---|-------|--------|---------------|
-| E6 | Batch E | §8a-retro batch E6 — PeerActorSpec + RLPxConnectionHandlerSpec | Gate: Wave 3 network/P2P sprint |
+| ~~E6~~ | ~~Batch E~~ | ~~§8a-retro batch E6 — PeerActorSpec + RLPxConnectionHandlerSpec~~ | ✅ DONE `ec00775b6` 2026-06-27 |
 | ~~7f~~ | ~~—~~ | ~~§7f — ForkChoiceManager.setListener typed callback (MITHRIL)~~ | ✅ DONE `456f12499` 2026-06-27 |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
 ---
 
-### §8a-E6 RLPxConnectionHandlerSpec — partial migration (pure unit tests now; TCP tests Wave 3 gated)
+### §8a-E6 RLPxConnectionHandlerSpec — partial migration ✅ DONE `ec00775b6` 2026-06-27
 
-**File:** `src/test/scala/com/chipprbots/ethereum/network/rlpx/RLPxConnectionHandlerSpec.scala`
-
-**What is blocking full migration:**
-
-Three Classic-only APIs that the TCP interaction tests depend on:
-
-1. **`TestActorRef`** — synchronous Classic actor ref. Used so `connection.lastSender` is reliable immediately after `expectMsgClass(Tcp.Register)`. The bridge child actor (spawned inside `RLPxConnectionHandler` to handle Pekko IO TCP events) sends `Tcp.Register` to the connection probe; `lastSender` captures its ref so the test can inject `Tcp.Received`. No Typed equivalent — Typed spawning is async.
-
-2. **`connection.lastSender` / `connection.reply()`** — Classic `TestProbe` APIs for capturing the sender of the last received message and replying to it. Used to inject `Tcp.Received` into the bridge child and to send `Ack` back to the actor. No equivalent on Typed `TestProbe`.
-
-3. **Pekko IO TCP is Classic-only** — `Tcp.Register`, `Tcp.Write`, `Tcp.Received` are Classic messages. The bridge child that sends/receives these is a Classic actor spawned via `context.toClassic.actorOf`. Migrating this requires either Pekko Typed TCP bindings or a redesigned bridge — Wave 3 network sprint work.
-
-**What CAN be done now — extract the pure unit tests:**
-
-The `computeCapabilityOffsets` suite (6 tests, lines 269–358) has zero actor dependencies — pure function calls, no `TestSetup`, no Classic APIs. Extract these into a new file `RLPxCapabilityOffsetsSpec.scala` as a plain `AnyFlatSpec` + `Matchers`. This removes those 6 tests from the Classic `TestKit` class permanently.
-
-**Fix:**
-
-1. Create `src/test/scala/com/chipprbots/ethereum/network/rlpx/RLPxCapabilityOffsetsSpec.scala` — move the 6 `computeCapabilityOffsets` tests there as a plain `AnyFlatSpec`. No actor system, no imports from `pekko.testkit`.
-
-2. Delete those 6 tests from `RLPxConnectionHandlerSpec.scala`. Leave the TCP interaction tests and `TestSetup` untouched — still Classic, still `TestActorRef`.
-
-3. Add `// Wave 3 gate: TCP tests require TestActorRef + lastSender — blocked on Typed TCP bridge migration` comment at the class declaration.
-
-**Verify:** `fukuii-test only "*RLPxCapabilityOffsets*"` → 6/6. `fukuii-test only "*RLPxConnectionHandler*"` → existing TCP tests still pass. Then commit referencing §8a-E6.
+`RLPxCapabilityOffsetsSpec` extracted (7 pure unit tests, plain `AnyFlatSpec`, no actor system).
+TCP interaction tests remain in `RLPxConnectionHandlerSpec` (Classic `TestActorRef` + `lastSender` — Wave 3 gate).
+VERIFY: RLPxCapabilityOffsetsSpec 7/7 ✅ · RLPxConnectionHandlerSpec 9/9 ✅
+See `completed/DEFERRED-BACKLOG.md §8a-E6` for full write-up.
 
 ---
 

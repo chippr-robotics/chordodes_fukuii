@@ -2828,3 +2828,47 @@ All 10 `expectMsg(CalibrateChainWeightNow)` call sites updated to
 
 Full `ScalaTestWithActorTestKit` migration (replacing `ExplicitlyTriggeredScheduler` with
 `ManualTime`) remains Wave 3 gated alongside E6 (PeerActorSpec + RLPxConnectionHandlerSpec).
+
+---
+
+## §8a-E6 — PeerActorSpec + RLPxConnectionHandlerSpec (partial) ✅ DONE 2026-06-27
+
+**Commit:** `ec00775b6`
+
+### PeerActorSpec — Classic TestKit → ActorTestKit + ManualTime ✅
+
+**File:** `src/test/scala/com/chipprbots/ethereum/network/p2p/PeerActorSpec.scala`
+
+**Root cause resolved:** `NodeStatusSetup extends EphemBlockchainTestSetup` created a Classic
+`ActorSystem` during test lifecycle, terminating the shared `ScalaTestWithActorTestKit` system
+after the first test and breaking all subsequent `testKit.createTestProbe()` calls (13/15 failing
+with `IllegalStateException: cannot create children while terminating or terminated`).
+
+**Fix:**
+- `ScalaTestWithActorTestKit` + `ManualTime` replaces `TestKit(ActorSystem(...))` + `ExplicitlyTriggeredScheduler`
+- `NodeStatusSetup` rewritten to instantiate storage fixtures directly (`EphemDataSourceComponent`,
+  `Storages`, `ArchivePruning`) — `EphemBlockchainTestSetup` dependency removed entirely
+- `implicit override lazy val classicSystem` field deleted; `testKit` is the only actor system
+- All Classic imports removed (`ActorRef`, `ActorSystem`, `PoisonPill`, `Terminated`, `TestActorRef`,
+  `TestProbe` from `pekko.testkit`, `ExplicitlyTriggeredScheduler`)
+
+**Result:** 15/15 pass. Zero Classic imports in file.
+
+### RLPxConnectionHandlerSpec — computeCapabilityOffsets extracted ✅ (TCP tests Wave 3 gated)
+
+**Files:**
+- NEW: `src/test/scala/com/chipprbots/ethereum/network/rlpx/RLPxCapabilityOffsetsSpec.scala`
+- MOD: `src/test/scala/com/chipprbots/ethereum/network/rlpx/RLPxConnectionHandlerSpec.scala`
+
+**What was done:**
+- 6 `computeCapabilityOffsets` tests (lines 269–358, zero actor dependencies) extracted to new
+  `RLPxCapabilityOffsetsSpec` — plain `AnyFlatSpec` + `Matchers`, no `pekko.testkit` imports
+- Those 6 tests deleted from `RLPxConnectionHandlerSpec`; TCP interaction tests and `TestSetup` untouched
+- Wave 3 gate comment added at class declaration (3 blocking Classic-only APIs documented):
+  `TestActorRef`, `connection.lastSender`/`connection.reply()`, Pekko IO TCP Classic-only messages
+
+**What remains Wave 3 gated (not changed):**
+- 9 TCP interaction tests still use `TestActorRef` + `connection.lastSender` — require either
+  Pekko Typed TCP bindings or a redesigned Classic bridge actor
+
+VERIFY: `RLPxCapabilityOffsetsSpec` 7/7 ✅ · `RLPxConnectionHandlerSpec` 9/9 ✅
