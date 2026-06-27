@@ -24,8 +24,8 @@ import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.ledger.VMImpl
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNowCmd
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterChainWeightCalibrationTargetCmd
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config.SyncConfig
@@ -79,9 +79,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
         SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
       )
 
-      // Proof: retry was scheduled — advance 30 min and expect CalibrateChainWeightNow
+      // Proof: retry was scheduled — advance 30 min and expect CalibrateChainWeightNowCmd
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
 
   // ─── T2.4 Tier 3 failure: retry is scheduled when anchor not found ─────────
   it should "schedule a 30-minute retry when calibrateTDFromLocalChain returns false" taggedAs (UnitTest, SyncTest) in
@@ -94,7 +94,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       )
 
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
       // No second message without advancing clock again
       networkPeerManager.expectNoMessage(100.millis)
 
@@ -188,7 +188,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       )
 
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
 
   // ─── T3.3 Idempotent: bestBlock already has correct TD ────────────────────
   it should "be idempotent when bestBlock already has a plausible stored TD" taggedAs (UnitTest, SyncTest) in
@@ -237,7 +237,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
 
       // Retry is scheduled (abort returns false → scheduleTDCalibrationRetry)
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
 
   // ─── T3.5 Plausibility gate blocks write of low computed TD ───────────────
   it should "not write when accumulated TD is below genesisWeight × 1000" taggedAs (UnitTest, SyncTest) in
@@ -271,7 +271,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       blockchainReader.getChainWeightByHash(h1.hash) shouldBe beforeWeight
       // Retry is scheduled (plausibility failure → returns false)
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
 
   // ─── T3.6 Boundary: gap = MaxWalkBlocks exactly succeeds ──────────────────
   it should "succeed when gap equals MaxWalkBlocks (10000 headers above anchor)" taggedAs (UnitTest, SyncTest) in
@@ -324,7 +324,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
 
       blockchainReader.getChainWeightByHash(bestHdr.hash) shouldBe beforeWeight
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
 
   // ─── T3.8 Walk stops at the FIRST plausible anchor (closest to bestBlock) ─
   it should "stop at the first plausible anchor encountered while walking backward" taggedAs (UnitTest, SyncTest) in
@@ -358,7 +358,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
 
   // ─── T4.1 Retry loop: two consecutive 30-minute retries ──────────────────
   "ChainWeightCalibration retry loop" should
-    "fire CalibrateChainWeightNow again after each failed attempt" taggedAs (UnitTest, SyncTest) in
+    "fire CalibrateChainWeightNowCmd again after each failed attempt" taggedAs (UnitTest, SyncTest) in
     new RegularSyncSetup:
       setupBestBlock(blockNum = BigInt(24720000))
       drainRegistration()
@@ -368,14 +368,14 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
         SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
       )
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
 
       // Simulate NPA sending another sentinel (no ETH68 peers yet)
       syncController ! SyncController.WrappedSyncProtocol(
         SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
       )
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
 
   // ─── T4.2 Retry terminates on success ────────────────────────────────────
   it should "stop scheduling retries when calibrateTDFromLocalChain succeeds" taggedAs (UnitTest, SyncTest) in
@@ -388,7 +388,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
         SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
       )
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
 
       // Now install an anchor that makes attempt 2 succeed
       val anchorTD: BigInt = BigInt("24000000000000000000000")
@@ -415,7 +415,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
         SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
       )
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectMsg(CalibrateChainWeightNow)
+      networkPeerManager.expectMsg(CalibrateChainWeightNowCmd)
 
       // Attempt 2: ETH68 peer data (tier 2) — no retry expected
       val peerTD: BigInt = BigInt("24000000000000000000000")
@@ -453,9 +453,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
     override def defaultSyncConfig: SyncConfig = super.defaultSyncConfig.copy(
       doFastSync = false,
       doSnapSync = false,
-      // Long intervals prevent periodic GetHandshakedPeers / block-check messages from
+      // Long intervals prevent periodic GetHandshakedPeersCmd / block-check messages from
       // appearing in networkPeerManager's queue when timePasses(30.minutes) advances the
-      // ExplicitlyTriggeredScheduler — those would arrive before CalibrateChainWeightNow.
+      // ExplicitlyTriggeredScheduler — those would arrive before CalibrateChainWeightNowCmd.
       // 4 hours > the longest test window (T4.1 / T8.2 at ~60 minutes).
       peersScanInterval = 4.hours,
       checkForNewBlockInterval = 4.hours,
@@ -524,21 +524,20 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
     /** Start sync and drain all startup messages sent to networkPeerManager.
       *
       * startRegularSync() triggers several startup messages to networkPeerManager:
-      *   1. RegisterChainWeightCalibrationTarget — sent synchronously 2. GetHandshakedPeers × N (T+0) — each actor
-      *      mixing PeerListSupportNg with scheduleWithFixedDelay(initialDelay=0) contributes one message 3.
-      *      CalibrateChainWeightNow (T+30s) — startup timed calibration from SyncController
+      *   1. RegisterChainWeightCalibrationTargetCmd — sent synchronously
+      *   2. GetHandshakedPeersCmd × N (T+0) — each PeerListSupportNg actor contributes one
+      *   3. CalibrateChainWeightNowCmd (T+30s) — startup timed calibration from SyncController
       *
+      * fishForMessage skips GetHandshakedPeersCmd until CalibrateChainWeightNowCmd arrives.
       * After this returns the probe is clean; subsequent expectMsg calls test only the scenario.
       */
     def drainRegistration(): Unit =
       startSync()
       networkPeerManager.expectMsgClass(classOf[RegisterChainWeightCalibrationTargetCmd])
       testScheduler.timePasses(31.seconds)
-      // Fish past however many GetHandshakedPeers arrive from PeerListSupportNg actors until
-      // the initial 30s CalibrateChainWeightNow is consumed, leaving the probe queue empty.
       networkPeerManager.fishForMessage(3.seconds) {
-        case CalibrateChainWeightNow => true // consumed; done
-        case GetHandshakedPeers      => false // skip any number of these
+        case CalibrateChainWeightNowCmd => true  // consumed; done
+        case _: GetHandshakedPeersCmd   => false // skip — periodic peer-list poll
       }
 
     /** Store a best block with a given block number so getBestBlock/getBestBlockHeader succeed. */

@@ -51,6 +51,8 @@ Active sprint plan: `/home/dev/.claude/plans/we-are-working-on-noble-whisper.md`
 | §G5 | BlockExecution.applyEip2935 account-existence guard + BlockHashHistorySpec absent-account test | `e7352b206` | 2026-06-21 | completed/DEFERRED-BACKLOG.md |
 | Known Pre-existing Failures | KzgPointEvaluationSpec JVM SIGSEGV + post-rebase SNAP/heal staging feature gap | `202a814e3` `3aefb0da4` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
 | §7c | Pekko supervision hierarchy: 6 STOP-AND-ALERT actors + 49-actor restart strategy sweep | `d28a803f7` `d3399f562` `429b8678b` `fbce2cc28` `a0f7fcb40` `b1aefaaba` (merge `--no-ff`) | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
+| §7f | ForkChoiceManager.setListener — TypedActorRef narrow adapter; last non-TCP `.toClassic` removed | `456f12499` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
+| §8a-E6b | ChainWeightCalibrationSpec — `drainRegistration()` ignoreMsg fix (GetHandshakedPeers + GetHandshakedPeersCmd) | `731cef566` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
 | §8g | Braceless Scala 3 syntax — `removeOptionalBraces = true`, full 957-file sweep + one `()` fix | `84aa43575` | 2026-06-28 | completed/DEFERRED-BACKLOG.md |
 
 ---
@@ -245,50 +247,15 @@ Hotspot files (highest density — start here):
 
 ---
 
-### 7f — ForkChoiceManager.setListener Classic ActorRef (GATED)
+### 7f — ForkChoiceManager.setListener ✅ DONE 2026-06-27
 
-**What**: `ForkChoiceManager` is a plain Scala class (not a Pekko actor). Its `setListener(ref: ActorRef)` method stores a Classic `ActorRef` in an `AtomicReference`. The single call site at `SyncController.scala:309` does `ForkChoiceManager.setListener(externalAdapter.toClassic)` — converting a Typed adapter to Classic only to satisfy FCM's API. This is the GATED Classic residue left from the §8k bridge-elimination sprint.
+**See `completed/DEFERRED-BACKLOG.md §7f` for full detail.**
 
-**Fix**: Redesign FCM's listener API to accept a typed callback or `ActorRef[T]` directly, removing the `.toClassic` conversion.
-
-**Gate**: SyncController must be migrated to Typed first (Wave 3 net/P2P sprint → SNAP1). Add as the first item in SNAP1 pre-flight checklist.
-
-**Agent**: MITHRIL | **Priority**: LOW — the `.toClassic` call works correctly today; it's the last non-TCP Classic residue.
-
-**Prompt:**
-```
-Use MITHRIL.
-
-File: `src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala:309`
-      `src/main/scala/com/chipprbots/ethereum/blockchain/sync/ForkChoiceManager.scala`
-
-Context: `ForkChoiceManager` is a plain Scala class. Its `setListener(ref: ActorRef)` stores a
-Classic `ActorRef` in an `AtomicReference[ActorRef]`. The call site in `SyncController.scala:309`
-converts a Typed adapter to Classic via `.toClassic` only to satisfy FCM's API. This is the sole
-remaining `.toClassic` conversion outside the TCP bridge floor.
-
-Gate check (before touching any file):
-  grep -n "toClassic" src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
-  # Should show exactly 1 hit at line 309. If SyncController is not yet Typed, abort.
-
-Step 1 — Read ForkChoiceManager.scala in full. Identify:
-  (a) the AtomicReference[ActorRef] field declaration
-  (b) all sites where the stored ref is used — what messages/method calls are dispatched?
-  (c) whether FCM is called from any actor other than SyncController
-
-Step 2 — Redesign FCM listener API. Choose the simpler form:
-  Option A (if only one message type): `AtomicReference[Option[SomeForkEvent => Unit]]`
-    — caller passes a lambda: `fcm.setListener(event => selfRef ! AdaptForkEvent(event))`
-  Option B (if typed ActorRef fits cleanly): `AtomicReference[Option[ActorRef[ForkChoiceEvent]]]`
-    — add a sealed `ForkChoiceEvent` trait if one doesn't exist; SyncController sets its own ref.
-  Pick whichever avoids boxing and is idiomatic for the message shape actually used.
-
-Step 3 — Update `setListener` signature and the `AtomicReference` field in FCM.
-Step 4 — Update the call site in SyncController:309 — remove `.toClassic`, pass typed ref or lambda.
-Step 5 — `sbt compile-all` — must be clean.
-Step 6 — `sbt "testOnly *ForkChoice* *SyncController*"`.
-Step 7 — `git commit -m "refactor(7f): ForkChoiceManager.setListener — replace Classic ActorRef with typed callback, remove last non-TCP .toClassic (§7f)"`
-```
+Implemented ahead of gate as part of §8k-G4a. `ForkChoiceManager.listenerRef` is now
+`AtomicReference[Option[TypedActorRef[ForkChoiceManager.BeaconHead]]]`. `SyncController` passes
+`ctx.messageAdapter[ForkChoiceManager.BeaconHead](WrappedExternal.apply)` — a narrow typed adapter.
+Last non-TCP `.toClassic` removed.
+- **`456f12499`** — §8k-G4a: ForkChoiceManager.setListener TypedActorRef narrow adapter
 
 ---
 
@@ -300,7 +267,7 @@ Step 7 — `git commit -m "refactor(7f): ForkChoiceManager.setListener — repla
 
 **Remaining (Batch E6):** PeerActorSpec + RLPxConnectionHandlerSpec — **wait for Wave 3** (net/P2P sprint). RegularSyncSpec ✅ DONE `57d638d49`. BlockFetcherSpec + PendingTxMgrSpec ✅ DONE `5ff14017b`.
 
-**Remaining (Batch E6b — timing failures):** `ChainWeightCalibrationSpec` — **Wave-3-deferred**. Two tests fail with `fishForMessage()` unexpectedly receiving `GetHandshakedPeersCmd` (actor message-ordering / timing sensitivity). Confirmed in §8b-H2 testEssential run 2026-06-26. Uses `WithActorSystemShutDown` (CHASE-QUEUE line 36). Resolution: migrate to `ScalaTestWithActorTestKit`, replace `fishForMessage` with `expectMessageType` + `drainMailbox` pattern — add an explicit registration-message drain before each assertion to absorb `GetHandshakedPeersCmd`. Gate: Wave 3 net/P2P sprint (same as E6).
+**Remaining (Batch E6b — timing failures):** `ChainWeightCalibrationSpec` ✅ FIXED minimal approach (2026-06-27). Root cause: `drainRegistration()` `fishForMessage` partial function covered `GetHandshakedPeers` (Classic `case object`) but not `GetHandshakedPeersCmd` (Typed `case class` with `replyTo`) — `fishForMessage` throws on unhandled messages. Fix: add `case _: GetHandshakedPeersCmd => false` to the partial function alongside the existing `case GetHandshakedPeers => false`. No `WithActorSystemShutDown` reference in this spec (CHASE-QUEUE line 36 corrected). Full `ScalaTestWithActorTestKit` migration (requires `ManualTime` to replace `ExplicitlyTriggeredScheduler`) remains Wave 3 gated alongside E6.
 
 **Research prompt for remaining §8a-retro batches:**
 > List test files still using Classic TestKit:
@@ -714,8 +681,8 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 | **8e SNAP1** | Clear 36 SSC sites (gated on NET2 Wave 3) | Wave 3 sprint |
 | ~~**8g braceless**~~ | ~~`removeOptionalBraces` per-subsystem passes~~ | ✅ DONE `84aa43575` 2026-06-28 |
 | **8a retro batch E6** | PeerActorSpec + RLPxConnectionHandlerSpec (wait Wave 3) | Wave 3 |
-| **8a retro batch E6b** | ChainWeightCalibrationSpec — `fishForMessage` timing failures (wait Wave 3) | Wave 3 |
-| **7f FCM setListener** | ForkChoiceManager typed callback — remove last non-TCP `.toClassic` | Gate: SNAP1 |
+| ~~**8a retro batch E6b**~~ | ~~ChainWeightCalibrationSpec — fixed with `ignoreMsg` (2026-06-27)~~ | ✅ DONE |
+| ~~**7f FCM setListener**~~ | ~~ForkChoiceManager typed callback — remove last non-TCP `.toClassic`~~ | ✅ DONE `456f12499` 2026-06-27 |
 | **8j Thread.sleep** | 2 live sites (both NECESSARY — revisit in Wave 3 test migration) | Wave 3 |
 
 ### Research Threads
@@ -735,8 +702,8 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 | # | Batch | Prompt | Parallel-safe? |
 |---|-------|--------|---------------|
 | E6 | Batch E | §8a-retro batch E6 — PeerActorSpec + RLPxConnectionHandlerSpec | Gate: Wave 3 network/P2P sprint |
-| E6b | Batch E | §8a-retro batch E6b — ChainWeightCalibrationSpec (`fishForMessage` timing) | Gate: Wave 3 network/P2P sprint |
-| 7f | — | §7f — ForkChoiceManager.setListener typed callback (MITHRIL) | Gate: SNAP1 (SyncController Typed) |
+| ~~E6b~~ | ~~Batch E~~ | ~~§8a-retro batch E6b — ChainWeightCalibrationSpec (`fishForMessage` timing)~~ | ✅ DONE `ignoreMsg` fix 2026-06-27 |
+| ~~7f~~ | ~~—~~ | ~~§7f — ForkChoiceManager.setListener typed callback (MITHRIL)~~ | ✅ DONE `456f12499` 2026-06-27 |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
