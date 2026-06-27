@@ -413,6 +413,9 @@ object FastSync {
 
       // SyncStateSchedulerActor (Group S4, narrowed S4) is a Typed Behavior (Behavior[Command]); spawn via ctx.spawn.
       // We send it StartSyncingTo / RestartRequested and it replies with messages matched in our Behavior[Command] states.
+      // §7c-E3: restartWithBackoff bounds the re-request storm on restart. On restart, all in-flight peer assignments
+      // are lost and re-requested, but PeerResponseTimeout per-request and the fresh DownloaderState (starts from zero)
+      // limit the burst. Backoff: min 5s, max 60s, 0.3 jitter, 2 restarts max (after which FastSync stops entirely).
       val scheduler = ctx
         .spawn(
           Behaviors
@@ -433,7 +436,9 @@ object FastSync {
                 stateSyncStatsAdapter
               )
             )
-            .onFailure[Exception](SupervisorStrategy.restart),
+            .onFailure[Throwable](
+              SupervisorStrategy.restartWithBackoff(5.seconds, 60.seconds, 0.3).withMaxRestarts(2)
+            ),
           s"$countActor-state-scheduler"
         )
 
