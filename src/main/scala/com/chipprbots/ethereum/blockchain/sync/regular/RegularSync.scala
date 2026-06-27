@@ -3,9 +3,6 @@ package com.chipprbots.ethereum.blockchain.sync.regular
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
-import org.apache.pekko.event.Logging
-import org.apache.pekko.event.LoggingAdapter
-
 import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
@@ -66,8 +63,6 @@ object RegularSync {
   ): Behavior[Command] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
-        val log: LoggingAdapter = Logging(ctx.system.classicSystem, classOf[RegularSyncImpl])
-
         val fetcher: TypedActorRef[BlockFetcher.FetchCommand] =
           ctx.spawn(
             BlockFetcher(peersClient, peerEventBus, ctx.self.narrow[ProgressProtocol], syncConfig, blockValidator),
@@ -126,7 +121,6 @@ object RegularSync {
           fetcher,
           importer,
           supervisor,
-          log,
           ctx
         )
       }
@@ -137,17 +131,16 @@ object RegularSync {
       fetcher: TypedActorRef[BlockFetcher.FetchCommand],
       importer: TypedActorRef[BlockImporter.Command],
       supervisor: TypedActorRef[SyncController.Command],
-      log: LoggingAdapter,
       ctx: org.apache.pekko.actor.typed.scaladsl.ActorContext[Command]
   ): Behavior[Command] =
     Behaviors.receiveMessage {
       case SyncProtocol.Start =>
-        log.info("Starting regular sync")
+        ctx.log.info("Starting regular sync")
         importer ! BlockImporter.Start
         Behaviors.same
 
       case SyncProtocol.MinedBlock(block) =>
-        log.info("Block mined [number = {}, hash = {}]", block.number, block.header.hashAsHexString)
+        ctx.log.info("Block mined [number = {}, hash = {}]", block.number, block.header.hashAsHexString)
         importer ! BlockImporter.MinedBlock(block)
         Behaviors.same
 
@@ -156,28 +149,28 @@ object RegularSync {
         Behaviors.same
 
       case ProgressProtocol.StartedFetching =>
-        running(progressState.copy(startedFetching = true), fetcher, importer, supervisor, log, ctx)
+        running(progressState.copy(startedFetching = true), fetcher, importer, supervisor, ctx)
 
       case ProgressProtocol.StartingFrom(blockNumber) =>
         val newState = progressState.copy(initialBlock = blockNumber, currentBlock = blockNumber)
         RegularSyncMetrics.setCurrentBlock(blockNumber)
-        running(newState, fetcher, importer, supervisor, log, ctx)
+        running(newState, fetcher, importer, supervisor, ctx)
 
       case ProgressProtocol.GotNewBlock(blockNumber) =>
-        log.debug(s"Got information about new block [number = $blockNumber]")
+        ctx.log.debug("Got information about new block [number = {}]", blockNumber)
         val newState = progressState.copy(bestKnownNetworkBlock = blockNumber)
         RegularSyncMetrics.setBestKnownNetworkBlock(blockNumber)
-        running(newState, fetcher, importer, supervisor, log, ctx)
+        running(newState, fetcher, importer, supervisor, ctx)
 
       case ProgressProtocol.ImportedBlock(blockNumber, internally) =>
-        log.debug(s"Imported new block [number = $blockNumber, internally = $internally]")
+        ctx.log.debug("Imported new block [number = {}, internally = {}]", blockNumber, internally)
         val newState = progressState.copy(currentBlock = blockNumber)
         RegularSyncMetrics.setCurrentBlock(blockNumber)
         RegularSyncMetrics.incrementBlocksImported()
         if internally then {
           fetcher ! InternalLastBlockImport(blockNumber)
         }
-        running(newState, fetcher, importer, supervisor, log, ctx)
+        running(newState, fetcher, importer, supervisor, ctx)
 
       case msg: SyncProtocol.RegularSyncStuck =>
         // Forward escape-valve signal to SyncController. BlockImporter detects this condition and emits the
@@ -185,7 +178,7 @@ object RegularSync {
         // 8k-F: SyncController is Behavior[Command]; its typed ref is injected as `supervisor` at spawn. Wrap
         // the raw SyncProtocol message in WrappedSyncProtocol so it is unwrapped by handleRegularSyncMsg
         // (the escape valve that re-runs SNAP sync from a recent pivot).
-        log.warning(
+        ctx.log.warn(
           "Regular sync stuck on block {} (missing {}); forwarding to SyncController for SNAP re-sync",
           msg.blockNumber,
           msg.missingHash
@@ -209,9 +202,13 @@ object RegularSync {
           if rate > 0.1 && lag > 0 then f"${lag.toDouble / rate / 3600}%.1fh"
           else if lag == 0 then "at head"
           else "unknown"
-        log.info(
-          s"RegularSync: current=${progressState.currentBlock} best=${progressState.bestKnownNetworkBlock} " +
-            s"lag=$lag rate=${f"$rate%.1f"}/s eta=$etaStr"
+        ctx.log.info(
+          "RegularSync: current={} best={} lag={} rate={}/s eta={}",
+          progressState.currentBlock,
+          progressState.bestKnownNetworkBlock,
+          lag,
+          f"$rate%.1f",
+          etaStr
         )
         val wormBar =
           if progressState.bestKnownNetworkBlock == 0 then WormToBrainBar.renderUnknown(WormToBrainBar.WormState.Active)
@@ -221,13 +218,12 @@ object RegularSync {
             val p = (progressState.currentBlock - progressState.initialBlock).toDouble /
               (progressState.bestKnownNetworkBlock - progressState.initialBlock).toDouble
             WormToBrainBar.renderKnown(p)
-        log.info(s"$wormBar — RegularSync")
+        ctx.log.info("{} — RegularSync", wormBar)
         running(
           progressState.copy(lastPrintBlock = progressState.currentBlock, lastPrintTimeMs = now),
           fetcher,
           importer,
           supervisor,
-          log,
           ctx
         )
 
@@ -252,6 +248,3 @@ object RegularSync {
   }
 
 }
-
-// Logger name anchor — never instantiated
-final private class RegularSyncImpl
