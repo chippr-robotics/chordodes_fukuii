@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor.*
+import org.apache.pekko.actor.{Cancellable, Scheduler}
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
