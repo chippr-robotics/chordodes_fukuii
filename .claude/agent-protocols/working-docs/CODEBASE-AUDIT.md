@@ -55,7 +55,7 @@ Every prompt that touches source files must apply this before committing:
 | ~~G2~~ | ~~SNAP S3-E: mutable task types → immutable~~ | ✅ DONE 2026-06-26 — S3-B/S3-E/INFO-8 all resolved |
 | ~~D1~~ | ~~INFO-13: RegularSync LoggingAdapter~~ | ✅ DONE `913c22363` |
 | ~~D2~~ | ~~SNAP S3-E conversion~~ | ✅ DONE 2026-06-26 — task classes all `val` |
-| §8e-SNAP1 | SNAPSyncController return clearout (62 sites) | UNBLOCKED — gate lifted (SNAP1 migration done) — see prompt below |
+| ~~§8e-SNAP1~~ | ~~SNAPSyncController return clearout (62 sites)~~ | ✅ DONE ca1446e49 |
 | POST-MIGRATION-SWEEP | Final Classic residue sweep | Gate: D1 (INFO-13) + AkkaTaskOps deletion |
 
 **Final gate**: **POST-MIGRATION-SWEEP** — confirm zero non-TCP Classic residue; delete AkkaTaskOps dead methods.
