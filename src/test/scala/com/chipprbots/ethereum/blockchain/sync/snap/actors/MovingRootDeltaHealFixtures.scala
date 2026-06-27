@@ -114,7 +114,7 @@ object MovingRootDeltaHealFixtures {
     )
   }
 
-  /** A present-interior-node-with-absent-child fixture (T003b) for the later pruned-descent completion-gate test.
+  /** A present-interior-node-with-absent-child fixture (T003b) for the pruned-descent completion-gate test (US3/T012b).
     *
     * @param storage
     *   holds the root and the present interior BranchNode, but NOT `absentGrandchildHash`.
@@ -125,22 +125,41 @@ object MovingRootDeltaHealFixtures {
     *   delta-discovery alone cannot see (it does not descend into a present interior node).
     * @param absentGrandchildHash
     *   the referenced-but-absent node the PRUNED DESCENT must catch.
+    * @param grandchildServed
+    *   the (path, hash, bytes) the heal fetches to CLOSE the gap once the descent has re-enqueued it. `hash ==
+    *   absentGrandchildHash` and `kec256(bytes) == hash`, so serving it passes the content gate. The grandchild is a
+    *   storage-trie leaf (no further children) so the post-heal descent is clean and completion is declared.
     */
   final case class IncompleteSubtreeFixture(
       storage: TestMptStorage,
       rootHash: ByteString,
       presentInteriorHash: ByteString,
-      absentGrandchildHash: ByteString
+      absentGrandchildHash: ByteString,
+      grandchildServed: ServedNode
   )
 
   /** Build the download-present-but-incomplete-subtree fixture (T003b). The root and the interior branch are stored
     * object-for-object (the heal reads them back as present); the interior branch references a grandchild hash that is
     * deliberately NOT stored. delta-discovery stops at the present interior node; only a descent into it finds the gap.
+    *
+    * The absent grandchild is a real LeafNode whose RLP `kec256` equals the referenced hash, so the completion-gate
+    * test can also serve it (close the gap) and confirm a later clean descent declares completion. The grandchild's
+    * served path is `[interior-slot-3-nibble]` — the HP-compact path the descent assigns when it re-enqueues slot 3 of
+    * the (empty-path) interior branch reached via root slot 0 — but the heal does not assert on the path here; the test
+    * fishes the actual re-enqueued GetTrieNodes and serves by the requested hash.
     */
   def incompleteSubtree(): IncompleteSubtreeFixture = {
     val storage = new TestMptStorage()
 
-    val absentGrandchildHash = kec256(ByteString("moving-root-delta/incomplete/absent-grandchild"))
+    // The absent grandchild is a REAL storage-trie leaf (≥ 32B value ⇒ HashNode-referenced, served by hash). Its
+    // kec256 IS the hash the interior branch references, so the descent's re-enqueued task accepts the served bytes.
+    val grandLeaf =
+      LeafNode(
+        ByteString(Array[Byte](0x07)),
+        ByteString(kec256(ByteString("moving-root/incomplete/grandchild")).toArray)
+      )
+    val grandEncoded = MptTraversals.encodeNode(grandLeaf)
+    val absentGrandchildHash = kec256(ByteString(grandEncoded))
 
     // A PRESENT interior branch whose slot-3 child is the absent grandchild.
     val interiorChildren = emptyChildren
@@ -155,11 +174,16 @@ object MovingRootDeltaHealFixtures {
     val root = BranchNode(rootChildren, None)
     storage.putNode(root)
 
+    // Served-grandchild path: root-slot-0 → interior-slot-3 ⇒ account-trie nibbles [0x0, 0x3]. The heal fetches it by
+    // hash; the path here documents the descent's child-path arithmetic for the reader (not asserted in the test).
+    val grandCompact = ByteString(com.chipprbots.ethereum.mpt.HexPrefix.encode(Array[Byte](0x0, 0x3), isLeaf = false))
+
     IncompleteSubtreeFixture(
       storage = storage,
       rootHash = ByteString(root.hash),
       presentInteriorHash = interiorHash,
-      absentGrandchildHash = absentGrandchildHash
+      absentGrandchildHash = absentGrandchildHash,
+      grandchildServed = ServedNode(Seq(grandCompact), absentGrandchildHash, ByteString(grandEncoded))
     )
   }
 }

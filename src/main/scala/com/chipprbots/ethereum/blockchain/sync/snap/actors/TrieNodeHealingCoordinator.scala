@@ -981,6 +981,16 @@ class TrieNodeHealingCoordinator(
         )
         stateRoot = newStateRoot
         flushRawNodesSync() // Flush any buffered nodes before clearing state
+        // spec 009 T010/C4 — RE-PEG-RETAINS-NODES INVARIANT (consensus-load-bearing): a re-peg MUST NOT delete any
+        // persisted trie node. The whole point of moving-root delta heal is that content-addressed verified nodes
+        // (keccak-keyed) carry over unchanged under the new root (~99.9% shared), so every node healed against the old
+        // root remains valid and reusable against `newStateRoot` — the post-re-peg delta only SHRINKS. The ONLY state
+        // cleared here is in-memory frontier (pendingTasks/pendingHashSet/activeRequests, below) plus the OPTIONAL
+        // frontier-mirror CF via clearPersistedFrontier(); the trie-node store `mptStorage` is NEVER touched on this
+        // path. Audit guard: clearPersistedFrontier() (TrieNodeHealingCoordinator.scala) operates solely on
+        // `healingFrontierStorage` (CF 'g' — frontier mirror + completeness marker) and never references `mptStorage`.
+        // If a future edit makes a re-peg drop trie nodes, it is a consensus bug (a referenced node could go missing
+        // under the new root → false completion / import failure) — keep this invariant intact.
         clearPersistedFrontier() // Layer 2: old-root frontier is stale after refresh — reseed (below) repopulates it
         clearHealedPathsSet() // spec 003 C1/F5: old-root healed paths are stale — clear before next gate
         pendingTasks.clear() // Will be re-populated by root reseed + inline discovery / trie walk from controller
@@ -1121,6 +1131,23 @@ class TrieNodeHealingCoordinator(
       }
 
     case HealingCheckCompletion =>
+      // spec 009 T011/C5 — SOUND-COMPLETION INVARIANT (THE consensus invariant of the moving-root delta heal):
+      // completion is declared ONLY when `isComplete` (empty frontier + no active requests) AND
+      // `verificationPassComplete` (a pruned descent from the CURRENT heal root found zero absent reachable node).
+      // Delta-discovery draining to `pending==0` is NOT sufficient on its own: the non-deferred download wrote MOSAIC
+      // fragments before the heal, so "present on disk" does NOT imply "subtree complete". `discoverMissingChildren`
+      // does not descend into an already-present child, so a download-written present interior node whose grandchild
+      // is absent would slip past pure delta-discovery → a false completion with a referenced-but-absent node (a
+      // consensus failure: import would later fault on the missing node). The PRUNED DESCENT (startVerificationBFS +
+      // rebuildFrontierBFS) closes this: it DECODES every present node and enqueues every absent referenced child
+      // (nodeOpt==None → frontier entry); it prunes a present child ONLY if that child carries a DURABLE
+      // subtree-complete record, and those records are written exclusively by the HEALER after the subtree's bytes are
+      // durably flushed (writeDurableSubtreeRecords) — never by the download. So a download-mosaic present-but-incomplete
+      // node is never pruned, the descent reaches its absent grandchild and re-enqueues it, and completion is withheld
+      // until a later clean descent passes. A re-peg resets `verificationPassComplete=false` (HealingPivotRefreshed) and
+      // the `walkRoot==stateRoot` guard (FrontierRebuildComplete) excludes a stale completion landing against a new
+      // root — so the descent is always redone against the current root before completion. DO NOT replace this descent
+      // with delta-discovery-only completion; it is the load-bearing soundness gate over the mosaic.
       if (isComplete && !flushing && !trieWalkInProgress && !verificationBFSRunning) {
         // FIX-BUG1-VERIFY: gate: skip verification when no inline healing was done.
         // If totalNodesHealed == 0 the coordinator was never given nodes to heal (idle case) OR

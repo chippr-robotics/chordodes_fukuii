@@ -635,20 +635,32 @@ class SNAPSyncController(
     // the in-flight latch so a later tick can retry.
     case SNAPSyncController.HealingServeRoot(blockNumber, rootOpt) =>
       healingServeRootRequestInFlight = false
-      rootOpt match {
-        case Some(root) if root.nonEmpty =>
-          lastHealingServeRootBlock = Some(blockNumber)
-          log.info(
-            s"[HEAL-SERVE-ROOT] Pushing newest-servable serve root ${root.take(4).toHex} (block $blockNumber) " +
-              s"to healing coordinator (walk root unchanged)."
-          )
-          trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingServeRootRefresh(root))
-        case _ =>
-          log.info(
-            "[HEAL-SERVE-ROOT] Parent could not fetch a newest-servable root (no peers / bootstrap failed). " +
-              "Keeping the current serve root; will retry on a later healing tick."
-          )
-      }
+      // spec 009 T009/C4: under `movingRootDeltaHeal` the stale-move trigger re-pegs the single heal root via
+      // `refreshPivotInPlace` (NOT a serve-root-only push), so this reply is never solicited on the flag path. If a
+      // late `HealingServeRoot` still arrives (e.g. an in-flight RequestHealingServeRoot from before the flag engaged),
+      // do NOT push a HealingServeRootRefresh — under single-root heal the serve root IS the walk root and a
+      // serve-root-only move would be meaningless. The re-peg already moved (or will move) the heal root in lockstep
+      // with the controller's stateRoot via the canonical-header path. Flag OFF: byte-identical to the spec-004 push.
+      if (snapSyncConfig.movingRootDeltaHeal) {
+        log.debug(
+          "[HEAL-REPEG] Ignoring late HealingServeRoot reply under moving-root delta heal — re-peg is driven by " +
+            "refreshPivotInPlace (single heal root)."
+        )
+      } else
+        rootOpt match {
+          case Some(root) if root.nonEmpty =>
+            lastHealingServeRootBlock = Some(blockNumber)
+            log.info(
+              s"[HEAL-SERVE-ROOT] Pushing newest-servable serve root ${root.take(4).toHex} (block $blockNumber) " +
+                s"to healing coordinator (walk root unchanged)."
+            )
+            trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingServeRootRefresh(root))
+          case _ =>
+            log.info(
+              "[HEAL-SERVE-ROOT] Parent could not fetch a newest-servable root (no peers / bootstrap failed). " +
+                "Keeping the current serve root; will retry on a later healing tick."
+            )
+        }
 
     case EnsureSnapServerPeersConnected =>
       ensureSnapServerPeersConnected()
@@ -3631,14 +3643,29 @@ class SNAPSyncController(
     * an empty one).
     */
   private def maybeRequestHealingServeRoot(): Unit =
+    // spec 009 T009/C4 (Moving-Root Delta Heal — stale-move trigger). The staleness MATH below is shared with the
+    // spec-004 serve-root path; the difference is the ACTION it takes when stale:
+    //   - flag OFF (decoupledHealServeRoot, byte-identical to today): push a HealingServeRootRefresh — moves only the
+    //     coordinator's SERVE root; the walk root and the controller's `stateRoot`/pivot are untouched.
+    //   - flag ON (movingRootDeltaHeal): re-peg the SINGLE heal root via `refreshPivotInPlace`, which routes through
+    //     `completePivotRefreshWithStateRoot` → `HealingPivotRefreshed(newRoot)`. That path is the load-bearing one
+    //     for soundness: it moves the controller's `stateRoot`/`pivotBlock` AND the coordinator's walk root IN
+    //     LOCKSTEP (and persists `snapSyncStateRoot` only on healing-clean), so the finalize anchor guard
+    //     (`snapStateRoot == pivotHeader.stateRoot`) and the validateState walk both operate on the SAME root the heal
+    //     completed against. Emitting `HealingPivotRefreshed` directly from the `HealingServeRoot` reply (which carries
+    //     only `(block, stateRoot)`, not a full header) would diverge the coordinator's heal root from the controller's
+    //     stateRoot → validateState would re-walk the stale old root and never converge. Hence we reach the canonical
+    //     header path (`refreshPivotInPlace` fetches the full header locally or via bootstrap) — this is the "confirm
+    //     the trigger reaches it" requirement in T009.
     if (
-      snapSyncConfig.decoupledHealServeRoot &&
+      (snapSyncConfig.decoupledHealServeRoot || snapSyncConfig.movingRootDeltaHeal) &&
       currentPhase == StateHealing &&
       trieNodeHealingCoordinator.isDefined &&
       !healingServeRootRequestInFlight &&
       // Don't contend with a pivot-refresh header bootstrap: while one is pending the parent is (or is about to be)
       // in runningPivotHeaderBootstrap, where a concurrent serve-root bootstrap completion could be mis-routed.
-      // The request will fire on a later tick once the refresh settles.
+      // The request will fire on a later tick once the refresh settles. (Under the flag this also prevents stacking a
+      // second refreshPivotInPlace while a re-peg header bootstrap is in flight.)
       pendingPivotRefresh.isEmpty
     ) {
       currentNetworkBestFromSnapPeers().foreach { networkBest =>
@@ -3655,13 +3682,29 @@ class SNAPSyncController(
             case None            => true
           }
           if (stale) {
-            healingServeRootRequestInFlight = true
-            log.info(
-              s"[HEAL-SERVE-ROOT] Requesting newest-servable serve root: networkBest=$networkBest target=$target " +
-                s"(margin=$HealingServeRootMarginBlocks, lastServeBlock=${lastHealingServeRootBlock.getOrElse("none")}). " +
-                s"Routing via parent RecentRoot bootstrap."
-            )
-            context.parent ! SNAPSyncController.RequestHealingServeRoot
+            if (snapSyncConfig.movingRootDeltaHeal) {
+              // spec 009 T009/C4: re-peg the single heal root to a fresh served root. `refreshPivotInPlace` selects
+              // `networkBest − margin`, fetches the full canonical header, and emits `HealingPivotRefreshed` via
+              // `completePivotRefreshWithStateRoot` — moving completeness AND fetch (one root) while RETAINING every
+              // persisted verified node (T010) and resetting `verificationPassComplete` so a fresh pruned descent
+              // gates completion against the new root (T011). Record the block so the cadence (≤ once per window)
+              // matches the serve-root path; the actual root lands when the refresh settles.
+              lastHealingServeRootBlock = Some(target)
+              log.info(
+                s"[HEAL-REPEG] Heal root stale (networkBest=$networkBest, target=$target, margin=" +
+                  s"$HealingServeRootMarginBlocks, lastRepegBlock=${lastHealingServeRootBlock.getOrElse("none")}) — " +
+                  s"re-pegging the single heal root via refreshPivotInPlace (spec 009 moving-root delta heal)."
+              )
+              refreshPivotInPlace("heal root stale (spec 009 moving-root re-peg)")
+            } else {
+              healingServeRootRequestInFlight = true
+              log.info(
+                s"[HEAL-SERVE-ROOT] Requesting newest-servable serve root: networkBest=$networkBest target=$target " +
+                  s"(margin=$HealingServeRootMarginBlocks, lastServeBlock=${lastHealingServeRootBlock.getOrElse("none")}). " +
+                  s"Routing via parent RecentRoot bootstrap."
+              )
+              context.parent ! SNAPSyncController.RequestHealingServeRoot
+            }
           }
         }
       }
