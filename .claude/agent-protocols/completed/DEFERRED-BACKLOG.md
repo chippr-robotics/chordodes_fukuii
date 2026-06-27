@@ -2707,3 +2707,32 @@ Merge commit: `--no-ff` into `scala3-cleanup-june`. 16 files, +1002/-492 lines. 
 - **RF-2 (BlockFetcher):** AbstractBehavior — constructor spawns children; Pekko restart re-runs constructor and ghosts old children. RegularSync `BlockFetcherStopped` death-watch + `spawnEpoch` suffix (avoids `InvalidActorNameException` on same-name re-spawn before `Terminated` processed).
 - **E3 (SyncStateSchedulerActor):** Had pre-existing `onFailure[Exception](restart)` (too broad, unbound). Replaced with `onFailure[Throwable](restartWithBackoff(5s,60s,0.3,max=2))`.
 - **sbt-git JGit worktree bug:** `NoWorkTreeException` on `sbt` in linked worktrees. Worked around with temporary `local-git-override.sbt` during compile/test (deleted before commit). Separate issue — not addressed here.
+
+---
+
+## §8g — Braceless Scala 3 Syntax ✅ DONE 2026-06-28
+
+**Branch:** `scala3-cleanup-june`
+**Commit:** `84aa43575`
+
+### Work completed
+
+Phase 1 (2026-06-18, prior session): `rewrite.scala3.convertToNewSyntax = true` applied — 392 files, 3,125 ins / 3,482 del, zero logic impact.
+
+Phase 2 (2026-06-28): `rewrite.scala3.removeOptionalBraces = true` enabled in `.scalafmt.conf`; `sbt scalafmtAll` run across all modules — 957 files, 10,874 ins / 19,921 del (net −9,047 lines).
+
+### Compile fix
+
+`src/test/scala/com/chipprbots/ethereum/nodebuilder/PortForwardingBuilderSpec.scala:51` — empty `catch case` body in braceless form requires explicit `()`:
+
+```scala
+// Before (scalafmt removed braces, left comment-only body — compiler rejected it)
+catch case NonFatal(_) => // Ignore non-fatal cleanup errors
+
+// After
+catch case NonFatal(_) => () // Ignore non-fatal cleanup errors
+```
+
+### Result
+
+`sbt compile-all` — 0 errors, 65 warnings (all pre-existing). Zero logic changes.

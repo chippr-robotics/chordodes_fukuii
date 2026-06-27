@@ -47,6 +47,7 @@
 | `948a25008` | Phase 1: sealed Command traits across S1/S4/S5/S6 actors | sync/fast, sync/regular, network/peers, sync/controller |
 | `04615ad43` | Phase 2: Command ADT non-sealed consolidated | sync/fast, sync/regular, network/peers |
 | `1f2d3a4b5` | CAPSTONE: root actor flip Classic→Typed | node/bootstrap + all |
+| `84aa43575` | style(8g): `removeOptionalBraces = true` — full 957-file braceless sweep | all |
 
 ---
 

@@ -1,6 +1,6 @@
 # Fukuii Modernization — Deferred Backlog
 
-**Last updated**: 2026-06-27
+**Last updated**: 2026-06-28
 **Purpose**: Active deferred items only. Completed section detail lives in `completed/DEFERRED-BACKLOG.md`.
 
 Active sprint plan: `/home/dev/.claude/plans/we-are-working-on-noble-whisper.md`
@@ -51,6 +51,7 @@ Active sprint plan: `/home/dev/.claude/plans/we-are-working-on-noble-whisper.md`
 | §G5 | BlockExecution.applyEip2935 account-existence guard + BlockHashHistorySpec absent-account test | `e7352b206` | 2026-06-21 | completed/DEFERRED-BACKLOG.md |
 | Known Pre-existing Failures | KzgPointEvaluationSpec JVM SIGSEGV + post-rebase SNAP/heal staging feature gap | `202a814e3` `3aefb0da4` | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
 | §7c | Pekko supervision hierarchy: 6 STOP-AND-ALERT actors + 49-actor restart strategy sweep | `d28a803f7` `d3399f562` `429b8678b` `fbce2cc28` `a0f7fcb40` `b1aefaaba` (merge `--no-ff`) | 2026-06-27 | completed/DEFERRED-BACKLOG.md |
+| §8g | Braceless Scala 3 syntax — `removeOptionalBraces = true`, full 957-file sweep + one `()` fix | `84aa43575` | 2026-06-28 | completed/DEFERRED-BACKLOG.md |
 
 ---
 
@@ -666,19 +667,6 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 
 ---
 
-### 8g — Braceless Scala 3 Syntax
-
-**Partial work committed (2026-06-18):** `convertToNewSyntax = true` applied (392 source files, 3,125 ins / 3,482 del, zero logic impact).
-
-**Remaining work**: Enable `removeOptionalBraces = true` in `.scalafmt.conf` and apply subsystem by subsystem (`jsonrpc/` first, then `network/`, etc.) rather than a 945-file sweep.
-
-**Gate:** After CAPSTONE (don't distract migration diffs with style churn).
-**Parallel-safe:** YES per-file, but mass conversion creates large diffs — scope per-subsystem.
-**Priority:** LOW — style only.
-**Agent:** MITHRIL.
-
----
-
 ### 8i — RLP Typeclass Derivation Modernization
 
 **Current state**: 183 `implicit val`/`def` RLP encoder/decoder instances. Two categories:
@@ -724,7 +712,7 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 | Task | Work | Effort |
 |------|------|--------|
 | **8e SNAP1** | Clear 36 SSC sites (gated on NET2 Wave 3) | Wave 3 sprint |
-| **8g braceless** | `removeOptionalBraces` per-subsystem passes | Low, per-subsystem |
+| ~~**8g braceless**~~ | ~~`removeOptionalBraces` per-subsystem passes~~ | ✅ DONE `84aa43575` 2026-06-28 |
 | **8a retro batch E6** | PeerActorSpec + RLPxConnectionHandlerSpec (wait Wave 3) | Wave 3 |
 | **8a retro batch E6b** | ChainWeightCalibrationSpec — `fishForMessage` timing failures (wait Wave 3) | Wave 3 |
 | **7f FCM setListener** | ForkChoiceManager typed callback — remove last non-TCP `.toClassic` | Gate: SNAP1 |
