@@ -68,7 +68,7 @@ class ConsensusAdapterSpec extends AnyFlatSpec with Matchers with ScalaFutures w
     ConsensusTest
   ) in new ImportBlockTestSetupImpl:
     val block: Block = getBlock(6, parent = bestBlock.header.hash.value)
-    val difficulty: BigInt = block.header.difficulty
+    val difficulty: BigInt = block.header.difficulty.value
     val hash: ByteString = block.header.hash.value
 
     setBlockExists(block, inChain = false, inQueue = false)
@@ -187,7 +187,7 @@ class ConsensusAdapterSpec extends AnyFlatSpec with Matchers with ScalaFutures w
     val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash.value)
     val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash.value)
 
-    val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
+    val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty.value + 999)
     val newWeight2: ChainWeight = weight1.increase(newBlock2.header)
     val newWeight3: ChainWeight = newWeight2.increase(newBlock3.header)
     val oldWeight2: ChainWeight = weight1.increase(oldBlock2.header)
@@ -236,7 +236,7 @@ class ConsensusAdapterSpec extends AnyFlatSpec with Matchers with ScalaFutures w
     val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash.value)
     val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash.value)
 
-    val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
+    val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty.value + 999)
     val newWeight2: ChainWeight = weight1.increase(newBlock2.header)
     newWeight2.increase(newBlock3.header)
     val oldWeight2: ChainWeight = weight1.increase(oldBlock2.header)
@@ -340,7 +340,7 @@ class ConsensusAdapterSpec extends AnyFlatSpec with Matchers with ScalaFutures w
     val newBlock3WithOmmer: Block =
       getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash.value, ommers = Seq(ommerBlock.header))
 
-    val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
+    val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty.value + 999)
     val oldWeight2: ChainWeight = weight1.increase(oldBlock2.header)
     val oldWeight3: ChainWeight = oldWeight2.increase(oldBlock3.header)
 
@@ -387,7 +387,7 @@ class ConsensusAdapterSpec extends AnyFlatSpec with Matchers with ScalaFutures w
     val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum - 2)
-    val block1Weight: ChainWeight = ChainWeight.totalDifficultyOnly(currentBestBlock.header.difficulty + 999)
+    val block1Weight: ChainWeight = ChainWeight.totalDifficultyOnly(currentBestBlock.header.difficulty.value + 999)
 
     blockchainWriter.save(currentBestBlock, Nil, block1Weight, saveAsBestBlock = true)
 

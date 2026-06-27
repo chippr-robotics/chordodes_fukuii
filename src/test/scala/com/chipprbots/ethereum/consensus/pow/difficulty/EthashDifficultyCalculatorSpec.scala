@@ -8,6 +8,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.TrieRoot
@@ -21,7 +22,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
   // Minimal BlockHeader for difficulty tests
   private def header(
       number: BigInt,
-      difficulty: BigInt,
+      difficulty: Difficulty,
       timestamp: Long,
       hasUncles: Boolean = false
   ): BlockHeader =
@@ -92,7 +93,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
 
   "EthashDifficultyCalculator" should "increase difficulty for fast blocks" taggedAs (UnitTest, ConsensusTest) in {
     // Parent block mined at timestamp 1000, next block at 1005 (5s gap, target is ~13s)
-    val parent = header(number = 10000000, difficulty = BigInt("1000000000000"), timestamp = 1000)
+    val parent = header(number = 10000000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
     val childTimestamp = 1005L
 
     val newDiff = EthashDifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parent)
@@ -101,7 +102,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
 
   it should "decrease difficulty for slow blocks" taggedAs (UnitTest, ConsensusTest) in {
     // Parent mined at timestamp 1000, next block at 1100 (100s gap, well above target)
-    val parent = header(number = 10000000, difficulty = BigInt("1000000000000"), timestamp = 1000)
+    val parent = header(number = 10000000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
     val childTimestamp = 1100L
 
     val newDiff = EthashDifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parent)
@@ -121,19 +122,19 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
 
   it should "include difficulty bomb before pause block" taggedAs (UnitTest, ConsensusTest) in {
     // Before difficultyBombPauseBlockNumber (3,000,000 on ETC)
-    val parent = header(number = 2999998, difficulty = BigInt("20000000000000"), timestamp = 1000)
+    val parent = header(number = 2999998, difficulty = Difficulty(BigInt("20000000000000")), timestamp = 1000)
     val childTimestamp = 1013L // ~13s gap, should be roughly same difficulty without bomb
 
     val newDiff = EthashDifficultyCalculator.calculateDifficulty(2999999, childTimestamp, parent)
     // Bomb adds 2^(blockNumber/100000 - 2) at block ~3M that's 2^(29-2) = 2^27 = 134M
     // Should still be calculable and positive
-    newDiff should be > BigInt(0)
+    newDiff should be > Difficulty.Zero
   }
 
   it should "pause difficulty bomb between pause and continue blocks" taggedAs (UnitTest, ConsensusTest) in {
     // Between pause (3M) and continue (5M), bomb should be frozen at pause level
-    val parent3_5M = header(number = 3500000, difficulty = BigInt("20000000000000"), timestamp = 1000)
-    val parent4_5M = header(number = 4500000, difficulty = BigInt("20000000000000"), timestamp = 1000)
+    val parent3_5M = header(number = 3500000, difficulty = Difficulty(BigInt("20000000000000")), timestamp = 1000)
+    val parent4_5M = header(number = 4500000, difficulty = Difficulty(BigInt("20000000000000")), timestamp = 1000)
     val childTimestamp = 1013L
 
     val diff3_5M = EthashDifficultyCalculator.calculateDifficulty(3500001, childTimestamp, parent3_5M)
@@ -142,15 +143,15 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     // Both should have same bomb contribution since bomb is paused
     // The base adjustment is the same (same parent difficulty, same timestamp gap)
     // So results should be very close (only differ by bomb contribution, which is frozen)
-    val ratio = diff3_5M.toDouble / diff4_5M.toDouble
+    val ratio = diff3_5M.value.toDouble / diff4_5M.value.toDouble
     ratio should be > 0.999
     ratio should be < 1.001
   }
 
   it should "remove difficulty bomb after removal block" taggedAs (UnitTest, ConsensusTest) in {
     // After difficultyBombRemovalBlockNumber (5,900,000 on ETC via ECIP-1041)
-    val parentA = header(number = 6000000, difficulty = BigInt("20000000000000"), timestamp = 1000)
-    val parentB = header(number = 12000000, difficulty = BigInt("20000000000000"), timestamp = 1000)
+    val parentA = header(number = 6000000, difficulty = Difficulty(BigInt("20000000000000")), timestamp = 1000)
+    val parentB = header(number = 12000000, difficulty = Difficulty(BigInt("20000000000000")), timestamp = 1000)
     val childTimestamp = 1013L
 
     val diffA = EthashDifficultyCalculator.calculateDifficulty(6000001, childTimestamp, parentA)
@@ -165,9 +166,9 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
   it should "account for uncles in difficulty adjustment post-Atlantis" taggedAs (UnitTest, ConsensusTest) in {
     // Post-Atlantis (8,772,000), uncle factor affects c coefficient
     val parentNoUncles =
-      header(number = 10000000, difficulty = BigInt("1000000000000"), timestamp = 1000, hasUncles = false)
+      header(number = 10000000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000, hasUncles = false)
     val parentWithUncles =
-      header(number = 10000000, difficulty = BigInt("1000000000000"), timestamp = 1000, hasUncles = true)
+      header(number = 10000000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000, hasUncles = true)
     val childTimestamp = 1013L
 
     val diffNoUncles = EthashDifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parentNoUncles)
@@ -181,20 +182,20 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
   // ecip1099BlockNumber in this config is 11,460,000. Tests below use block 15,000,000 (post-ECIP-1099).
 
   it should "increase difficulty for fast blocks post-ECIP-1099" taggedAs (UnitTest, ConsensusTest) in {
-    val parent = header(number = 15_000_000, difficulty = BigInt("1000000000000"), timestamp = 1000)
+    val parent = header(number = 15_000_000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
     EthashDifficultyCalculator.calculateDifficulty(15_000_001, 1001L, parent) should be > parent.difficulty
   }
 
   it should "not change difficulty near target (13s gap) post-ECIP-1099" taggedAs (UnitTest, ConsensusTest) in {
-    val parent = header(number = 15_000_000, difficulty = BigInt("1000000000000"), timestamp = 1000)
+    val parent = header(number = 15_000_000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
     val newDiff = EthashDifficultyCalculator.calculateDifficulty(15_000_001, 1013L, parent)
     // 13s gap: adjustment factor is 0 → difficulty should be approximately equal (within parent/2048 band)
     val maxDelta = parent.difficulty / 2048
-    (newDiff - parent.difficulty).abs should be <= maxDelta
+    (newDiff - parent.difficulty).value.abs should be <= maxDelta.value
   }
 
   it should "decrease difficulty for slow blocks post-ECIP-1099" taggedAs (UnitTest, ConsensusTest) in {
-    val parent = header(number = 15_000_000, difficulty = BigInt("1000000000000"), timestamp = 1000)
+    val parent = header(number = 15_000_000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
     EthashDifficultyCalculator.calculateDifficulty(15_000_001, 1030L, parent) should be < parent.difficulty
   }
 
@@ -205,7 +206,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
   }
 
   it should "have MinimumDifficulty constant equal to 131072" taggedAs (UnitTest, ConsensusTest) in {
-    DifficultyCalculator.MinimumDifficulty shouldBe BigInt(131072)
+    DifficultyCalculator.MinimumDifficulty shouldBe Difficulty(131072)
   }
 
   // ===== DifficultyCalculator Dispatch =====
@@ -214,7 +215,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     UnitTest,
     ConsensusTest
   ) in {
-    val parent = header(number = 10000000, difficulty = BigInt("1000000000000"), timestamp = 1000)
+    val parent = header(number = 10000000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
     val childTimestamp = 1013L
 
     // Default config has no powTargetTime, so dispatches to EthashDifficultyCalculator
@@ -224,12 +225,12 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
   }
 
   it should "use TargetTimeDifficultyCalculator when powTargetTime is set" taggedAs (UnitTest, ConsensusTest) in {
-    val parent = header(number = 10000000, difficulty = BigInt("1000000000000"), timestamp = 1000)
+    val parent = header(number = 10000000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
     val childTimestamp = 1013L
 
     implicit val configWithTarget: BlockchainConfig = blockchainConfig.copy(powTargetTime = Some(15))
     val result = DifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parent)
     // Should be different from Ethash calculator
-    result should be > BigInt(0)
+    result should be > Difficulty.Zero
   }
 // scalastyle:on magic.number

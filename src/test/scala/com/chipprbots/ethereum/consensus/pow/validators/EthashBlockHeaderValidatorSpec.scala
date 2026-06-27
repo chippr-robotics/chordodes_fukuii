@@ -95,9 +95,9 @@ class EthashBlockHeaderValidatorSpec
 
   it should "return a failure if created based on invalid difficulty" taggedAs (UnitTest, ConsensusTest) in {
     forAll(bigIntGen) { difficulty =>
-      val blockHeader = validBlockHeader.copy(difficulty = difficulty)
+      val blockHeader = validBlockHeader.copy(difficulty = Difficulty(difficulty))
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
-      if difficulty != validBlockHeader.difficulty then assert(validateResult == Left(HeaderDifficultyError))
+      if Difficulty(difficulty) != validBlockHeader.difficulty then assert(validateResult == Left(HeaderDifficultyError))
       else assert(validateResult == Right(BlockHeaderValid))
     }
   }
@@ -201,32 +201,32 @@ class EthashBlockHeaderValidatorSpec
     ConsensusTest
   ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
-      validParentBlockHeader.copy(number = 5000101, unixTimestamp = 1513175023, difficulty = BigInt("22627021745803"))
+      validParentBlockHeader.copy(number = 5000101, unixTimestamp = 1513175023, difficulty = Difficulty(BigInt("22627021745803")))
     val parent: Block = Block(parentHeader, parentBody)
 
     val blockNumber: BigInt = parentHeader.number + 1
     val blockTimestamp: Long = parentHeader.unixTimestamp + 6
 
-    val difficulty: BigInt = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
+    val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
     val expected: BigInt = BigInt("22638070358408")
 
-    difficulty shouldBe expected
+    difficulty.value shouldBe expected
 
   it should "properly calculate the difficulty after difficulty defuse" taggedAs (
     UnitTest,
     ConsensusTest
   ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
-      validParentBlockHeader.copy(number = 5899999, unixTimestamp = 1525176000, difficulty = BigInt("22627021745803"))
+      validParentBlockHeader.copy(number = 5899999, unixTimestamp = 1525176000, difficulty = Difficulty(BigInt("22627021745803")))
     val parent: Block = Block(parentHeader, parentBody)
 
     val blockNumber: BigInt = parentHeader.number + 1
     val blockTimestamp: Long = parentHeader.unixTimestamp + 6
 
-    val difficulty: BigInt = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
+    val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
     val blockDifficultyWihtoutBomb: BigInt = BigInt("22638070096264")
 
-    difficulty shouldBe blockDifficultyWihtoutBomb
+    difficulty.value shouldBe blockDifficultyWihtoutBomb
 
   it should "properly calculate a block after block reward reduction (without uncles)" taggedAs (
     UnitTest,
@@ -237,7 +237,7 @@ class EthashBlockHeaderValidatorSpec
     val blockNumber: BigInt = afterRewardReductionBlockHeader.number
     val blockTimestamp: Long = afterRewardReductionBlockHeader.unixTimestamp
 
-    val difficulty: BigInt = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
+    val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
 
     /** Expected calculations: blockNumber = 5863375 // < 5900000 timestampDiff = 6 x = 3480699544328087 / 2048 = c = (1
       * \- (6 / 9)) = 0,33 // > -99 fakeBlockNumber = 5863375 - 3000000 = 2863375 extraDifficulty = 134217728
@@ -245,7 +245,7 @@ class EthashBlockHeaderValidatorSpec
       */
     BigInt("3484099629090779")
 
-    difficulty shouldBe afterRewardReductionBlockHeader.difficulty
+    difficulty.value shouldBe afterRewardReductionBlockHeader.difficulty.value
 
   it should "properly calculate the difficulty after muir glacier delay" taggedAs (
     UnitTest,
@@ -265,19 +265,19 @@ class EthashBlockHeaderValidatorSpec
       validParentBlockHeader.copy(
         number = 9200000 - 1,
         unixTimestamp = 1525176000,
-        difficulty = BigInt("22627021745803")
+        difficulty = Difficulty(BigInt("22627021745803"))
       )
     val parent: Block = Block(parentHeader, parentBody)
 
     val blockNumber: BigInt = parentHeader.number + 1
     val blockTimestamp: Long = parentHeader.unixTimestamp + 6
 
-    val difficulty: BigInt = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)(
+    val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)(
       blockchainConfigWithoutDifficultyBombRemoval
     )
     val blockDifficultyWihtoutBomb: BigInt = BigInt("22638070096265")
 
-    difficulty shouldBe blockDifficultyWihtoutBomb
+    difficulty.value shouldBe blockDifficultyWihtoutBomb
 
   object BlockValidatorWithPowMocked extends BlockHeaderValidatorSkeleton():
 
@@ -297,7 +297,7 @@ class EthashBlockHeaderValidatorSpec
       TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
-    difficulty = BigInt("20626433633447"),
+    difficulty = Difficulty(BigInt("20626433633447")),
     number = 3582022,
     gasLimit = 4700036,
     gasUsed = 0,
@@ -316,7 +316,7 @@ class EthashBlockHeaderValidatorSpec
       TrieRoot(ByteString(Hex.decode("6616c23aeb486dd47aca667814ffed831553c7322440913b95847235a4c3bb97"))),
     receiptsRoot = TrieRoot(ByteString(Hex.decode("5fa90473cd08a08fc766329651d81bb6e4ef2bb330cf90c3025927a3bafe0c57"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
-    difficulty = BigInt("20616098743527"),
+    difficulty = Difficulty(BigInt("20616098743527")),
     number = 3582021,
     gasLimit = 4699925,
     gasUsed = 1005896,
@@ -335,7 +335,7 @@ class EthashBlockHeaderValidatorSpec
       TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     receiptsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
-    difficulty = BigInt("3482399171761329"),
+    difficulty = Difficulty(BigInt("3482399171761329")),
     number = 5863375,
     gasLimit = 7999992,
     gasUsed = 7998727,
@@ -354,7 +354,7 @@ class EthashBlockHeaderValidatorSpec
       TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     receiptsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
-    difficulty = BigInt("3480699544328087"),
+    difficulty = Difficulty(BigInt("3480699544328087")),
     number = 5863374,
     gasLimit = 7992222,
     gasUsed = 7980470,
@@ -373,7 +373,7 @@ class EthashBlockHeaderValidatorSpec
       TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
-    difficulty = BigInt("989772"),
+    difficulty = Difficulty(BigInt("989772")),
     number = 20,
     gasLimit = 131620495,
     gasUsed = 0,
@@ -392,7 +392,7 @@ class EthashBlockHeaderValidatorSpec
       TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
-    difficulty = BigInt("989289"),
+    difficulty = Difficulty(BigInt("989289")),
     number = 19,
     gasLimit = 131749155,
     gasUsed = 0,
@@ -453,7 +453,7 @@ class EthashBlockHeaderValidatorSpec
       TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
-    difficulty = BigInt("62230570926948"),
+    difficulty = Difficulty(BigInt("62230570926948")),
     number = 1920008,
     gasLimit = 4707788,
     gasUsed = 0,
@@ -478,7 +478,7 @@ class EthashBlockHeaderValidatorSpec
         )
       )
     ),
-    difficulty = BigInt("62230571058020"),
+    difficulty = Difficulty(BigInt("62230571058020")),
     number = 1920009,
     gasLimit = 4712384,
     gasUsed = 109952,
@@ -503,7 +503,7 @@ class EthashBlockHeaderValidatorSpec
         )
       )
     ),
-    difficulty = BigInt("62230571189092"),
+    difficulty = Difficulty(BigInt("62230571189092")),
     number = 1920010,
     gasLimit = 4712388,
     gasUsed = 114754,

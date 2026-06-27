@@ -77,7 +77,7 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers:
       TrieRoot(ByteString(Hex.decode("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac"))),
     receiptsRoot = TrieRoot(ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
-    difficulty = BigInt("14005986920576"),
+    difficulty = Difficulty(BigInt("14005986920576")),
     number = 3125369,
     gasLimit = 4699996,
     gasUsed = 84000,

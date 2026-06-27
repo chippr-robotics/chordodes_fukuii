@@ -16,6 +16,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Mocks.MockHandshakerAlwaysFails
 import com.chipprbots.ethereum.Mocks.MockHandshakerAlwaysSucceeds
@@ -194,7 +195,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers:
     val defaultStatusMsg: Status = Status(
       protocolVersion = Capability.ETH63.version,
       networkId = 1,
-      totalDifficulty = Fixtures.Blocks.Genesis.header.difficulty,
+      totalDifficulty = Fixtures.Blocks.Genesis.header.difficulty.value,
       bestHash = Fixtures.Blocks.Genesis.header.hash.value,
       genesisHash = Fixtures.Blocks.Genesis.header.hash.value,
       forkId = ForkId(0, None)

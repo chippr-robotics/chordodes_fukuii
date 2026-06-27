@@ -80,7 +80,7 @@ object TestConverter:
       transactionsRoot = TrieRoot(ByteString(parseHex(testHeader.transactionsTrie))),
       receiptsRoot = TrieRoot(ByteString(parseHex(testHeader.receiptTrie))),
       logsBloom = BloomFilter(ByteString(parseHex(testHeader.bloom))),
-      difficulty = parseBigInt(testHeader.difficulty),
+      difficulty = Difficulty(parseBigInt(testHeader.difficulty)),
       number = parseBigInt(testHeader.number),
       gasLimit = parseBigInt(testHeader.gasLimit),
       gasUsed = parseBigInt(testHeader.gasUsed),

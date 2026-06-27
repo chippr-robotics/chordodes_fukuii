@@ -668,7 +668,7 @@ class BlockExecutionSpec
         val poSHeader: BlockHeader = validBlockParentHeader.copy(
           parentHash = validBlockParentHeader.hash,
           number = validBlockParentHeader.number + 1,
-          difficulty = 0,
+          difficulty = Difficulty.Zero,
           extraFields = com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai(
             baseFee = BigInt(1000000000),
             withdrawalsRoot = com.chipprbots.ethereum.domain.BlockHeader.EmptyMpt

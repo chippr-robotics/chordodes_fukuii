@@ -8,6 +8,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BloomFilter
@@ -35,7 +36,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
     override protected def difficulty: DifficultyCalculator = new DifficultyCalculator:
       def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
           blockchainConfig: BlockchainConfig
-      ): BigInt = parent.difficulty
+      ): Difficulty = parent.difficulty
 
     override protected def validateEvenMore(blockHeader: BlockHeader)(implicit
         blockchainConfig: BlockchainConfig
@@ -72,7 +73,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
       TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
-    difficulty = 1000,
+    difficulty = Difficulty(1000),
     number = 100,
     gasLimit = 1024000, // 1024 * 1000 — easy math for bound calculations
     gasUsed = 0,

@@ -119,7 +119,7 @@ object BlockResponse:
       stateRoot = block.header.stateRoot.value,
       receiptsRoot = block.header.receiptsRoot.value,
       miner = if pendingBlock then None else Some(block.header.beneficiary),
-      difficulty = block.header.difficulty,
+      difficulty = block.header.difficulty.value,
       totalDifficulty = td,
       extraData = block.header.extraData,
       size = Block.size(block),

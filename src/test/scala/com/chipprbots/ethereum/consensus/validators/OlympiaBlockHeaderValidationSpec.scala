@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.consensus.pow.validators.MockedPowBlockHeaderVali
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderBaseFeeError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderExtraFieldsError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderGasLimitError
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
@@ -53,7 +54,7 @@ class OlympiaBlockHeaderValidationSpec
       gasLimit = BigInt(8_000_000),
       gasUsed = 0,
       unixTimestamp = timestamp,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefEmpty
     )
@@ -65,7 +66,7 @@ class OlympiaBlockHeaderValidationSpec
       gasLimit = OneStepFrom8M,
       gasUsed = 0,
       unixTimestamp = timestamp,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefPostOlympia(baseFee)
     )
@@ -157,7 +158,7 @@ class OlympiaBlockHeaderValidationSpec
           gasLimit = TwoStepsFrom8M,
           gasUsed = 0,
           unixTimestamp = 2000L,
-          difficulty = 0,
+          difficulty = Difficulty.Zero,
           extraData = baseExtraData,
           extraFields = HefPostOlympia(expectedBaseFee)
         )
@@ -172,7 +173,7 @@ class OlympiaBlockHeaderValidationSpec
           gasLimit = TwoStepsFrom8M,
           gasUsed = 0,
           unixTimestamp = 2000L,
-          difficulty = 0,
+          difficulty = Difficulty.Zero,
           extraData = baseExtraData,
           extraFields = HefEmpty
         )

@@ -205,7 +205,7 @@ class BlockchainReader(
               .map(_.totalDifficulty)
               .getOrElse(BigInt(1))
             if ourBestNum > 0 then
-              val rate = rollingMedianDifficulty.orElse(bestHeaderOpt.map(_.difficulty)).getOrElse(BigInt(1))
+              val rate = rollingMedianDifficulty.orElse(bestHeaderOpt.map(_.difficulty.value)).getOrElse(BigInt(1))
               val gap = (latestBlock - ourBestNum).max(BigInt(0))
               val estimatedTD = ourBestTD + rate * gap
               (ChainWeight.totalDifficultyOnly(estimatedTD), "POW_SCALING")
@@ -221,8 +221,8 @@ class BlockchainReader(
     *
     * Called by BlockExecution and ChainImporter after each successful block save. Thread-safe via intrinsic lock.
     */
-  def recordBlockDifficulty(difficulty: BigInt): Unit = synchronized {
-    difficultyRingBuffer.addOne(difficulty)
+  def recordBlockDifficulty(difficulty: Difficulty): Unit = synchronized {
+    difficultyRingBuffer.addOne(difficulty.value)
     if difficultyRingBuffer.length > RollingMedianCapacity then difficultyRingBuffer.removeHead()
   }
 

@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.MissingBlob
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.MissingWithdrawalsRootError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.PoSNonceError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.PoSOmmersError
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
@@ -61,7 +62,7 @@ class PoSBlockHeaderValidatorSpec
   /** A Cancun-active post-merge header that satisfies every post-merge invariant. */
   private def validCancunHeader: BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       nonce = EmptyNonce,
       ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       gasUsed = 0,
@@ -113,7 +114,7 @@ class PoSBlockHeaderValidatorSpec
 
     "difficulty is non-zero" should {
       "fail with HeaderDifficultyError" taggedAs (UnitTest, ConsensusTest) in {
-        val badDifficulty = validCancunHeader.copy(difficulty = BigInt(1))
+        val badDifficulty = validCancunHeader.copy(difficulty = Difficulty(BigInt(1)))
         PoSBlockHeaderValidator.validateHeaderOnly(badDifficulty) shouldBe Left(HeaderDifficultyError)
       }
     }

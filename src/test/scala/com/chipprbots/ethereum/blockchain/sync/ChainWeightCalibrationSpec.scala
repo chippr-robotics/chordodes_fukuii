@@ -168,7 +168,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       )
 
       // Expected: anchorTD + h8.difficulty + h9.difficulty + h10.difficulty
-      val expectedTD: BigInt = anchorTD + h8.difficulty + h9.difficulty + h10.difficulty
+      val expectedTD: BigInt = anchorTD + h8.difficulty.value + h9.difficulty.value + h10.difficulty.value
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h10.hash)
       stored shouldBe defined
       stored.get.totalDifficulty shouldBe expectedTD
@@ -297,7 +297,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(bestHdr.hash)
       stored shouldBe defined
-      val expectedTD: BigInt = anchorTD + chain.tail.foldLeft(BigInt(0))((acc, h) => acc + h.difficulty)
+      val expectedTD: BigInt = anchorTD + chain.tail.foldLeft(BigInt(0))((acc, h) => acc + h.difficulty.value)
       stored.get.totalDifficulty shouldBe expectedTD
 
   // ─── T3.7 Boundary: gap = MaxWalkBlocks + 1 defers ───────────────────────
@@ -353,7 +353,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       stored shouldBe defined
       // accumulated = anchorTD_10 + h11.difficulty + ... + h15.difficulty (5 headers)
       val gapHeaders: Vector[BlockHeader] = chain.slice(6, 11) // h11..h15
-      val expectedTD: BigInt = anchorTD_10 + gapHeaders.foldLeft(BigInt(0))(_ + _.difficulty)
+      val expectedTD: BigInt = anchorTD_10 + gapHeaders.foldLeft(BigInt(0))(_ + _.difficulty.value)
       stored.get.totalDifficulty shouldBe expectedTD
 
   // ─── T4.1 Retry loop: two consecutive 30-minute retries ──────────────────
@@ -508,7 +508,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
     blockchainWriter
       .storeChainWeight(
         Fixtures.Blocks.Genesis.header.hash,
-        ChainWeight.totalDifficultyOnly(Fixtures.Blocks.Genesis.header.difficulty)
+        ChainWeight.totalDifficultyOnly(Fixtures.Blocks.Genesis.header.difficulty.value)
       )
       .commit()
     blockchainWriter.storeChainWeight(Fixtures.Blocks.Genesis.header.parentHash, ChainWeight.zero).commit()

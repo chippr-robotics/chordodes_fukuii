@@ -101,7 +101,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val ourBestTD = block1Weight.totalDifficulty
     val ourBestNum = block1.header.number
     val gap: BigInt = (peerBlockNum - ourBestNum).max(BigInt(0))
-    val rate: BigInt = block1.header.difficulty
+    val rate: BigInt = block1.header.difficulty.value
     cw.totalDifficulty shouldBe ourBestTD + rate * gap
 
   it should "return POS_PROXY block number for post-merge peers (isPoWChain = false)" taggedAs (

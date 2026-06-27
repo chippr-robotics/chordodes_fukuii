@@ -32,6 +32,7 @@ import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.AppStateStorage
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
@@ -269,7 +270,7 @@ class JsonRpcControllerFixture(implicit
 
   val blockHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     logsBloom = BloomFilter.Empty,
-    difficulty = 10,
+    difficulty = Difficulty(10),
     number = 2,
     gasLimit = 0,
     gasUsed = 0,

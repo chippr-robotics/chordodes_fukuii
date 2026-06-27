@@ -58,7 +58,7 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
   val minerAddress: Address = Address(666)
 
   val defaultBlockHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
-    difficulty = 1000000,
+    difficulty = Difficulty(1000000),
     number = blockchainConfig.forkBlockNumbers.homesteadBlockNumber + 1,
     gasLimit = 1000000,
     gasUsed = 0,
@@ -295,7 +295,7 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
     ObjectGenerators.byteStringOfLengthNGen(32).sample.get
 
   val defaultHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
-    difficulty = 100,
+    difficulty = Difficulty(100),
     number = 1,
     gasLimit = 1000000,
     gasUsed = 0,
@@ -312,7 +312,7 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
       ommers: Seq[BlockHeader] = Nil
   ): Block =
     Block(
-      defaultHeader.copy(parentHash = BlockHash(parent), difficulty = difficulty, number = number, extraData = salt),
+      defaultHeader.copy(parentHash = BlockHash(parent), difficulty = Difficulty(difficulty), number = number, extraData = salt),
       BlockBody(Nil, ommers)
     )
 

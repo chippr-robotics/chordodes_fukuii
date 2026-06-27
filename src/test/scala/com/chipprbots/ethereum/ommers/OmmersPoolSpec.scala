@@ -10,6 +10,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures.Blocks.Block3125369
 import com.chipprbots.ethereum.Timeouts
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.ommers.OmmersPool.AddOmmers
@@ -126,27 +127,27 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
     /** 00 ---> 11 --> 21 --> 31 (chain1) \ \ \--> 33 (chain3) \ \--> 22 --> 32 (chain2) \--> 14 --> 24 (chain4) \-> 15
       * (chain5)
       */
-    val block0: BlockHeader = Block3125369.header.copy(number = 0, difficulty = 0)
+    val block0: BlockHeader = Block3125369.header.copy(number = 0, difficulty = Difficulty.Zero)
 
-    val block1Chain1: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = 11)
+    val block1Chain1: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(11))
     val block2Chain1: BlockHeader =
-      Block3125369.header.copy(number = 2, parentHash = block1Chain1.hash, difficulty = 21)
+      Block3125369.header.copy(number = 2, parentHash = block1Chain1.hash, difficulty = Difficulty(21))
     val block3Chain1: BlockHeader =
-      Block3125369.header.copy(number = 3, parentHash = block2Chain1.hash, difficulty = 31)
+      Block3125369.header.copy(number = 3, parentHash = block2Chain1.hash, difficulty = Difficulty(31))
 
     val block2Chain2: BlockHeader =
-      Block3125369.header.copy(number = 2, parentHash = block1Chain1.hash, difficulty = 22)
+      Block3125369.header.copy(number = 2, parentHash = block1Chain1.hash, difficulty = Difficulty(22))
     val block3Chain2: BlockHeader =
-      Block3125369.header.copy(number = 2, parentHash = block2Chain2.hash, difficulty = 32)
+      Block3125369.header.copy(number = 2, parentHash = block2Chain2.hash, difficulty = Difficulty(32))
 
     val block3Chain3: BlockHeader =
-      Block3125369.header.copy(number = 3, parentHash = block2Chain1.hash, difficulty = 33)
+      Block3125369.header.copy(number = 3, parentHash = block2Chain1.hash, difficulty = Difficulty(33))
 
-    val block1Chain4: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = 14)
+    val block1Chain4: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(14))
     val block2Chain4: BlockHeader =
-      Block3125369.header.copy(number = 2, parentHash = block1Chain4.hash, difficulty = 24)
+      Block3125369.header.copy(number = 2, parentHash = block1Chain4.hash, difficulty = Difficulty(24))
 
-    val block1Chain5: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = 15)
+    val block1Chain5: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(15))
 
     // Mock created lazily so it's initialized when accessed within the MockFactory context
     lazy val blockchainReader: BlockchainReader = mock[BlockchainReader]

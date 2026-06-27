@@ -512,9 +512,9 @@ class EthSimulateService(
       else HefEmpty // Pre-London
 
     // Pre-merge blocks have non-zero difficulty
-    val difficulty = extraFields match
+    val difficulty: Difficulty = extraFields match
       case HefEmpty => parentHeader.difficulty // Inherit PoW difficulty
-      case _        => BigInt(0) // Post-merge
+      case _        => Difficulty.Zero // Post-merge
 
     BlockHeader(
       parentHash = parentHeader.hash,

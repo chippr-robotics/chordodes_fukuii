@@ -259,7 +259,7 @@ trait ObjectGenerators:
     transactionsRoot <- byteStringOfLengthNGen(32)
     receiptsRoot <- byteStringOfLengthNGen(32)
     logsBloom <- byteStringOfLengthNGen(256) // BloomFilter.BloomFilterByteSize = 256
-    difficulty <- bigIntGen
+    difficultyRaw <- bigIntGen
     number <- bigIntGen
     gasLimit <- bigIntGen
     gasUsed <- bigIntGen
@@ -275,7 +275,7 @@ trait ObjectGenerators:
     transactionsRoot = TrieRoot(transactionsRoot),
     receiptsRoot = TrieRoot(receiptsRoot),
     logsBloom = BloomFilter(logsBloom),
-    difficulty = difficulty,
+    difficulty = Difficulty(difficultyRaw),
     number = number,
     gasLimit = gasLimit,
     gasUsed = gasUsed,

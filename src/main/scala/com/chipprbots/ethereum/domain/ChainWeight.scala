@@ -30,7 +30,7 @@ case class ChainWeight(
     *   New ChainWeight with the block incorporated
     */
   def increase(header: BlockHeader): ChainWeight =
-    ChainWeight(totalDifficulty + header.difficulty)
+    ChainWeight(totalDifficulty + header.difficulty.value)
 
   // Test API
 

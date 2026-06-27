@@ -467,7 +467,7 @@ class PeerActorSpec
     val nodeStatusHolder = new AtomicReference(nodeStatus)
 
     val genesisBlock = Fixtures.Blocks.Genesis.block
-    val genesisWeight: ChainWeight = ChainWeight.totalDifficultyOnly(genesisBlock.header.difficulty)
+    val genesisWeight: ChainWeight = ChainWeight.totalDifficultyOnly(genesisBlock.header.difficulty.value)
 
     blockchainWriter.save(genesisBlock, Nil, genesisWeight, saveAsBestBlock = true)
 

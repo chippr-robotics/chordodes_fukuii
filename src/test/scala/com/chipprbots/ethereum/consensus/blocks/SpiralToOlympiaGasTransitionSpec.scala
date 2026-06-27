@@ -16,6 +16,7 @@ import com.chipprbots.ethereum.consensus.pow.blocks.Ommers
 import com.chipprbots.ethereum.consensus.pow.validators.MockedPowBlockHeaderValidator
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderGasLimitError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -75,7 +76,7 @@ class SpiralToOlympiaGasTransitionSpec
       gasLimit = gasLimit,
       gasUsed = 0,
       unixTimestamp = timestamp,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefEmpty
     )
@@ -93,7 +94,7 @@ class SpiralToOlympiaGasTransitionSpec
       gasLimit = gasLimit,
       gasUsed = 0,
       unixTimestamp = timestamp,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefPostOlympia(baseFee)
     )
@@ -114,7 +115,7 @@ class SpiralToOlympiaGasTransitionSpec
         new DifficultyCalculator:
           def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
               blockchainConfig: BlockchainConfig
-          ): BigInt = BigInt(1)
+          ): Difficulty = Difficulty(BigInt(1))
       ):
     type X = Ommers
     override protected def newBlockBody(transactions: Seq[SignedTransaction], x: Ommers): BlockBody =

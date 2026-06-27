@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.ForkTimestamps
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
 import com.chipprbots.ethereum.utils.NetworkType
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.TrieRoot
@@ -243,7 +244,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
       transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
       receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       number = 9876543,
       gasLimit = 30000000,
       gasUsed = 0,
@@ -1223,7 +1224,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
   "PoSBlockHeaderValidator (pivot header gate)" should
     "reject an ETH/Sepolia pivot header with difficulty > 0 (not a PoS block)" taggedAs UnitTest in {
       given bc: BlockchainConfig = sepoliaTestConfig
-      val badHeader = validSepoliaHeader.copy(difficulty = BigInt(1))
+      val badHeader = validSepoliaHeader.copy(difficulty = Difficulty(BigInt(1)))
       PoSBlockHeaderValidator.validateHeaderOnly(badHeader).isLeft shouldBe true
     }
 
@@ -1244,7 +1245,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
     // On ETC the gate is skipped (isPoSChain = false). We verify the validator itself
     // would reject this header, confirming that the ETC gate correctly avoids calling it.
     given bc: BlockchainConfig = sepoliaTestConfig
-    val etcStyleHeader = validSepoliaHeader.copy(difficulty = BigInt("10000000000000000"))
+    val etcStyleHeader = validSepoliaHeader.copy(difficulty = Difficulty(BigInt("10000000000000000")))
     PoSBlockHeaderValidator.validateHeaderOnly(etcStyleHeader).isLeft shouldBe true
   }
 
@@ -1285,7 +1286,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
       transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
       receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
-      difficulty = BigInt(0),
+      difficulty = Difficulty.Zero,
       number = BigInt(5187023),
       gasLimit = BigInt(30000000),
       gasUsed = BigInt(0),

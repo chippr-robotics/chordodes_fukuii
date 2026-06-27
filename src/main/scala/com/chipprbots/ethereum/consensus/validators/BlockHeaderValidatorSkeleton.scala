@@ -6,6 +6,7 @@ import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostPrague
@@ -170,7 +171,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
       blockHeader: BlockHeader,
       parent: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    if blockHeader.difficulty == 0 then
+    if blockHeader.difficulty == Difficulty.Zero then
       // Post-merge: difficulty is always 0 (EIP-3675). Pre-merge blocks never have difficulty=0
       // because the Ethash difficulty algorithm always produces a positive value.
       Right(BlockHeaderValid)

@@ -11,6 +11,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
@@ -163,7 +164,7 @@ class ShiftingOpCodeSpec extends AnyWordSpec with Matchers with ScalaCheckProper
     def defaultWorld: MockWorldState = MockWorldState().saveAccount(senderAddr, senderAcc)
 
     val blockHeader: BlockHeader = BlockFixtures.ValidBlock.header.copy(
-      difficulty = 1000000,
+      difficulty = Difficulty(1000000),
       number = 1,
       gasLimit = 10000000,
       gasUsed = 0,

@@ -10,6 +10,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError.*
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -154,7 +155,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         )
       ),
-      difficulty = BigInt("17864037202"),
+      difficulty = Difficulty(BigInt("17864037202")),
       number = 94,
       gasLimit = 5000,
       gasUsed = 0,
@@ -183,7 +184,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         )
       ),
-      difficulty = BigInt("17864037202"),
+      difficulty = Difficulty(BigInt("17864037202")),
       number = 94,
       gasLimit = 5000,
       gasUsed = 0,
@@ -210,7 +211,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         )
       ),
-      difficulty = BigInt("17864037202"),
+      difficulty = Difficulty(BigInt("17864037202")),
       number = 94,
       gasLimit = 5000,
       gasUsed = 0,
@@ -242,7 +243,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             )
           )
         ),
-        difficulty = BigInt("17829189056"),
+        difficulty = Difficulty(BigInt("17829189056")),
         number = 90,
         gasLimit = 5000,
         gasUsed = 0,
@@ -273,7 +274,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             )
           )
         ),
-        difficulty = BigInt("17837894714"),
+        difficulty = Difficulty(BigInt("17837894714")),
         number = 91,
         gasLimit = 5000,
         gasUsed = 0,
@@ -304,7 +305,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             )
           )
         ),
-        difficulty = BigInt("17846604623"),
+        difficulty = Difficulty(BigInt("17846604623")),
         number = 92,
         gasLimit = 5000,
         gasUsed = 0,
@@ -335,7 +336,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             )
           )
         ),
-        difficulty = BigInt("17855318785"),
+        difficulty = Difficulty(BigInt("17855318785")),
         number = 93,
         gasLimit = 5000,
         gasUsed = 0,
@@ -366,7 +367,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
                 )
               )
             ),
-            difficulty = BigInt("17837894714"),
+            difficulty = Difficulty(BigInt("17837894714")),
             number = 91,
             gasLimit = 5000,
             gasUsed = 0,
@@ -399,7 +400,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             )
           )
         ),
-        difficulty = BigInt("17864037202"),
+        difficulty = Difficulty(BigInt("17864037202")),
         number = 94,
         gasLimit = 5000,
         gasUsed = 0,
@@ -430,7 +431,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
                 )
               )
             ),
-            difficulty = BigInt("17829189056"),
+            difficulty = Difficulty(BigInt("17829189056")),
             number = 90,
             gasLimit = 5000,
             gasUsed = 0,
@@ -463,7 +464,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             )
           )
         ),
-        difficulty = BigInt("17872759876"),
+        difficulty = Difficulty(BigInt("17872759876")),
         number = 95,
         gasLimit = 5000,
         gasUsed = 0,
@@ -494,7 +495,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             )
           )
         ),
-        difficulty = BigInt("17881486809"),
+        difficulty = Difficulty(BigInt("17881486809")),
         number = 96,
         gasLimit = 5000,
         gasUsed = 0,
@@ -526,7 +527,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             )
           )
         ),
-        difficulty = BigInt("17820487647"),
+        difficulty = Difficulty(BigInt("17820487647")),
         number = 89,
         gasLimit = 5000,
         gasUsed = 0,

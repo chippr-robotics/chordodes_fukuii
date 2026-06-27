@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
@@ -126,7 +127,7 @@ class RestrictedEthashBlockHeaderValidatorSpec
       receiptsRoot =
         TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
       logsBloom = BloomFilter(ByteStringUtils.string2hash("00" * 256)),
-      difficulty = BigInt("131520"),
+      difficulty = Difficulty(BigInt("131520")),
       number = 10,
       gasLimit = 5030,
       gasUsed = 0,
@@ -152,7 +153,7 @@ class RestrictedEthashBlockHeaderValidatorSpec
       receiptsRoot =
         TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
       logsBloom = BloomFilter(ByteStringUtils.string2hash("00" * 256)),
-      difficulty = BigInt("131584"),
+      difficulty = Difficulty(BigInt("131584")),
       number = 11,
       gasLimit = 5033,
       gasUsed = 0,

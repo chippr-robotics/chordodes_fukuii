@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.domain.BlobTransaction
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.domain.BlobVersionedHash
@@ -54,6 +55,8 @@ object Picklers:
 
   given addressPickler: Pickler[Address] =
     transformPickler[Address, ByteString](bytes => Address(bytes))(address => address.bytes)
+  given difficultyPickler: Pickler[Difficulty] =
+    transformPickler[Difficulty, BigInt](Difficulty(_))(_.value)
   given storageKeyPickler: Pickler[StorageKey] =
     transformPickler[StorageKey, BigInt](StorageKey(_))(_.value)
   given accessListItemPickler: Pickler[AccessListItem] = generatePickler[AccessListItem]

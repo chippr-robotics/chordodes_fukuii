@@ -953,7 +953,7 @@ object SyncController:
               val genesisWeight = blockchainReader
                 .getChainWeightByHash(blockchainReader.genesisHeader.hash)
                 .map(_.totalDifficulty)
-                .getOrElse(blockchainReader.genesisHeader.difficulty)
+                .getOrElse(blockchainReader.genesisHeader.difficulty.value)
               val calibratedTD =
                 if peerMaxBlock > BigInt(0) then peerTD * bestBlock.header.number / peerMaxBlock
                 else peerTD
@@ -2382,12 +2382,12 @@ object SyncController:
             // Phase 2: accumulate forward from anchorTD over headers collected above anchor.
             // All headers guaranteed present (collected via parentHash traversal — no silent skips).
             var td = anchorTD
-            headersAboveAnchor.reverseIterator.foreach(h => td += h.difficulty)
+            headersAboveAnchor.reverseIterator.foreach(h => td += h.difficulty.value)
 
             val genesisWeight = blockchainReader
               .getChainWeightByHash(blockchainReader.genesisHeader.hash)
               .map(_.totalDifficulty)
-              .getOrElse(blockchainReader.genesisHeader.difficulty)
+              .getOrElse(blockchainReader.genesisHeader.difficulty.value)
 
             if td > genesisWeight * BigInt(1000) then
               val storedTD = blockchainReader

@@ -36,7 +36,7 @@ case object BlockMetrics extends MetricsContainer:
     BlockNumberGauge.set(block.number.toDouble)
     BlockGasLimitGauge.set(block.header.gasLimit.toDouble)
     BlockGasUsedGauge.set(block.header.gasUsed.toDouble)
-    BlockDifficultyGauge.set(block.header.difficulty.toDouble)
+    BlockDifficultyGauge.set(block.header.difficulty.value.toDouble)
     BlockTransactionsGauge.set(block.body.numberOfTxs)
     BlockUnclesGauge.set(block.body.numberOfUncles)
 
