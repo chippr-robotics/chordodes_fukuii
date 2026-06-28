@@ -73,7 +73,8 @@ private class SNAPSyncControllerImpl(
   import SyncPhase.*
 
   // P11: plain SLF4J logger, safe to call from Future callbacks (off the actor thread).
-  // Used ONLY at the two Recovery-streaming Future `.foreach` sites; all on-thread logging uses ctx.log.
+  // Used ONLY at the Future `.foreach` sites — the two recovery-streaming sites and the two
+  // account-completion recovery-file-path persist sites; all on-thread logging uses ctx.log.
   private val asyncLog = org.slf4j.LoggerFactory.getLogger(getClass)
 
   // ── Timer keys (Behaviors.withTimers; replaces the Classic Cancellable fields) ───────────────
@@ -695,6 +696,9 @@ private class SNAPSyncControllerImpl(
         case _: TrieWalkBatch    => ctx.log.debug("Dropping stale TrieWalkBatch in idle"); Behaviors.same
         case _: TrieWalkComplete => ctx.log.debug("Dropping stale TrieWalkComplete in idle"); Behaviors.same
         case _: TrieWalkFailed   => ctx.log.debug("Dropping stale TrieWalkFailed in idle"); Behaviors.same
+        // The TNHC seed-guard (#1371) can emit HealingRootUnservable; if it lands after the controller has left
+        // StateHealing it must be dropped, not MatchError-crash the idle behavior (the StateHealing handler is guarded).
+        case _: HealingRootUnservable => ctx.log.debug("Dropping stale HealingRootUnservable in idle"); Behaviors.same
         case _: ValidateAccountTrieResult =>
           ctx.log.debug("Dropping stale ValidateAccountTrieResult in idle"); Behaviors.same
         case _: ValidateStorageTriesResult =>
@@ -1241,7 +1245,10 @@ private class SNAPSyncControllerImpl(
               )
               .foreach { info =>
                 appStateStorage.putSnapSyncStorageFilePath(info.filePath.toString).commit()
-                ctx.log.info(s"Persisted storage file path for recovery: ${info.filePath} (${info.count} entries)")
+                // asyncLog (off-thread SLF4J), NOT ctx.log: this runs in the ask Future callback on a
+                // dispatcher thread, and ctx.log enforces actor-thread confinement (throws
+                // UnsupportedOperationException otherwise — observed live at account-completion).
+                asyncLog.info(s"Persisted storage file path for recovery: ${info.filePath} (${info.count} entries)")
               }
             coordinator
               .ask[actors.AccountRangeCoordinator.CodeHashesFileInfoResponse](replyTo =>
@@ -1249,7 +1256,8 @@ private class SNAPSyncControllerImpl(
               )
               .foreach { info =>
                 appStateStorage.putSnapSyncCodeHashesPath(info.filePath.toString).commit()
-                ctx.log.info(s"Persisted codeHashes file path for recovery: ${info.filePath} (${info.count} entries)")
+                // asyncLog (off-thread SLF4J), NOT ctx.log — see the storage-file-path callback above.
+                asyncLog.info(s"Persisted codeHashes file path for recovery: ${info.filePath} (${info.count} entries)")
               }
           }
 
@@ -1392,6 +1400,30 @@ private class SNAPSyncControllerImpl(
           // ARCH-WALK-HEAL-INTERLEAVE: Start walk with coordinator alive (if still running) or
           // create a fresh coordinator before the walk so inline discovery can run concurrently.
           startStateHealingWithInterleave()
+        Behaviors.same
+
+      // Complementary guard (root-cause w98gfx4wn): the heal walk root's own bytes are absent from local node storage,
+      // so the coordinator REFUSED to seed it (seeding an unservable root stalls at "exactly 1 node, healed=0" forever —
+      // a root cannot be reconstructed from nothing and cannot be fetched against an advancing serve root). This fires at
+      // the SEED, so it covers every entry into healing — crucially the BootstrapComplete RESTART handlers that call
+      // startStateHealing() directly and bypass shouldSkipHealingAfterDownloads (the whole point of the seed-site guard).
+      //
+      // Hand off to lazy on-demand healing exactly as shouldSkipHealingAfterDownloads's deferred path does: stop the
+      // (idle) coordinator and call completeSnapSync(). The missing trie nodes are then fetched on-demand via GetTrieNodes
+      // during block execution (BlockImporter/StateNodeFetcher, with real parent-root context) — the established
+      // post-SNAP regular-sync fallback. This converges to a REAL Completed/regular-sync state; it is NOT a silent
+      // skip-and-mark-done (finalizeSnapSync still enforces the snapStateRoot == pivotHeader.stateRoot anchor guard).
+      case HealingRootUnservable(root) if currentPhase == StateHealing =>
+        ctx.log.warn(
+          s"[HEAL-ROOT-UNSERVABLE] Heal walk root ${root.toHex.take(16)} is absent from local storage and cannot be " +
+            s"seeded (a heal cannot reconstruct an unservable root). Handing off to lazy on-demand healing via " +
+            s"completeSnapSync() — missing trie nodes will be fetched on-demand via GetTrieNodes during block execution."
+        )
+        // completeSnapSync() → finalizeSnapSync() performs ALL cleanup: stopSnapOnlySchedules() cancels the
+        // healing-request scheduler, and stopStateSyncChildren() stops the idle healing coordinator. No manual
+        // coordinator/scheduler teardown needed here (it would double-cancel). finalizeSnapSync still enforces the
+        // snapStateRoot == pivotHeader.stateRoot anchor guard, so this is NOT a false completion.
+        completeSnapSync()
         Behaviors.same
 
       // Streaming batch from ongoing trie walk — forward immediately to coordinator for early healing
@@ -1816,7 +1848,6 @@ private class SNAPSyncControllerImpl(
     then
       if SNAPSyncController.shouldSkipHealingAfterDownloads(
           snapSyncConfig,
-          storagePhaseForceCompleted,
           resumedStaleCursors
         )
       then
@@ -1827,17 +1858,43 @@ private class SNAPSyncControllerImpl(
         // Skip healing/validation entirely. Regular sync's BlockImporter will fetch missing trie
         // nodes on-demand via GetTrieNodes (SNAP protocol) when block execution encounters them.
         // This is the "lazy healing" pattern used by geth's path-based storage.
-        ctx.log.info(
-          "All state downloads complete (accounts + bytecodes + storage). " +
-            "Deferred merkleization enabled — skipping healing/validation phase. " +
-            "Missing trie nodes will be fetched on-demand during block execution."
-        )
+        //
+        // This handoff now also covers the force-completed case under deferred merkleization
+        // (storagePhaseForceCompleted). Previously that routed into healing "to fill the known
+        // holes", but the walk root's bytes are absent from local storage AND unservable by peers
+        // (aged pivot, outside the ~128-block serve window), so the heal seeded the walk root as its
+        // sole frontier task and stalled at "exactly 1 node, healed=0" forever. The same lazy
+        // on-demand BlockImporter fetch — which has real parent-root context during execution —
+        // fills those holes correctly. (root-cause w98gfx4wn.)
+        if snapSyncConfig.deferredMerkleization && storagePhaseForceCompleted then
+          ctx.log.info(
+            "All state downloads reached terminal state (storage force-completed) with deferred " +
+              "merkleization enabled — handing off via completeSnapSync(). Missing trie nodes will be " +
+              "fetched on-demand during block execution (a heal cannot reconstruct the unservable pivot root)."
+          )
+        else
+          ctx.log.info(
+            "All state downloads complete (accounts + bytecodes + storage). " +
+              "Deferred merkleization enabled — skipping healing/validation phase. " +
+              "Missing trie nodes will be fetched on-demand during block execution."
+          )
         completeSnapSync()
       else
-        if snapSyncConfig.deferredMerkleization && storagePhaseForceCompleted then
-          ctx.log.warn(
-            "All state downloads reached terminal state, but storage was force-completed with deferred " +
-              "merkleization enabled. Starting healing instead of handing off a state with known holes."
+        // Healing is entered ONLY when the walk root is servable: either the non-deferred path (the
+        // account trie was built locally this session, so SnapHashTrie emit/flush wrote the root),
+        // or the resumedStaleCursors anti-corruption guard (a delta downloaded against a possibly
+        // drifted root must be reconciled before completion).
+        //
+        // COMPLEMENTARY-GUARD NOTE: under deferred merkleization, resumedStaleCursors == true reaches
+        // this branch with the walk root's bytes ALSO absent — so it can hit the identical
+        // unservable-root heal stall. The complementary guard is the seed-site HealingRootUnservable
+        // signal from TrieNodeHealingCoordinator (covers every entry into healing, including the
+        // BootstrapComplete restart handlers that call startStateHealing() directly), which hands off
+        // to lazy on-demand fetch exactly as the deferred path above does.
+        if resumedStaleCursors then
+          ctx.log.info(
+            "All state downloads complete (accounts + bytecodes + storage); account cursors were " +
+              "resumed from a prior session — running healing to reconcile the delta against the pivot root."
           )
         else ctx.log.info("All state downloads complete (accounts + bytecodes + storage). Starting healing...")
         currentPhase = StateHealing
@@ -3451,12 +3508,18 @@ private class SNAPSyncControllerImpl(
       }
   // end if !trieWalkInProgress && currentPhase == StateHealing
 
-  /** Layer 2: shared, lazily-built persisted-frontier handle for the healing coordinator. `None` (the default,
-    * `healing-frontier-persistence = false`) keeps Layer-1 behaviour — no CF writes, always full DFS on restart. Reuses
-    * the node's existing RocksDB DataSource (via `flatSlotStorage`); the CF auto-creates on open.
+  /** Layer 2: shared, lazily-built persisted-frontier handle for the healing coordinator. Reuses the node's existing
+    * RocksDB DataSource (via `flatSlotStorage`); the CF (`'g'`) auto-creates on open.
+    *
+    * Built when EITHER `healing-frontier-persistence` (frontier resume, Layer 2) OR `pruned-heal-verification` (spec
+    * 005 subtree-complete records, additive sentinels in the SAME CF `'g'`) is enabled. Both features only ever WRITE
+    * to CF `'g'`; the subtree-complete records are root-independent and never affect the frontier-resume path
+    * (`loadAll` filters them out), so co-enabling them is safe. `None` (both off) keeps Layer-1 behaviour — no CF
+    * writes, always full DFS on restart, no pruning.
     */
   private lazy val healingFrontierStorageOpt: Option[HealingFrontierStorage] =
-    if snapSyncConfig.healingFrontierPersistence then Some(new HealingFrontierStorage(flatSlotStorage.dataSource))
+    if snapSyncConfig.healingFrontierPersistence || snapSyncConfig.prunedHealVerification then
+      Some(new HealingFrontierStorage(flatSlotStorage.dataSource))
     else None
 
   private lazy val bfsQueueStorage: BfsQueueStorage =
@@ -4292,14 +4355,18 @@ private class SNAPSyncControllerImpl(
     currentPhase = StateHealing
     stateRoot.foreach { root =>
       val storage = getOrCreateMptStorage(pivotBlock.getOrElse(BigInt(0)))
+      // Capture self before the Future, matching startStateHealing/spawnStorageValidation: ctx.self's getter
+      // is not thread-confined in Pekko 1.6.0, but using the captured ref inside the callback keeps the idiom
+      // consistent and immune to a future Pekko adding the actor-thread guard to self() (as it has for log()).
+      val selfRef = ctx.self
       scala.concurrent
         .Future {
           val validator = new StateValidator(storage)
           validator.findMissingNodesWithPaths(root.value)
         }(ec)
         .foreach {
-          case Right(nodes) => ctx.self ! TrieWalkResult(nodes)
-          case Left(error)  => ctx.self ! TrieWalkFailed(error)
+          case Right(nodes) => selfRef ! TrieWalkResult(nodes)
+          case Left(error)  => selfRef ! TrieWalkFailed(error)
         }(ec)
     }
 
@@ -4864,6 +4931,22 @@ object SNAPSyncController:
   ) extends Command
   case object StateHealingComplete extends Command
   case object HealingAllPeersStateless extends Command
+
+  /** Seed-site complementary guard for the permanent-heal-stall fix (#1371, root-cause w98gfx4wn). Sent by
+    * `TrieNodeHealingCoordinator` from the StartTrieNodeHealing seed branch when the walk root's own bytes are absent
+    * from local storage AND it is unservable by peers (an advancing serve root or an aged walk root outside peers'
+    * ~128-block serve window). Seeding such a root stalls the heal at "exactly 1 node, healed=0" forever: a root cannot
+    * be reconstructed from nothing, every reply is some other root's node (dropped by the content-hash gate), and
+    * `discoverMissingChildren` never re-enqueues a root — so pending stays at exactly 1, healed=0, forever.
+    *
+    * It is emitted FROM the seed branch (not the controller's routing decision) so it fires for EVERY entry into
+    * healing, including the BootstrapComplete RESTART handlers that call `startStateHealing()` directly and bypass
+    * `shouldSkipHealingAfterDownloads`. On receipt the controller takes the lazy-heal handoff (`completeSnapSync()`) —
+    * the SAME path `shouldSkipHealingAfterDownloads` uses — so the missing state is filled on-demand via GetTrieNodes
+    * during block execution (the established post-SNAP regular-sync path, with real parent-root context). Root-PRESENT
+    * heals proceed normally; this never fires in that case.
+    */
+  final case class HealingRootUnservable(root: ByteString) extends Command
   case object StateValidationComplete extends Command
 
   // ── Group 3: Status / progress queries (C3 — explicit replyTo, OQ-5) ───────
@@ -4931,15 +5014,29 @@ object SNAPSyncController:
 
   private[snap] def shouldSkipHealingAfterDownloads(
       snapSyncConfig: SNAPSyncConfig,
-      storagePhaseForceCompleted: Boolean,
       resumedStaleCursors: Boolean
   ): Boolean =
-    // The deferred-merkleization fast path (skip healing, lazy-heal during block execution) is
-    // ONLY safe when the trie was built fresh this session. If any account-range cursor was
-    // resumed from a prior session (against a possibly drifted root), the delta MUST be walked
-    // and re-fetched from the current pivot root before completion — otherwise the state is
-    // handed off with silent holes. So a resume forces the full healing walk.
-    snapSyncConfig.deferredMerkleization && !storagePhaseForceCompleted && !resumedStaleCursors
+    // Under deferred merkleization the account/storage trie nodes are NEVER built locally during
+    // download — only flat storage is written. The walk root (the pivot's state root) is therefore
+    // absent from the hash-keyed CF. A heal in that state cannot make progress: the coordinator
+    // seeds the walk-root node itself as the sole frontier task (isNodeInStorage(root) == false),
+    // but no peer can serve that root — it is the pivot, ~200 blocks back, outside peers' ~128-block
+    // serve window. The heal stalls at "exactly 1 node, healed=0" forever (root-cause w98gfx4wn).
+    // The holes are instead filled lazily by BlockImporter's on-demand GetTrieNodes fetch during
+    // block execution (walking the local trie from the parent state root, with real root context) —
+    // the same post-SNAP regular-sync fallback that StateNodeFetcher already uses. So for deferred
+    // merkleization we skip healing and take the completeSnapSync() handoff in BOTH the clean case
+    // AND the force-completed case (force-completed previously routed into healing "to fill the known
+    // holes", but healing provably cannot reconstruct an unservable root — only lazy on-demand fetch
+    // can). storagePhaseForceCompleted is therefore no longer a routing input here; the caller still
+    // inspects it for logging.
+    //
+    // resumedStaleCursors STILL forces the healing walk: a delta downloaded against a possibly
+    // drifted root must be reconciled before completion (correctness boundary, not a perf choice).
+    //
+    // The NON-deferred path always returns false (run healing): there the account trie IS built
+    // locally (SnapHashTrie emit/flush writes the root), so the heal has a servable root and works.
+    snapSyncConfig.deferredMerkleization && !resumedStaleCursors
 
   /** Freshness gate for `refreshPivotInPlace`: reject candidate pivots whose source peer is more than `maxStaleness`
     * blocks behind the CL-driven head.
@@ -5007,7 +5104,15 @@ object SNAPSyncController:
           blacklist,
           syncController,
           validatorFactory
-        ).startSnapSync()
+          // Bug: calling startSnapSync() directly here bypassed start(), which sets up the
+          // peer-polling timer (PollHandshakedPeersKey, 5s) and sends the initial
+          // PollHandshakedPeers. Without the timer, peerListHelper was never updated and
+          // snapPeersForPivot was always empty → pivot never selected → escape hatch fired.
+          // Fix: call start() instead. start() starts the timer, sends an immediate poll,
+          // and returns idle(). SyncController then sends Start → idle() calls startSnapSync()
+          // with an already-ticking poll cycle. (SyncController.startSnapSync sends Start after
+          // spawning: see SyncController.scala line ~1702.)
+        ).start()
       }
     }
 
@@ -5061,6 +5166,14 @@ case class SNAPSyncConfig(
     // Upper bound on the in-memory healed-paths set (spec 003 FR-011). Over-bound rounds fall back to
     // full-root verification rather than growing the set, bounding its worst-case heap.
     scopedHealMaxPaths: Int = 200000,
+    // Pruned (descend-and-stop) post-heal verification (spec 005). When true (default), the completeness
+    // verification treats a present node that has a durable subtree-complete record (HealingFrontierStorage
+    // CF 'g', spec 005) as a verified frontier leaf and does NOT descend its subtree, so a fresh node's first
+    // verification costs O(missing-frontier) instead of re-reading the whole ~90M-node trie (~16-20h). Records
+    // are root-INDEPENDENT (content-addressed), seeded crash-safely during the SNAP/heal write path, and never
+    // cleared. Effective ONLY under storageScheme == Hash; off ⇒ Path scheme ⇒ no records ⇒ the unchanged
+    // full-trie walk (byte-identical completion decision/state root/marker). Set false to force the full walk.
+    prunedHealVerification: Boolean = true,
     // Decoupled heal serve-root (spec 004 FR-008). When true (default), the healing fetch targets an advancing
     // newest-servable serve root while the completeness walk stays pinned to the fixed walk root. Off ⇒ coupled
     // behaviour (fetch uses the walk root), byte-identical to today. Consensus-safety rests on the unchanged
@@ -5193,6 +5306,9 @@ object SNAPSyncConfig:
       scopedHealMaxPaths =
         if snapConfig.hasPath("scoped-heal-max-paths") then snapConfig.getInt("scoped-heal-max-paths")
         else 200000,
+      prunedHealVerification =
+        if snapConfig.hasPath("pruned-heal-verification") then snapConfig.getBoolean("pruned-heal-verification")
+        else true,
       decoupledHealServeRoot =
         if snapConfig.hasPath("decoupled-heal-serve-root") then snapConfig.getBoolean("decoupled-heal-serve-root")
         else true,

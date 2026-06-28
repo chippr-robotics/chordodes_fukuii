@@ -132,8 +132,14 @@ object RegularSync:
                   configBuilder
                 )
               )
+              // Restore the baseline's UNLIMITED importer restart budget (classic AllForOneStrategy defaulted to
+              // maxNrOfRetries = -1). The importer is not death-watched, so a hard restart cap (.withMaxRestarts(3))
+              // would stop block import PERMANENTLY and silently after the 4th crash with no escape signal — the
+              // exact 'silent sync death' this audit targets. Keep restartWithBackoff (1s→30s) as a strict
+              // improvement over the baseline's immediate restart: it prevents a crash hot-loop while still
+              // retrying forever, so a transient missing-state-node / validation crash eventually recovers.
               .onFailure[Throwable](
-                SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3)
+                SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)
               ),
             s"block-importer-$epoch"
           )

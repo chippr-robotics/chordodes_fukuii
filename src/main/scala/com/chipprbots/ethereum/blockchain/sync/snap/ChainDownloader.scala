@@ -196,8 +196,11 @@ class ChainDownloader private (
       handleCommon(message).getOrElse {
         message match
           case Dispatch =>
-            if !paused then dispatchRequests()
-            Behaviors.same
+            // Propagate the dispatch result: checkCompletion() inside dispatchRequests() returns idle() when the
+            // backfill is done, and discarding it would strand the actor in downloading() with its dispatch timer
+            // cancelled — a later UpdateTarget(bigger) would then never reschedule (only the idle() branch does).
+            // When not complete, dispatchRequests() re-arms the timer and returns Behaviors.same.
+            if !paused then dispatchRequests() else Behaviors.same
 
           case Pause =>
             if !paused then
@@ -206,11 +209,12 @@ class ChainDownloader private (
             Behaviors.same
 
           case Resume =>
+            // Propagate the dispatch result (idle() on completion) instead of always returning Behaviors.same.
             if paused then
               paused = false
               log.info("Chain download resumed")
               dispatchRequests()
-            Behaviors.same
+            else Behaviors.same
 
           case UpdateTarget(newTarget) =>
             if newTarget > targetBlock then
@@ -231,8 +235,9 @@ class ChainDownloader private (
 
           case BoostConcurrency(n) =>
             boostConcurrency(n)
-            dispatchRequests() // Immediately use the new slots
-            Behaviors.same
+            // Immediately use the new slots; propagate completion (dispatchRequests may return idle()) so a
+            // post-completion boost doesn't re-arm dispatch and fire `replyTo ! Done` a second time.
+            dispatchRequests()
 
           case YieldToRegularSync(n) =>
             yieldToRegularSync(n)

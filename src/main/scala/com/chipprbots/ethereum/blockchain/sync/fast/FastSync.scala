@@ -461,8 +461,11 @@ object FastSync:
       lastLoggedFullBlock = initial.lastFullBlockNumber
       lastLoggedStateNodes = initial.downloadedNodesCount
 
-      // Persist delay should be 0, as the presence of it marks that fast sync was started.
-      timers.startTimerWithFixedDelay(PersistTimerKey, PersistSyncState, persistStateSnapshotInterval)
+      // Persist delay should be 0, as the presence of it marks that fast sync was started. Use the 4-arg form with a
+      // 0s INITIAL delay: the 3-arg form reuses `persistStateSnapshotInterval` (= 1.minute) as the initial delay too,
+      // so a crash within the first minute would leave getSyncState()==None and re-enter startFromScratch (re-selecting
+      // a pivot) instead of resuming. The immediate persist records the chosen pivot at startup.
+      timers.startTimerWithFixedDelay(PersistTimerKey, PersistSyncState, 0.seconds, persistStateSnapshotInterval)
       timers.startTimerWithFixedDelay(PrintStatusTimerKey, PrintStatus, printStatusInterval)
       timers.startTimerWithFixedDelay(HeartBeatTimerKey, ProcessSyncing, syncRetryInterval * 2)
 
@@ -1436,6 +1439,13 @@ object FastSync:
           // Re-read after potential update. Returns Some(pivotUpdateBehavior) if stale, None otherwise.
           // The stale-state branch may transition to waitingForPivotBlockUpdate; the final block may
           // override it (or keep it). The method returns the last-decided behavior.
+          // `pivotUpdateTriggered` records whether this cycle invoked askForPivotBlockUpdate (→ waitingForPivotBlockUpdate).
+          // The Classic baseline set context.become(waitingForPivotBlockUpdate) as a side effect that PERSISTED past the
+          // later `if (blockchainDataToDownload) processDownloads()`. In the typed rewrite the transition lives in a value,
+          // so the final block must NOT discard it when blocks are still downloading — otherwise the selector's
+          // WrappedPivotResult/PivotSelectionFailed reply is dropped (syncing() has no case for it), updatingPivotBlock
+          // stays true forever, and the state-sync pivot refresh wedges permanently.
+          var pivotUpdateTriggered = false
           val nextBehavior: Behavior[Command] = session
             .flatMap { s2 =>
               if s2.stateSyncStarted && !s2.syncState.stateSyncFinished && !s2.stateSyncRestartRequested &&
@@ -1452,6 +1462,7 @@ object FastSync:
                   )
                   s2.syncStateScheduler ! RestartRequested
                   updateSession(_.copy(stateSyncRestartRequested = true))
+                  pivotUpdateTriggered = true
                   Some(askForPivotBlockUpdate(ImportedLastBlock))
                 else None
               else None
@@ -1489,6 +1500,16 @@ object FastSync:
           }
 
           if fullySynced then finish()
+          else if pivotUpdateTriggered then
+            // A pivot refresh was just requested this cycle: askForPivotBlockUpdate already spawned the selector and
+            // set updatingPivotBlock=true + stateSyncRestartRequested=true. We MUST return nextBehavior
+            // (waitingForPivotBlockUpdate) so the selector's reply is handled — returning processDownloads() here (as
+            // the next branch would when blocks are still downloading) silently drops the transition and wedges the
+            // refresh. Still dispatch outstanding block downloads for Classic parity (become+processDownloads both ran);
+            // their responses are dropped during the brief wait and re-dispatched when the reply transitions back to
+            // syncing(), exactly as the baseline behaved.
+            if blockchainDataToDownload then processDownloads()
+            nextBehavior
           else if blockchainDataToDownload then processDownloads()
           else if noBlockchainWorkRemaining && notInTheMiddleOfUpdate then
             session.foreach { s4 =>
