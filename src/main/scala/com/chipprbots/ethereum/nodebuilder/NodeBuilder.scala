@@ -184,7 +184,7 @@ trait KnownNodesManagerBuilder:
     classicSystem.spawn(
       Behaviors
         .supervise(KnownNodesManager(knownNodesManagerConfig, storagesInstance.storages.knownNodesStorage))
-        .onFailure[Throwable](SupervisorStrategy.restart),
+        .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)),
       "known-nodes-manager"
     )
 
@@ -223,7 +223,7 @@ trait PeerDiscoveryManagerBuilder:
             randomNodeBufferSize = instanceConfig.Network.peer.maxOutgoingPeers
           )
         )
-        .onFailure[Throwable](SupervisorStrategy.restart),
+        .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)),
       "peer-discovery-manager-typed"
     )
 
@@ -346,7 +346,7 @@ trait PeerStatisticsBuilder:
           slotCount = instanceConfig.Network.peer.statSlotCount
         )
       )
-      .onFailure[Throwable](SupervisorStrategy.restart),
+      .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)),
     "peer-statistics"
   )
 
@@ -428,7 +428,7 @@ trait BlockchainHostBuilder:
           pendingTransactionsManagerTyped
         )
       )
-      .onFailure[Throwable](SupervisorStrategy.restart),
+      .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)),
     "blockchain-host"
   )
 
@@ -484,7 +484,7 @@ object PendingTransactionsManagerBuilder:
             )
           )
           .onFailure[Throwable](
-            SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3)
+            SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)
           ),
         "pending-transactions-manager"
       )
@@ -520,7 +520,7 @@ trait FilterManagerBuilder:
           )
         )
         .onFailure[Throwable](
-          SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3)
+          SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)
         ),
       "filter-manager"
     )
@@ -927,7 +927,7 @@ trait OmmersPoolBuilder:
     classicSystem.spawn(
       Behaviors
         .supervise(OmmersPool(blockchainReader, ommersPoolSize))
-        .onFailure[Throwable](SupervisorStrategy.restart),
+        .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)),
       "ommers-pool"
     )
 
