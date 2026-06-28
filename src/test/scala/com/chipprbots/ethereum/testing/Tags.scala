@@ -29,14 +29,13 @@ import org.scalatest.Tag
   *
   * SBT Usage:
   * {{{
-  * // Run only essential tests (exclude slow and integration tests)
-  * sbt "testOnly -- -l SlowTest -l IntegrationTest -l BenchmarkTest"
-  *
-  * // Run standard tests (exclude only comprehensive tests)
-  * sbt "testOnly -- -l BenchmarkTest -l EthereumTest"
-  *
-  * // Run all tests
-  * sbt testAll
+  * sbt testEssential      // Tier 1 — fast unit tests (< 5 min), excludes SlowTest + IntegrationTest
+  * sbt testStandard       // Tier 2 — all unit/integration tests (< 30 min), excludes BenchmarkTest + EthereumTest
+  * sbt testComprehensive  // Tier 3 — full compliance suite (< 3 h), no exclusions
+  * sbt testConsensus      // Run only ConsensusTest-tagged tests
+  * sbt testRPC            // Run only RPCTest-tagged tests
+  * sbt testSync           // Run only SyncTest-tagged tests
+  * sbt testEthereum       // Run only EthereumTest-tagged tests
   * }}}
   *
   * @see
@@ -44,7 +43,7 @@ import org.scalatest.Tag
   * @see
   *   ADR-015 for ethereum/tests integration
   */
-object Tags {
+object Tags:
 
   // ===== Tier 1: Essential Tests (Target: < 5 minutes) =====
 
@@ -54,12 +53,6 @@ object Tags {
     * all.
     */
   object UnitTest extends Tag("UnitTest")
-
-  /** Fast-executing tests suitable for rapid feedback.
-    *
-    * Use this for tests that complete in under 100ms and provide high value-to-time ratio.
-    */
-  object FastTest extends Tag("FastTest")
 
   // ===== Tier 2: Standard Tests (Target: < 30 minutes) =====
 
@@ -110,14 +103,7 @@ object Tags {
     */
   object BenchmarkTest extends Tag("BenchmarkTest")
 
-  /** Long-running stress tests.
-    *
-    * Tests that may take minutes or hours to complete:
-    *   - Large blockchain sync
-    *   - Memory leak detection
-    *   - Concurrent load testing
-    *   - Resource exhaustion scenarios
-    */
+  /** Long-running stress tests. Reserved for future use — no tests currently use this tag. */
   object StressTest extends Tag("StressTest")
 
   // ===== Module-Specific Tags =====
@@ -228,58 +214,8 @@ object Tags {
 
   // ===== Fork-Specific Tags =====
 
-  /** Tests specific to Homestead fork. */
-  object HomesteadTest extends Tag("HomesteadTest")
-
-  /** Tests specific to Tangerine Whistle fork (EIP-150). */
-  object TangerineWhistleTest extends Tag("TangerineWhistleTest")
-
-  /** Tests specific to Spurious Dragon fork (EIP-158). */
-  object SpuriousDragonTest extends Tag("SpuriousDragonTest")
-
-  /** Tests specific to Byzantium fork. */
-  object ByzantiumTest extends Tag("ByzantiumTest")
-
-  /** Tests specific to Constantinople fork. */
-  object ConstantinopleTest extends Tag("ConstantinopleTest")
-
-  /** Tests specific to Istanbul fork. */
-  object IstanbulTest extends Tag("IstanbulTest")
-
-  /** Tests specific to Berlin fork. */
-  object BerlinTest extends Tag("BerlinTest")
-
-  /** Tests specific to Ethereum Classic Atlantis fork. */
-  object AtlantisTest extends Tag("AtlantisTest")
-
-  /** Tests specific to Ethereum Classic Agharta fork. */
-  object AghartaTest extends Tag("AghartaTest")
-
-  /** Tests specific to Ethereum Classic Phoenix fork. */
-  object PhoenixTest extends Tag("PhoenixTest")
-
-  /** Tests specific to Ethereum Classic Magneto fork. */
-  object MagnetoTest extends Tag("MagnetoTest")
-
-  /** Tests specific to Ethereum Classic Mystique fork. */
-  object MystiqueTest extends Tag("MystiqueTest")
-
-  /** Tests specific to Ethereum Classic Spiral fork. */
-  object SpiralTest extends Tag("SpiralTest")
-
   /** Tests specific to Ethereum Classic Olympia fork (ECIP-1111/1112/1121). */
   object OlympiaTest extends Tag("OlympiaTest")
-
-  // ===== Environment-Specific Tags (from RPC tests) =====
-
-  /** Tests that require connection to MainNet. */
-  object MainNet extends Tag("MainNet")
-
-  /** Tests that run against private test network. */
-  object PrivNet extends Tag("PrivNet")
-
-  /** Tests that run against private network without mining. */
-  object PrivNetNoMining extends Tag("PrivNetNoMining")
 
   // ===== Special Tags =====
 
@@ -295,6 +231,17 @@ object Tags {
     */
   object DisabledTest extends Tag("DisabledTest")
 
-  /** Tests that require manual verification or are non-deterministic. */
+  /** Tests that require manual verification or are non-deterministic. Reserved for future use — no tests currently use
+    * this tag.
+    */
   object ManualTest extends Tag("ManualTest")
-}
+
+  /** Fast ETH-path smoke tests (Target: < 60 seconds).
+    *
+    * A lightweight subset that exercises the ETH execution path (chainId=1, `forTimestamp` dispatch) using a handful of
+    * named ethereum/tests vectors. Reachable below `testComprehensive` so the ETH path gets quick CI/local coverage.
+    *
+    * @see
+    *   `EthSmokeSpec` and the `testEthSmoke` sbt target
+    */
+  object EthSmoke extends Tag("EthSmoke")

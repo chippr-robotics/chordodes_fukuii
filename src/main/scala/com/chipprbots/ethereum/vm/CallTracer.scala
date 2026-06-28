@@ -1,11 +1,11 @@
 package com.chipprbots.ethereum.vm
 
-import scala.collection.mutable
-
 import org.apache.pekko.util.ByteString
 
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import scala.collection.mutable
+
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.utils.Hex
@@ -36,7 +36,7 @@ import com.chipprbots.ethereum.utils.Hex
   * @param onlyTopCall
   *   when true, only capture the top-level call (skip sub-calls)
   */
-class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
+class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer:
 
   private case class CallFrame(
       opCode: String,
@@ -55,8 +55,8 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
   private val callStack = mutable.Stack[CallFrame]()
   private var rootFrame: Option[CallFrame] = None
 
-  override def onTxStart(from: Address, to: Option[Address], gas: BigInt, value: BigInt, input: ByteString): Unit = {
-    val opCode = if (to.isDefined) "CALL" else "CREATE"
+  override def onTxStart(from: Address, to: Option[Address], gas: BigInt, value: BigInt, input: ByteString): Unit =
+    val opCode = if to.isDefined then "CALL" else "CREATE"
     val frame = CallFrame(
       opCode = opCode,
       from = from,
@@ -67,18 +67,15 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
     )
     callStack.push(frame)
     rootFrame = Some(frame)
-  }
 
   override def onTxEnd(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit =
-    if (callStack.nonEmpty) {
+    if callStack.nonEmpty then
       val frame = callStack.pop()
       frame.gasUsed = gasUsed
       frame.output = output
       frame.error = error
-      if (error.exists(_.contains("execution reverted")) && output.length >= 4) {
+      if error.exists(_.contains("execution reverted")) && output.length >= 4 then
         frame.revertReason = parseRevertReason(output)
-      }
-    }
 
   override def onCallEnter(
       opCode: String,
@@ -87,8 +84,8 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
       gas: BigInt,
       value: BigInt,
       input: ByteString
-  ): Unit = {
-    if (onlyTopCall) return
+  ): Unit =
+    if onlyTopCall then return
 
     val frame = CallFrame(
       opCode = opCode,
@@ -99,40 +96,33 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
       input = input
     )
     callStack.push(frame)
-  }
 
-  override def onCallExit(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit = {
-    if (onlyTopCall) return
-    if (callStack.size <= 1) return // don't pop the root frame
+  override def onCallExit(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit =
+    if onlyTopCall then return
+    if callStack.size <= 1 then return // don't pop the root frame
 
     val frame = callStack.pop()
     frame.gasUsed = gasUsed
     frame.output = output
     frame.error = error
-    if (error.exists(_.contains("execution reverted")) && output.length >= 4) {
+    if error.exists(_.contains("execution reverted")) && output.length >= 4 then
       frame.revertReason = parseRevertReason(output)
-    }
 
-    if (callStack.nonEmpty) {
-      callStack.top.calls += frame
-    }
-  }
+    if callStack.nonEmpty then callStack.top.calls += frame
 
-  override def getResult: JValue = rootFrame match {
+  override def getResult: JValue = rootFrame match
     case Some(frame) => encodeFrame(frame)
     case None        => JNull
-  }
 
-  private def encodeFrame(frame: CallFrame): JValue = {
+  private def encodeFrame(frame: CallFrame): JValue =
     var obj: JObject = ("type" -> frame.opCode) ~
       ("from" -> encodeAddress(frame.from)) ~
       ("to" -> encodeAddress(frame.to)) ~
       ("gas" -> JString("0x" + frame.gas.toString(16))) ~
       ("gasUsed" -> JString("0x" + frame.gasUsed.toString(16)))
 
-    if (frame.opCode == "CALL" || frame.opCode == "CREATE" || frame.opCode == "CREATE2") {
+    if frame.opCode == "CALL" || frame.opCode == "CREATE" || frame.opCode == "CREATE2" then
       obj = obj ~ ("value" -> encodeHex(frame.value))
-    }
 
     obj = obj ~
       ("input" -> encodeHexBytes(frame.input)) ~
@@ -141,12 +131,9 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
     frame.error.foreach(e => obj = obj ~ ("error" -> JString(e)))
     frame.revertReason.foreach(r => obj = obj ~ ("revertReason" -> JString(r)))
 
-    if (frame.calls.nonEmpty) {
-      obj = obj ~ ("calls" -> JArray(frame.calls.toList.map(encodeFrame)))
-    }
+    if frame.calls.nonEmpty then obj = obj ~ ("calls" -> JArray(frame.calls.toList.map(encodeFrame)))
 
     obj
-  }
 
   private def encodeAddress(addr: Address): JString =
     JString("0x" + Hex.toHexString(addr.bytes.toArray))
@@ -155,22 +142,18 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
     JString("0x" + value.toString(16))
 
   private def encodeHexBytes(bs: ByteString): JString =
-    if (bs.isEmpty) JString("0x")
+    if bs.isEmpty then JString("0x")
     else JString("0x" + Hex.toHexString(bs.toArray))
 
   /** Parse Solidity revert reason from ABI-encoded error data. Format: 0x08c379a0 + offset + length + utf8 string
     */
-  private def parseRevertReason(data: ByteString): Option[String] = {
-    if (data.length < 68) return None
+  private def parseRevertReason(data: ByteString): Option[String] =
+    if data.length < 68 then return None
     val selector = data.take(4)
-    if (selector != ByteString(0x08, 0xc3, 0x79, 0xa0)) return None
-    try {
+    if selector != ByteString(0x08, 0xc3, 0x79, 0xa0) then return None
+    try
       val offset = BigInt(1, data.slice(4, 36).toArray).toInt
       val length = BigInt(1, data.slice(36 + offset, 68 + offset).toArray).toInt
-      if (data.length < 68 + offset + length) return None
+      if data.length < 68 + offset + length then return None
       Some(new String(data.slice(68 + offset, 68 + offset + length).toArray, "UTF-8"))
-    } catch {
-      case _: Exception => None
-    }
-  }
-}
+    catch case _: Exception => None

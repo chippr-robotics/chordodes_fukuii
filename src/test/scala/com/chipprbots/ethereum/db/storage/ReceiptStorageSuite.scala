@@ -7,9 +7,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.domain.Receipt
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class ReceiptStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class ReceiptStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
 
   test("ReceiptStorage insert", UnitTest, DatabaseTest) {
     forAll(Gen.listOf(byteStringOfLengthNGen(32))) { blockByteArrayHashes =>
@@ -59,4 +59,3 @@ class ReceiptStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with
       toDelete.foreach { case (_, bh) => assert(storage.get(bh).isEmpty) }
     }
   }
-}

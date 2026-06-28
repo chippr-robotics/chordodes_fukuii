@@ -6,9 +6,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableFor2
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class BlakeCompressionSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+class BlakeCompressionSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
   // test vectors from: https://eips.ethereum.org/EIPS/eip-152
   val testVectors: TableFor2[String, Option[String]] = Table[String, Option[String]](
     ("value", "result"),
@@ -63,4 +63,3 @@ class BlakeCompressionSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val result = Blake2bCompression.blake2bCompress(Array())
     assert(result.isEmpty)
   }
-}

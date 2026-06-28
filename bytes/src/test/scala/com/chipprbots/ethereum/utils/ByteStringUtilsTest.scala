@@ -10,8 +10,9 @@ import scala.util.Try
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import ByteStringUtils._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
+
+import ByteStringUtils.*
 
 class ByteStringUtilsTest extends AnyWordSpec with Matchers {
 
@@ -27,7 +28,7 @@ class ByteStringUtilsTest extends AnyWordSpec with Matchers {
     "fail parsing a valid hash string" taggedAs UnitTest in {
       val invalidHashString = "XXYYZZXX"
       val parsed = Try(string2hash(invalidHashString))
-      parsed shouldBe a[Failure[_]]
+      parsed shouldBe a[Failure[?]]
     }
 
     "concatByteStrings for simple bytestrings" taggedAs UnitTest in {

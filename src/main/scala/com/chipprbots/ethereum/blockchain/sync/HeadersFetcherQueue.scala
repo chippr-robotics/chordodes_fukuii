@@ -19,9 +19,9 @@ import com.chipprbots.ethereum.utils.Logger
   *
   * Reference: go-ethereum/eth/downloader/queue.go — headerTaskQueue
   */
-class HeadersFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBlockHeaders, BlockHeaders] with Logger {
+class HeadersFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBlockHeaders, BlockHeaders] with Logger:
 
-  import HeadersFetcherQueue._
+  import HeadersFetcherQueue.*
 
   private val pendingQueue = mutable.Queue[BigInt]()
   private val inFlightMap = mutable.Map[PeerId, InFlightEntry]()
@@ -55,7 +55,7 @@ class HeadersFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetB
       .max(1)
 
   def reserve(peer: PeerWithInfo, items: Int): Option[GetBlockHeaders] = synchronized {
-    if (pendingQueue.isEmpty) return None
+    if pendingQueue.isEmpty then return None
 
     val count = items.min(MaxHeadersPerRequest).min(pendingQueue.size)
     val taken = (0 until count).map(_ => pendingQueue.dequeue()).toVector
@@ -88,7 +88,7 @@ class HeadersFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetB
   }
 
   def deliver(peer: PeerWithInfo, resp: BlockHeaders, elapsedMs: Long): DeliveryResult = synchronized {
-    inFlightMap.get(peer.peer.id) match {
+    inFlightMap.get(peer.peer.id) match
       case None =>
         DeliveryResult.Duplicate
 
@@ -105,7 +105,6 @@ class HeadersFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetB
             s"elapsed=${elapsedMs}ms, pending=${pendingQueue.size}"
         )
         DeliveryResult.Delivered(resp.headers.size)
-    }
   }
 
   def expireStale(nowMs: Long): Seq[(PeerId, GetBlockHeaders)] = synchronized {
@@ -129,14 +128,11 @@ class HeadersFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetB
       sentMs: Long,
       deadlineMs: Long,
       consecutiveFailures: Int
-  ) {
+  ):
     def snapshot: InFlightRequest[GetBlockHeaders] =
       InFlightRequest(req, peer, sentMs, deadlineMs)
-  }
-}
 
-object HeadersFetcherQueue {
+object HeadersFetcherQueue:
 
   /** ETH protocol maximum headers per request (matches go-ethereum/eth/handler.go maxHeadersServe). */
   val MaxHeadersPerRequest: Int = 1024
-}

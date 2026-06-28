@@ -7,6 +7,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Hybrid validator for Engine API chains that transition from PoW to PoS.
@@ -21,26 +22,22 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
   * fake Ethash seals), the pre-merge branch falls back to [[MockedPowBlockHeaderValidator]] so synthetic test chains
   * pass the header check without a real Ethash seal.
   */
-object TransitionBlockHeaderValidator extends BlockHeaderValidator {
+object TransitionBlockHeaderValidator extends BlockHeaderValidator:
 
-  private def preMergeValidator: BlockHeaderValidator =
-    if (java.lang.Boolean.getBoolean("fukuii.mining.skip-pow-validation")) MockedPowBlockHeaderValidator
+  private def poWValidator: BlockHeaderValidator =
+    if java.lang.Boolean.getBoolean("fukuii.mining.skip-pow-validation") then MockedPowBlockHeaderValidator
     else PoWBlockHeaderValidator
 
   override def validate(
       blockHeader: BlockHeader,
       getBlockHeaderByHash: GetBlockHeaderByHash
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    if (blockHeader.difficulty == 0)
-      PostMergeBlockHeaderValidator.validate(blockHeader, getBlockHeaderByHash)
-    else
-      preMergeValidator.validate(blockHeader, getBlockHeaderByHash)
+    if blockHeader.difficulty == Difficulty.Zero then
+      PoSBlockHeaderValidator.validate(blockHeader, getBlockHeaderByHash)
+    else poWValidator.validate(blockHeader, getBlockHeaderByHash)
 
   override def validateHeaderOnly(blockHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if (blockHeader.difficulty == 0)
-      PostMergeBlockHeaderValidator.validateHeaderOnly(blockHeader)
-    else
-      preMergeValidator.validateHeaderOnly(blockHeader)
-}
+    if blockHeader.difficulty == Difficulty.Zero then PoSBlockHeaderValidator.validateHeaderOnly(blockHeader)
+    else poWValidator.validateHeaderOnly(blockHeader)

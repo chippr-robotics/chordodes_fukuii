@@ -14,11 +14,12 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.testmode.EthTransactionResponse
 
-object JsonSerializers {
+object JsonSerializers:
 
-  implicit lazy val formats: Formats =
+  given formats: Formats =
     DefaultFormats + UnformattedDataJsonSerializer + QuantitiesSerializer +
-      OptionNoneToJNullSerializer + AddressJsonSerializer + EthTransactionResponseSerializer +
+      OptionNoneToJNullSerializer + AddressJsonSerializer + RpcErrorJsonSerializer +
+      EthTransactionResponseSerializer +
       makeTransactionResponseSerializer + makeTransactionReceiptResponseSerializer + makeBlockResponseSerializer
 
   object UnformattedDataJsonSerializer
@@ -34,16 +35,14 @@ object JsonSerializers {
         (
           PartialFunction.empty,
           { case n: BigInt =>
-            if (n == 0)
-              JString("0x0")
-            else
-              JString(s"0x${Hex.toHexString(n.toByteArray).dropWhile(_ == '0')}")
+            if n == 0 then JString("0x0")
+            else JString(s"0x${Hex.toHexString(n.toByteArray).dropWhile(_ == '0')}")
           }
         )
       )
 
   object OptionNoneToJNullSerializer
-      extends CustomSerializer[Option[_]](_ =>
+      extends CustomSerializer[Option[?]](_ =>
         (
           PartialFunction.empty,
           { case None => JNull }
@@ -74,7 +73,7 @@ object JsonSerializers {
         (
           PartialFunction.empty,
           { case tx: EthTransactionResponse =>
-            implicit val formats: Formats =
+            given formats: Formats =
               DefaultFormats.preservingEmptyValues + UnformattedDataJsonSerializer + QuantitiesSerializer + AddressJsonSerializer
             Extraction.decompose(tx)
           }
@@ -116,4 +115,3 @@ object JsonSerializers {
         }
       )
     )
-}

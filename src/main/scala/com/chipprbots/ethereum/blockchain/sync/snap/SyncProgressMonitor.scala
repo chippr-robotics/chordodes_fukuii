@@ -1,14 +1,16 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor.{Cancellable, Scheduler}
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.Scheduler
 
 import scala.collection.mutable
 
 import com.chipprbots.ethereum.utils.Logger
 
-class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logger {
+class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logger:
 
-  import SNAPSyncController._
+  import SNAPSyncController.*
+  import SNAPSyncController.SyncPhase.*
 
   private var currentPhaseState: SyncPhase = Idle
   private var bytecodesDone: Boolean = false
@@ -49,31 +51,30 @@ class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logg
   private val nodesHistory = mutable.Queue[(Long, Long)]()
 
   /** Start periodic progress logging. */
-  def startPeriodicLogging(): Unit = {
+  def startPeriodicLogging(): Unit =
     val timer = new java.util.Timer("sync-progress-monitor", true)
     timer.scheduleAtFixedRate(
-      new java.util.TimerTask {
+      new java.util.TimerTask:
         def run(): Unit =
           try logProgress()
-          catch { case e: Exception => log.error(s"Progress monitor error: ${e.getMessage}", e) }
-      },
+          catch case e: Exception => log.error(s"Progress monitor error: ${e.getMessage}", e)
+      ,
       30000L,
       30000L
     )
-    periodicLogTask = Some(new Cancellable {
-      def cancel(): Boolean = { timer.cancel(); true }
+    periodicLogTask = Some(new Cancellable:
+      def cancel(): Boolean =
+        timer.cancel(); true
       def isCancelled: Boolean = false
-    })
-  }
+    )
 
-  def stopPeriodicLogging(): Unit = {
+  def stopPeriodicLogging(): Unit =
     periodicLogTask.foreach(_.cancel())
     periodicLogTask = None
-  }
 
   def setFinalizingTrie(value: Boolean): Unit = synchronized {
     finalizingTrie = value
-    if (value) finalizeStartTimeMs = System.currentTimeMillis()
+    if value then finalizeStartTimeMs = System.currentTimeMillis()
   }
 
   def setBytecodeComplete(): Unit = synchronized { bytecodesDone = true }
@@ -101,22 +102,19 @@ class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logg
     nodesHistory.clear()
   }
 
-  def startPhase(phase: SyncPhase): Unit = {
+  def startPhase(phase: SyncPhase): Unit =
     val previousPhase = currentPhaseState
-    if (previousPhase != phase) {
+    if previousPhase != phase then
       currentPhaseState = phase
       phaseStartTime = System.currentTimeMillis()
       log.info(s"SNAP Sync phase transition: $previousPhase -> $phase")
-    }
     logProgress()
-  }
 
-  def complete(): Unit = {
+  def complete(): Unit =
     currentPhaseState = Completed
     stopPeriodicLogging()
     log.info("SNAP Sync completed!")
     logProgress()
-  }
 
   def incrementAccountsSynced(count: Long): Unit = synchronized {
     accountsSynced += count
@@ -147,9 +145,9 @@ class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logg
   }
 
   def updateEstimates(accounts: Long = 0, bytecodes: Long = 0, slots: Long = 0): Unit = synchronized {
-    if (accounts > 0) estimatedTotalAccounts = accounts
-    if (bytecodes > 0) estimatedTotalBytecodes = bytecodes
-    if (slots > 0) estimatedTotalSlots = slots
+    if accounts > 0 then estimatedTotalAccounts = accounts
+    if bytecodes > 0 then estimatedTotalBytecodes = bytecodes
+    if slots > 0 then estimatedTotalSlots = slots
   }
 
   def getStorageSlotsSynced: Long = synchronized(storageSlotsSynced)
@@ -166,40 +164,36 @@ class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logg
     chainTarget = target
   }
 
-  private def cleanupHistory(history: mutable.Queue[(Long, Long)], now: Long): Unit = {
+  private def cleanupHistory(history: mutable.Queue[(Long, Long)], now: Long): Unit =
     val cutoff = now - (metricsWindow * 1000)
-    while (history.nonEmpty && history.head._1 < cutoff)
-      history.dequeue()
-  }
+    while history.nonEmpty && history.head._1 < cutoff do history.dequeue()
 
-  private def calculateRecentThroughput(history: mutable.Queue[(Long, Long)]): Double = {
-    if (history.size < 2) return 0.0
+  private def calculateRecentThroughput(history: mutable.Queue[(Long, Long)]): Double =
+    if history.size < 2 then return 0.0
     val oldest = history.head
     val newest = history.last
     val timeDiff = (newest._1 - oldest._1) / 1000.0
     val countDiff = newest._2 - oldest._2
-    if (timeDiff > 0) countDiff / timeDiff else 0.0
-  }
+    if timeDiff > 0 then countDiff / timeDiff else 0.0
 
   def calculateETA: Option[Long] = synchronized {
-    currentPhaseState match {
+    currentPhaseState match
       case AccountRangeSync if estimatedTotalAccounts > 0 =>
         val remaining = estimatedTotalAccounts - accountsSynced
         val throughput = calculateRecentThroughput(accountsHistory)
-        if (throughput > 0 && remaining > 0) Some((remaining / throughput).toLong) else None
+        if throughput > 0 && remaining > 0 then Some((remaining / throughput).toLong) else None
 
       case ByteCodeAndStorageSync if estimatedTotalSlots > 0 =>
         val remaining = estimatedTotalSlots - storageSlotsSynced
         val throughput = calculateRecentThroughput(slotsHistory)
-        if (throughput > 0 && remaining > 0) Some((remaining / throughput).toLong) else None
+        if throughput > 0 && remaining > 0 then Some((remaining / throughput).toLong) else None
 
       case _ => None
-    }
   }
 
   private def formatETA(seconds: Long): String =
-    if (seconds < 60) s"${seconds}s"
-    else if (seconds < 3600) s"${seconds / 60}m ${seconds % 60}s"
+    if seconds < 60 then s"${seconds}s"
+    else if seconds < 3600 then s"${seconds / 60}m ${seconds % 60}s"
     else s"${seconds / 3600}h ${(seconds % 3600) / 60}m"
 
   def logProgress(): Unit = synchronized {
@@ -207,32 +201,32 @@ class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logg
     val etaStr = calculateETA.map(eta => s", ETA: ${formatETA(eta)}").getOrElse("")
     SNAPSyncMetrics.measure(progress)
     log.info(s"SNAP Sync Progress: ${progress.formattedString}$etaStr")
+    log.info(progress.wormBlock)
   }
 
   def currentProgress: SyncProgress = synchronized {
     val elapsed = (System.currentTimeMillis() - startTime) / 1000.0
     val phaseElapsed = (System.currentTimeMillis() - phaseStartTime) / 1000.0
 
-    val overallAccountsPerSec = if (elapsed > 0) accountsSynced / elapsed else 0
-    val overallBytecodesPerSec = if (elapsed > 0) bytecodesDownloaded / elapsed else 0
-    val overallSlotsPerSec = if (elapsed > 0) storageSlotsSynced / elapsed else 0
-    val overallNodesPerSec = if (elapsed > 0) nodesHealed / elapsed else 0
+    val overallAccountsPerSec = if elapsed > 0 then accountsSynced / elapsed else 0
+    val overallBytecodesPerSec = if elapsed > 0 then bytecodesDownloaded / elapsed else 0
+    val overallSlotsPerSec = if elapsed > 0 then storageSlotsSynced / elapsed else 0
+    val overallNodesPerSec = if elapsed > 0 then nodesHealed / elapsed else 0
 
     val recentAccountsPerSec = calculateRecentThroughput(accountsHistory)
     val recentBytecodesPerSec = calculateRecentThroughput(bytecodesHistory)
     val recentSlotsPerSec = calculateRecentThroughput(slotsHistory)
     val recentNodesPerSec = calculateRecentThroughput(nodesHistory)
 
-    val phaseProgress = currentPhaseState match {
+    val phaseProgress = currentPhaseState match
       case AccountRangeSync if estimatedTotalAccounts > 0 =>
         (accountsSynced.toDouble / estimatedTotalAccounts * 100).toInt
       case ByteCodeAndStorageSync if estimatedTotalSlots > 0 =>
         (storageSlotsSynced.toDouble / estimatedTotalSlots * 100).toInt
       case _ => 0
-    }
 
     val finalizeElapsedSec =
-      if (finalizingTrie) ((System.currentTimeMillis() - finalizeStartTimeMs) / 1000.0).toInt else 0
+      if finalizingTrie then ((System.currentTimeMillis() - finalizeStartTimeMs) / 1000.0).toInt else 0
 
     SyncProgress(
       phase = currentPhaseState,
@@ -267,7 +261,6 @@ class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logg
       bytecodeComplete = bytecodesDone
     )
   }
-}
 
 case class SyncProgress(
     phase: SNAPSyncController.SyncPhase,
@@ -300,10 +293,11 @@ case class SyncProgress(
     chainReceipts: BigInt = BigInt(0),
     chainTarget: BigInt = BigInt(0),
     bytecodeComplete: Boolean = false
-) {
+):
 
-  private def wormChasesBrainBar: String = {
-    import SNAPSyncController._
+  private def globalProgress: Double =
+    import SNAPSyncController.*
+    import SNAPSyncController.SyncPhase.*
 
     val stages = Vector[SyncPhase](
       AccountRangeSync,
@@ -314,29 +308,19 @@ case class SyncProgress(
       Completed
     )
 
-    val stageIndex = stages.indexOf(phase) match {
+    val stageIndex = stages.indexOf(phase) match
       case -1 => 0
       case i  => i
-    }
 
-    val stageSize = if (stages.size <= 1) 1.0 else 1.0 / (stages.size - 1)
+    val stageSize = if stages.size <= 1 then 1.0 else 1.0 / (stages.size - 1)
     val withinStage =
-      if (phaseProgress > 0 && phaseProgress <= 100) (phaseProgress / 100.0) * stageSize else 0.0
+      if phaseProgress > 0 && phaseProgress <= 100 then (phaseProgress / 100.0) * stageSize else 0.0
 
-    val globalProgress = math.max(0.0, math.min(1.0, stageIndex * stageSize + withinStage))
-
-    val trackLen = 20
-    val wormPos = math.max(0, math.min(trackLen, math.round(globalProgress * trackLen).toInt))
-    val filled = "=" * math.max(0, wormPos)
-    val remaining = "." * (trackLen - wormPos)
-    val worm = "\ud83e\udeb1"
-    val brain = "\ud83e\udde0"
-    s"$worm[$filled$remaining]$brain"
-  }
+    math.max(0.0, math.min(1.0, stageIndex * stageSize + withinStage))
 
   private def formatCount(n: Long): String =
-    if (n >= 1000000) f"${n / 1000000.0}%.1fM"
-    else if (n >= 1000) f"${n / 1000.0}%.1fK"
+    if n >= 1000000 then f"${n / 1000000.0}%.1fM"
+    else if n >= 1000 then f"${n / 1000.0}%.1fK"
     else n.toString
 
   override def toString: String =
@@ -346,58 +330,116 @@ case class SyncProgress(
       s"elapsed=${elapsedSeconds.toInt}s"
 
   private def chainStr: String =
-    if (chainTarget > 0) {
-      val pct = if (chainTarget > 0) (chainHeaders * 100 / chainTarget).toInt else 0
+    if chainTarget > 0 then
+      val pct = if chainTarget > 0 then (chainHeaders * 100 / chainTarget).toInt else 0
       s" | chain: h=${formatBigInt(chainHeaders)}/${formatBigInt(chainTarget)}($pct%) b=${formatBigInt(chainBodies)} r=${formatBigInt(chainReceipts)}"
-    } else ""
+    else ""
 
   private def formatBigInt(n: BigInt): String =
-    if (n >= 1000000) f"${(n.toDouble / 1000000)}%.1fM"
-    else if (n >= 1000) f"${(n.toDouble / 1000)}%.1fK"
+    if n >= 1000000 then f"${(n.toDouble / 1000000)}%.1fM"
+    else if n >= 1000 then f"${(n.toDouble / 1000)}%.1fK"
     else n.toString
 
-  private def elapsedStr: String = {
+  private def elapsedStr: String =
     val s = elapsedSeconds.toInt
-    if (s >= 3600) f"${s / 3600}h${(s % 3600) / 60}%02dm"
-    else if (s >= 60) s"${s / 60}m${s % 60}s"
+    if s >= 3600 then f"${s / 3600}h${(s % 3600) / 60}%02dm"
+    else if s >= 60 then s"${s / 60}m${s % 60}s"
     else s"${s}s"
-  }
 
-  def formattedString: String = {
-    val bar = wormChasesBrainBar
+  def formattedString: String =
+    import SNAPSyncController.SyncPhase.*
     val chain = chainStr
     val elapsed = elapsedStr
 
-    phase match {
-      case SNAPSyncController.AccountRangeSync if isFinalizingTrie =>
-        s"$bar FINALIZING TRIE: flushing ${formatCount(accountsSynced)} accounts to disk (${finalizeElapsedSeconds}s)$chain | $elapsed"
+    phase match
+      case AccountRangeSync if isFinalizingTrie =>
+        s"FINALIZING TRIE: flushing ${formatCount(accountsSynced)} accounts to disk (${finalizeElapsedSeconds}s)$chain | $elapsed"
 
-      case SNAPSyncController.AccountRangeSync =>
-        val progressStr = if (estimatedTotalAccounts > 0) s" ${phaseProgress}%" else ""
-        val totalStr = if (estimatedTotalAccounts > 0) s"/~${formatCount(estimatedTotalAccounts)}" else ""
-        s"$bar Accounts$progressStr: ${formatCount(accountsSynced)}$totalStr @ ${accountsPerSec.toInt}/s$chain | $elapsed"
+      case AccountRangeSync =>
+        val progressStr = if estimatedTotalAccounts > 0 then s" ${phaseProgress}%" else ""
+        val totalStr = if estimatedTotalAccounts > 0 then s"/~${formatCount(estimatedTotalAccounts)}" else ""
+        s"Accounts$progressStr: ${formatCount(accountsSynced)}$totalStr @ ${accountsPerSec.toInt}/s$chain | $elapsed"
 
-      case SNAPSyncController.ByteCodeAndStorageSync =>
+      case ByteCodeAndStorageSync =>
         val contractsStr =
-          if (storageContractsTotal > 0) s" (${storageContractsCompleted}/${storageContractsTotal} contracts)" else ""
+          if storageContractsTotal > 0 then s" (${storageContractsCompleted}/${storageContractsTotal} contracts)"
+          else ""
         val codeStr =
-          if (bytecodeComplete) s"codes=${formatCount(bytecodesDownloaded)} \u2714"
+          if bytecodeComplete then s"codes=${formatCount(bytecodesDownloaded)} \u2714"
           else s"codes=${formatCount(bytecodesDownloaded)} @ ${bytecodesPerSec.toInt}/s"
-        s"$bar Code+Storage: $codeStr, slots=${formatCount(storageSlotsSynced)} @ ${slotsPerSec.toInt}/s$contractsStr$chain | $elapsed"
+        s"Code+Storage: $codeStr, slots=${formatCount(storageSlotsSynced)} @ ${slotsPerSec.toInt}/s$contractsStr$chain | $elapsed"
 
-      case SNAPSyncController.StateHealing =>
-        s"$bar Healing: ${formatCount(nodesHealed)} nodes @ ${nodesPerSec.toInt}/s$chain | $elapsed"
+      case StateHealing =>
+        s"Healing: ${formatCount(nodesHealed)} nodes @ ${nodesPerSec.toInt}/s$chain | $elapsed"
 
-      case SNAPSyncController.StateValidation =>
-        s"$bar Validating state trie...$chain | $elapsed"
+      case StateValidation =>
+        s"Validating state trie...$chain | $elapsed"
 
-      case SNAPSyncController.ChainDownloadCompletion =>
-        val bodiesPct = if (chainTarget > 0) (chainBodies * 100 / chainTarget).toInt else 0
-        val receiptsPct = if (chainTarget > 0) (chainReceipts * 100 / chainTarget).toInt else 0
-        s"$bar State done, chain download (boosted): bodies=${formatBigInt(chainBodies)}/$bodiesPct% receipts=${formatBigInt(chainReceipts)}/$receiptsPct% | $elapsed"
+      case ChainDownloadCompletion =>
+        val bodiesPct = if chainTarget > 0 then (chainBodies * 100 / chainTarget).toInt else 0
+        val receiptsPct = if chainTarget > 0 then (chainReceipts * 100 / chainTarget).toInt else 0
+        s"State done, chain download (boosted): bodies=${formatBigInt(chainBodies)}/$bodiesPct% receipts=${formatBigInt(chainReceipts)}/$receiptsPct% | $elapsed"
 
       case _ =>
-        s"$bar $phase$chain | $elapsed"
-    }
-  }
-}
+        s"$phase$chain | $elapsed"
+
+  def wormBlock: String =
+    import com.chipprbots.ethereum.blockchain.sync.WormToBrainBar
+    import com.chipprbots.ethereum.blockchain.sync.WormToBrainBar.WormState.*
+    import SNAPSyncController.SyncPhase.*
+
+    val overallBar = s"${WormToBrainBar.renderKnown(globalProgress)} \u2014 SNAP Overall"
+
+    val contractsStr =
+      if storageContractsTotal > 0 then s" (${storageContractsCompleted}/${storageContractsTotal} contracts)"
+      else ""
+
+    val accountsBar =
+      val (bar, detail) =
+        if estimatedTotalAccounts > 0 then
+          (
+            WormToBrainBar.renderKnown(accountsSynced.toDouble / estimatedTotalAccounts),
+            s" \u2014 ${formatCount(accountsSynced)} / ~${formatCount(estimatedTotalAccounts)} @ ${accountsPerSec.toInt}/s"
+          )
+        else if accountsSynced > 0 then
+          (
+            WormToBrainBar.renderUnknown(Active),
+            s" \u2014 ${formatCount(accountsSynced)} accounts @ ${accountsPerSec.toInt}/s"
+          )
+        else (WormToBrainBar.renderUnknown(Queued), "")
+      s"  Accounts   $bar$detail"
+
+    val storageBar =
+      val (bar, detail) =
+        if estimatedTotalSlots > 0 then
+          (
+            WormToBrainBar.renderKnown(storageSlotsSynced.toDouble / estimatedTotalSlots),
+            s" \u2014 ${formatCount(storageSlotsSynced)} slots$contractsStr"
+          )
+        else if storageSlotsSynced > 0 then
+          (WormToBrainBar.renderUnknown(Active), s" \u2014 ${formatCount(storageSlotsSynced)} slots$contractsStr")
+        else (WormToBrainBar.renderUnknown(Queued), "")
+      s"  Storage    $bar$detail"
+
+    val bytecodesBar =
+      val (bar, detail) =
+        if bytecodeComplete then (WormToBrainBar.renderUnknown(Complete), "")
+        else if bytecodesDownloaded > 0 && estimatedTotalBytecodes > 0 then
+          (
+            WormToBrainBar.renderKnown(bytecodesDownloaded.toDouble / estimatedTotalBytecodes),
+            s" \u2014 ${formatCount(bytecodesDownloaded)} bytecodes"
+          )
+        else if bytecodesDownloaded > 0 then
+          (WormToBrainBar.renderUnknown(Active), s" \u2014 ${formatCount(bytecodesDownloaded)} bytecodes")
+        else (WormToBrainBar.renderUnknown(Queued), "")
+      s"  Bytecodes  $bar$detail"
+
+    val healingBar =
+      val (bar, detail) =
+        if phase == Completed then (WormToBrainBar.renderUnknown(Complete), "")
+        else if nodesHealed > 0 then
+          (WormToBrainBar.renderUnknown(Active), s" \u2014 ${formatCount(nodesHealed)} nodes @ ${nodesPerSec.toInt}/s")
+        else (WormToBrainBar.renderUnknown(Queued), "")
+      s"  Healing    $bar$detail"
+
+    s"$overallBar\n$accountsBar\n$storageBar\n$bytecodesBar\n$healingBar"

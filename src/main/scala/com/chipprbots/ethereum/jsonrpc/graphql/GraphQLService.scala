@@ -3,18 +3,22 @@ package com.chipprbots.ethereum.jsonrpc.graphql
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import io.circe.Json
-
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Success
 
+import io.circe.Json
 import sangria.ast.Document
-import sangria.execution.{ErrorWithResolver, Executor, HandledException, QueryAnalysisError, QueryReducer}
+import sangria.execution.ErrorWithResolver
+import sangria.execution.Executor
+import sangria.execution.HandledException
+import sangria.execution.QueryAnalysisError
+import sangria.execution.QueryReducer
 import sangria.marshalling.ResultMarshaller
-import sangria.marshalling.circe._
-import sangria.parser.{QueryParser, SyntaxError}
+import sangria.marshalling.circe.*
+import sangria.parser.QueryParser
+import sangria.parser.SyntaxError
 
 import com.chipprbots.ethereum.utils.Logger
 
@@ -29,7 +33,7 @@ class GraphQLService(
     maxQueryDepth: Int = GraphQLSchema.MaxQueryDepth,
     executionTimeout: FiniteDuration = 30.seconds
 )(implicit ec: ExecutionContext, @annotation.unused runtime: IORuntime)
-    extends Logger {
+    extends Logger:
 
   private val schema = GraphQLSchema.schema
 
@@ -38,16 +42,15 @@ class GraphQLService(
   /** Parse + validate + execute a GraphQL request, returning the JSON response body and a preferred HTTP status code
     * (200 for success, 400 for query errors).
     */
-  def execute(query: String, variables: Option[Json], operationName: Option[String]): IO[(Int, Json)] = {
-    val parsed: Either[Json, Document] = QueryParser.parse(query) match {
+  def execute(query: String, variables: Option[Json], operationName: Option[String]): IO[(Int, Json)] =
+    val parsed: Either[Json, Document] = QueryParser.parse(query) match
       case Success(doc) => Right(doc)
       case Failure(e: SyntaxError) =>
         Left(errorEnvelope(e.getMessage))
       case Failure(other) =>
         Left(errorEnvelope(other.getMessage))
-    }
 
-    parsed match {
+    parsed match
       case Left(errorJson) => IO.pure((400, errorJson))
       case Right(doc) =>
         val vars = variables.getOrElse(Json.obj())
@@ -72,17 +75,14 @@ class GraphQLService(
           log.error("GraphQL execution failed", t)
           IO.pure((500, errorEnvelope(s"internal error: ${t.getMessage}")))
         }
-    }
-  }
 
   /** Geth returns 400 whenever a GraphQL response has a non-empty `errors` array, regardless of whether the query
     * parsed successfully. Hive testcases rely on this.
     */
   private def statusForResult(json: Json): Int =
-    json.hcursor.downField("errors").focus.flatMap(_.asArray) match {
+    json.hcursor.downField("errors").focus.flatMap(_.asArray) match
       case Some(arr) if arr.nonEmpty => 400
       case _                         => 200
-    }
 
   private def errorEnvelope(message: String): Json =
     Json.obj("errors" -> Json.arr(Json.obj("message" -> Json.fromString(message))))
@@ -120,7 +120,7 @@ class GraphQLService(
       reason: String,
       errorCode: Option[Int],
       errorMessage: Option[String]
-  ): HandledException = {
+  ): HandledException =
     val classificationField = Vector("classification" -> m.scalarNode("DataFetchingException", "String", Set.empty))
     val codeField = errorCode.map(c => "errorCode" -> m.scalarNode(c, "Int", Set.empty)).toVector
     val msgField = errorMessage.map(em => "errorMessage" -> m.scalarNode(em, "String", Set.empty)).toVector
@@ -131,10 +131,8 @@ class GraphQLService(
       addFieldsInExtensions = true,
       addFieldsInError = false
     )
-  }
-}
 
-object GraphQLService {
+object GraphQLService:
 
   /** Parses an incoming HTTP body into a GraphQL request. Accepts:
     *   - `application/json` with `{"query": "...", "variables": {...}, "operationName": "..."}`
@@ -143,16 +141,13 @@ object GraphQLService {
   final case class GraphQLRequest(query: String, variables: Option[Json], operationName: Option[String])
 
   def parseJsonBody(body: String): Either[String, GraphQLRequest] =
-    io.circe.parser.parse(body) match {
+    io.circe.parser.parse(body) match
       case Left(err) => Left(s"invalid JSON body: ${err.message}")
       case Right(json) =>
         val cursor = json.hcursor
-        cursor.get[String]("query") match {
+        cursor.get[String]("query") match
           case Left(e) => Left(s"missing 'query' field: ${e.message}")
           case Right(q) =>
             val variables = cursor.downField("variables").focus.filterNot(_.isNull)
             val opName = cursor.get[String]("operationName").toOption.filter(_.nonEmpty)
             Right(GraphQLRequest(q, variables, opName))
-        }
-    }
-}

@@ -1,22 +1,25 @@
 package com.chipprbots.ethereum.network.discovery
 
 import org.apache.pekko.util.ByteString
-import org.bouncycastle.util.encoders.{Hex => BCHex}
-import org.scalatest.matchers.should._
-import org.scalatest.wordspec.AnyWordSpec
-import scodec.bits.{BitVector, ByteVector}
 
-import com.chipprbots.ethereum.forkid.ForkId
-import com.chipprbots.ethereum.forkid.ForkId._
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.utils.Config._
 import com.chipprbots.scalanet.discovery.crypto.Signature
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
+import org.bouncycastle.util.encoders.Hex as BCHex
+import org.scalatest.matchers.should.*
+import org.scalatest.wordspec.AnyWordSpec
+import scodec.bits.BitVector
+import scodec.bits.ByteVector
 
-class ForkIdTagSpec extends AnyWordSpec with Matchers {
+import com.chipprbots.ethereum.forkid.ForkId
+import com.chipprbots.ethereum.forkid.ForkId.*
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.utils.BlockchainConfig
+import com.chipprbots.ethereum.utils.Config.*
+
+class ForkIdTagSpec extends AnyWordSpec with Matchers:
 
   val config = blockchains
-  val etcConf = config.blockchains("etc")
+  val etcConf: BlockchainConfig = config.blockchains("etc")
   val etcGenesis: ByteString =
     ByteString(BCHex.decode("d4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"))
 
@@ -61,7 +64,7 @@ class ForkIdTagSpec extends AnyWordSpec with Matchers {
       // Local at Spiral (no Olympia scheduled). Remote is on ETH mainnet (Petersburg hash).
       // The ETH Petersburg hash never appears in ETC's checksum chain → ErrLocalIncompatibleOrStale.
       val ethPetersburg = ForkId(0x668db0afL, None)
-      makeTag(20000000).toFilter(enrWith(ethPetersburg)) shouldBe a[Left[_, _]]
+      makeTag(20000000).toFilter(enrWith(ethPetersburg)) shouldBe a[Left[?, ?]]
     }
 
     // *** THE CRITICAL BUG REGRESSION ***
@@ -84,13 +87,12 @@ class ForkIdTagSpec extends AnyWordSpec with Matchers {
       val tag = makeTag(20000000, olympiaConf)
       // Remote: ETH mainnet. Hash 0x668db0af never appears in ETC's checksum chain.
       val ethPetersburg = ForkId(0x668db0afL, None)
-      tag.toFilter(enrWith(ethPetersburg)) shouldBe a[Left[_, _]]
+      tag.toFilter(enrWith(ethPetersburg)) shouldBe a[Left[?, ?]]
     }
 
     "reject an ENR with malformed eth key bytes" in {
       val badBytes = ByteVector(0xff.toByte, 0xfe.toByte, 0x00.toByte)
       val enr = EthereumNodeRecord(dummySig, 0L, ethKey -> badBytes)
-      makeTag(20000000).toFilter(enr) shouldBe a[Left[_, _]]
+      makeTag(20000000).toFilter(enr) shouldBe a[Left[?, ?]]
     }
   }
-}

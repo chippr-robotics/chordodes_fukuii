@@ -4,7 +4,7 @@ import java.net.Inet6Address
 import java.nio.charset.StandardCharsets.UTF_8
 
 import scala.collection.SortedMap
-import scala.math.Ordering.Implicits._
+import scala.math.Ordering.Implicits.*
 
 import com.chipprbots.scalanet.discovery.crypto.PrivateKey
 import com.chipprbots.scalanet.discovery.crypto.PublicKey
@@ -34,7 +34,7 @@ object EthereumNodeRecord {
   )
   object Content {
     def apply(seq: Long, attrs: (ByteVector, ByteVector)*): Content =
-      Content(seq, SortedMap(attrs: _*))
+      Content(seq, SortedMap(attrs*))
   }
 
   object Keys {
@@ -72,14 +72,14 @@ object EthereumNodeRecord {
   def apply(signature: Signature, seq: Long, attrs: (ByteVector, ByteVector)*): EthereumNodeRecord =
     EthereumNodeRecord(
       signature,
-      EthereumNodeRecord.Content(seq, attrs: _*)
+      EthereumNodeRecord.Content(seq, attrs*)
     )
 
   def apply(privateKey: PrivateKey, seq: Long, attrs: (ByteVector, ByteVector)*)(
       implicit sigalg: SigAlg,
       codec: Codec[Content]
   ): Attempt[EthereumNodeRecord] = {
-    val content = EthereumNodeRecord.Content(seq, attrs: _*)
+    val content = EthereumNodeRecord.Content(seq, attrs*)
     codec.encode(content).map { data =>
       val sig = sigalg.removeRecoveryId(sigalg.sign(privateKey, data))
       EthereumNodeRecord(sig, content)
@@ -127,7 +127,7 @@ object EthereumNodeRecord {
     // Make sure a custom attribute doesn't overwrite a pre-defined one.
     val attrs = standardAttrs ++ customAttrs.filterNot(kv => Keys.Predefined(kv._1))
 
-    apply(privateKey, seq, attrs: _*)
+    apply(privateKey, seq, attrs*)
   }
 
   def validateSignature(

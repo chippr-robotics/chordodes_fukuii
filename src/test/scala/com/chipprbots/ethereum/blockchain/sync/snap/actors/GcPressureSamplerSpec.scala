@@ -3,17 +3,16 @@ package com.chipprbots.ethereum.blockchain.sync.snap.actors
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Deterministic unit test for [[GcPressureSampler]] (spec 002 US2 / T015). The GC-bean-sum supplier and the wall clock
   * are injected fakes driven by mutable cells, so the test advances time/pauses explicitly with no `Thread.sleep`.
   */
-class GcPressureSamplerSpec extends AnyFlatSpec with Matchers {
+class GcPressureSamplerSpec extends AnyFlatSpec with Matchers:
 
   /** A mutable cell the test can advance between samples. */
-  private class Cell(var value: Long) extends (() => Long) {
+  private class Cell(var value: Long) extends (() => Long):
     def apply(): Long = value
-  }
 
   "GcPressureSampler" should "report the GC pause delta and fraction since the baseline" taggedAs UnitTest in {
     val gc = new Cell(1000L) // baseline GC collection time = 1000ms
@@ -79,4 +78,3 @@ class GcPressureSamplerSpec extends AnyFlatSpec with Matchers {
     pauseMs shouldBe 0L
     fraction shouldBe 0.0 +- 1e-9
   }
-}

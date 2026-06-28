@@ -1,19 +1,23 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem}
-import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.mpt.{BranchNode, HashNode, MptNode, NullNode}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.mpt.BranchNode
+import com.chipprbots.ethereum.mpt.HashNode
+import com.chipprbots.ethereum.mpt.MptNode
+import com.chipprbots.ethereum.mpt.NullNode
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** T012 (US1, C2 / FR-007): single-element multi-seed byte-parity.
@@ -26,34 +30,32 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * over a deterministic fixture demonstrate the wrapper and a one-element multi-seed call agree.
   */
 class RebuildFrontierBfsMultiSeedSpec
-    extends TestKit(ActorSystem("RebuildFrontierBfsMultiSeedSpec"))
-    with ImplicitSender
+    extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfterAll {
+    with Eventually:
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
 
   /** Build a fixed 3-level account trie: root branch → 2 present branch children, each referencing one missing leaf
     * hash. Frontier (missing) = 2. Every internal node is stored; the two leaf hashes are deliberately absent.
     */
-  private def buildFixture(): (TestMptStorage, ByteString, Int) = {
+  private def buildFixture(): (TestMptStorage, ByteString, Int) =
     val storage = new TestMptStorage()
     val missingA = kec256(ByteString("multiseed-parity-missing-A"))
     val missingB = kec256(ByteString("multiseed-parity-missing-B"))
 
-    val childA = {
+    val childA =
       val c = emptyChildren
       c(4) = HashNode(missingA.toArray)
       BranchNode(c, None)
-    }
-    val childB = {
+    val childB =
       val c = emptyChildren
       c(9) = HashNode(missingB.toArray)
       BranchNode(c, None)
-    }
     storage.putNode(childA)
     storage.putNode(childB)
 
@@ -64,43 +66,33 @@ class RebuildFrontierBfsMultiSeedSpec
     storage.putNode(root)
 
     (storage, ByteString(root.hash), 2)
-  }
 
-  private def pendingTasks(coordinator: ActorRef): Int = {
-    val probe = TestProbe()
-    coordinator.tell(Messages.HealingGetProgress, probe.ref)
-    probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
-  }
+  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
+    val probe = testKit.createTestProbe[HealingStatistics]()
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
+    probe.expectMessageType[HealingStatistics].pendingTasks
 
-  private def runSingleSeedWalk(storage: TestMptStorage, root: ByteString): Int = {
-    val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
-        stateRoot = root,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 16,
-        snapSyncController = TestProbe().ref,
-        healingWriterEcOverride = Some(system.dispatcher)
-      )
+  private def runSingleSeedWalk(storage: TestMptStorage, root: ByteString): Int =
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = root,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 16,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
+      healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
-    try {
-      coordinator ! Messages.StartTrieNodeHealing(root)
+    try
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
       var observed = -1
-      awaitAssert(
-        {
-          observed = pendingTasks(coordinator)
-          observed should be > 0
-        },
-        5.seconds,
-        100.millis
-      )
+      eventually(timeout(5.seconds), interval(100.millis)) {
+        observed = pendingTasks(coordinator)
+        observed should be > 0
+      }
       observed
-    } finally {
-      system.stop(coordinator)
+    finally
+      testKit.stop(coordinator)
       ()
-    }
-  }
 
   "Single-element multi-seed rebuildFrontierBFS" should
     "discover the identical frontier as the single-seed wrapper over the same trie (byte-parity)" taggedAs UnitTest in {
@@ -126,4 +118,3 @@ class RebuildFrontierBfsMultiSeedSpec
     first shouldBe expectedFrontier
     second shouldBe first
   }
-}

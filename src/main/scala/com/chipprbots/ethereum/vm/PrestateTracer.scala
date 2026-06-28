@@ -1,11 +1,11 @@
 package com.chipprbots.ethereum.vm
 
-import scala.collection.mutable
-
 import org.apache.pekko.util.ByteString
 
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import scala.collection.mutable
+
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
@@ -34,7 +34,7 @@ import com.chipprbots.ethereum.utils.Hex
 class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
     val preWorld: W,
     diffMode: Boolean = false
-) extends ExecutionTracer {
+) extends ExecutionTracer:
 
   private val touchedAddresses = mutable.LinkedHashSet[Address]()
   private val touchedStorageKeys = mutable.HashMap[Address, mutable.LinkedHashSet[UInt256]]()
@@ -43,10 +43,9 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
   def setPostWorld(world: W): Unit =
     postWorld = Some(world)
 
-  override def onTxStart(from: Address, to: Option[Address], gas: BigInt, value: BigInt, input: ByteString): Unit = {
+  override def onTxStart(from: Address, to: Option[Address], gas: BigInt, value: BigInt, input: ByteString): Unit =
     touchedAddresses += from
     to.foreach(addr => touchedAddresses += addr)
-  }
 
   override def onCallEnter(
       opCode: String,
@@ -55,55 +54,45 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
       gas: BigInt,
       value: BigInt,
       input: ByteString
-  ): Unit = {
+  ): Unit =
     touchedAddresses += from
     touchedAddresses += to
-  }
 
   override def onStep[W2 <: WorldStateProxy[W2, S2], S2 <: Storage[S2]](
       opCode: OpCode,
       prevState: ProgramState[W2, S2],
       nextState: ProgramState[W2, S2]
-  ): Unit = {
+  ): Unit =
     val opName = opCode.toString
-    if (opName == "SLOAD" || opName == "SSTORE") {
+    if opName == "SLOAD" || opName == "SSTORE" then
       val stack = prevState.stack
-      if (stack.size >= 1) {
+      if stack.size >= 1 then
         val addr = prevState.env.ownerAddr
         val key = stack.toSeq.head
         touchedAddresses += addr
         touchedStorageKeys.getOrElseUpdate(addr, mutable.LinkedHashSet.empty) += key
-      }
-    }
-    opName match {
+    opName match
       case "BALANCE" | "EXTCODESIZE" | "EXTCODECOPY" | "EXTCODEHASH" =>
         val stack = prevState.stack
-        if (stack.size >= 1) {
+        if stack.size >= 1 then
           val addrUint = stack.toSeq.head
           touchedAddresses += Address(addrUint)
-        }
       case "SELFDESTRUCT" =>
         val stack = prevState.stack
-        if (stack.size >= 1) {
+        if stack.size >= 1 then
           val beneficiary = stack.toSeq.head
           touchedAddresses += Address(beneficiary)
           touchedAddresses += prevState.env.ownerAddr
-        }
       case _ => ()
-    }
-  }
 
   override def getResult: JValue =
-    if (diffMode) {
-      postWorld match {
+    if diffMode then
+      postWorld match
         case Some(pw) => encodeDiff(pw)
         case None     => encodePrestate()
-      }
-    } else {
-      encodePrestate()
-    }
+    else encodePrestate()
 
-  private def encodePrestate(): JValue = {
+  private def encodePrestate(): JValue =
     val fields = touchedAddresses.toList.flatMap { addr =>
       preWorld.getAccount(addr).map { account =>
         val addrHex = "0x" + Hex.toHexString(addr.bytes.toArray)
@@ -111,9 +100,8 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
       }
     }
     JObject(fields.map { case (k, v) => JField(k, v) })
-  }
 
-  private def encodeDiff(pw: W): JValue = {
+  private def encodeDiff(pw: W): JValue =
     val preFields = mutable.ListBuffer[JField]()
     val postFields = mutable.ListBuffer[JField]()
 
@@ -129,86 +117,67 @@ class PrestateTracer[W <: WorldStateProxy[W, S], S <: Storage[S]](
       postAccount.foreach { postAcc =>
         val preAcc = preAccount.getOrElse(com.chipprbots.ethereum.domain.Account.empty(0))
         val diff = encodeAccountDiff(addr, preAcc, postAcc, pw)
-        if (diff != JNothing) {
-          postFields += JField(addrHex, diff)
-        }
+        if diff != JNothing then postFields += JField(addrHex, diff)
       }
 
-      if (preAccount.isEmpty && postAccount.isDefined) {
+      if preAccount.isEmpty && postAccount.isDefined then
         postFields += JField(addrHex, encodeAccountState(addr, postAccount.get, pw))
-      }
     }
 
     ("pre" -> JObject(preFields.toList)) ~ ("post" -> JObject(postFields.toList))
-  }
 
-  private def encodeAccountState(addr: Address, account: com.chipprbots.ethereum.domain.Account, world: W): JValue = {
+  private def encodeAccountState(addr: Address, account: com.chipprbots.ethereum.domain.Account, world: W): JValue =
     var obj: JObject = ("balance" -> JString("0x" + account.balance.toBigInt.toString(16))) ~
       ("nonce" -> JInt(account.nonce.bigInteger))
 
     val code = world.getCode(addr)
-    if (code.nonEmpty) {
-      obj = obj ~ ("code" -> JString("0x" + Hex.toHexString(code.toArray)))
-    }
+    if code.nonEmpty then obj = obj ~ ("code" -> JString("0x" + Hex.toHexString(code.toArray)))
 
     val storageKeys = touchedStorageKeys.getOrElse(addr, Set.empty)
-    if (storageKeys.nonEmpty) {
+    if storageKeys.nonEmpty then
       val storage = world.getStorage(addr)
       val storageFields = storageKeys.toList.flatMap { key =>
         val value = storage.load(key.toBigInt)
-        if (value != BigInt(0)) {
+        if value != BigInt(0) then
           val keyHex = "0x" + key.toBigInt.toString(16).reverse.padTo(64, '0').reverse
           val valHex = "0x" + value.toString(16).reverse.padTo(64, '0').reverse
           Some(JField(keyHex, JString(valHex)))
-        } else None
+        else None
       }
-      if (storageFields.nonEmpty) {
-        obj = obj ~ ("storage" -> JObject(storageFields))
-      }
-    }
+      if storageFields.nonEmpty then obj = obj ~ ("storage" -> JObject(storageFields))
 
     obj
-  }
 
   private def encodeAccountDiff(
       addr: Address,
       preAcc: com.chipprbots.ethereum.domain.Account,
       postAcc: com.chipprbots.ethereum.domain.Account,
       pw: W
-  ): JValue = {
+  ): JValue =
     var fields = List.empty[JField]
 
-    if (preAcc.balance != postAcc.balance) {
+    if preAcc.balance != postAcc.balance then
       fields :+= JField("balance", JString("0x" + postAcc.balance.toBigInt.toString(16)))
-    }
-    if (preAcc.nonce != postAcc.nonce) {
-      fields :+= JField("nonce", JInt(postAcc.nonce.bigInteger))
-    }
+    if preAcc.nonce != postAcc.nonce then fields :+= JField("nonce", JInt(postAcc.nonce.bigInteger))
 
     val preCode = preWorld.getCode(addr)
     val postCode = pw.getCode(addr)
-    if (preCode != postCode && postCode.nonEmpty) {
+    if preCode != postCode && postCode.nonEmpty then
       fields :+= JField("code", JString("0x" + Hex.toHexString(postCode.toArray)))
-    }
 
     val storageKeys = touchedStorageKeys.getOrElse(addr, Set.empty)
-    if (storageKeys.nonEmpty) {
+    if storageKeys.nonEmpty then
       val preStorage = preWorld.getStorage(addr)
       val postStorage = pw.getStorage(addr)
       val storageFields = storageKeys.toList.flatMap { key =>
         val preVal = preStorage.load(key.toBigInt)
         val postVal = postStorage.load(key.toBigInt)
-        if (preVal != postVal) {
+        if preVal != postVal then
           val keyHex = "0x" + key.toBigInt.toString(16).reverse.padTo(64, '0').reverse
           val valHex = "0x" + postVal.toString(16).reverse.padTo(64, '0').reverse
           Some(JField(keyHex, JString(valHex)))
-        } else None
+        else None
       }
-      if (storageFields.nonEmpty) {
-        fields :+= JField("storage", JObject(storageFields))
-      }
-    }
+      if storageFields.nonEmpty then fields :+= JField("storage", JObject(storageFields))
 
-    if (fields.isEmpty) JNothing else JObject(fields)
-  }
-}
+    if fields.isEmpty then JNothing else JObject(fields)

@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 import java.io.File
 import java.nio.file.Files
@@ -22,33 +22,30 @@ import java.nio.file.Files
   * they assert on `isSubtreeComplete` / `multiIsSubtreeComplete` / key presence, exactly as the production oracle reads
   * them.
   */
-class HealingFrontierStorageSubtreeSpec extends AnyFlatSpec with Matchers {
+class HealingFrontierStorageSubtreeSpec extends AnyFlatSpec with Matchers:
 
   private def hash(i: Int): ByteString = ByteString(Array.fill(32)(i.toByte))
 
   /** Open a fresh temp-dir RocksDB-backed store, run the body, destroy. */
-  private def withStorage(test: HealingFrontierStorage => Unit): Unit = {
+  private def withStorage(test: HealingFrontierStorage => Unit): Unit =
     val dbPath = Files.createTempDirectory("healing-frontier-subtree-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(rocksDbConfig(dbPath), Namespaces.nsSeq)
     try test(new HealingFrontierStorage(dataSource))
-    finally {
+    finally
       dataSource.destroy()
       val dir = new File(dbPath)
       !dir.exists() || dir.delete()
-    }
-  }
 
   /** Open a store at a CALLER-OWNED path so the same on-disk data can be re-opened in a second store instance — used to
     * prove records are durable / additive across a re-open (D1).
     */
-  private def withStorageAt(dbPath: String)(test: HealingFrontierStorage => Unit): Unit = {
+  private def withStorageAt(dbPath: String)(test: HealingFrontierStorage => Unit): Unit =
     val dataSource = RocksDbDataSource(rocksDbConfig(dbPath), Namespaces.nsSeq)
     try test(new HealingFrontierStorage(dataSource))
     finally dataSource.close()
-  }
 
   private def rocksDbConfig(dbPath: String): RocksDbConfig =
-    new RocksDbConfig {
+    new RocksDbConfig:
       override val createIfMissing: Boolean = true
       override val paranoidChecks: Boolean = true
       override val path: String = dbPath
@@ -58,13 +55,11 @@ class HealingFrontierStorageSubtreeSpec extends AnyFlatSpec with Matchers {
       override val levelCompaction: Boolean = true
       override val blockSize: Long = 16384
       override val blockCacheSize: Long = 33554432
-    }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   // ── C1: markSubtreeComplete / isSubtreeComplete round-trip ─────────────────────────────────────
 
@@ -184,7 +179,7 @@ class HealingFrontierStorageSubtreeSpec extends AnyFlatSpec with Matchers {
     val dbPath = Files.createTempDirectory("healing-frontier-subtree-reopen-rocksdb").toAbsolutePath.toString
     val recorded = (50 until 55).map(hash)
     val neverRecorded = hash(60)
-    try {
+    try
       // First open: write records, then close (datasource.close, NOT destroy — keep the on-disk bytes).
       withStorageAt(dbPath) { storage =>
         recorded.foreach(storage.markSubtreeComplete)
@@ -197,6 +192,5 @@ class HealingFrontierStorageSubtreeSpec extends AnyFlatSpec with Matchers {
         // A hash that was never recorded is still absent after the re-open.
         storage.isSubtreeComplete(neverRecorded) shouldBe false
       }
-    } finally deleteRecursively(new File(dbPath))
+    finally deleteRecursively(new File(dbPath))
   }
-}

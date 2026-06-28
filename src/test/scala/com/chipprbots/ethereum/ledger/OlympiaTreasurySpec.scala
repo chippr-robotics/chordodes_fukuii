@@ -1,12 +1,11 @@
 package com.chipprbots.ethereum.ledger
 
+import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.typesafe.config.ConfigFactory
-
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** L8 — ECIP-1112 Olympia treasury address configuration tests.
@@ -19,7 +18,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
   * consistency requirement). Updated from demo v0.3 address in the olympia treasury-address fix commit.
   */
 // scalastyle:off magic.number
-class OlympiaTreasurySpec extends AnyFlatSpec with Matchers {
+class OlympiaTreasurySpec extends AnyFlatSpec with Matchers:
 
   private val fullConfig = ConfigFactory.load()
   private val etcConfig = BlockchainConfig.fromRawConfig(fullConfig.getConfig("fukuii.blockchains.etc"))
@@ -79,5 +78,4 @@ class OlympiaTreasurySpec extends AnyFlatSpec with Matchers {
   ) in {
     mordorConfig.forkBlockNumbers.olympiaBlockNumber should be > BigInt("1000000000000")
   }
-}
 // scalastyle:on magic.number

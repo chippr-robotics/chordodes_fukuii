@@ -28,6 +28,23 @@ For those areas, direct the main session to `forge` (ETC/Mordor) or `beacon`
 metrics, RPC, networking, node configuration, build tooling, tests, and new
 utilities.
 
+## Shared protocols (reference when framing findings)
+
+When a finding maps to an established protocol, cite it so the downstream fix agent has direct guidance rather than re-deriving it:
+
+- Logging quality issues (missing metrics, ambiguous messages, wrong level): `~/.claude/agent-protocols/logging-standards.md`
+- Inline cleanup opportunities (log.warning, println, unused imports): `~/.claude/agent-protocols/inline-cleanup.md`
+- Warning suppression findings (broad -Wconf, buried @nowarn): `~/.claude/agent-protocols/warning-ratchet.md`
+- Multi-bucket commit advice (mixing A/B/C risks in one diff): `~/.claude/agent-protocols/risk-stratified-commit.md`
+- Test quality gaps (Thread.sleep, missing tier coverage, non-determinism): `~/.claude/agent-protocols/testing-protocol.md`
+- Dead code candidates (zero callers, orphaned implementations, unregistered strategies): `~/.claude/agent-protocols/dead-code-review.md` — before labelling something DEAD, apply the three-verdict assessment: Wire it / Delete it / Defer
+- Opaque type violations (S11 — `.value` inside a layer boundary): `~/.claude/agent-protocols/scala3-style.md` § S11 + `.local/best-practices/scala/type-safety.md`
+- Pekko Typed API violations (P17–P25: messageAdapter placement, spawnAnonymous, PreRestart, bounded restart): `~/.claude/agent-protocols/pekko-typed-api.md`
+- Cats Effect integration violations (TL1: IORuntime.global outside root; TL2: unsafeRunSync in actors): `~/.claude/agent-protocols/pekko-typed-api.md` § TL1/TL2
+- Known violation index (52 findings, 9 categories, file:line): `.local/best-practices/codebase-audit.md`
+
+**Contributing protocols**: If a finding type recurs across multiple reviews and no protocol covers it yet, note it in `~/.claude/agent-protocols/working-docs/CHASE-QUEUE.md` with a suggested protocol name. Prism reviews surface systemic issues — those are the right inputs for new protocols.
+
 ## When invoked
 
 1. Run `git diff HEAD` (or `git diff --staged`, or read the file list given)
@@ -71,6 +88,7 @@ Owns: macro-level organisation.
 - Are there circular dependencies between packages?
 - Is the same logic duplicated across two or more files?
 - Is there a premature abstraction whose only client is the file that defines it?
+- **[MIGRATION SPRINT]** Is there a new `extends Actor` or `ActorLogging` mixin in `network/` or `blockchain/sync/`? These paths are actively being migrated to Pekko Typed — new Classic actor code here is a **critical** regression, even if it compiles.
 
 ### simplicity
 Owns: whether the solution matches the problem's actual complexity.
@@ -108,6 +126,33 @@ Owns: idiomatic Scala 3 functional style.
   `given`/`using` injection?
 - Does a single function do more than one thing (compute + persist + log)?
 - Is braceless Scala 3 style preferred for new code?
+
+## Reference repos
+
+When a finding relates to a known library pattern or inspection, cross-check locally before reporting:
+
+- **scapegoat** — local: `.claude/repo-references/scapegoat/src/main/scala/com/sksamuel/scapegoat/inspections/`
+  - Understand what each enabled inspection catches before advising a `@SuppressWarnings` suppression
+- **scalafix** — local: `.claude/repo-references/scalafix/rules/src/main/scala/scalafix/`
+  - Check rule behaviour before advising a `@nowarn` suppression on a scalafix-generated warning
+
+Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
+
+## Destructive change rule (findings output)
+
+Any finding that recommends **deleting, removing entirely, or inlining-and-discarding**
+a class, trait, object, or method body of **≥ 20 lines** MUST include this block
+in the findings output before the recommendation:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "strip extends X instead of deleting the class"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+The main session reviews this block before encoding findings into implementation prompts.
 
 ## Output format
 

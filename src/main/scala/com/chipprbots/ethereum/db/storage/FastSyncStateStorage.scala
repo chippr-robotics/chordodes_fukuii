@@ -7,32 +7,41 @@ import org.apache.pekko.util.ByteString
 import scala.collection.immutable.ArraySeq
 
 import boopickle.CompositePickler
-import boopickle.Default._
+import boopickle.Default.*
 
-import com.chipprbots.ethereum.blockchain.sync.fast.FastSync._
+import com.chipprbots.ethereum.blockchain.sync.fast.FastSync.*
 import com.chipprbots.ethereum.db.dataSource.DataSource
+import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 
-object FastSyncStateStorage {
+object FastSyncStateStorage:
 
   val syncStateKey: String = "fast-sync-state"
 
-}
-
-class FastSyncStateStorage(val dataSource: DataSource)
-    extends KeyValueStorage[String, SyncState, FastSyncStateStorage] {
+class FastSyncStateStorage(val dataSource: DataSource) extends KeyValueStorage[String, SyncState, FastSyncStateStorage]:
   type T = FastSyncStateStorage
 
-  import FastSyncStateStorage._
+  import FastSyncStateStorage.*
 
   override val namespace: IndexedSeq[Byte] = Namespaces.FastSyncStateNamespace
 
-  implicit val byteStringPickler: Pickler[ByteString] =
+  given difficultyPickler: Pickler[Difficulty] =
+    transformPickler[Difficulty, BigInt](Difficulty(_))(_.value)
+  given byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])
+  given bloomFilterPickler: Pickler[BloomFilter] =
+    transformPickler[BloomFilter, Array[Byte]](arr => BloomFilter.fromArray(arr))(_.toArray)
+  given blockHashPickler: Pickler[BlockHash] =
+    transformPickler[BlockHash, Array[Byte]](arr => BlockHash(ByteString(arr)))(_.toArray)
+  given trieRootPickler: Pickler[TrieRoot] =
+    transformPickler[TrieRoot, Array[Byte]](arr => TrieRoot(ByteString(arr)))(_.toArray)
 
-  implicit val headerExtraFieldsPickler: CompositePickler[HeaderExtraFields] =
+  given headerExtraFieldsPickler: CompositePickler[HeaderExtraFields] =
     compositePickler[HeaderExtraFields]
       .addConcreteType[HefEmpty.type]
       .addConcreteType[HefPostOlympia]
@@ -40,7 +49,7 @@ class FastSyncStateStorage(val dataSource: DataSource)
       .addConcreteType[HefPostCancun]
       .addConcreteType[HefPostPrague]
 
-  implicit val hashTypePickler: CompositePickler[HashType] =
+  given hashTypePickler: CompositePickler[HashType] =
     compositePickler[HashType]
       .addConcreteType[StateMptNodeHash]
       .addConcreteType[ContractStorageMptNodeHash]
@@ -65,5 +74,3 @@ class FastSyncStateStorage(val dataSource: DataSource)
   def getSyncState(): Option[SyncState] = get(syncStateKey)
 
   def purge(): FastSyncStateStorage = remove(syncStateKey)
-
-}

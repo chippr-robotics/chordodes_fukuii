@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 
-class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder {
+class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder:
   // We'll be using the same private key over and over to sign messages.
   // To save the time transforming it into a public-private key pair every time, store the results.
   // In the future we might want to not pass around the private key but have it as a constructor argument.
@@ -42,7 +42,7 @@ class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder {
   val SignatureWithoutRecoveryBytesSize = 64
   val PublicKeyCompressedBytesSize = 33
 
-  override def newKeyPair: (PublicKey, PrivateKey) = {
+  override def newKeyPair: (PublicKey, PrivateKey) =
     val keyPair = crypto.generateKeyPair(secureRandom)
     val (privateKeyBytes, publicKeyBytes) = crypto.keyPairToByteArrays(keyPair)
 
@@ -50,30 +50,27 @@ class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder {
     val privateKey = toPrivateKey(privateKeyBytes)
 
     publicKey -> privateKey
-  }
 
-  override def sign(privateKey: PrivateKey, data: BitVector): Signature = {
+  override def sign(privateKey: PrivateKey, data: BitVector): Signature =
     val message = crypto.kec256(data.toByteArray)
     val keyPair =
       signingKeyPairCache.getOrElseUpdate(privateKey, crypto.keyPairFromPrvKey(privateKey.value.toByteArray))
     val sig = ECDSASignature.sign(message, keyPair)
     toSignature(sig)
-  }
 
   // ENR wants the signature without recovery ID, just 64 bytes.
   // The Packet on the other hand has the full 65 bytes.
   override def removeRecoveryId(signature: Signature): Signature =
-    signature.value.size / 8 match {
+    signature.value.size / 8 match
       case SignatureBytesSize =>
         Signature(signature.value.dropRight(8))
       case SignatureWithoutRecoveryBytesSize =>
         signature
       case other =>
         throw new IllegalArgumentException(s"Unexpected signature size: $other bytes")
-    }
 
   override def compressPublicKey(publicKey: PublicKey): PublicKey =
-    publicKey.value.size / 8 match {
+    publicKey.value.size / 8 match
       case PublicKeyBytesSize =>
         // This is a public key without the prefix, it consists of an x and y bigint.
         // To compress we drop y, and the first byte becomes 02 for even values of y and 03 for odd values.
@@ -90,14 +87,13 @@ class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder {
 
       case other =>
         throw new IllegalArgumentException(s"Unexpected uncompressed public key size: $other bytes")
-    }
 
   // The public key points lie on the curve `y^2 = x^3 + 7`.
   // In the compressed form we have x and a prefix telling us whether y is even or odd.
   // https://bitcoin.stackexchange.com/questions/86234/how-to-uncompress-a-public-key
   // https://bitcoin.stackexchange.com/questions/44024/get-uncompressed-public-key-from-compressed-form
   def decompressPublicKey(publicKey: PublicKey): PublicKey =
-    publicKey.value.size / 8 match {
+    publicKey.value.size / 8 match
       case PublicKeyBytesSize =>
         publicKey
 
@@ -109,17 +105,15 @@ class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder {
 
       case other =>
         throw new IllegalArgumentException(s"Unexpected compressed public key size: $other bytes")
-    }
 
-  override def verify(publicKey: PublicKey, signature: Signature, data: BitVector): Boolean = {
+  override def verify(publicKey: PublicKey, signature: Signature, data: BitVector): Boolean =
     val message = crypto.kec256(data.toByteArray)
     val uncompressedPublicKey = decompressPublicKey(publicKey)
     toECDSASignatures(signature).exists { sig =>
       sig.publicKey(message).map(toPublicKey).contains(uncompressedPublicKey)
     }
-  }
 
-  override def recoverPublicKey(signature: Signature, data: BitVector): Attempt[PublicKey] = {
+  override def recoverPublicKey(signature: Signature, data: BitVector): Attempt[PublicKey] =
     val message = crypto.kec256(data.toByteArray)
 
     val maybePublicKey = toECDSASignatures(signature).flatMap { sig =>
@@ -127,22 +121,19 @@ class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder {
     }.headOption
 
     Attempt.fromOption(maybePublicKey, Err("Failed to recover the public key from the signature."))
-  }
 
-  override def recoverPublicKeyFromHash(signature: Signature, messageHash: BitVector): Attempt[PublicKey] = {
+  override def recoverPublicKeyFromHash(signature: Signature, messageHash: BitVector): Attempt[PublicKey] =
     val maybePublicKey = toECDSASignatures(signature).flatMap { sig =>
       sig.publicKey(messageHash.toByteArray).map(toPublicKey)
     }.headOption
 
     Attempt.fromOption(maybePublicKey, Err("Failed to recover the public key from the signature hash."))
-  }
 
-  override def toPublicKey(privateKey: PrivateKey): PublicKey = {
+  override def toPublicKey(privateKey: PrivateKey): PublicKey =
     val publicKeyBytes = crypto.pubKeyFromPrvKey(privateKey.value.toByteArray)
     toPublicKey(publicKeyBytes)
-  }
 
-  private def toPublicKey(publicKeyBytes: Array[Byte]): PublicKey = {
+  private def toPublicKey(publicKeyBytes: Array[Byte]): PublicKey =
     // Discovery uses 64 byte keys, without the prefix.
     val publicKey = PublicKey(BitVector(publicKeyBytes))
     assert(
@@ -150,16 +141,14 @@ class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder {
       s"Unexpected public key size: ${publicKey.value.size / 8} bytes"
     )
     publicKey
-  }
 
-  private def toPrivateKey(privateKeyBytes: Array[Byte]): PrivateKey = {
+  private def toPrivateKey(privateKeyBytes: Array[Byte]): PrivateKey =
     val privateKey = PrivateKey(BitVector(privateKeyBytes))
     assert(
       privateKey.value.size == PrivateKeyBytesSize * 8,
       s"Unexpected private key size: ${privateKey.value.size / 8} bytes"
     )
     privateKey
-  }
 
   // Apparently the `v` has to adjusted by 27, which is the negative point sign.
   private def vToWire(v: Byte): Byte =
@@ -171,16 +160,15 @@ class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder {
   private def adjustV(bytes: Array[Byte], f: Byte => Byte): Unit =
     bytes(bytes.size - 1) = f(bytes(bytes.size - 1))
 
-  private def toSignature(sig: ECDSASignature): Signature = {
+  private def toSignature(sig: ECDSASignature): Signature =
     val signatureBytes = sig.toBytes.toArray[Byte]
     assert(signatureBytes.size == SignatureBytesSize)
     adjustV(signatureBytes, vToWire)
     Signature(BitVector(signatureBytes))
-  }
 
   // Based on whether we have the recovery ID in the signature we may have to try 1 or 2 signatures.
   private def toECDSASignatures(signature: Signature): Iterable[ECDSASignature] =
-    signature.value.size / 8 match {
+    signature.value.size / 8 match
       case SignatureBytesSize =>
         val signatureBytes = signature.value.toByteArray
         adjustV(signatureBytes, wireToV)
@@ -195,10 +183,8 @@ class Secp256k1SigAlg extends SigAlg with SecureRandomBuilder {
 
       case other =>
         throw new IllegalArgumentException(s"Unexpected signature size: $other bytes")
-    }
 
   private def toECDSASignature(signatureBytes: Array[Byte]): ECDSASignature =
     ECDSASignature.fromBytes(ByteString(signatureBytes)).getOrElse {
       throw new IllegalArgumentException(s"Could not convert to ECDSA signature.")
     }
-}

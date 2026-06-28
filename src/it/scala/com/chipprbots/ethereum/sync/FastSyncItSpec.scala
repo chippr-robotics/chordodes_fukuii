@@ -4,22 +4,21 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.FlatSpecBase
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
-import com.chipprbots.ethereum.sync.FastSyncItSpec._
+import com.chipprbots.ethereum.sync.FastSyncItSpec.*
 import com.chipprbots.ethereum.sync.util.FastSyncItSpecUtils.FakePeer
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
+import com.chipprbots.ethereum.testing.Tags.*
 
-import com.chipprbots.ethereum.testing.Tags._
-
-class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
+class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll:
   implicit val testRuntime: IORuntime = IORuntime.global
 
   override def afterAll(): Unit = {
@@ -33,22 +32,19 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
   ) in customTestCaseResourceM(
     FakePeer.start3FakePeersRes()
   ) { case (peer1, peer2, peer3) =>
-    for {
+    for
       _ <- peer2.importBlocksUntil(1000)(IdentityUpdate)
       _ <- peer3.importBlocksUntil(1000)(IdentityUpdate)
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       assert(
-        peer1.blockchainReader
-          .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+        peer1.blockchainReader.getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
       )
       assert(
-        peer1.blockchainReader
-          .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+        peer1.blockchainReader.getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
       )
-    }
   }
 
   it should "sync blockchain with state nodes" taggedAs (
@@ -58,28 +54,25 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
   ) in customTestCaseResourceM(
     FakePeer.start3FakePeersRes()
   ) { case (peer1, peer2, peer3) =>
-    for {
+    for
       _ <- peer2.importBlocksUntil(1000)(updateStateAtBlock(500))
       _ <- peer3.importBlocksUntil(1000)(updateStateAtBlock(500))
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       val trie = peer1.getBestBlockTrie()
       val synchronizingPeerHaveAllData = peer1.containsExpectedDataUpToAccountAtBlock(1000, 500)
       // due to the fact that function generating state is deterministic both peer2 and peer3 ends up with exactly same
       // state, so peer1 can get whole trie from both of them.
       assert(
-        peer1.blockchainReader
-          .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+        peer1.blockchainReader.getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
       )
       assert(
-        peer1.blockchainReader
-          .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+        peer1.blockchainReader.getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
       )
       assert(trie.isDefined)
       assert(synchronizingPeerHaveAllData)
-    }
   }
 
   it should "sync blockchain with state nodes when peer do not response with full responses" taggedAs (
@@ -93,7 +86,7 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
         fakePeerCustomConfig3 = FakePeerCustomConfig(HostConfig())
       )
     ) { case (peer1, peer2, peer3, peer4) =>
-      for {
+      for
         _ <- peer2.importBlocksUntil(1000)(updateStateAtBlock(500))
         _ <- peer3.importBlocksUntil(1000)(updateStateAtBlock(500))
         _ <- peer4.importBlocksUntil(1000)(updateStateAtBlock(500))
@@ -101,22 +94,19 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
         _ <- peer1.connectToPeers(Set(peer2.node, peer3.node, peer4.node))
         _ <- peer1.startFastSync().delayBy(50.milliseconds)
         _ <- peer1.waitForFastSyncFinish()
-      } yield {
+      yield
         val trie = peer1.getBestBlockTrie()
         val synchronizingPeerHaveAllData = peer1.containsExpectedDataUpToAccountAtBlock(1000, 500)
         // due to the fact that function generating state is deterministic both peer3 and peer4 ends up with exactly same
         // state, so peer1 can get whole trie from both of them.
         assert(
-          peer1.blockchainReader
-            .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+          peer1.blockchainReader.getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
         )
         assert(
-          peer1.blockchainReader
-            .getBestBlockNumber() == peer4.blockchainReader.getBestBlockNumber() - peer4.testSyncConfig.pivotBlockOffset
+          peer1.blockchainReader.getBestBlockNumber == peer4.blockchainReader.getBestBlockNumber - peer4.testSyncConfig.pivotBlockOffset
         )
         assert(trie.isDefined)
         assert(synchronizingPeerHaveAllData)
-      }
     }
 
   it should "sync blockchain with state nodes when one of the peers send empty state responses" taggedAs (
@@ -130,7 +120,7 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
         fakePeerCustomConfig3 = FakePeerCustomConfig(HostConfig().copy(maxMptComponentsPerMessage = 0))
       )
     ) { case (peer1, peer2, peer3, peer4) =>
-      for {
+      for
         _ <- peer2.importBlocksUntil(1000)(updateStateAtBlock(500))
         _ <- peer3.importBlocksUntil(1000)(updateStateAtBlock(500))
         _ <- peer4.importBlocksUntil(1000)(updateStateAtBlock(500))
@@ -138,36 +128,32 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
         _ <- peer1.connectToPeers(Set(peer2.node, peer3.node, peer4.node))
         _ <- peer1.startFastSync().delayBy(50.milliseconds)
         _ <- peer1.waitForFastSyncFinish()
-      } yield {
+      yield
         val trie = peer1.getBestBlockTrie()
         val synchronizingPeerHaveAllData = peer1.containsExpectedDataUpToAccountAtBlock(1000, 500)
         // due to the fact that function generating state is deterministic both peer3 and peer4 ends up with exactly same
         // state, so peer1 can get whole trie from both of them.
         assert(
-          peer1.blockchainReader
-            .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+          peer1.blockchainReader.getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
         )
         assert(
-          peer1.blockchainReader
-            .getBestBlockNumber() == peer4.blockchainReader.getBestBlockNumber() - peer4.testSyncConfig.pivotBlockOffset
+          peer1.blockchainReader.getBestBlockNumber == peer4.blockchainReader.getBestBlockNumber - peer4.testSyncConfig.pivotBlockOffset
         )
         assert(trie.isDefined)
         assert(synchronizingPeerHaveAllData)
-      }
     }
 
   it should "update pivot block" taggedAs (IntegrationTest, SyncTest, SlowTest) in customTestCaseResourceM(
     FakePeer.start2FakePeersRes()
   ) { case (peer1, peer2) =>
-    for {
+    for
       _ <- peer2.importBlocksUntil(1000)(IdentityUpdate)
       _ <- peer1.connectToPeers(Set(peer2.node))
       _ <- peer2.importBlocksUntil(2000)(IdentityUpdate).start.void
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield assert(
-      peer1.blockchainReader
-        .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+    yield assert(
+      peer1.blockchainReader.getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
     )
   }
 
@@ -178,15 +164,14 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
   ) in customTestCaseResourceM(
     FakePeer.start2FakePeersRes()
   ) { case (peer1, peer2) =>
-    for {
+    for
       _ <- peer2.importBlocksUntil(1000)(IdentityUpdate)
       _ <- peer1.connectToPeers(Set(peer2.node))
       _ <- peer2.importBlocksUntil(2000)(updateStateAtBlock(1500)).start.void
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield assert(
-      peer1.blockchainReader
-        .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+    yield assert(
+      peer1.blockchainReader.getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
     )
   }
 
@@ -197,7 +182,7 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
   ) in customTestCaseResourceM(
     FakePeer.start2FakePeersRes()
   ) { case (peer1, peer2) =>
-    for {
+    for
       _ <- peer2.importBlocksUntil(2000)(updateStateAtBlock(1500))
       _ <- peer2.importBlocksUntil(3000)(updateStateAtBlock(2500, 1000, 2000))
       _ <- peer1.importBlocksUntil(2000)(updateStateAtBlock(1500))
@@ -205,16 +190,15 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
       _ <- peer1.connectToPeers(Set(peer2.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield assert(
-      peer1.blockchainReader
-        .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+    yield assert(
+      peer1.blockchainReader.getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
     )
   }
 
   it should "follow the longest chains" taggedAs (IntegrationTest, SyncTest, SlowTest) in customTestCaseResourceM(
     FakePeer.start4FakePeersRes()
   ) { case (peer1, peer2, peer3, peer4) =>
-    for {
+    for
       _ <- peer2.importBlocksUntil(1000)(IdentityUpdate)
       _ <- peer3.importBlocksUntil(1000)(IdentityUpdate)
       _ <- peer4.importBlocksUntil(1000)(IdentityUpdate)
@@ -226,22 +210,19 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node, peer4.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       val trie = peer1.getBestBlockTrie()
       val synchronizingPeerHaveAllData = peer1.containsExpectedDataUpToAccountAtBlock(3000, 1001)
       // due to the fact that function generating state is deterministic both peer3 and peer4 ends up with exactly same
       // state, so peer1 can get whole trie from both of them.
       assert(
-        peer1.blockchainReader
-          .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+        peer1.blockchainReader.getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
       )
       assert(
-        peer1.blockchainReader
-          .getBestBlockNumber() == peer4.blockchainReader.getBestBlockNumber() - peer4.testSyncConfig.pivotBlockOffset
+        peer1.blockchainReader.getBestBlockNumber == peer4.blockchainReader.getBestBlockNumber - peer4.testSyncConfig.pivotBlockOffset
       )
       assert(trie.isDefined)
       assert(synchronizingPeerHaveAllData)
-    }
   }
 
   it should "switch to regular sync once `safeDownloadTarget` is reached" taggedAs (
@@ -251,26 +232,24 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
   ) in customTestCaseResourceM(
     FakePeer.start3FakePeersRes()
   ) { case (peer1, peer2, peer3) =>
-    for {
+    for
       _ <- peer2.importBlocksUntil(1200)(IdentityUpdate)
       _ <- peer3.importBlocksUntil(1200)(IdentityUpdate)
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield assert(
-      peer1.blockchainReader
-        .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+    yield assert(
+      peer1.blockchainReader.getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
     )
   }
-}
 
-object FastSyncItSpec {
+object FastSyncItSpec:
 
   def updateWorldWithAccounts(
       startAccount: Int,
       endAccount: Int,
       world: InMemoryWorldStateProxy
-  ): InMemoryWorldStateProxy = {
+  ): InMemoryWorldStateProxy =
     val resultWorld = (startAccount until endAccount).foldLeft(world) { (world, num) =>
       val randomBalance = num
       val randomAddress = Address(num)
@@ -283,18 +262,12 @@ object FastSyncItSpec {
         .saveStorage(randomAddress, changedStorage)
     }
     InMemoryWorldStateProxy.persistState(resultWorld)
-  }
 
   def updateStateAtBlock(
       blockWithUpdate: BigInt,
       startAccount: Int = 0,
       endAccount: Int = 1000
-  ): (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy = {
+  ): (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy =
     (blockNr: BigInt, world: InMemoryWorldStateProxy) =>
-      if (blockNr == blockWithUpdate) {
-        updateWorldWithAccounts(startAccount, endAccount, world)
-      } else {
-        IdentityUpdate(blockNr, world)
-      }
-  }
-}
+      if blockNr == blockWithUpdate then updateWorldWithAccounts(startAccount, endAccount, world)
+      else IdentityUpdate(blockNr, world)

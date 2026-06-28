@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -17,19 +18,19 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum._
+import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.domain.branch.BestBranch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
-import com.chipprbots.ethereum.jsonrpc.EthBlocksService._
-import com.chipprbots.ethereum.jsonrpc.EthTxService._
+import com.chipprbots.ethereum.jsonrpc.EthBlocksService.*
+import com.chipprbots.ethereum.jsonrpc.EthTxService.*
 import com.chipprbots.ethereum.ledger.BlockQueue
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
@@ -44,17 +45,16 @@ import com.chipprbots.ethereum.utils.Config
   *   - F. Network-specific integration regression
   */
 class GasPriceOracleSpec
-    extends TestKit(ActorSystem("GasPriceOracleSpec_ActorSystem"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with OptionValues
     with MockFactory
-    with NormalPatience
-    with TypeCheckedTripleEquals {
+    with TypeCheckedTripleEquals:
 
   implicit val runtime: IORuntime = IORuntime.global
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
 
   // ─── Shared constants ──────────────────────────────────────────────────────
 
@@ -133,35 +133,34 @@ class GasPriceOracleSpec
       bestNum: BigInt,
       window: Map[BigInt, Option[Block]],
       bestBlock: Option[Block]
-  ): BlockchainReader = {
+  ): BlockchainReader =
     val r = mock[BlockchainReader]
-    val branch = if (bestNum > 0) BestBranch(zeroHash, bestNum) else EmptyBranch
-    (r.getBestBlockNumber _).expects().returning(bestNum).anyNumberOfTimes()
-    (r.getBestBranch _).expects().returning(branch).anyNumberOfTimes()
-    (r.getBestBlock _).expects().returning(bestBlock).anyNumberOfTimes()
+    val branch = if bestNum > 0 then BestBranch(zeroHash, bestNum) else EmptyBranch
+    (() => r.getBestBlockNumber).expects().returning(bestNum).anyNumberOfTimes()
+    (() => r.getBestBranch).expects().returning(branch).anyNumberOfTimes()
+    (() => r.getBestBlock).expects().returning(bestBlock).anyNumberOfTimes()
     window.foreach { case (n, bOpt) =>
-      (r.getBlockByNumber _).expects(branch, n).returning(bOpt).anyNumberOfTimes()
+      r.getBlockByNumber.expects(branch, n).returning(bOpt).anyNumberOfTimes()
     }
     r
-  }
 
   /** Window covering bestNum-20..bestNum, all empty (no txs → oracle returns floor). */
   private def emptyWindow(bestNum: BigInt): Map[BigInt, Option[Block]] =
     (BigInt(0).max(bestNum - 20) to bestNum).map(n => n -> None).toMap
 
   /** Build EthTxService with a mocked reader and given config. */
-  private def svc(reader: BlockchainReader, cfg: BlockchainConfig = defaultCfg): EthTxService = {
+  private def svc(reader: BlockchainReader, cfg: BlockchainConfig = defaultCfg): EthTxService =
     implicit val implCfg: BlockchainConfig = cfg
     val probe = TestProbe()
     new EthTxService(
       stub[Blockchain],
       reader,
       stub[Mining],
-      probe.ref,
+      probe.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
       5.seconds,
-      stub[TransactionMappingStorage]
+      stub[TransactionMappingStorage],
+      system.scheduler
     )
-  }
 
   /** Build EthBlocksService with stubbed dependencies (uses Config singleton for blockchainConfig). */
   private def blocksSvc(): EthBlocksService =
@@ -405,7 +404,7 @@ class GasPriceOracleSpec
   "getGetGasPrice()" should "return Right(GetGasPriceResponse(v)) where v ≥ 1" taggedAs (UnitTest, RPCTest) in {
     val r = mockReader(bestNum = 5, window = emptyWindow(5), bestBlock = None)
     val response = svc(r).getGetGasPrice(GetGasPriceRequest()).unsafeRunSync()
-    response shouldBe a[Right[_, _]]
+    response shouldBe a[Right[?, ?]]
     response.toOption.value.price should be >= BigInt(1)
   }
 
@@ -430,7 +429,7 @@ class GasPriceOracleSpec
 
   "maxPriorityFeePerGas()" should "return Right(MaxPriorityFeePerGasResponse(...))" taggedAs (UnitTest, RPCTest) in {
     val response = blocksSvc().maxPriorityFeePerGas(MaxPriorityFeePerGasRequest()).unsafeRunSync()
-    response shouldBe a[Right[_, _]]
+    response shouldBe a[Right[?, ?]]
   }
 
   it should "return the value from blockchainConfig.minTip (not a hardcoded literal)" taggedAs (UnitTest, RPCTest) in {
@@ -532,4 +531,3 @@ class GasPriceOracleSpec
     val highResult = svc(rHigh, ethLondonCfg).suggestGasPrice()
     highResult should be > lowResult
   }
-}

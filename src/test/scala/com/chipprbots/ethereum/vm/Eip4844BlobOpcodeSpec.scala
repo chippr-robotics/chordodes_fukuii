@@ -1,10 +1,11 @@
 package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
+
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -12,9 +13,9 @@ import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancu
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostPrague
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.FeeSchedule
+import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
 
 // scalastyle:off magic.number
 /** Tests for spec-009: ETC Olympia opcode cleanup.
@@ -26,7 +27,7 @@ import com.chipprbots.ethereum.vm.FeeSchedule
   *
   * go-ethereum reference: consensus/misc/eip4844/eip4844_test.go TestCalcBlobFee
   */
-class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers {
+class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers:
 
   // ETC Olympia config — now uses EtcOlympiaOpCodes (BLOBHASH/BLOBBASEFEE excluded)
   val etcOlympiaConfig: EvmConfig = EvmConfig.OlympiaConfigBuilder(blockchainConfig)
@@ -151,7 +152,7 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers {
       header: BlockHeader,
       config: EvmConfig,
       blobVersionedHashes: Seq[ByteString] = Seq.empty
-  ): ProgramContext[MockWorldState, MockStorage] = {
+  ): ProgramContext[MockWorldState, MockStorage] =
     val world = MockWorldState()
       .saveAccount(ownerAddr, Account(balance = UInt256(1000), nonce = 1))
       .saveCode(ownerAddr, code)
@@ -175,7 +176,6 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers {
       warmStorage = Set.empty,
       blobVersionedHashes = blobVersionedHashes
     )
-  }
 
   "EtcOlympiaOpCodes list" should {
 
@@ -416,4 +416,3 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

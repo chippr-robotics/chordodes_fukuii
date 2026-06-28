@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.domain.Address
   *
   * All methods have default no-op implementations so each tracer only overrides what it needs.
   */
-trait ExecutionTracer {
+trait ExecutionTracer:
 
   /** Called after each opcode execution in the VM exec loop. Corresponds to Besu's tracePostExecution. prevState gives
     * the pre-execution view.
@@ -76,4 +76,3 @@ trait ExecutionTracer {
 
   /** Returns the tracer-specific result as a JSON value for the RPC response. */
   def getResult: org.json4s.JValue
-}

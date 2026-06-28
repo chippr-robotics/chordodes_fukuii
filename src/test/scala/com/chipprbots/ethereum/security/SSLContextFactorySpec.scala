@@ -1,5 +1,4 @@
 package com.chipprbots.ethereum.security
-
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -7,26 +6,27 @@ import java.io.FileOutputStream
 import java.security.KeyStore
 import java.security.SecureRandom
 import javax.net.ssl.KeyManager
+import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 
+import scala.compiletime.uninitialized
 import scala.io.BufferedSource
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import javax.net.ssl.SSLContext
-import com.chipprbots.ethereum.testing.Tags._
 
-class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory with BeforeAndAfterAll {
+import com.chipprbots.ethereum.testing.Tags.*
+
+class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory with BeforeAndAfterAll:
 
   val fileName: String = "temp.txt"
-  var file: File = _
+  var file: File = uninitialized
 
-  override def beforeAll(): Unit = {
+  override def beforeAll(): Unit =
     new FileOutputStream(fileName, false).getFD
     file = new File(fileName)
-  }
 
   override def afterAll(): Unit =
     file.delete()
@@ -41,19 +41,17 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     fLoadKeyStore = () => Right(()),
     fGetKeyManager = () => Right(Array.empty),
     fGetTrustManager = () => Right(Array.empty)
-  ) {
+  ):
 
     val sslConfig: SSLConfig = SSLConfig(
       keyStorePath = keyStorePath,
       keyStoreType = keyStoreType,
       passwordFile = passwordFile
     )
-    sSLContextFactory.createSSLContext(sslConfig, new SecureRandom()) match {
+    sSLContextFactory.createSSLContext(sslConfig, new SecureRandom()) match
       case Right(ssl) =>
         ssl.getProtocol shouldBe "TLS"
       case Left(error) => fail(error.reason)
-    }
-  }
 
   it should "return a Error because keystore path and password are missing" taggedAs (UnitTest) in new TestSetup(
     existingFiles = Nil,
@@ -61,7 +59,7 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     fLoadKeyStore = () => Right(()),
     fGetKeyManager = () => Right(Array.empty),
     fGetTrustManager = () => Right(Array.empty)
-  ) {
+  ):
 
     val sslConfig: SSLConfig = SSLConfig(
       keyStorePath = keyStorePath,
@@ -70,7 +68,6 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     )
     val response: Either[SSLError, SSLContext] = sSLContextFactory.createSSLContext(sslConfig, new SecureRandom())
     response shouldBe Left(SSLError("Certificate keystore path and password file configured but files are missing"))
-  }
 
   it should "return a Error because keystore path is missing" taggedAs (UnitTest) in new TestSetup(
     existingFiles = List(passwordFile),
@@ -78,7 +75,7 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     fLoadKeyStore = () => Right(()),
     fGetKeyManager = () => Right(Array.empty),
     fGetTrustManager = () => Right(Array.empty)
-  ) {
+  ):
 
     val sslConfig: SSLConfig = SSLConfig(
       keyStorePath = keyStorePath,
@@ -87,7 +84,6 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     )
     val response: Either[SSLError, SSLContext] = sSLContextFactory.createSSLContext(sslConfig, new SecureRandom())
     response shouldBe Left(SSLError("Certificate keystore path configured but file is missing"))
-  }
 
   it should "return a Error because password file is missing" taggedAs (UnitTest) in new TestSetup(
     existingFiles = List(keyStorePath),
@@ -95,7 +91,7 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     fLoadKeyStore = () => Right(()),
     fGetKeyManager = () => Right(Array.empty),
     fGetTrustManager = () => Right(Array.empty)
-  ) {
+  ):
 
     val sslConfig: SSLConfig = SSLConfig(
       keyStorePath = keyStorePath,
@@ -104,7 +100,6 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     )
     val response: Either[SSLError, SSLContext] = sSLContextFactory.createSSLContext(sslConfig, new SecureRandom())
     response shouldBe Left(SSLError("Certificate password file configured but file is missing"))
-  }
 
   it should "return a Error because invalid KeyStore Type" taggedAs (UnitTest) in new TestSetup(
     existingFiles = List(keyStorePath, passwordFile),
@@ -112,7 +107,7 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     fLoadKeyStore = () => Right(()),
     fGetKeyManager = () => Right(Array.empty),
     fGetTrustManager = () => Right(Array.empty)
-  ) {
+  ):
 
     val invalidKeyStoreType = "invalidkeyStoreType"
     val sslConfig: SSLConfig = SSLConfig(
@@ -122,7 +117,6 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     )
     val response: Either[SSLError, SSLContext] = sSLContextFactory.createSSLContext(sslConfig, new SecureRandom())
     response shouldBe Left(SSLError(s"Certificate keystore invalid type set: $invalidKeyStoreType"))
-  }
 
   it should "return a Error because keystore file creation failed" taggedAs (UnitTest) in new TestSetup(
     existingFiles = List(keyStorePath, passwordFile),
@@ -130,7 +124,7 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     fLoadKeyStore = () => Right(()),
     fGetKeyManager = () => Right(Array.empty),
     fGetTrustManager = () => Right(Array.empty)
-  ) {
+  ):
 
     val sslConfig: SSLConfig = SSLConfig(
       keyStorePath = keyStorePath,
@@ -139,7 +133,6 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     )
     val response: Either[SSLError, SSLContext] = sSLContextFactory.createSSLContext(sslConfig, new SecureRandom())
     response shouldBe Left(SSLError("Certificate keystore file creation failed"))
-  }
 
   it should "return a Error because failed to load keystore" taggedAs (UnitTest) in new TestSetup(
     existingFiles = List(keyStorePath, passwordFile),
@@ -147,7 +140,7 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     fLoadKeyStore = () => Left(new RuntimeException("Failed to load keyStore")),
     fGetKeyManager = () => Right(Array.empty),
     fGetTrustManager = () => Right(Array.empty)
-  ) {
+  ):
 
     val sslConfig: SSLConfig = SSLConfig(
       keyStorePath = keyStorePath,
@@ -156,7 +149,6 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     )
     val response: Either[SSLError, SSLContext] = sSLContextFactory.createSSLContext(sslConfig, new SecureRandom())
     response shouldBe Left(SSLError("Failed to load keyStore"))
-  }
 
   it should "return a Error because KeyManager failure" taggedAs (UnitTest) in new TestSetup(
     existingFiles = List(keyStorePath, passwordFile),
@@ -164,7 +156,7 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     fLoadKeyStore = () => Right(()),
     fGetKeyManager = () => Left(new RuntimeException("Failed to get KeyManager")),
     fGetTrustManager = () => Right(Array.empty)
-  ) {
+  ):
 
     val sslConfig: SSLConfig = SSLConfig(
       keyStorePath = keyStorePath,
@@ -173,7 +165,6 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     )
     val response: Either[SSLError, SSLContext] = sSLContextFactory.createSSLContext(sslConfig, new SecureRandom())
     response shouldBe Left(SSLError("Invalid Certificate keystore"))
-  }
 
   it should "return a Error because TrustManager failure" taggedAs (UnitTest) in new TestSetup(
     existingFiles = List(keyStorePath, passwordFile),
@@ -181,7 +172,7 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     fLoadKeyStore = () => Right(()),
     fGetKeyManager = () => Right(Array.empty),
     fGetTrustManager = () => Left(new RuntimeException("Failed to get TrustManager"))
-  ) {
+  ):
 
     val sslConfig: SSLConfig = SSLConfig(
       keyStorePath = keyStorePath,
@@ -190,7 +181,6 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
     )
     val response: Either[SSLError, SSLContext] = sSLContextFactory.createSSLContext(sslConfig, new SecureRandom())
     response shouldBe Left(SSLError("Invalid Certificate keystore"))
-  }
 
   class TestSetup(
       existingFiles: List[String],
@@ -198,9 +188,9 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
       fLoadKeyStore: () => Either[Throwable, Unit],
       fGetKeyManager: () => Either[Throwable, Array[KeyManager]],
       fGetTrustManager: () => Either[Throwable, Array[TrustManager]]
-  ) {
+  ):
 
-    val sSLContextFactory: SSLContextFactory = new SSLContextFactory {
+    val sSLContextFactory: SSLContextFactory = new SSLContextFactory:
 
       override def exist(pathName: String): Boolean = existingFiles.contains(pathName)
 
@@ -225,6 +215,3 @@ class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory w
 
       override def getTrustManager(keyStore: KeyStore): Either[Throwable, Array[TrustManager]] =
         fGetTrustManager()
-    }
-  }
-}

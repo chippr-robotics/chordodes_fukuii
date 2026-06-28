@@ -2,14 +2,14 @@ package com.chipprbots.ethereum.sync.util
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed
-import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
 import cats.effect.Resource
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
@@ -31,19 +31,19 @@ import com.chipprbots.ethereum.consensus.pow
 import com.chipprbots.ethereum.consensus.pow.EthashConfig
 import com.chipprbots.ethereum.consensus.pow.PoWMining
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.ledger._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.ledger.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.nodebuilder.VmSetup
 import com.chipprbots.ethereum.ommers.OmmersPool
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
 import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.FakePeerCustomConfig.defaultConfig
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.utils.*
 
-object RegularSyncItSpecUtils {
+object RegularSyncItSpecUtils:
 
-  class ValidatorsExecutorAlwaysSucceed extends MockValidatorsAlwaysSucceed {
+  class ValidatorsExecutorAlwaysSucceed extends MockValidatorsAlwaysSucceed:
     override def validateBlockAfterExecution(
         block: Block,
         stateRootHash: ByteString,
@@ -52,14 +52,13 @@ object RegularSyncItSpecUtils {
     )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockExecutionSuccess] = Right(
       BlockExecutionSuccess
     )
-  }
 
   object ValidatorsExecutorAlwaysSucceed extends ValidatorsExecutorAlwaysSucceed
 
   class FakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig)
-      extends CommonFakePeer(peerName, fakePeerCustomConfig) {
+      extends CommonFakePeer(peerName, fakePeerCustomConfig):
 
-    def buildEthashMining(): pow.PoWMining = {
+    def buildEthashMining(): pow.PoWMining =
       val miningConfig: MiningConfig = MiningConfig(Config.config)
       val specificConfig: EthashConfig = pow.EthashConfig(config)
       val fullConfig = FullMiningConfig(miningConfig, specificConfig)
@@ -75,11 +74,10 @@ object RegularSyncItSpecUtils {
           NoAdditionalPoWData
         )
       mining
-    }
 
-    lazy val peersClient: ActorRef =
-      system.actorOf(
-        PeersClient.props(etcPeerManager, peerEventBus, blacklist, testSyncConfig, system.scheduler),
+    lazy val peersClient: typed.ActorRef[PeersClient.Command] =
+      system.spawn(
+        PeersClient.behavior(etcPeerManager, peerEventBus, blacklist, testSyncConfig),
         "peers-client"
       )
 
@@ -110,72 +108,107 @@ object RegularSyncItSpecUtils {
       IORuntime.global
     )
 
-    lazy val ommersPool: ActorRef = system.actorOf(OmmersPool.props(blockchainReader, 1), "ommers-pool")
+    lazy val ommersPool: typed.ActorRef[OmmersPool.Command] =
+      system.spawn(OmmersPool(blockchainReader, 1), "ommers-pool")
 
-    lazy val pendingTransactionsManager: ActorRef = system.actorOf(
-      PendingTransactionsManager.props(TxPoolConfig(config), peerManager, etcPeerManager, peerEventBus),
+    lazy val pendingTxTopic: typed.ActorRef[
+      org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewPendingTransaction]
+    ] = system.spawn(
+      org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewPendingTransaction](
+        "pending-tx-topic"
+      ),
+      "pending-tx-topic"
+    )
+
+    lazy val pendingTransactionsManager: typed.ActorRef[PendingTransactionsManager.Command] = system.spawn(
+      PendingTransactionsManager(TxPoolConfig(config), peerManager, etcPeerManager, peerEventBus, pendingTxTopic),
       "pending-transactions-manager"
+    )
+
+    lazy val blockTopic: typed.ActorRef[
+      org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+    ] = system.spawn(
+      org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
+        "block-imported-topic"
+      ),
+      "block-imported-topic"
     )
 
     lazy val validators: ValidatorsExecutor = buildEthashMining().validators
 
-    val broadcasterRef: ActorRef = system.actorOf(
-      BlockBroadcasterActor
-        .props(
+    val broadcasterRef: typed.ActorRef[BlockBroadcasterActor.BroadcasterMsg] =
+      system.spawn(
+        BlockBroadcasterActor.apply(
           new BlockBroadcast(etcPeerManager),
           peerEventBus,
           etcPeerManager,
           blacklist,
-          syncConfig,
-          system.scheduler
+          syncConfig
         ),
-      "block-broadcaster"
-    )
+        "block-broadcaster"
+      )
 
     val fetcher: typed.ActorRef[BlockFetcher.FetchCommand] =
       system.spawn(
-        BlockFetcher(peersClient, peerEventBus, regularSync, syncConfig, validators.blockValidator),
+        BlockFetcher(
+          peersClient,
+          peerEventBus,
+          regularSync.toTyped[RegularSync.ProgressProtocol],
+          syncConfig,
+          validators.blockValidator
+        ),
         "block-fetcher"
       )
 
-    lazy val blockImporter: ActorRef = system.actorOf(
-      BlockImporter.props(
-        fetcher.toClassic,
-        consensusAdapter,
-        blockchainReader,
-        blockchainWriter,
-        storagesInstance.storages.stateStorage,
-        storagesInstance.storages.evmCodeStorage,
-        new BranchResolution(blockchainReader),
-        syncConfig,
-        ommersPool,
-        broadcasterRef,
-        pendingTransactionsManager,
-        regularSync,
-        this
+    lazy val blockImporter: typed.ActorRef[BlockImporter.Command] =
+      system.spawn(
+        BlockImporter.apply(
+          fetcher,
+          consensusAdapter,
+          blockchainReader,
+          blockchainWriter,
+          storagesInstance.storages.stateStorage,
+          storagesInstance.storages.evmCodeStorage,
+          new BranchResolution(blockchainReader),
+          syncConfig,
+          ommersPool,
+          broadcasterRef,
+          pendingTransactionsManager,
+          blockTopic,
+          regularSync.toTyped[RegularSync.Command],
+          peerEventBus.toClassic,
+          etcPeerManager,
+          bl,
+          blacklist,
+          this
+        ),
+        "block-importer"
       )
-    )
 
-    lazy val regularSync: ActorRef = system.actorOf(
-      RegularSync.props(
-        peersClient,
-        etcPeerManager,
-        peerEventBus,
-        consensusAdapter,
-        blockchainReader,
-        blockchainWriter,
-        storagesInstance.storages.stateStorage,
-        storagesInstance.storages.evmCodeStorage,
-        new BranchResolution(blockchainReader),
-        validators.blockValidator,
-        blacklist,
-        testSyncConfig,
-        ommersPool,
-        pendingTransactionsManager,
-        system.scheduler,
-        this
+    lazy val regularSync: ActorRef = system
+      .spawnAnonymous(
+        RegularSync.apply(
+          peersClient,
+          etcPeerManager,
+          peerEventBus.toClassic,
+          consensusAdapter,
+          bl,
+          blockchainReader,
+          blockchainWriter,
+          storagesInstance.storages.stateStorage,
+          storagesInstance.storages.evmCodeStorage,
+          new BranchResolution(blockchainReader),
+          validators.blockValidator,
+          blacklist,
+          testSyncConfig,
+          ommersPool,
+          pendingTransactionsManager,
+          blockTopic,
+          this,
+          system.toTyped.ignoreRef[com.chipprbots.ethereum.blockchain.sync.SyncController.Command]
+        )
       )
-    )
+      .toClassic
 
     def startRegularSync(): IO[Unit] = IO {
       regularSync ! SyncProtocol.Start
@@ -184,13 +217,13 @@ object RegularSyncItSpecUtils {
     def broadcastBlock(
         blockNumber: Option[Int] = None
     )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
-      IO(blockNumber match {
+      IO(blockNumber match
         case Some(bNumber) =>
           blockchainReader
-            .getBlockByNumber(blockchainReader.getBestBranch(), bNumber)
+            .getBlockByNumber(blockchainReader.getBestBranch, bNumber)
             .getOrElse(throw new RuntimeException(s"block by number: $bNumber doesn't exist"))
-        case None => blockchainReader.getBestBlock().get
-      }).flatMap { block =>
+        case None => blockchainReader.getBestBlock.get
+      ).flatMap { block =>
         IO {
           val currentWeight = blockchainReader
             .getChainWeightByHash(block.hash)
@@ -201,21 +234,20 @@ object RegularSyncItSpecUtils {
         }
       }
 
-    def waitForRegularSyncLoadLastBlock(blockNumber: BigInt): IO[Boolean] = {
+    def waitForRegularSyncLoadLastBlock(blockNumber: BigInt): IO[Boolean] =
       // Scale timeout based on block number - larger syncs need more time
       // Use minimum 90 retries, but add 1 retry per 20 blocks for large syncs
       val baseRetries = 90
-      val additionalRetries = if (blockNumber > 1000) ((blockNumber - 1000) / 20).toInt else 0
+      val additionalRetries = if blockNumber > 1000 then ((blockNumber - 1000) / 20).toInt else 0
       val maxRetries = baseRetries + additionalRetries
-      retryUntilWithDelay(IO(blockchainReader.getBestBlockNumber() == blockNumber), 1.second, maxRetries)(isDone =>
+      retryUntilWithDelay(IO(blockchainReader.getBestBlockNumber == blockNumber), 1.second, maxRetries)(isDone =>
         isDone
       )
-    }
 
     def mineNewBlock(
         plusDifficulty: BigInt = 0
     )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] = IO {
-      val block: Block = blockchainReader.getBestBlock().get
+      val block: Block = blockchainReader.getBestBlock.get
       val currentWeight = blockchainReader
         .getChainWeightByHash(block.hash)
         .getOrElse(throw new RuntimeException(s"ChainWeight by hash: ${block.hash} doesn't exist"))
@@ -228,17 +260,17 @@ object RegularSyncItSpecUtils {
     def mineNewBlocks(delay: FiniteDuration, nBlocks: Int)(
         updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy
     ): IO[Unit] =
-      if (nBlocks > 0) {
+      if nBlocks > 0 then
         mineNewBlock()(updateWorldForBlock)
           .delayBy(delay)
           .flatMap(_ => mineNewBlocks(delay, nBlocks - 1)(updateWorldForBlock))
-      } else IO(())
+      else IO(())
 
     private def getMptForBlock(block: Block) =
       InMemoryWorldStateProxy(
         storagesInstance.storages.evmCodeStorage,
         bl.getBackingMptStorage(block.number),
-        (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+        (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
         UInt256.Zero,
         ByteString(MerklePatriciaTrie.EmptyRootHash),
         noEmptyAccounts = false,
@@ -255,29 +287,27 @@ object RegularSyncItSpecUtils {
         plusDifficulty: BigInt = 0
     )(
         updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy
-    ): (Block, ChainWeight, InMemoryWorldStateProxy) = {
+    ): (Block, ChainWeight, InMemoryWorldStateProxy) =
       val newBlockNumber = parent.header.number + 1
       val newWorld = updateWorldForBlock(newBlockNumber, parentWorld)
       val newBlock = parent.copy(header =
         parent.header.copy(
           parentHash = parent.header.hash,
           number = newBlockNumber,
-          stateRoot = newWorld.stateRootHash,
-          difficulty = plusDifficulty + parent.header.difficulty
+          stateRoot = TrieRoot(newWorld.stateRootHash),
+          difficulty = Difficulty(plusDifficulty) + parent.header.difficulty
         )
       )
       val newWeight = parentWeight.increase(newBlock.header)
       (newBlock, newWeight, parentWorld)
-    }
-  }
 
-  object FakePeer {
+  object FakePeer:
 
     def startFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig): IO[FakePeer] =
-      for {
+      for
         peer <- IO(new FakePeer(peerName, fakePeerCustomConfig))
         _ <- peer.startPeer()
-      } yield peer
+      yield peer
 
     def start1FakePeerRes(
         fakePeerCustomConfig: FakePeerCustomConfig = defaultConfig,
@@ -293,10 +323,7 @@ object RegularSyncItSpecUtils {
         fakePeerCustomConfig1: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig2: FakePeerCustomConfig = defaultConfig
     ): Resource[IO, (FakePeer, FakePeer)] =
-      for {
+      for
         peer1 <- start1FakePeerRes(fakePeerCustomConfig1, "Peer1")
         peer2 <- start1FakePeerRes(fakePeerCustomConfig2, "Peer2")
-      } yield (peer1, peer2)
-
-  }
-}
+      yield (peer1, peer2)

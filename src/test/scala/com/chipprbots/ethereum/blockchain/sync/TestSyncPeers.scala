@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -9,19 +10,24 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 
-trait TestSyncPeers { self: TestSyncConfig =>
+trait TestSyncPeers:
+  self: TestSyncConfig =>
   implicit def system: ActorSystem
 
   val peer1TestProbe: TestProbe = TestProbe("peer1")(system)
   val peer2TestProbe: TestProbe = TestProbe("peer2")(system)
   val peer3TestProbe: TestProbe = TestProbe("peer3")(system)
 
-  val peer1: Peer = Peer(PeerId("peer1"), new InetSocketAddress("127.0.0.1", 0), peer1TestProbe.ref, false)
-  val peer2: Peer = Peer(PeerId("peer2"), new InetSocketAddress("127.0.0.2", 0), peer2TestProbe.ref, false)
-  val peer3: Peer = Peer(PeerId("peer3"), new InetSocketAddress("127.0.0.3", 0), peer3TestProbe.ref, false)
+  val peer1: Peer =
+    Peer(PeerId("peer1"), new InetSocketAddress("127.0.0.1", 0), peer1TestProbe.ref.toTyped[PeerActor.Command], false)
+  val peer2: Peer =
+    Peer(PeerId("peer2"), new InetSocketAddress("127.0.0.2", 0), peer2TestProbe.ref.toTyped[PeerActor.Command], false)
+  val peer3: Peer =
+    Peer(PeerId("peer3"), new InetSocketAddress("127.0.0.3", 0), peer3TestProbe.ref.toTyped[PeerActor.Command], false)
 
   // Use ETH66 (not ETH68) because fast sync tests require GetNodeData-compatible peers.
   // GetNodeData was removed in ETH68 per EIP-4938.
@@ -72,4 +78,3 @@ trait TestSyncPeers { self: TestSyncConfig =>
       bestBlockHash = peer1Status.bestHash
     )
   )
-}

@@ -5,7 +5,7 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks
 import com.chipprbots.ethereum.vm.PrecompiledContracts.ModExp
@@ -22,45 +22,41 @@ import com.chipprbots.ethereum.vm.PrecompiledContracts.ModExp
   *
   * EIP-7823: Post-Olympia, ModExp rejects operands > 1024 bytes.
   */
-class ModExpEIP7883GasSpec extends AnyFlatSpec with Matchers {
+class ModExpEIP7883GasSpec extends AnyFlatSpec with Matchers:
 
   val etcForkOlympia: EtcForks.Value = EtcForks.Olympia
   val etcForkSpiral: EtcForks.Value = EtcForks.Spiral
   val ethFork: EthForks.Value = EthForks.Berlin
 
   /** Builds a ModExp input: 3x32-byte length headers + zero-filled operands. */
-  private def buildModExpInput(baseLen: Int, expLen: Int, modLen: Int): ByteString = {
-    def toBytes32(n: Int): ByteString = {
+  private def buildModExpInput(baseLen: Int, expLen: Int, modLen: Int): ByteString =
+    def toBytes32(n: Int): ByteString =
       val arr = new Array[Byte](32)
       arr(28) = ((n >> 24) & 0xff).toByte
       arr(29) = ((n >> 16) & 0xff).toByte
       arr(30) = ((n >> 8) & 0xff).toByte
       arr(31) = (n & 0xff).toByte
       ByteString(arr)
-    }
     toBytes32(baseLen) ++ toBytes32(expLen) ++ toBytes32(modLen) ++
       ByteString(new Array[Byte](baseLen)) ++
       ByteString(new Array[Byte](expLen)) ++
       ByteString(new Array[Byte](modLen))
-  }
 
   /** Builds ModExp input with a specific exponent value (first 32 bytes of exp). */
-  private def buildModExpInputWithExp(baseLen: Int, expLen: Int, modLen: Int, expFirstByte: Byte): ByteString = {
-    def toBytes32(n: Int): ByteString = {
+  private def buildModExpInputWithExp(baseLen: Int, expLen: Int, modLen: Int, expFirstByte: Byte): ByteString =
+    def toBytes32(n: Int): ByteString =
       val arr = new Array[Byte](32)
       arr(28) = ((n >> 24) & 0xff).toByte
       arr(29) = ((n >> 16) & 0xff).toByte
       arr(30) = ((n >> 8) & 0xff).toByte
       arr(31) = (n & 0xff).toByte
       ByteString(arr)
-    }
     val expData = new Array[Byte](expLen)
-    if (expLen > 0) expData(0) = expFirstByte
+    if expLen > 0 then expData(0) = expFirstByte
     toBytes32(baseLen) ++ toBytes32(expLen) ++ toBytes32(modLen) ++
       ByteString(new Array[Byte](baseLen)) ++
       ByteString(expData) ++
       ByteString(new Array[Byte](modLen))
-  }
 
   "ModExp gas (EIP-7883)" should "return minimum gas of 500 for small inputs" taggedAs (OlympiaTest, VMTest) in {
     // All zero operands of length 1 — x=1, x<=32 so multComplexity=16
@@ -116,5 +112,4 @@ class ModExpEIP7883GasSpec extends AnyFlatSpec with Matchers {
     val cost = ModExp.gas(input, etcForkSpiral, ethFork)
     cost shouldBe BigInt(341)
   }
-}
 // scalastyle:on magic.number

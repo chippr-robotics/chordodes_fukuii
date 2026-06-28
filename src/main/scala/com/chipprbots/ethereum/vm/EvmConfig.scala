@@ -9,10 +9,10 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm
 
-import EvmConfig._
+import EvmConfig.*
 
 // scalastyle:off magic.number
-object EvmConfig {
+object EvmConfig:
 
   type EvmConfigBuilder = BlockchainConfigForEvm => EvmConfig
 
@@ -29,45 +29,40 @@ object EvmConfig {
 
   /** returns the evm config for a given block, applying timestamp-based fork overrides for post-merge ETH chains.
     */
-  def forBlock(blockNumber: BigInt, timestamp: Long, blockchainConfig: BlockchainConfig): EvmConfig = {
+  def forBlock(blockNumber: BigInt, timestamp: Long, blockchainConfig: BlockchainConfig): EvmConfig =
     var config = forBlock(blockNumber, blockchainConfig)
     // Apply timestamp-based fork upgrades for ETH chains
-    if (blockchainConfig.isShanghaiTimestamp(timestamp)) {
+    if blockchainConfig.isShanghaiTimestamp(timestamp) then
       config = config.copy(
         opCodeList = SpiralOpCodes, // Adds PUSH0 (EIP-3855)
         eip3651Enabled = true, // Warm COINBASE
         eip3860Enabled = true // Initcode metering
       )
-    }
-    if (blockchainConfig.isCancunTimestamp(timestamp)) {
+    if blockchainConfig.isCancunTimestamp(timestamp) then
       config = config.copy(
         opCodeList = OlympiaOpCodes, // Adds TSTORE/TLOAD/MCOPY/BLOBHASH/BLOBBASEFEE
         feeSchedule = new FeeSchedule.OlympiaFeeSchedule,
         eip6780Enabled = true // SELFDESTRUCT restriction
       )
-    }
-    if (blockchainConfig.isPragueTimestamp(timestamp)) {
+    if blockchainConfig.isPragueTimestamp(timestamp) then
       config = config.copy(
         feeSchedule = new FeeSchedule.PragueFeeSchedule // EIP-7623: increased calldata costs
       )
-    }
-    if (blockchainConfig.isOsakaTimestamp(timestamp)) {
+    if blockchainConfig.isOsakaTimestamp(timestamp) then
       config = config.copy(
         feeSchedule = new FeeSchedule.OsakaFeeSchedule,
         opCodeList = OsakaOpCodes // EIP-7939: CLZ opcode
       )
-    }
     config
-  }
 
   /** returns the evm config that should be used for given block
     */
-  def forBlock(blockNumber: BigInt, blockchainConfig: BlockchainConfigForEvm): EvmConfig = {
+  def forBlock(blockNumber: BigInt, blockchainConfig: BlockchainConfigForEvm): EvmConfig =
     // When ETC-specific forks (Spiral, Mystique) activate AFTER Olympia, the chain follows
     // standard Ethereum fork schedule where London only activates EIP-1559/3529/3541.
     // On ETC, Spiral < Olympia in the fork sequence, so Olympia bundles all EIPs.
     val etcForksDisabled = blockchainConfig.spiralBlockNumber > blockchainConfig.olympiaBlockNumber
-    val olympiaBuilder = if (etcForksDisabled) LondonConfigBuilder else OlympiaConfigBuilder
+    val olympiaBuilder = if etcForksDisabled then LondonConfigBuilder else OlympiaConfigBuilder
 
     val transitionBlockToConfigWithPriorityMapping: List[(BigInt, Int, EvmConfigBuilder)] = List(
       (blockchainConfig.frontierBlockNumber, 1, FrontierConfigBuilder),
@@ -98,7 +93,6 @@ object EvmConfig {
       ._3
 
     evmConfigBuilder(blockchainConfig)
-  }
 
   val FrontierOpCodes: OpCodeList = OpCodeList(OpCodes.FrontierOpCodes)
   val HomesteadOpCodes: OpCodeList = OpCodeList(OpCodes.HomesteadOpCodes)
@@ -221,12 +215,9 @@ object EvmConfig {
       eip6780Enabled = true
     )
 
-  case class OpCodeList(opCodes: List[OpCode]) {
+  case class OpCodeList(opCodes: List[OpCode]):
     val byteToOpCode: Map[Byte, OpCode] =
       opCodes.map(op => op.code -> op).toMap
-  }
-
-}
 
 case class EvmConfig(
     blockchainConfig: BlockchainConfigForEvm,
@@ -242,10 +233,10 @@ case class EvmConfig(
     eip3860Enabled: Boolean = false,
     eip6049DeprecationEnabled: Boolean = false,
     eip6780Enabled: Boolean = false
-) {
+):
 
-  import feeSchedule._
-  import EvmConfig._
+  import feeSchedule.*
+  import EvmConfig.*
 
   def opCodes: List[OpCode] =
     opCodeList.opCodes
@@ -264,22 +255,17 @@ case class EvmConfig(
     * @return
     *   gas cost
     */
-  def calcMemCost(memSize: BigInt, offset: BigInt, dataSize: BigInt): BigInt = {
+  def calcMemCost(memSize: BigInt, offset: BigInt, dataSize: BigInt): BigInt =
 
     /** See YP H.1 (222) */
-    def c(m: BigInt): BigInt = {
+    def c(m: BigInt): BigInt =
       val a = wordsForBytes(m)
       G_memory * a + a * a / 512
-    }
 
-    val memNeeded = if (dataSize == 0) BigInt(0) else offset + dataSize
-    if (memNeeded > MaxMemory)
-      UInt256.MaxValue / 2
-    else if (memNeeded <= memSize)
-      0
-    else
-      c(memNeeded) - c(memSize)
-  }
+    val memNeeded = if dataSize == 0 then BigInt(0) else offset + dataSize
+    if memNeeded > MaxMemory then UInt256.MaxValue / 2
+    else if memNeeded <= memSize then 0
+    else c(memNeeded) - c(memSize)
 
   /** Calculates transaction intrinsic gas. See YP section 6.2
     */
@@ -288,7 +274,7 @@ case class EvmConfig(
       isContractCreation: Boolean,
       accessList: Seq[AccessListItem],
       authorizationListSize: Int = 0
-  ): BigInt = {
+  ): BigInt =
     val txDataZero = txData.count(_ == 0)
     val txDataNonZero = txData.length - txDataZero
 
@@ -299,14 +285,13 @@ case class EvmConfig(
     // EIP-7702: Per-authorization intrinsic gas = PER_AUTH_BASE_COST (25000) per EIP spec
     val authListPrice: BigInt = BigInt(authorizationListSize) * BigInt(25000)
 
-    val initCodeCost: BigInt = if (isContractCreation) calcInitCodeCost(txData) else BigInt(0)
+    val initCodeCost: BigInt = if isContractCreation then calcInitCodeCost(txData) else BigInt(0)
 
     txDataZero * G_txdatazero +
       txDataNonZero * G_txdatanonzero + accessListPrice + authListPrice +
-      (if (isContractCreation) G_txcreate else 0) +
+      (if isContractCreation then G_txcreate else 0) +
       G_transaction +
       initCodeCost
-  }
 
   /** If the initialization code completes successfully, a final contract-creation cost is paid, the code-deposit cost,
     * proportional to the size of the created contract’s code. See YP equation (96)
@@ -330,7 +315,7 @@ case class EvmConfig(
   /** EIP-3860: Maximum initcode size (2 * MAX_CODE_SIZE)
     */
   def maxInitCodeSize: Option[BigInt] =
-    if (eip3860Enabled) maxCodeSize.map(_ * 2) else None
+    if eip3860Enabled then maxCodeSize.map(_ * 2) else None
 
   /** EIP-3860: Calculate gas cost for initcode
     * @param initCode
@@ -339,17 +324,14 @@ case class EvmConfig(
     *   Gas cost (INITCODE_WORD_COST * ceil(len(initcode) / 32))
     */
   def calcInitCodeCost(initCode: ByteString): BigInt =
-    if (eip3860Enabled) {
+    if eip3860Enabled then
       val words = wordsForBytes(initCode.size)
       feeSchedule.G_initcode_word * words
-    } else {
-      BigInt(0)
-    }
-}
+    else BigInt(0)
 
-object FeeSchedule {
+object FeeSchedule:
 
-  class FrontierFeeSchedule extends FeeSchedule {
+  class FrontierFeeSchedule extends FeeSchedule:
     override val G_zero = 0
     override val G_base = 2
     override val G_verylow = 3
@@ -394,23 +376,19 @@ object FeeSchedule {
     override val G_access_list_storage = 1900
     // note: initcode metering does not exist until spiral hard fork (EIP-3860)
     override val G_initcode_word = 0
-  }
 
-  class HomesteadFeeSchedule extends FrontierFeeSchedule {
+  class HomesteadFeeSchedule extends FrontierFeeSchedule:
     override val G_txcreate = 32000
-  }
 
-  class PostEIP150FeeSchedule extends HomesteadFeeSchedule {
+  class PostEIP150FeeSchedule extends HomesteadFeeSchedule:
     override val G_sload = 200
     override val G_call = 700
     override val G_balance = 400
     override val G_selfdestruct = 5000
     override val G_extcode = 700
-  }
 
-  class PostEIP160FeeSchedule extends PostEIP150FeeSchedule {
+  class PostEIP160FeeSchedule extends PostEIP150FeeSchedule:
     override val G_expbyte = 50
-  }
 
   class ByzantiumFeeSchedule extends PostEIP160FeeSchedule
 
@@ -420,21 +398,19 @@ object FeeSchedule {
 
   class AghartaFeeSchedule extends ByzantiumFeeSchedule
 
-  class PhoenixFeeSchedule extends AghartaFeeSchedule {
+  class PhoenixFeeSchedule extends AghartaFeeSchedule:
     override val G_sload: BigInt = 800
     override val G_balance: BigInt = 700
     override val G_txdatanonzero = 16
-  }
 
-  class MagnetoFeeSchedule extends PhoenixFeeSchedule {
+  class MagnetoFeeSchedule extends PhoenixFeeSchedule:
     override val G_sload: BigInt = G_warm_storage_read
     override val G_sreset: BigInt = 5000 - G_cold_sload
     override val G_sset: BigInt = 20000 // EIP-2929: G_sset remains 20000, cold access cost added separately in SSTORE
     override val G_access_list_address: BigInt = 2400
     override val G_access_list_storage: BigInt = 1900
-  }
 
-  class MystiqueFeeSchedule extends MagnetoFeeSchedule {
+  class MystiqueFeeSchedule extends MagnetoFeeSchedule:
     // EIP-3529: Reduce refunds for SSTORE
     // R_sclear = SSTORE_RESET_GAS + ACCESS_LIST_STORAGE_KEY_COST = 2900 + 1900 = 4800
     override val R_sclear: BigInt = 4800
@@ -442,7 +418,6 @@ object FeeSchedule {
     override val R_selfdestruct: BigInt = 0
     // EIP-3860: Initcode metering (activated in Spiral fork)
     override val G_initcode_word: BigInt = 2
-  }
 
   class OlympiaFeeSchedule extends MystiqueFeeSchedule
 
@@ -456,9 +431,8 @@ object FeeSchedule {
     * inside the MODEXP precompile itself, not the fee schedule.
     */
   class OsakaFeeSchedule extends PragueFeeSchedule
-}
 
-trait FeeSchedule {
+trait FeeSchedule:
   val G_zero: BigInt
   val G_base: BigInt
   val G_verylow: BigInt
@@ -500,4 +474,3 @@ trait FeeSchedule {
   val G_access_list_address: BigInt
   val G_access_list_storage: BigInt
   val G_initcode_word: BigInt
-}

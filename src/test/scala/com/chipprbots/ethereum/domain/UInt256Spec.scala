@@ -6,11 +6,11 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.prop.TableFor2
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.domain.UInt256._
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.vm.Generators._
+import com.chipprbots.ethereum.domain.UInt256.*
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.vm.Generators.*
 
-class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
+class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks:
 
   val Modulus: BigInt = UInt256.MaxValue.toBigInt + 1
   val MaxSignedValue: BigInt = Modulus / 2 - 1
@@ -23,11 +23,11 @@ class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
     .map { case Seq(n1, n2) => n1 -> n2 }
     .toSeq
 
-  val specialCases: TableFor2[BigInt, BigInt] = Table(("n1", "n2"), pairs: _*)
+  val specialCases: TableFor2[BigInt, BigInt] = Table(("n1", "n2"), pairs*)
 
-  def toSignedBigInt(n: BigInt): BigInt = if (n > MaxSignedValue) n - Modulus else n
+  def toSignedBigInt(n: BigInt): BigInt = if n > MaxSignedValue then n - Modulus else n
 
-  def toUnsignedBigInt(n: BigInt): BigInt = if (n < 0) n + Modulus else n
+  def toUnsignedBigInt(n: BigInt): BigInt = if n < 0 then n + Modulus else n
 
   /** For each operation (op) tests check a following property: For two BigInts (n1, n2): UInt256(n1) op UInt256(n2) ==
     * UInt256(n1 op n2)
@@ -63,7 +63,7 @@ class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
     forAll(bigIntGen) { (n: BigInt) =>
       assert(~UInt256(n) == UInt256(~n))
     }
-    forAll(Table("n", specialNumbers: _*)) { (n: BigInt) =>
+    forAll(Table("n", specialNumbers*)) { (n: BigInt) =>
       assert(~UInt256(n) == UInt256(~n))
     }
   }
@@ -72,7 +72,7 @@ class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
     forAll(bigIntGen) { (n: BigInt) =>
       assert(-UInt256(n) == UInt256(-n))
     }
-    forAll(Table("n", specialNumbers: _*)) { (n: BigInt) =>
+    forAll(Table("n", specialNumbers*)) { (n: BigInt) =>
       assert(-UInt256(n) == UInt256(-n))
     }
     assert(-UInt256(1) == UInt256(-1))
@@ -285,7 +285,7 @@ class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
 
     val uint256Gen = getUInt256Gen()
 
-    forAll(Table("comparators", comparators: _*)) { cmp =>
+    forAll(Table("comparators", comparators*)) { cmp =>
       forAll(uint256Gen, uint256Gen) { (a, b) =>
         assert(cmp.uint(a, b) == cmp.bi(a.toBigInt, b.toBigInt))
       }
@@ -342,9 +342,8 @@ class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
     }
 
     forAll(getUInt256Gen(min = UInt256(1))) { x =>
-      import math._
+      import math.*
       val byteSize = 1 + floor(log(x.doubleValue) / log(256)).toInt
       assert(x.byteSize === byteSize)
     }
   }
-}

@@ -7,10 +7,11 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import Generators._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+import Generators.*
+
+class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
 
   val CodeSize = Byte.MaxValue
   val PositionsSize = 10
@@ -24,7 +25,7 @@ class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyCheck
   it should "detect all jump destinations if there are no push op" taggedAs (UnitTest, VMTest) in {
     forAll(positionsSetGen) { jumpDestLocations =>
       val code = ByteString((0 to CodeSize).map { i =>
-        if (jumpDestLocations.contains(i)) JUMPDEST.code
+        if jumpDestLocations.contains(i) then JUMPDEST.code
         else nonPushOp
       }.toArray)
       val program = Program(code)
@@ -35,8 +36,8 @@ class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyCheck
   it should "detect all jump destinations if there are push op" taggedAs (UnitTest, VMTest) in {
     forAll(positionsSetGen, positionsSetGen) { (jumpDestLocations, pushOpLocations) =>
       val code = ByteString((0 to CodeSize).map { i =>
-        if (jumpDestLocations.contains(i)) JUMPDEST.code
-        else if (pushOpLocations.contains(i)) PUSH1.code
+        if jumpDestLocations.contains(i) then JUMPDEST.code
+        else if pushOpLocations.contains(i) then PUSH1.code
         else nonPushOp
       }.toArray)
       val program = Program(code)
@@ -48,7 +49,7 @@ class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyCheck
         .toList
         .sorted
         .foldLeft(List.empty[Int]) { case (recPushOpLocations, i) =>
-          if (recPushOpLocations.lastOption.contains(i - 1)) recPushOpLocations else recPushOpLocations :+ i
+          if recPushOpLocations.lastOption.contains(i - 1) then recPushOpLocations else recPushOpLocations :+ i
         }
 
       val jumpDestLocationsWithoutPushBefore = jumpDestLocations
@@ -61,8 +62,8 @@ class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyCheck
   it should "detect all jump destinations if there are invalid ops" taggedAs (UnitTest, VMTest) in {
     forAll(positionsSetGen, positionsSetGen) { (jumpDestLocations, invalidOpLocations) =>
       val code = ByteString((0 to CodeSize).map { i =>
-        if (jumpDestLocations.contains(i)) JUMPDEST.code
-        else if (invalidOpLocations.contains(i)) invalidOpCode
+        if jumpDestLocations.contains(i) then JUMPDEST.code
+        else if invalidOpLocations.contains(i) then invalidOpCode
         else nonPushOp
       }.toArray)
       val program = Program(code)
@@ -75,4 +76,3 @@ class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyCheck
     val program = Program(code)
     program.validJumpDestinations shouldBe (0 to CodeSize).toSet
   }
-}

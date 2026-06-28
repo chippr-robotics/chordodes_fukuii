@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.faucet
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.Config
 
@@ -12,8 +12,8 @@ case class SupervisorConfig(
     attempts: Int,
     delay: FiniteDuration
 )
-object SupervisorConfig {
-  def apply(typesafeConfig: Config): SupervisorConfig = {
+object SupervisorConfig:
+  def apply(typesafeConfig: Config): SupervisorConfig =
     val supervisorConfig = typesafeConfig.getConfig("supervisor")
 
     SupervisorConfig(
@@ -24,6 +24,3 @@ object SupervisorConfig {
       supervisorConfig.getInt("attempts"),
       supervisorConfig.getDuration("delay").toMillis.millis
     )
-
-  }
-}

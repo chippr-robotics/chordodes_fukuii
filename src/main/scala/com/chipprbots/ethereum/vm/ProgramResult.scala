@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.vm
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.TxLogEntry
 
 /** Represenation of the result of execution of a contract
@@ -30,6 +31,6 @@ case class ProgramResult[W <: WorldStateProxy[W, S], S <: Storage[S]](
     gasRefund: BigInt,
     error: Option[ProgramError],
     accessedAddresses: Set[Address],
-    accessedStorageKeys: Set[(Address, BigInt)],
-    transientStorage: Map[(Address, BigInt), BigInt] = Map.empty
+    accessedStorageKeys: Set[(Address, StorageKey)],
+    transientStorage: Map[(Address, StorageKey), BigInt] = Map.empty
 )

@@ -8,13 +8,15 @@ import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 
@@ -41,12 +43,13 @@ import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.ForkResolver
 import com.chipprbots.ethereum.network.KnownNodesManager
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.PeerEventBusActor
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguration
@@ -55,25 +58,26 @@ import com.chipprbots.ethereum.network.PeerStatisticsActor
 import com.chipprbots.ethereum.network.ServerActor
 import com.chipprbots.ethereum.network.discovery.DiscoveryConfig
 import com.chipprbots.ethereum.network.discovery.Node
-import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager.DiscoveredNodesInfo
+import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager
+
+import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshakerConfiguration
-import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.PruningConfigBuilder
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
+import com.chipprbots.ethereum.utils.*
 import com.chipprbots.ethereum.utils.ServerStatus.Listening
-import com.chipprbots.ethereum.utils._
 import com.chipprbots.ethereum.vm.EvmConfig
 
 abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig)
     extends SecureRandomBuilder
     with TestSyncConfig
-    with BlockchainConfigBuilder {
+    with BlockchainConfigBuilder:
   // Use longer timeout in CI environment to accommodate slower I/O and network operations
   // CI environments (GitHub Actions, etc.) often have higher latency due to shared resources
   private val baseTimeout = 5.seconds
@@ -102,7 +106,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   lazy val tempDir: Path = Files.createTempDirectory("temp-fast-sync")
 
   def getRockDbTestConfig(dbPath: String): RocksDbConfig =
-    new RocksDbConfig {
+    new RocksDbConfig:
       override val createIfMissing: Boolean = true
       override val paranoidChecks: Boolean = false
       override val path: String = dbPath
@@ -112,23 +116,20 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       override val levelCompaction: Boolean = true
       override val blockSize: Long = 16384
       override val blockCacheSize: Long = 33554432
-    }
 
   sealed trait LocalPruningConfigBuilder
       extends PruningConfigBuilder
-      with com.chipprbots.ethereum.TestInstanceConfigProvider {
+      with com.chipprbots.ethereum.TestInstanceConfigProvider:
     override val pruningMode: PruningMode = ArchivePruning
-  }
 
   lazy val nodeStatusHolder = new AtomicReference(nodeStatus)
-  lazy val storagesInstance: RocksDbDataSourceComponent with LocalPruningConfigBuilder with Storages.DefaultStorages =
+  lazy val storagesInstance: RocksDbDataSourceComponent & LocalPruningConfigBuilder & Storages.DefaultStorages =
     new RocksDbDataSourceComponent
       with LocalPruningConfigBuilder
       with Storages.DefaultStorages
-      with com.chipprbots.ethereum.TestInstanceConfigProvider {
+      with com.chipprbots.ethereum.TestInstanceConfigProvider:
       override lazy val dataSource: RocksDbDataSource =
         RocksDbDataSource(getRockDbTestConfig(tempDir.toAbsolutePath.toString), Namespaces.nsSeq)
-    }
   implicit override lazy val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
   lazy val discoveryConfig: DiscoveryConfig = DiscoveryConfig(Config.config, blockchainConfig.bootstrapNodes)
 
@@ -138,12 +139,23 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   lazy val knownNodesManagerConfig: KnownNodesManager.KnownNodesManagerConfig =
     KnownNodesManager.KnownNodesManagerConfig(config).copy(persistInterval = 1.seconds)
 
-  lazy val knownNodesManager: ActorRef = system.actorOf(
-    KnownNodesManager.props(
-      knownNodesManagerConfig,
-      storagesInstance.storages.knownNodesStorage
+  lazy val knownNodesManagerTyped: org.apache.pekko.actor.typed.ActorRef[KnownNodesManager.Command] =
+    system.spawn(
+      KnownNodesManager(knownNodesManagerConfig, storagesInstance.storages.knownNodesStorage),
+      "known-nodes-manager-typed"
     )
-  )
+
+  lazy val knownNodesManager: ActorRef =
+    system.actorOf(
+      org.apache.pekko.actor.Props(
+        new org.apache.pekko.actor.Actor:
+          @annotation.nowarn("msg=Matchable")
+          def receive: Receive = { case cmd: KnownNodesManager.Command =>
+            knownNodesManagerTyped ! cmd
+          }
+      ),
+      "known-nodes-manager"
+    )
 
   val blockchainReader: BlockchainReader = BlockchainReader(storagesInstance.storages)
   val blockchainWriter: BlockchainWriter = BlockchainWriter(storagesInstance.storages)
@@ -151,7 +163,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   val evmCodeStorage = storagesInstance.storages.evmCodeStorage
 
   val genesis: Block = Block(
-    Fixtures.Blocks.Genesis.header.copy(stateRoot = ByteString(MerklePatriciaTrie.EmptyRootHash)),
+    Fixtures.Blocks.Genesis.header.copy(stateRoot = TrieRoot(ByteString(MerklePatriciaTrie.EmptyRootHash))),
     Fixtures.Blocks.Genesis.body
   )
   val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
@@ -160,17 +172,15 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
 
   lazy val nh = nodeStatusHolder
 
-  val peerConf: PeerConfiguration = new PeerConfiguration {
-    override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration {
+  val peerConf: PeerConfiguration = new PeerConfiguration:
+    override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration:
       val maxBlocksHeadersPerMessage: Int = fakePeerCustomConfig.hostConfig.maxBlocksHeadersPerMessage
       val maxBlocksBodiesPerMessage: Int = fakePeerCustomConfig.hostConfig.maxBlocksBodiesPerMessage
       val maxReceiptsPerMessage: Int = fakePeerCustomConfig.hostConfig.maxReceiptsPerMessage
       val maxMptComponentsPerMessage: Int = fakePeerCustomConfig.hostConfig.maxMptComponentsPerMessage
-    }
-    override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration {
+    override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration:
       override val waitForTcpAckTimeout: FiniteDuration = Timeouts.normalTimeout
       override val waitForHandshakeTimeout: FiniteDuration = Timeouts.normalTimeout
-    }
     override val waitForHelloTimeout: FiniteDuration = 3 seconds
     override val waitForStatusTimeout: FiniteDuration = 30 seconds
     override val waitForChainCheckTimeout: FiniteDuration = 15 seconds
@@ -192,12 +202,11 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
     override val longBlacklistDuration: FiniteDuration = 3.minutes
     override val statSlotDuration: FiniteDuration = 1.minute
     override val statSlotCount: Int = 30
-  }
 
-  lazy val peerEventBus: ActorRef = system.actorOf(PeerEventBusActor.props, "peer-event-bus")
+  lazy val peerEventBus = system.spawn(PeerEventBusActor.behavior(), "peer-event-bus")
 
   private val handshakerConfiguration: NetworkHandshakerConfiguration =
-    new NetworkHandshakerConfiguration {
+    new NetworkHandshakerConfiguration:
       override val forkResolverOpt: Option[ForkResolver] = None
       override val nodeStatusHolder: AtomicReference[NodeStatus] = nh
       override val peerConfiguration: PeerConfiguration = peerConf
@@ -205,64 +214,70 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       override val blockchainReader: BlockchainReader = CommonFakePeer.this.blockchainReader
       override val appStateStorage: AppStateStorage = storagesInstance.storages.appStateStorage
       override val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
-    }
 
   lazy val handshaker: Handshaker[PeerInfo] = NetworkHandshaker(handshakerConfiguration)
 
   lazy val authHandshaker: AuthHandshaker = AuthHandshaker(nodeKey, secureRandom)
 
-  lazy val peerStatistics: ActorRef =
-    system.actorOf(PeerStatisticsActor.props(peerEventBus, slotDuration = 1.minute, slotCount = 30))
+  lazy val peerStatistics: org.apache.pekko.actor.typed.ActorRef[PeerStatisticsActor.Command] =
+    system.spawn(PeerStatisticsActor(peerEventBus, slotDuration = 1.minute, slotCount = 30), "peer-statistics")
 
   lazy val blacklist: CacheBasedBlacklist = CacheBasedBlacklist.empty(1000)
 
-  lazy val peerManager: ActorRef = system.actorOf(
-    PeerManagerActor.props(
-      peerDiscoveryManager,
-      Config.Network.peer,
+  lazy val peerManager: org.apache.pekko.actor.typed.ActorRef[PeerManagerActor.Command] = system.spawn(
+    PeerManagerActor.behavior(
       peerEventBus,
+      peerDiscoveryManager.toTyped[PeerDiscoveryManager.Command],
+      Config.Network.peer,
       knownNodesManager,
       peerStatistics,
-      handshaker,
-      authHandshaker,
+      PeerManagerActor.peerFactory(
+        Config.Network.peer,
+        peerEventBus,
+        knownNodesManager,
+        handshaker,
+        authHandshaker,
+        Config.supportedCapabilities
+      ),
       discoveryConfig,
-      blacklist,
-      Config.supportedCapabilities
+      blacklist
     ),
     "peer-manager"
   )
 
-  lazy val etcPeerManager: ActorRef = system.actorOf(
-    NetworkPeerManagerActor.props(peerManager, peerEventBus, storagesInstance.storages.appStateStorage, None),
-    "etc-peer-manager"
-  )
+  lazy val etcPeerManager: ActorRef = system
+    .spawn(
+      NetworkPeerManagerActor.behavior(peerManager, peerEventBus, storagesInstance.storages.appStateStorage, None),
+      s"npma-fake-peer-${java.util.UUID.randomUUID()}"
+    )
+    .toClassic
 
   // Integration-test fake peer — PendingTransactionsManager isn't exercised by the sync harness,
   // so an actor that discards everything suffices to satisfy the ctor requirement added with the
   // txpool_* namespace.
-  lazy val pendingTransactionsManagerStub: ActorRef =
-    system.actorOf(
-      org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
-        def receive: Receive = { case _ => () }
-      }),
+  lazy val pendingTransactionsManagerStub: org.apache.pekko.actor.typed.ActorRef[
+    com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+  ] =
+    system.spawn(
+      Behaviors.ignore[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
       s"pending-txs-stub-${System.nanoTime()}"
     )
 
-  val blockchainHost: ActorRef =
-    system.actorOf(
-      BlockchainHostActor
-        .props(
-          blockchainReader,
-          storagesInstance.storages.evmCodeStorage,
-          peerConf,
-          peerEventBus,
-          etcPeerManager,
-          pendingTransactionsManagerStub
-        ),
+  val blockchainHost: org.apache.pekko.actor.typed.ActorRef[BlockchainHostActor.Command] =
+    system.spawn(
+      BlockchainHostActor(
+        blockchainReader,
+        storagesInstance.storages.evmCodeStorage,
+        peerConf,
+        peerEventBus,
+        etcPeerManager,
+        pendingTransactionsManagerStub
+      ),
       "blockchain-host"
     )
 
-  lazy val server: ActorRef = system.actorOf(ServerActor.props(nodeStatusHolder, peerManager, blacklist), "server")
+  lazy val server: org.apache.pekko.actor.typed.ActorRef[ServerActor.Command] =
+    system.spawn(ServerActor(nodeStatusHolder, peerManager, blacklist), "server")
 
   val listenAddress: InetSocketAddress = randomAddress()
 
@@ -289,17 +304,19 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
 
   lazy val broadcaster = new BlockBroadcast(etcPeerManager)
 
-  lazy val broadcasterActor: ActorRef = system.actorOf(
-    BlockBroadcasterActor.props(broadcaster, peerEventBus, etcPeerManager, blacklist, testSyncConfig, system.scheduler)
-  )
+  lazy val broadcasterActor: org.apache.pekko.actor.typed.ActorRef[BlockBroadcasterActor.BroadcasterMsg] =
+    system.spawn(
+      BlockBroadcasterActor.apply(broadcaster, peerEventBus, etcPeerManager, blacklist, testSyncConfig),
+      "block-broadcaster"
+    )
 
   private def getMptForBlock(block: Block) =
     InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       bl.getBackingMptStorage(block.number),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       blockchainConfig.accountStartNonce,
-      block.header.stateRoot,
+      block.header.stateRoot.value,
       noEmptyAccounts = EvmConfig.forBlock(block.number, blockchainConfig).noEmptyAccounts,
       ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
     )
@@ -307,29 +324,28 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   private def broadcastBlock(block: Block, weight: ChainWeight) =
     broadcasterActor ! BroadcastBlock(BlockToBroadcast(block, weight))
 
-  def getCurrentState(): BlockchainState = {
-    val bestBlock = blockchainReader.getBestBlock().get
+  def getCurrentState(): BlockchainState =
+    val bestBlock = blockchainReader.getBestBlock.get
     val currentWorldState = getMptForBlock(bestBlock)
     val currentWeight = blockchainReader.getChainWeightByHash(bestBlock.hash).get
     BlockchainState(bestBlock, currentWorldState, currentWeight)
-  }
 
   def startPeer(): IO[Unit] =
-    for {
+    for
       _ <- IO {
-        peerManager ! PeerManagerActor.StartConnecting
+        peerManager ! PeerManagerActor.StartConnectingCmd
         server ! ServerActor.StartServer(listenAddress)
       }
       _ <- retryUntilWithDelay(IO(nodeStatusHolder.get()), 1.second, 5) { status =>
         status.serverStatus == Listening(listenAddress)
       }
-    } yield ()
+    yield ()
 
   def shutdown(): IO[Unit] =
-    for {
+    for
       _ <- IO.fromFuture(IO(system.terminate()))
       _ <- IO(storagesInstance.dataSource.destroy())
-    } yield ()
+    yield ()
 
   /** Ask the PeerManager to dial the given nodes and block until every requested node has been persisted as a known
     * node (which only happens after a successful *outgoing* handshake).
@@ -341,17 +357,17 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
     *   time out non-deterministically.
     */
   def connectToPeers(nodes: Set[Node], maxRetries: Int = 15): IO[Unit] =
-    for {
+    for
       _ <- IO {
-        peerManager ! DiscoveredNodesInfo(nodes)
+        peerManager ! PeerManagerActor.DiscoveredNodesReceived(nodes)
       }
-      _ <- retryUntilWithDelay(IO(storagesInstance.storages.knownNodesStorage.getKnownNodes()), 1.second, maxRetries) {
+      _ <- retryUntilWithDelay(IO(storagesInstance.storages.knownNodesStorage.getKnownNodes), 1.second, maxRetries) {
         knownNodes =>
           val requestedNodes = nodes.map(_.id)
           val currentNodes = knownNodes.map(Node.fromUri).map(_.id)
           requestedNodes.subsetOf(currentNodes)
       }
-    } yield ()
+    yield ()
 
   /** Best-effort variant of [[connectToPeers]] for redundant/reverse dials. When both peers dial each other
     * simultaneously, the PeerManager's connection de-duplication (`canConnectTo` / `hasIncomingPendingFromHost`)
@@ -365,20 +381,19 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
 
   private def createChildBlock(parent: Block, parentWeight: ChainWeight, parentWorld: InMemoryWorldStateProxy)(
       updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy
-  ): (Block, ChainWeight, InMemoryWorldStateProxy) = {
+  ): (Block, ChainWeight, InMemoryWorldStateProxy) =
     val newBlockNumber = parent.header.number + 1
     val newWorld = updateWorldForBlock(newBlockNumber, parentWorld)
     val newBlock = parent.copy(header =
       parent.header.copy(
         parentHash = parent.header.hash,
         number = newBlockNumber,
-        stateRoot = newWorld.stateRootHash,
+        stateRoot = TrieRoot(newWorld.stateRootHash),
         unixTimestamp = parent.header.unixTimestamp + 1
       )
     )
     val newWeight = parentWeight.increase(newBlock.header)
     (newBlock, newWeight, parentWorld)
-  }
 
   private def generateInvalidBlock(
       currentBestBlock: Block
@@ -394,7 +409,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
         currentBestBlock.copy(header =
           currentBestBlock.header.copy(
             number = newBlockNumber,
-            stateRoot = newWorld.stateRootHash
+            stateRoot = TrieRoot(newWorld.stateRootHash)
           )
         )
       val newWeight = ChainWeight.totalDifficultyOnly(1)
@@ -418,30 +433,25 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   def importBlocksUntil(
       n: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
-    IO(blockchainReader.getBestBlock()).flatMap { block =>
-      if (block.get.number >= n) {
-        IO(())
-      } else {
-        generateValidBlock(block.get)(updateWorldForBlock).flatMap(_ => importBlocksUntil(n)(updateWorldForBlock))
-      }
+    IO(blockchainReader.getBestBlock).flatMap { block =>
+      if block.get.number >= n then IO(())
+      else generateValidBlock(block.get)(updateWorldForBlock).flatMap(_ => importBlocksUntil(n)(updateWorldForBlock))
     }
 
   def importInvalidBlocks(
       from: BigInt,
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
-    IO(blockchainReader.getBestBlock()).flatMap { block =>
-      if (block.get.number >= to) {
-        IO(())
-      } else if (block.get.number >= from) {
+    IO(blockchainReader.getBestBlock).flatMap { block =>
+      if block.get.number >= to then IO(())
+      else if block.get.number >= from then
         generateInvalidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlocks(from, to)(updateWorldForBlock)
         )
-      } else {
+      else
         generateValidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlocks(from, to)(updateWorldForBlock)
         )
-      }
 
     }
 
@@ -449,17 +459,12 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       from: BigInt,
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
-    IO(blockchainReader.getBestBlock()).flatMap { block =>
-      if (block.get.number >= to) {
-        IO(())
-      } else if (block.get.number >= from) {
+    IO(blockchainReader.getBestBlock).flatMap { block =>
+      if block.get.number >= to then IO(())
+      else if block.get.number >= from then
         generateInvalidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlockNumbers(from, to)(updateWorldForBlock)
         )
-      } else {
-        importBlocksUntil(from)(updateWorldForBlock)
-      }
+      else importBlocksUntil(from)(updateWorldForBlock)
 
     }
-
-}

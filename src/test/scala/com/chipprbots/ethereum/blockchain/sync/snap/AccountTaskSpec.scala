@@ -6,9 +6,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class AccountTaskSpec extends AnyFlatSpec with Matchers {
+class AccountTaskSpec extends AnyFlatSpec with Matchers:
 
   private val dummyRoot = kec256(ByteString("state-root"))
 
@@ -20,10 +20,9 @@ class AccountTaskSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "produce N tasks when concurrency=N" taggedAs UnitTest in {
-    for (n <- Seq(4, 16, 256)) {
+    for n <- Seq(4, 16, 256) do
       val tasks = AccountTask.createInitialTasks(dummyRoot, concurrency = n)
       tasks.size shouldBe n
-    }
   }
 
   it should "start the first task at 0x00...00" taggedAs UnitTest in {
@@ -100,4 +99,3 @@ class AccountTaskSpec extends AnyFlatSpec with Matchers {
     task.progress should be > 0.0
     task.progress should be <= 1.0
   }
-}

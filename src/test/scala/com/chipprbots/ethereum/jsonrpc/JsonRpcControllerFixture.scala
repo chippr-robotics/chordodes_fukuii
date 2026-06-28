@@ -1,10 +1,14 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
 import org.json4s.JsonAST.JArray
@@ -23,45 +27,51 @@ import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
 import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.TestMining
-import com.chipprbots.ethereum.consensus.pow.blocks._
+import com.chipprbots.ethereum.consensus.pow.blocks.*
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
-import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.AppStateStorage
+import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.keystore.KeyStore
-import com.chipprbots.ethereum.ledger.BloomFilter
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
+import com.chipprbots.ethereum.ommers.OmmersPool
+import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.FilterConfig
 
 /** Factory for creating JsonRpcControllerFixture instances with mocks. This is needed because in Scala 3, MockFactory
   * requires TestSuite self-type, which anonymous classes created by 'new' don't satisfy.
   */
-object JsonRpcControllerFixture {
+object JsonRpcControllerFixture:
   def apply()(implicit
       system: ActorSystem,
-      mockFactory: org.scalamock.scalatest.MockFactory
+      mockFactory: org.scalamock.scalatest.MockFactory,
+      actorTestKit: ActorTestKit
   ): JsonRpcControllerFixture =
-    new JsonRpcControllerFixture()(system, mockFactory)
-}
+    new JsonRpcControllerFixture()(system, mockFactory, actorTestKit)
 
-class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.scalamock.scalatest.MockFactory)
-    extends EphemBlockchainTestSetup
+class JsonRpcControllerFixture(implicit
+    system: ActorSystem,
+    mockFactory: org.scalamock.scalatest.MockFactory,
+    actorTestKit: ActorTestKit
+) extends EphemBlockchainTestSetup
     with JsonMethodsImplicits
-    with ApisBuilder {
+    with ApisBuilder:
 
   // Import all mockFactory members to enable mock creation and expectations
-  import mockFactory._
+  import mockFactory.*
 
   def config: JsonRpcConfig = JsonRpcConfig(Config.config, available)
 
@@ -81,7 +91,7 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
     * Tests that need to feed a particular `generateBlock` result call `blockGenerator.setGenerateBlockResult(...)` or
     * assign to `blockGenerator.generateBlockFn` directly.
     */
-  class StubPoWBlockGenerator extends PoWBlockGenerator {
+  class StubPoWBlockGenerator extends PoWBlockGenerator:
     @volatile var generateBlockFn: (
         Block,
         Seq[SignedTransaction],
@@ -117,31 +127,28 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
         beneficiary: Address,
         x: Ommers,
         initialWorldStateBeforeExecution: Option[InMemoryWorldStateProxy]
-    )(implicit blockchainConfig: BlockchainConfig): PendingBlockAndState = {
+    )(implicit blockchainConfig: BlockchainConfig): PendingBlockAndState =
       val result =
         generateBlockFn(parent, transactions, beneficiary, x, initialWorldStateBeforeExecution, blockchainConfig)
       prepared = result :: prepared
       result
-    }
 
     override def blockTimestampProvider: BlockTimestampProvider = DefaultBlockTimestampProvider
 
     override def withBlockTimestampProvider(blockTimestampProvider: BlockTimestampProvider): PoWBlockGenerator = this
-  }
 
   val blockGenerator: StubPoWBlockGenerator = new StubPoWBlockGenerator
 
   val syncingController: TestProbe = TestProbe()
 
   override lazy val stxLedger: StxLedger = mock[StxLedger]
-  override lazy val validators: ValidatorsExecutor = {
+  override lazy val validators: ValidatorsExecutor =
     val v = mock[ValidatorsExecutor]
     (() => v.signedTransactionValidator)
       .expects()
       .returns(null)
       .anyNumberOfTimes()
     v
-  }
 
   override lazy val mining: TestMining = buildTestMining()
     .withValidators(validators)
@@ -151,7 +158,8 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
 
   val pendingTransactionsManager: TestProbe = TestProbe()
   val ommersPool: TestProbe = TestProbe()
-  val filterManager: TestProbe = TestProbe()
+  val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
+    actorTestKit.spawn(Behaviors.ignore[FilterManager.Command])
 
   val ethashConfig = MiningConfigs.ethashConfig
   override lazy val miningConfig = MiningConfigs.miningConfig
@@ -159,10 +167,9 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
   // Increased timeout for CI environments where actor-based tests may be slower
   val getTransactionFromPoolTimeout: FiniteDuration = 60.seconds
 
-  val filterConfig: FilterConfig = new FilterConfig {
+  val filterConfig: FilterConfig = new FilterConfig:
     override val filterTimeout: FiniteDuration = Timeouts.normalTimeout
     override val filterManagerQueryTimeout: FiniteDuration = Timeouts.normalTimeout
-  }
 
   val appStateStorage: AppStateStorage = mock[AppStateStorage]
   val web3Service = new Web3Service
@@ -175,9 +182,10 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
     mining,
     stxLedger,
     keyStore,
-    syncingController.ref,
+    syncingController.ref.toTyped[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
     Capability.ETH63,
-    Timeouts.shortTimeout
+    Timeouts.shortTimeout,
+    system.toTyped.scheduler
   )
 
   override lazy val coinbaseProvider = new CoinbaseProvider(mining.config.generic.coinbase)
@@ -186,9 +194,9 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
     blockchainReader,
     mining,
     config,
-    ommersPool.ref,
-    syncingController.ref,
-    pendingTransactionsManager.ref,
+    ommersPool.ref.toTyped[OmmersPool.Command],
+    syncingController.ref.toTyped[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
+    pendingTransactionsManager.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
     getTransactionFromPoolTimeout,
     this,
     coinbaseProvider,
@@ -201,9 +209,10 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
     blockchain,
     blockchainReader,
     mining,
-    pendingTransactionsManager.ref,
+    pendingTransactionsManager.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
     getTransactionFromPoolTimeout,
-    storagesInstance.storages.transactionMappingStorage
+    storagesInstance.storages.transactionMappingStorage,
+    system.toTyped.scheduler
   )
 
   val ethUserService = new EthUserService(
@@ -215,16 +224,17 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
   )
 
   val ethFilterService = new EthFilterService(
-    filterManager.ref,
+    filterManager,
     filterConfig,
     blockchainReader
-  )
+  )(system)
   val personalService: TestPersonalService = new TestPersonalService
   val debugService: DebugService = mock[DebugService]
   val qaService: QAService = mock[QAService]
   val fukuiiService: FukuiiService = mock[FukuiiService]
+  implicit val scheduler: typed.Scheduler = system.toTyped.scheduler
   val mcpService: McpService = new McpService(
-    TestProbe().ref,
+    TestProbe().ref.toTyped[PeerManagerActor.Command],
     TestProbe().ref,
     null,
     null,
@@ -254,12 +264,13 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
       null: TxPoolService,
       null: DebugTracingService,
       null: TraceService,
-      config
+      config,
+      system
     )
 
   val blockHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
-    logsBloom = BloomFilter.EmptyBloomFilter,
-    difficulty = 10,
+    logsBloom = BloomFilter.Empty,
+    difficulty = Difficulty(10),
     number = 2,
     gasLimit = 0,
     gasUsed = 0,
@@ -288,10 +299,9 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
   val fakeWorld: InMemoryWorldStateProxy = InMemoryWorldStateProxy(
     storagesInstance.storages.evmCodeStorage,
     blockchain.getReadOnlyMptStorage(),
-    (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+    (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
     blockchainConfig.accountStartNonce,
     ByteString.empty,
     noEmptyAccounts = false,
     ethCompatibleStorage = true
   )
-}

@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -10,28 +11,33 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts68
 import com.chipprbots.ethereum.rlp.RLPList
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for the ConcurrentFetch infrastructure (ARCH-002).
   *
   * Tests queue reserve/unreserve/deliver lifecycle, expireStale, and the dispatchTo() dispatch loop. No actor
   * choreography — all assertions are deterministic.
   */
-class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
+class ConcurrentFetchSpec extends AnyFlatSpec with Matchers:
 
-  import Helpers._
+  import Helpers.*
 
   // ─── HeadersFetcherQueue ──────────────────────────────────────────────────
 
@@ -121,10 +127,9 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
 
     val wrongId = req.requestId + 999
     val resp = BlockHeaders(wrongId, Seq.empty)
-    q.deliver(peer1, resp, 50L) match {
+    q.deliver(peer1, resp, 50L) match
       case DeliveryResult.Invalid(_) => succeed
       case other                     => fail(s"Expected Invalid, got $other")
-    }
   }
 
   it should "expire stale in-flight requests and return items to the queue" taggedAs UnitTest in {
@@ -226,7 +231,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
 
   "ConcurrentFetch.dispatchTo" should "return empty when queue is empty" taggedAs UnitTest in {
     val q = new HeadersFetcherQueue(new PeerRateTracker())
-    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result =
+      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
     result shouldBe empty
   }
 
@@ -235,7 +241,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
     q.enqueue(Seq(100, 101, 102))
     q.reserve(peer1, 1)
 
-    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
     result shouldBe empty
   }
 
@@ -243,7 +249,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
     val q = new HeadersFetcherQueue(new PeerRateTracker())
     q.enqueue(BigInt(100) to BigInt(110))
 
-    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result =
+      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
 
     result should have size 2
     val assignedPeers = result.map(_._1.peer.id).toSet
@@ -257,7 +264,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
     q.enqueue(BigInt(100) to BigInt(120))
     q.reserve(peer1, 3)
 
-    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result =
+      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
 
     result should have size 1
     result.head._1.peer.id shouldBe peer2.peer.id
@@ -268,7 +276,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
     q.enqueue(Seq(100))
 
     val result =
-      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2, peer3), 2000L, "headers", org.apache.pekko.event.NoLogging)
+      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2, peer3), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
 
     result should have size 1
     q.pending shouldBe 0
@@ -287,7 +295,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
 
     val q2 = new HeadersFetcherQueue(tracker)
     q2.enqueue(BigInt(100) to BigInt(200))
-    val result = ConcurrentFetch.dispatchTo(q2, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result =
+      ConcurrentFetch.dispatchTo(q2, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
 
     result should have size 2
     val p1batch = result.find(_._1.peer.id == peer1.peer.id).get._2
@@ -329,7 +338,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  private object Helpers {
+  private object Helpers:
     implicit val system: ActorSystem = ActorSystem("ConcurrentFetch_System")
 
     val peer1: PeerWithInfo = mkPeer("peer-1")
@@ -349,34 +358,32 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
       genesisHash = hash32
     )
 
-    def mkPeer(id: String): PeerWithInfo = {
-      val peer = Peer(PeerId(id), new InetSocketAddress("127.0.0.1", 30303), TestProbe().ref, false)
+    def mkPeer(id: String): PeerWithInfo =
+      val peer =
+        Peer(PeerId(id), new InetSocketAddress("127.0.0.1", 30303), TestProbe().ref.toTyped[PeerActor.Command], false)
       val peerInfo = PeerInfo(
         remoteStatus,
-        ChainWeight(BigInt(1000)),
+        ChainWeight.totalDifficultyOnly(BigInt(1000)),
         forkAccepted = true,
         maxBlockNumber = 1000,
         bestBlockHash = hash32
       )
       PeerWithInfo(peer, peerInfo)
-    }
 
     val stubHeader: BlockHeader = BlockHeader(
-      parentHash = hash32,
-      ommersHash = hash32,
+      parentHash = BlockHash(hash32),
+      ommersHash = BlockHash(hash32),
       beneficiary = beneficiary,
-      stateRoot = hash32,
-      transactionsRoot = hash32,
-      receiptsRoot = hash32,
-      logsBloom = bloom256,
-      difficulty = 1,
+      stateRoot = TrieRoot(hash32),
+      transactionsRoot = TrieRoot(hash32),
+      receiptsRoot = TrieRoot(hash32),
+      logsBloom = BloomFilter(bloom256),
+      difficulty = Difficulty(1),
       number = 0,
       gasLimit = 1000000,
       gasUsed = 0,
       unixTimestamp = 0,
       extraData = ByteString.empty,
-      mixHash = hash32,
+      mixHash = BlockHash(hash32),
       nonce = nonce8
     )
-  }
-}

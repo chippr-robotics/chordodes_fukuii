@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.domain.SignedTransaction.FirstByteOfAddress
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 
-trait SignedTransactionBehavior extends Matchers with ScalaCheckPropertyChecks with SecureRandomBuilder {
+trait SignedTransactionBehavior extends Matchers with ScalaCheckPropertyChecks with SecureRandomBuilder:
   this: AnyFlatSpec =>
 
   def SignedTransactionBehavior(
@@ -36,4 +36,3 @@ trait SignedTransactionBehavior extends Matchers with ScalaCheckPropertyChecks w
           address shouldEqual result.senderAddress
       }
     }
-}

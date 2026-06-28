@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.domain
 
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 /** EIP-4895: Beacon chain push withdrawals as operations.
@@ -22,9 +22,9 @@ case class Withdrawal(
     amount: BigInt
 )
 
-object Withdrawal {
+object Withdrawal:
 
-  implicit class WithdrawalEnc(val w: Withdrawal) extends RLPSerializable {
+  implicit class WithdrawalEnc(val w: Withdrawal) extends RLPSerializable:
     override def toRLPEncodable: RLPEncodeable =
       RLPList(
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(w.index)),
@@ -32,11 +32,10 @@ object Withdrawal {
         RLPValue(w.address.bytes.toArray),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(w.amount))
       )
-  }
 
-  implicit class WithdrawalDec(val rlpEncodeable: RLPEncodeable) extends AnyVal {
+  implicit class WithdrawalDec(val rlpEncodeable: RLPEncodeable) extends AnyVal:
     def toWithdrawal: Withdrawal =
-      rlpEncodeable match {
+      rlpEncodeable match
         case RLPList(index, validatorIndex, address, amount) =>
           Withdrawal(
             index = bigIntFromEncodeable(index),
@@ -45,10 +44,6 @@ object Withdrawal {
             amount = bigIntFromEncodeable(amount)
           )
         case _ => throw new RuntimeException("Cannot decode Withdrawal")
-      }
-  }
 
-  implicit class WithdrawalBytesDec(val bytes: Array[Byte]) extends AnyVal {
+  implicit class WithdrawalBytesDec(val bytes: Array[Byte]) extends AnyVal:
     def toWithdrawal: Withdrawal = WithdrawalDec(rawDecode(bytes)).toWithdrawal
-  }
-}

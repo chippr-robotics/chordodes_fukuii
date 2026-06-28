@@ -4,7 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.consensus.pow.blocks.OmmersSeqEnc
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -13,12 +13,12 @@ import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.Withdrawal
 import com.chipprbots.ethereum.domain.Withdrawal.WithdrawalBytesDec
 import com.chipprbots.ethereum.domain.Withdrawal.WithdrawalEnc
-import com.chipprbots.ethereum.ledger.BloomFilter
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
-import com.chipprbots.ethereum.rlp.{encode => rlpEncode}
+import com.chipprbots.ethereum.rlp.encode as rlpEncode
 import com.chipprbots.ethereum.utils.ByteUtils.or
 
-object StdBlockValidator extends BlockValidator {
+object StdBlockValidator extends BlockValidator:
 
   /** ECIP adaptation of EIP-7934: Max RLP-encoded block size (8 MiB = 10 MiB - 2 MiB). Activates at Olympia. ETC adapts
     * the Ethereum 10 MiB cap down to 8 MiB to match ETC's lower gas limits. Pre-Olympia chains never produce blocks
@@ -34,15 +34,14 @@ object StdBlockValidator extends BlockValidator {
     * @return
     *   Block if valid, a Some otherwise
     */
-  private def validateTransactionRoot(block: Block): Either[BlockError, BlockValid] = {
+  private def validateTransactionRoot(block: Block): Either[BlockError, BlockValid] =
     val isValid = MptListValidator.isValid[SignedTransaction](
-      block.header.transactionsRoot.toArray[Byte],
+      block.header.transactionsRoot.toArray,
       block.body.transactionList,
       SignedTransaction.byteArraySerializable
     )
-    if (isValid) Right(BlockValid)
+    if isValid then Right(BlockValid)
     else Left(BlockTransactionsHashError)
-  }
 
   /** Validates [[BlockBody.uncleNodesList]] against [[com.chipprbots.ethereum.domain.BlockHeader.ommersHash]] based on
     * validations stated in section 4.4.2 of http://paper.gavwood.com/
@@ -52,11 +51,10 @@ object StdBlockValidator extends BlockValidator {
     * @return
     *   Block if valid, a Some otherwise
     */
-  private def validateOmmersHash(block: Block): Either[BlockError, BlockValid] = {
+  private def validateOmmersHash(block: Block): Either[BlockError, BlockValid] =
     val encodedOmmers: Array[Byte] = block.body.uncleNodesList.toBytes
-    if (kec256(encodedOmmers).sameElements(block.header.ommersHash)) Right(BlockValid)
+    if kec256(encodedOmmers).sameElements(block.header.ommersHash.value) then Right(BlockValid)
     else Left(BlockOmmersHashError)
-  }
 
   /** Validates [[Receipt]] against [[com.chipprbots.ethereum.domain.BlockHeader.receiptsRoot]] based on validations
     * stated in section 4.4.2 of http://paper.gavwood.com/
@@ -67,13 +65,12 @@ object StdBlockValidator extends BlockValidator {
     *   Receipts to use
     * @return
     */
-  private def validateReceipts(blockHeader: BlockHeader, receipts: Seq[Receipt]): Either[BlockError, BlockValid] = {
+  private def validateReceipts(blockHeader: BlockHeader, receipts: Seq[Receipt]): Either[BlockError, BlockValid] =
 
     val isValid =
-      MptListValidator.isValid[Receipt](blockHeader.receiptsRoot.toArray[Byte], receipts, Receipt.byteArraySerializable)
-    if (isValid) Right(BlockValid)
+      MptListValidator.isValid[Receipt](blockHeader.receiptsRoot.toArray, receipts, Receipt.byteArraySerializable)
+    if isValid then Right(BlockValid)
     else Left(BlockReceiptsHashError)
-  }
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.logsBloom]] against [[Receipt.logsBloomFilter]] based on
     * validations stated in section 4.4.2 of http://paper.gavwood.com/
@@ -84,13 +81,12 @@ object StdBlockValidator extends BlockValidator {
     *   Receipts to use
     * @return
     */
-  private def validateLogBloom(blockHeader: BlockHeader, receipts: Seq[Receipt]): Either[BlockError, BlockValid] = {
-    val logsBloomOr =
-      if (receipts.isEmpty) BloomFilter.EmptyBloomFilter
-      else ByteString(or(receipts.map(_.logsBloomFilter.toArray): _*))
-    if (logsBloomOr == blockHeader.logsBloom) Right(BlockValid)
+  private def validateLogBloom(blockHeader: BlockHeader, receipts: Seq[Receipt]): Either[BlockError, BlockValid] =
+    val logsBloomOr: BloomFilter =
+      if receipts.isEmpty then BloomFilter.Empty
+      else BloomFilter(ByteString(or(receipts.map(_.logsBloomFilter.toArray)*)))
+    if logsBloomOr == blockHeader.logsBloom then Right(BlockValid)
     else Left(BlockLogBloomError)
-  }
 
   /** EIP-7934: Validates that the RLP-encoded block size does not exceed the cap.
     *
@@ -99,11 +95,10 @@ object StdBlockValidator extends BlockValidator {
     * @return
     *   Block if valid, BlockRLPSizeError otherwise
     */
-  private def validateBlockRLPSize(block: Block): Either[BlockError, BlockValid] = {
+  private def validateBlockRLPSize(block: Block): Either[BlockError, BlockValid] =
     val size = Block.size(block)
-    if (size <= BlockRLPSizeCap) Right(BlockValid)
+    if size <= BlockRLPSizeCap then Right(BlockValid)
     else Left(BlockRLPSizeError(size, BlockRLPSizeCap))
-  }
 
   /** This method allows validate a Block. It only performs the following validations (stated on section 4.4.2 of
     * http://paper.gavwood.com/):
@@ -121,10 +116,10 @@ object StdBlockValidator extends BlockValidator {
     *   The block if validations are ok, error otherwise
     */
   def validate(block: Block, receipts: Seq[Receipt]): Either[BlockError, BlockValid] =
-    for {
+    for
       _ <- validateHeaderAndBody(block.header, block.body)
       _ <- validateBlockAndReceipts(block.header, receipts)
-    } yield BlockValid
+    yield BlockValid
 
   /** This method allows validate that a BlockHeader matches a BlockBody.
     *
@@ -135,16 +130,15 @@ object StdBlockValidator extends BlockValidator {
     * @return
     *   The block if the header matched the body, error otherwise
     */
-  def validateHeaderAndBody(blockHeader: BlockHeader, blockBody: BlockBody): Either[BlockError, BlockValid] = {
+  def validateHeaderAndBody(blockHeader: BlockHeader, blockBody: BlockBody): Either[BlockError, BlockValid] =
     val block = Block(blockHeader, blockBody)
-    for {
+    for
       _ <- validateTransactionRoot(block)
       _ <- validateOmmersHash(block)
       _ <- validateBlockRLPSize(block)
       _ <- validateWithdrawalsPresence(block)
       _ <- validateWithdrawalsRoot(block)
-    } yield BlockValid
-  }
+    yield BlockValid
 
   /** EIP-4895: pre-Shanghai blocks (header.withdrawalsRoot = None) MUST NOT attach a withdrawals field to the body.
     *
@@ -157,33 +151,29 @@ object StdBlockValidator extends BlockValidator {
     * `Block.BlockDec.toBlock`.
     */
   private def validateWithdrawalsPresence(block: Block): Either[BlockError, BlockValid] =
-    (block.header.withdrawalsRoot, block.body.withdrawals) match {
+    (block.header.withdrawalsRoot, block.body.withdrawals) match
       case (None, Some(_)) => Left(BlockWithdrawalsOrphanedError)
       case _               => Right(BlockValid)
-    }
 
   /** EIP-4895: if the header declares a withdrawalsRoot, it must equal the trie root computed from
     * block.body.withdrawals (indexed like transactions/receipts). Pre-Shanghai headers have no withdrawalsRoot and no
     * withdrawals in the body — no-op.
     */
   private def validateWithdrawalsRoot(block: Block): Either[BlockError, BlockValid] =
-    block.header.withdrawalsRoot match {
+    block.header.withdrawalsRoot match
       case None => Right(BlockValid)
       case Some(expectedRoot) =>
         val withdrawals = block.body.withdrawals.getOrElse(Seq.empty)
         val computedRoot = computeWithdrawalsRoot(withdrawals)
-        if (computedRoot == expectedRoot) Right(BlockValid)
+        if computedRoot == expectedRoot then Right(BlockValid)
         else Left(BlockWithdrawalsRootError)
-    }
 
   private def computeWithdrawalsRoot(withdrawals: Seq[Withdrawal]): ByteString =
-    if (withdrawals.isEmpty) {
-      BlockHeader.EmptyMpt
-    } else {
-      val serializable = new ByteArraySerializable[Withdrawal] {
+    if withdrawals.isEmpty then BlockHeader.EmptyMpt
+    else
+      val serializable = new ByteArraySerializable[Withdrawal]:
         override def fromBytes(bytes: Array[Byte]): Withdrawal = WithdrawalBytesDec(bytes).toWithdrawal
         override def toBytes(input: Withdrawal): Array[Byte] = rlpEncode(WithdrawalEnc(input).toRLPEncodable)
-      }
       val stateStorage = com.chipprbots.ethereum.db.storage.StateStorage.getReadOnlyStorage(
         com.chipprbots.ethereum.db.dataSource.EphemDataSource()
       )
@@ -192,7 +182,6 @@ object StdBlockValidator extends BlockValidator {
       )(MptListValidator.intByteArraySerializable, serializable)
       val root = withdrawals.zipWithIndex.foldLeft(trie)((t, r) => t.put(r._2, r._1)).getRootHash
       ByteString(root)
-    }
 
   /** This method allows validations of the block with its associated receipts. It only perfoms the following
     * validations (stated on section 4.4.2 of http://paper.gavwood.com/):
@@ -207,10 +196,10 @@ object StdBlockValidator extends BlockValidator {
     *   The block if validations are ok, error otherwise
     */
   def validateBlockAndReceipts(blockHeader: BlockHeader, receipts: Seq[Receipt]): Either[BlockError, BlockValid] =
-    for {
+    for
       _ <- validateReceipts(blockHeader, receipts)
       _ <- validateLogBloom(blockHeader, receipts)
-    } yield BlockValid
+    yield BlockValid
 
   sealed trait BlockError
 
@@ -232,4 +221,3 @@ object StdBlockValidator extends BlockValidator {
   sealed trait BlockValid
 
   case object BlockValid extends BlockValid
-}

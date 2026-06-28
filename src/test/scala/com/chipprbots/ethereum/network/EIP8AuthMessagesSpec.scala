@@ -9,15 +9,15 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.network.rlpx.AuthInitiateMessageV4
-import com.chipprbots.ethereum.network.rlpx.AuthInitiateMessageV4._
+import com.chipprbots.ethereum.network.rlpx.AuthInitiateMessageV4.*
 import com.chipprbots.ethereum.network.rlpx.AuthResponseMessageV4
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class EIP8AuthMessagesSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
+class EIP8AuthMessagesSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder:
 
   val testKeyPair = new AsymmetricCipherKeyPair(
     new ECPublicKeyParameters(
@@ -194,4 +194,3 @@ class EIP8AuthMessagesSpec extends AnyFlatSpec with Matchers with SecureRandomBu
       encoded.toAuthInitiateMessageV4
     }
   }
-}

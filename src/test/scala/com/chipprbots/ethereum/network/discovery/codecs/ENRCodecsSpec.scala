@@ -14,20 +14,20 @@ import com.chipprbots.scalanet.discovery.hash.Hash
 import com.chipprbots.scalanet.discovery.hash.Keccak256
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scodec.bits._
+import scodec.bits.*
 
 import com.chipprbots.ethereum.network.discovery.Secp256k1SigAlg
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPDecoder
 import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPEncoder
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class ENRCodecsSpec extends AnyFlatSpec with Matchers {
+class ENRCodecsSpec extends AnyFlatSpec with Matchers:
 
   import RLPCodecs.given
 
@@ -78,14 +78,13 @@ class ENRCodecsSpec extends AnyFlatSpec with Matchers {
 
     val rlpStructureFromNode = RLPEncoder.encode(enr)
 
-    rlpStructureFromNode match {
+    rlpStructureFromNode match
       case list: RLPList =>
-        def compare(a: Iterable[RLPEncodeable], b: Iterable[RLPEncodeable]) = {
+        def compare(a: Iterable[RLPEncodeable], b: Iterable[RLPEncodeable]) =
           // .toString hack used because RLPValue has mutable arrays in it where equality doesn't work.
           val encoded = a.map(_.toString).toList
           val expected = b.map(_.toString).toList
           (encoded should contain).theSameElementsInOrderAs(expected)
-        }
 
         // Ignoring the signature, taking items up to where "tcp" would be.
         compare(list.items.drop(1).take(7), enrRLP.items.drop(1).take(7))
@@ -105,7 +104,6 @@ class ENRCodecsSpec extends AnyFlatSpec with Matchers {
 
       case other =>
         fail(s"Unexpected RLP structure $other")
-    }
   }
 
   it should "decode the address from the example ENR" taggedAs (UnitTest, NetworkTest) in {
@@ -113,14 +111,13 @@ class ENRCodecsSpec extends AnyFlatSpec with Matchers {
     val enrRLPWithTCP = enrRLP ++ RLPList("tcp", hex"7660")
     val enr = RLPDecoder.decode[EthereumNodeRecord](enrRLPWithTCP)
 
-    Node.Address.fromEnr(enr) match {
+    Node.Address.fromEnr(enr) match
       case Some(address) =>
         address.ip shouldBe localhost
         address.udpPort shouldBe 30303
         address.tcpPort shouldBe 30304
       case None =>
         fail("Couldn't extract the node address")
-    }
   }
 
   it should "verify the signature of the example ENR" taggedAs (UnitTest, NetworkTest) in {
@@ -178,4 +175,3 @@ class ENRCodecsSpec extends AnyFlatSpec with Matchers {
     address.tcpPort should be > 0
     address.udpPort should be > 0
   }
-}

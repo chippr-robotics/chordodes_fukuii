@@ -4,16 +4,17 @@ import java.security.SecureRandom
 
 import org.apache.pekko.util.ByteString
 
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.consensus.validators.SignedTransactionError._
+import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.*
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** EIP-7825: Validate per-transaction gas limit cap of 2^24 (16,777,216) post-Olympia. */
@@ -21,7 +22,7 @@ class EIP7825GasCapSpec
     extends AnyFlatSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   val olympiaBlock: BigInt = 10
 
@@ -34,11 +35,11 @@ class EIP7825GasCapSpec
   )
 
   val secureRandom = new SecureRandom()
-  val senderKeys = crypto.generateKeyPair(secureRandom)
-  val senderAddress = Address(senderKeys)
+  val senderKeys: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
+  val senderAddress: Address = Address(senderKeys)
   val senderAccount: Account = Account(nonce = 0, balance = UInt256(BigInt("1000000000000000000000")))
 
-  def makeTx(gasLimit: BigInt): SignedTransaction = {
+  def makeTx(gasLimit: BigInt): SignedTransaction =
     val tx = LegacyTransaction(
       nonce = 0,
       gasPrice = BigInt(1),
@@ -48,17 +49,15 @@ class EIP7825GasCapSpec
       payload = ByteString.empty
     )
     SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
-  }
 
-  def makeHeader(number: BigInt): BlockHeader = {
-    val extraFields = if (number >= olympiaBlock) HefPostOlympia(BigInt(1000000000)) else HefEmpty
+  def makeHeader(number: BigInt): BlockHeader =
+    val extraFields = if number >= olympiaBlock then HefPostOlympia(BigInt(1000000000)) else HefEmpty
     Fixtures.Blocks.ValidBlock.header.copy(
       number = number,
       gasLimit = BigInt(100_000_000),
       gasUsed = 0,
       extraFields = extraFields
     )
-  }
 
   "EIP-7825" should "reject tx with gas > 2^24 post-Olympia" taggedAs (OlympiaTest, ConsensusTest) in {
     val stx = makeTx(BigInt(16_777_217))
@@ -66,7 +65,7 @@ class EIP7825GasCapSpec
     val upfrontCost = UInt256(stx.tx.gasLimit * stx.tx.gasPrice)
 
     val result = StdSignedTransactionValidator.validate(stx, senderAccount, header, upfrontCost, 0)
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
     result.left.toOption.get shouldBe a[TransactionGasLimitExceedsCap]
   }
 
@@ -76,7 +75,7 @@ class EIP7825GasCapSpec
     val upfrontCost = UInt256(stx.tx.gasLimit * stx.tx.gasPrice)
 
     val result = StdSignedTransactionValidator.validate(stx, senderAccount, header, upfrontCost, 0)
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
   }
 
   it should "accept tx > 2^24 pre-Olympia" taggedAs (OlympiaTest, ConsensusTest) in {
@@ -85,10 +84,9 @@ class EIP7825GasCapSpec
     val upfrontCost = UInt256(stx.tx.gasLimit * stx.tx.gasPrice)
 
     val result = StdSignedTransactionValidator.validate(stx, senderAccount, header, upfrontCost, 0)
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
   }
 
   "TxGasLimitCap constant" should "be 2^24 (16,777,216)" taggedAs (OlympiaTest, ConsensusTest) in {
     StdSignedTransactionValidator.TxGasLimitCap shouldBe BigInt(16_777_216)
   }
-}

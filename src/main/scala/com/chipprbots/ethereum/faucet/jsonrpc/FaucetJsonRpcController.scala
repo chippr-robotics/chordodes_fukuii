@@ -2,7 +2,11 @@ package com.chipprbots.ethereum.faucet.jsonrpc
 
 import cats.effect.IO
 
-import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain._
+import org.apache.pekko.actor.ActorSystem
+
+import scala.concurrent.ExecutionContext
+
+import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
 import com.chipprbots.ethereum.jsonrpc.JsonRpcResponse
@@ -12,12 +16,15 @@ import com.chipprbots.ethereum.utils.Logger
 
 class FaucetJsonRpcController(
     faucetRpcService: FaucetRpcService,
-    override val config: JsonRpcConfig
+    override val config: JsonRpcConfig,
+    actorSystem: ActorSystem
 ) extends ApisBuilder
     with Logger
-    with JsonRpcBaseController {
+    with JsonRpcBaseController:
 
-  import FaucetMethodsImplicits._
+  implicit override def executionContext: ExecutionContext = actorSystem.dispatcher
+
+  import FaucetMethodsImplicits.given
 
   override def enabledApis: Seq[String] = config.apis
 
@@ -38,12 +45,9 @@ class FaucetJsonRpcController(
     case req @ JsonRpcRequest(_, FaucetJsonRpcController.Status, _, _) =>
       handle[StatusRequest, StatusResponse](faucetRpcService.status, req)
   }
-}
 
-object FaucetJsonRpcController {
+object FaucetJsonRpcController:
   private val Prefix = "faucet_"
 
   val SendFunds: String = Prefix + "sendFunds"
   val Status: String = Prefix + "status"
-
-}

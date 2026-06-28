@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-object RestrictedEthashBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
+object RestrictedEthashBlockHeaderValidator extends BlockHeaderValidatorSkeleton:
 
   override protected def validateEvenMore(blockHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
@@ -24,20 +24,14 @@ object RestrictedEthashBlockHeaderValidator extends BlockHeaderValidatorSkeleton
   private def validateSignatureAgainstAllowedMiners(
       blockHeader: BlockHeader,
       allowedMiners: Set[ByteString]
-  ): Either[BlockHeaderError, BlockHeaderValid] = {
+  ): Either[BlockHeaderError, BlockHeaderValid] =
     val emptyOrValid = allowedMiners.isEmpty || RestrictedPoWSigner.validateSignature(blockHeader, allowedMiners)
     Either.cond(emptyOrValid, BlockHeaderValid, RestrictedPoWHeaderExtraDataError)
-  }
 
   override protected def validateExtraData(
       blockHeader: BlockHeader
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     val tooLargeExtraData = blockHeader.extraData.length > ExtraDataMaxSize
 
-    if (tooLargeExtraData) {
-      Left(RestrictedPoWHeaderExtraDataError)
-    } else {
-      validateSignatureAgainstAllowedMiners(blockHeader, blockchainConfig.allowedMinersPublicKeys)
-    }
-  }
-}
+    if tooLargeExtraData then Left(RestrictedPoWHeaderExtraDataError)
+    else validateSignatureAgainstAllowedMiners(blockHeader, blockchainConfig.allowedMinersPublicKeys)

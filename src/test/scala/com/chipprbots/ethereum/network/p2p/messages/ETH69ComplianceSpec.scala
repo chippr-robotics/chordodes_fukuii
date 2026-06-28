@@ -9,7 +9,8 @@ import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.p2p.EthereumMessageDecoder
 import com.chipprbots.ethereum.network.p2p.NetworkMessageDecoder
 import com.chipprbots.ethereum.rlp.RLPList
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.domain.BloomFilter
 
 /** Wire-format compliance tests for ETH68 and ETH69.
   *
@@ -18,7 +19,7 @@ import com.chipprbots.ethereum.testing.Tags._
   *
   * Run before every JAR build targeted at live peer testing.
   */
-class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
+class ETH69ComplianceSpec extends AnyWordSpec with Matchers:
 
   private def decoder(cap: Capability) =
     NetworkMessageDecoder.orElse(EthereumMessageDecoder.ethMessageDecoder(cap))
@@ -26,7 +27,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
   // ── Status68 — ETH68 wire format: 6-field [v, netId, td, best, genesis, forkId] ──
 
   "ETH68 Status68" when {
-    import ETHPackets.Status68.Status68._
+    import ETHPackets.Status68.Status68.*
 
     "encoding and decoding" should {
       "round-trip correctly with all 6 fields" in {
@@ -48,9 +49,9 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val msg = ETHPackets.Status68.Status68(68, 61L, td, ByteString("best"), ByteString("genesis"), ForkId(1L, None))
         val encoded = msg.toBytes
         // Wire: RLPList[v, netId, td, best, genesis, forkId]
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         val rlpDecoded = rawDecode(encoded)
-        rlpDecoded match {
+        rlpDecoded match
           case RLPList(
                 RLPValue(_),
                 RLPValue(_),
@@ -62,7 +63,6 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
             import com.chipprbots.ethereum.utils.ByteUtils
             ByteUtils.bytesToBigInt(tdBytes) shouldEqual td
           case _ => fail("Expected 6-field RLPList for Status68")
-        }
       }
     }
   }
@@ -70,7 +70,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
   // ── Status69 — ETH69 wire format: 7-field [v, netId, genesis, forkId, earliest, latest, bestHash] ──
 
   "ETH69 Status69" when {
-    import ETHPackets.Status69.Status69._
+    import ETHPackets.Status69.Status69.*
 
     "encoding and decoding" should {
       "round-trip correctly with all 7 fields" in {
@@ -99,18 +99,16 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
           ByteString("hash")
         )
         val encoded = msg.toBytes
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         val rlpDecoded = rawDecode(encoded)
-        rlpDecoded match {
+        rlpDecoded match
           case rlpList: RLPList =>
             rlpList.items.size shouldEqual 7
             // Field 3 (index 2) should be genesisHash (32-byte ByteString), NOT a BigInt TD
-            rlpList.items(2) match {
+            rlpList.items(2) match
               case RLPValue(bytes) => bytes.length shouldEqual 7 // "genesis".getBytes
               case _               => fail("Field 3 should be genesisHash RLPValue")
-            }
           case _ => fail("Expected RLPList for Status69")
-        }
       }
 
       "field ordering matches EIP-7642: [v, netId, genesis, forkId, earliest, latest, bestHash]" in {
@@ -129,13 +127,12 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val encoded = msg.toBytes
         // Decode as ETH69 — should give back same fields
         val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, encoded)
-        decoded match {
+        decoded match
           case Right(s: ETHPackets.Status69.Status69) =>
             s.genesisHash shouldEqual genesisHash
             s.latestBlock shouldEqual latestBlock
             s.latestBlockHash shouldEqual latestHash
           case other => fail(s"Expected Status69, got $other")
-        }
       }
     }
   }
@@ -143,7 +140,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
   // ── BlockRangeUpdate — ETH69 new message: [earliest, latest, latestHash] ──
 
   "ETH69 BlockRangeUpdate" when {
-    import ETHPackets.BlockRangeUpdate._
+    import ETHPackets.BlockRangeUpdate.*
 
     "encoding and decoding" should {
       "round-trip correctly" in {
@@ -165,11 +162,11 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
   // ── Receipts68 — bloom PRESENT in wire format ──
 
   "ETH68 Receipts68" when {
-    import ETHPackets.Receipts68._
+    import ETHPackets.Receipts68.*
 
     "encoding and decoding" should {
       "round-trip with raw RLPList (bloom-inclusive blocks)" in {
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         val bloom256 = Array.fill(256)(0xff.toByte)
         val receiptRLP = RLPList(
           RLPValue(Array.fill(32)(0xaa.toByte)), // stateHash
@@ -180,24 +177,22 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val receiptsForBlocks = RLPList(RLPList(receiptRLP))
         val msg = ETHPackets.Receipts68(requestId = BigInt(42), receiptsForBlocks)
         val encoded = msg.toBytes
-        decoder(Capability.ETH68).fromBytes(Codes.ReceiptsCode, encoded) match {
+        decoder(Capability.ETH68).fromBytes(Codes.ReceiptsCode, encoded) match
           case Right(r: ETHPackets.Receipts68) =>
             r.requestId shouldEqual BigInt(42)
             // Verify bloom field is present (4 fields per receipt)
             val firstReceipt = r.receiptsForBlocks.items.head.asInstanceOf[RLPList].items.head.asInstanceOf[RLPList]
             firstReceipt.items.size shouldEqual 4 // stateHash, gasUsed, bloom, logs
           case other => fail(s"Expected Receipts68, got $other")
-        }
       }
 
       "decode from ETH68 decoder (not ETH69)" in {
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         val msg = ETHPackets.Receipts68(BigInt(1), RLPList())
         val encoded = msg.toBytes
-        decoder(Capability.ETH68).fromBytes(Codes.ReceiptsCode, encoded) match {
+        decoder(Capability.ETH68).fromBytes(Codes.ReceiptsCode, encoded) match
           case Right(_: ETHPackets.Receipts68) => succeed
           case other                           => fail(s"Expected Receipts68, got $other")
-        }
       }
     }
   }
@@ -205,11 +200,11 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
   // ── Receipts69 — bloom ABSENT from wire format (EIP-7642) ──
 
   "ETH69 Receipts69" when {
-    import ETHPackets.Receipts69._
+    import ETHPackets.Receipts69.*
 
     "encoding and decoding" should {
       "round-trip with raw RLPList (bloom-absent blocks)" in {
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         // ETH69 receipt: only 3 fields — [stateHash, gasUsed, logs] — NO bloom (EIP-7642)
         val receiptRLP = RLPList(
           RLPValue(Array.fill(32)(0xaa.toByte)), // stateHash
@@ -219,28 +214,26 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val receiptsForBlocks = RLPList(RLPList(receiptRLP))
         val msg = ETHPackets.Receipts69(requestId = BigInt(42), receiptsForBlocks)
         val encoded = msg.toBytes
-        decoder(Capability.ETH69).fromBytes(Codes.ReceiptsCode, encoded) match {
+        decoder(Capability.ETH69).fromBytes(Codes.ReceiptsCode, encoded) match
           case Right(r: ETHPackets.Receipts69) =>
             r.requestId shouldEqual BigInt(42)
             // Verify bloom field is ABSENT (3 fields per receipt, not 4)
             val firstReceipt = r.receiptsForBlocks.items.head.asInstanceOf[RLPList].items.head.asInstanceOf[RLPList]
             firstReceipt.items.size shouldEqual 3 // stateHash, gasUsed, logs — NO bloom
           case other => fail(s"Expected Receipts69, got $other")
-        }
       }
 
       "decode from ETH69 decoder (not ETH68)" in {
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         val msg = ETHPackets.Receipts69(BigInt(1), RLPList())
         val encoded = msg.toBytes
-        decoder(Capability.ETH69).fromBytes(Codes.ReceiptsCode, encoded) match {
+        decoder(Capability.ETH69).fromBytes(Codes.ReceiptsCode, encoded) match
           case Right(_: ETHPackets.Receipts69) => succeed
           case other                           => fail(s"Expected Receipts69, got $other")
-        }
       }
 
       "have 3 fields per receipt (not 4) — bloom ABSENT" in {
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         // Bloom-absent receipt has 3 fields
         val bloomAbsentReceipt = RLPList(
           RLPValue(Array.fill(32)(0xaa.toByte)), // stateHash
@@ -264,16 +257,15 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
   // ── ETH68 supports GetReceipts (ETHPackets type) ──
 
   "ETH68 GetReceipts" when {
-    import ETHPackets.GetReceipts._
+    import ETHPackets.GetReceipts.*
 
     "encoding and decoding" should {
       "round-trip via ETH68 decoder" in {
         val msg = ETHPackets.GetReceipts(BigInt(7), Seq(ByteString(Array.fill(32)(0xde.toByte))))
         val encoded = msg.toBytes
-        decoder(Capability.ETH68).fromBytes(Codes.GetReceiptsCode, encoded) match {
+        decoder(Capability.ETH68).fromBytes(Codes.GetReceiptsCode, encoded) match
           case Right(_: ETHPackets.GetReceipts) => succeed
           case other                            => fail(s"Expected GetReceipts, got $other")
-        }
       }
     }
   }
@@ -281,16 +273,15 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
   // ── ETH69 returns GetReceipts69 (distinct type triggering bloom-absent response) ──
 
   "ETH69 GetReceipts69" when {
-    import ETHPackets.GetReceipts69._
+    import ETHPackets.GetReceipts69.*
 
     "encoding and decoding" should {
       "return GetReceipts69 (not GetReceipts) from ETH69 decoder" in {
         val msg = ETHPackets.GetReceipts69(BigInt(9), Seq(ByteString(Array.fill(32)(0xde.toByte))))
         val encoded = msg.toBytes
-        decoder(Capability.ETH69).fromBytes(Codes.GetReceiptsCode, encoded) match {
+        decoder(Capability.ETH69).fromBytes(Codes.GetReceiptsCode, encoded) match
           case Right(_: ETHPackets.GetReceipts69) => succeed
           case other                              => fail(s"Expected GetReceipts69, got $other")
-        }
       }
     }
   }
@@ -305,10 +296,10 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
   // a LegacyReceipt with a real non-zero bloom does NOT include that bloom on the wire.
 
   "ETH69 Receipts69 bloom regression" when {
-    import ETHPackets.Receipts69._
+    import ETHPackets.Receipts69.*
     import ETHPackets.ReceiptBloomFreeEnc
-    import com.chipprbots.ethereum.rlp._
-    import com.chipprbots.ethereum.domain._
+    import com.chipprbots.ethereum.rlp.*
+    import com.chipprbots.ethereum.domain.*
 
     "encoding a LegacyReceipt via ReceiptBloomFreeEnc" should {
 
@@ -317,15 +308,14 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val receipt = LegacyReceipt(
           SuccessOutcome,
           cumulativeGasUsed = BigInt(21000),
-          logsBloomFilter = bloom256,
+          logsBloomFilter = BloomFilter(bloom256),
           logs = Seq.empty
         )
         val receiptRLP = new ReceiptBloomFreeEnc(receipt).toRLPEncodable
-        receiptRLP match {
+        receiptRLP match
           case r: RLPList =>
             r.items.size shouldEqual 3 // stateHash, gasUsed, logs — NO bloom
           case _ => fail("Expected RLPList for receipt")
-        }
       }
 
       "not include the 256-byte bloom in Receipts69 wire bytes" taggedAs UnitTest in {
@@ -333,7 +323,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val receipt = LegacyReceipt(
           SuccessOutcome,
           cumulativeGasUsed = BigInt(21000),
-          logsBloomFilter = bloom256,
+          logsBloomFilter = BloomFilter(bloom256),
           logs = Seq.empty
         )
         // Build Receipts69 using the production bloom-free path
@@ -354,7 +344,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val receipt = LegacyReceipt(
           HashOutcome(ByteString(Array.fill(32)(0x11.toByte))),
           cumulativeGasUsed = BigInt(50000),
-          logsBloomFilter = bloom256,
+          logsBloomFilter = BloomFilter(bloom256),
           logs = Seq.empty
         )
         val receiptRLP = new ReceiptBloomFreeEnc(receipt).toRLPEncodable
@@ -362,14 +352,13 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val msg = ETHPackets.Receipts69(BigInt(5), receiptsForBlocks)
         val wireBytes = msg.toBytes
 
-        decoder(Capability.ETH69).fromBytes(Codes.ReceiptsCode, wireBytes) match {
+        decoder(Capability.ETH69).fromBytes(Codes.ReceiptsCode, wireBytes) match
           case Right(r: ETHPackets.Receipts69) =>
             r.requestId shouldEqual BigInt(5)
             val blockReceipts = r.receiptsForBlocks.items.head.asInstanceOf[RLPList]
             val innerReceipt = blockReceipts.items.head.asInstanceOf[RLPList]
             innerReceipt.items.size shouldEqual 3 // no bloom
           case other => fail(s"Expected Receipts69, got $other")
-        }
       }
     }
   }
@@ -383,7 +372,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
 
     "receiving an ETH/68-shaped 6-field STATUS on the eth/69 channel" should {
       "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
-        import ETHPackets.Status68.Status68._
+        import ETHPackets.Status68.Status68.*
         val eth68Shaped = ETHPackets.Status68.Status68(
           protocolVersion = 69,
           networkId = 7L,
@@ -393,7 +382,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
           forkId = ForkId(0xbe46d57cL, None)
         )
         val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, eth68Shaped.toBytes)
-        decoded match {
+        decoded match
           case Right(s: ETHPackets.Status69.Status69) =>
             s.protocolVersion shouldEqual 69
             s.networkId shouldEqual 7L
@@ -403,14 +392,13 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
             s.latestBlock shouldEqual BigInt(0)
             s.latestBlockHash shouldEqual ByteString.empty
           case other => fail(s"Expected stub Status69 decode, got $other")
-        }
       }
     }
 
     "receiving the legacy 6-field shape (forkId at index 3, no earliestBlock)" should {
       "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
-        import com.chipprbots.ethereum.rlp._
-        import ETHPackets.Status69.Status69._
+        import com.chipprbots.ethereum.rlp.*
+        import ETHPackets.Status69.Status69.*
         val canonical = ETHPackets.Status69.Status69(
           protocolVersion = 69,
           networkId = 7L,
@@ -423,7 +411,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val i = rawDecode(canonical.toBytes).asInstanceOf[RLPList].items
         val legacyBytes = encode(RLPList(i(0), i(1), i(2), i(3), i(5), i(6)))
         val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, legacyBytes)
-        decoded match {
+        decoded match
           case Right(s: ETHPackets.Status69.Status69) =>
             s.networkId shouldEqual 7L
             s.genesisHash shouldEqual ByteString.empty
@@ -432,14 +420,13 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
             s.latestBlock shouldEqual BigInt(0)
             s.latestBlockHash shouldEqual ByteString.empty
           case other => fail(s"Expected stub Status69 decode, got $other")
-        }
       }
     }
 
     "receiving an 8-field STATUS (canonical 7 + 1 trailing extension field)" should {
       "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
-        import com.chipprbots.ethereum.rlp._
-        import ETHPackets.Status69.Status69._
+        import com.chipprbots.ethereum.rlp.*
+        import ETHPackets.Status69.Status69.*
         val canonical = ETHPackets.Status69.Status69(
           protocolVersion = 69,
           networkId = 1L,
@@ -453,7 +440,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val eightFieldBytes =
           encode(RLPList(i(0), i(1), i(2), i(3), i(4), i(5), i(6), RLPValue(BigInt(99).toByteArray)))
         val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, eightFieldBytes)
-        decoded match {
+        decoded match
           case Right(s: ETHPackets.Status69.Status69) =>
             s.networkId shouldEqual 1L
             s.genesisHash shouldEqual ByteString.empty
@@ -462,13 +449,12 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
             s.latestBlock shouldEqual BigInt(0)
             s.latestBlockHash shouldEqual ByteString.empty
           case other => fail(s"Expected stub Status69 decode, got $other")
-        }
       }
     }
 
     "receiving an 8-field all-RLPValue STATUS (no forkId RLPList — live observed variant)" should {
       "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         // Mirrors the live DECODE_ERROR observed on 5.161.72.73:30303:
         // RLPList(Queue(RLPValue(45), RLPValue(89), ...)) — 8 RLPValues, no embedded RLPList.
         val eightAllValueBytes = encode(
@@ -484,19 +470,18 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
           )
         )
         val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, eightAllValueBytes)
-        decoded match {
+        decoded match
           case Right(s: ETHPackets.Status69.Status69) =>
             s.protocolVersion shouldEqual 45
             s.networkId shouldEqual 89L
             s.genesisHash shouldEqual ByteString.empty
           case other => fail(s"Expected stub Status69 decode for all-RLPValue input, got $other")
-        }
       }
     }
 
     "receiving a STATUS that matches no known shape" should {
       "still be rejected" taggedAs UnitTest in {
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         // Single-field input — does not satisfy the 2-field minimum of the catch-all arm.
         val garbage = encode(RLPList(RLPValue(Array[Byte](69))))
         val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, garbage)
@@ -504,4 +489,3 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

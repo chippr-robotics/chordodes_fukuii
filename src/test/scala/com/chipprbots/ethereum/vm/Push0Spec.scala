@@ -5,10 +5,10 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
 
-class Push0Spec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks {
+class Push0Spec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks:
 
   // Use Spiral config which includes PUSH0
   override val config: EvmConfig = EvmConfig.SpiralConfigBuilder(blockchainConfig)
@@ -22,24 +22,22 @@ class Push0Spec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaC
       val stateOut = PUSH0.execute(stateIn)
 
       // Should not error if stack has room
-      if (stateIn.stack.size < stateIn.stack.maxSize) {
+      if stateIn.stack.size < stateIn.stack.maxSize then
         stateOut.error shouldBe None
         stateOut.stack.size shouldEqual stateIn.stack.size + 1
         val (top, _) = stateOut.stack.pop()
         top shouldEqual UInt256.Zero
         stateOut.pc shouldEqual stateIn.pc + 1
-      }
     }
   }
 
   test("PUSH0 should use 2 gas (G_base)", UnitTest, VMTest) {
     forAll(Generators.getProgramStateGen()) { stateIn =>
       // Only test when we have enough gas
-      if (stateIn.gas >= 2 && stateIn.stack.size < stateIn.stack.maxSize) {
+      if stateIn.gas >= 2 && stateIn.stack.size < stateIn.stack.maxSize then
         val stateOut = PUSH0.execute(stateIn)
         stateOut.error shouldBe None
         stateOut.gas shouldEqual (stateIn.gas - 2)
-      }
     }
   }
 
@@ -183,4 +181,3 @@ class Push0Spec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaC
     val finalState = PUSH0.execute(state)
     finalState.error shouldBe Some(StackOverflow)
   }
-}

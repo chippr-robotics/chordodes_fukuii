@@ -7,12 +7,12 @@ import com.chipprbots.ethereum.utils.VmConfig
 /** VM setup — only internal VM is supported. External VM features (IELE, KEVM) were experimental in the original Mantis
   * codebase and have been removed. The configuration key `vm.mode` must be set to "internal" (the default).
   */
-object VmSetup extends Logger {
+object VmSetup extends Logger:
 
-  import VmConfig.VmMode._
+  import VmConfig.VmMode.*
 
   def vm(vmConfig: VmConfig): VMImpl =
-    vmConfig.mode match {
+    vmConfig.mode match
       case Internal =>
         log.info("Using Fukuii internal VM")
         new VMImpl
@@ -20,6 +20,3 @@ object VmSetup extends Logger {
       case _ =>
         log.error("Only vm.mode = 'internal' is supported.")
         throw new RuntimeException("External VM features are not supported. Use vm.mode = 'internal'")
-    }
-
-}

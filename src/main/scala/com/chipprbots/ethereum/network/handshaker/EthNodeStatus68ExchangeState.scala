@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.network.handshaker
 
 import cats.effect.SyncIO
 
-import com.chipprbots.ethereum.forkid.Connect
+import com.chipprbots.ethereum.forkid.ForkIdValidationResult.Connect
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.forkid.ForkIdValidator
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
@@ -27,10 +27,10 @@ case class EthNodeStatus68ExchangeState(
     supportsSnap: Boolean = false,
     peerCapabilities: List[Capability] = List.empty,
     clientId: String = ""
-) extends NodeStatusExchangeState[ETHPackets.Status68.Status68] {
+) extends NodeStatusExchangeState[ETHPackets.Status68.Status68]:
 
-  import ETHPackets.Status68.Status68._ // toBytes for createStatusMsg
-  import handshakerConfiguration._
+  import ETHPackets.Status68.Status68.* // toBytes for createStatusMsg
+  import handshakerConfiguration.*
 
   def applyResponseMessage: PartialFunction[Message, HandshakerState[PeerInfo]] = {
     // ETH68MessageDecoder returns ETHPackets.Status68.Status68
@@ -52,7 +52,7 @@ case class EthNodeStatus68ExchangeState(
       bestHash: org.apache.pekko.util.ByteString,
       genesisHash: org.apache.pekko.util.ByteString,
       forkId: ForkId
-  ): HandshakerState[PeerInfo] = {
+  ): HandshakerState[PeerInfo] =
     import ForkIdValidator.syncIoLogger
     log.debug(
       "ETH{}_STATUS: Received - totalDifficulty={}, networkId={}, bestHash={}, genesisHash={}, forkId={}",
@@ -64,10 +64,10 @@ case class EthNodeStatus68ExchangeState(
       forkId
     )
 
-    val localBestBlock = blockchainReader.getBestBlockNumber()
-    val localGenesisHash = blockchainReader.genesisHeader.hash
+    val localBestBlock = blockchainReader.getBestBlockNumber
+    val localGenesisHash = blockchainReader.genesisHeader.hash.value
     val storedTimestamp = blockchainReader.getBlockHeaderByNumber(localBestBlock).map(_.unixTimestamp).getOrElse(0L)
-    val localBestTimestamp = if (storedTimestamp == 0L) System.currentTimeMillis() / 1000 else storedTimestamp
+    val localBestTimestamp = if storedTimestamp == 0L then System.currentTimeMillis() / 1000 else storedTimestamp
     val localForkId = ForkId.create(localGenesisHash, blockchainConfig)(localBestBlock, localBestTimestamp)
 
     log.debug(
@@ -78,7 +78,7 @@ case class EthNodeStatus68ExchangeState(
       localForkId
     )
 
-    if (networkId != peerConfiguration.networkId) {
+    if networkId != peerConfiguration.networkId then
       log.debug(
         "ETH{}_STATUS: NetworkId mismatch - local={}, remote={} - disconnecting",
         protocolVersion,
@@ -86,7 +86,7 @@ case class EthNodeStatus68ExchangeState(
         networkId
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else if (genesisHash != localGenesisHash) {
+    else if genesisHash != localGenesisHash then
       log.debug(
         "ETH{}_STATUS: Genesis mismatch - local={}, remote={} - disconnecting",
         protocolVersion,
@@ -94,16 +94,15 @@ case class EthNodeStatus68ExchangeState(
         genesisHash
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else {
-      (for {
-        validationResult <-
-          ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash, blockchainConfig)(
-            blockchainReader.getBestBlockNumber(),
+    else
+      (for validationResult <-
+          ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash.value, blockchainConfig)(
+            blockchainReader.getBestBlockNumber,
             forkId
           )
-      } yield {
+      yield
         log.debug("STATUS_EXCHANGE: ForkId validation result: {}", validationResult)
-        validationResult match {
+        validationResult match
           case Connect =>
             log.info(
               "ETH{}_STATUS: Accepted - totalDifficulty={}, latestBlock={} (forkId ok)",
@@ -133,14 +132,11 @@ case class EthNodeStatus68ExchangeState(
               forkId
             )
             DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-        }
-      }).unsafeRunSync()
-    }
-  }
+      ).unsafeRunSync()
 
-  override protected def createStatusMsg(): MessageSerializable = {
+  override protected def createStatusMsg(): MessageSerializable =
     val bestBlockHeader = getBestBlockHeader()
-    val bestBlockNumber = blockchainReader.getBestBlockNumber()
+    val bestBlockNumber = blockchainReader.getBestBlockNumber
 
     // ChainWeightStorage isn't populated for blocks reached via SNAP sync (the pivot block
     // has no upstream PoW chain in our DB to sum difficulties over). On post-merge chains
@@ -169,20 +165,20 @@ case class EthNodeStatus68ExchangeState(
         ttdFallback
       }
 
-    val genesisHash = blockchainReader.genesisHeader.hash
+    val genesisHash = blockchainReader.genesisHeader.hash.value
 
     // ALIGNMENT WITH CORE-GETH: Use actual current block number for ForkId calculation.
     // Core-geth uses head.Number.Uint64() and head.Time for forkID — not checkpoints.
     val forkIdBlockNumber = bestBlockNumber
     val forkIdTimestamp =
-      if (bestBlockHeader.unixTimestamp == 0L) System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
+      if bestBlockHeader.unixTimestamp == 0L then System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
     val forkId = ForkId.create(genesisHash, blockchainConfig)(forkIdBlockNumber, forkIdTimestamp)
 
     val status = ETHPackets.Status68.Status68(
       protocolVersion = negotiatedCapability.version,
       networkId = peerConfiguration.networkId,
-      totalDifficulty = chainWeight.totalDifficulty,
-      bestHash = bestBlockHeader.hash,
+      totalDifficulty = chainWeight.totalDifficulty.value,
+      bestHash = bestBlockHeader.hash.value,
       genesisHash = genesisHash,
       forkId = forkId
     )
@@ -198,17 +194,13 @@ case class EthNodeStatus68ExchangeState(
       forkId
     )
 
-    if (log.underlying.isDebugEnabled()) {
+    if log.underlying.isDebugEnabled() then
       val encodedBytes = status.toBytes
       val hexBytes = org.bouncycastle.util.encoders.Hex.toHexString(encodedBytes)
       log.debug(
         "STATUS_EXCHANGE: Raw RLP bytes (len={}): {}",
         encodedBytes.length,
-        if (hexBytes.length > 200) hexBytes.take(200) + "..." else hexBytes
+        if hexBytes.length > 200 then hexBytes.take(200) + "..." else hexBytes
       )
-    }
 
     status
-  }
-
-}

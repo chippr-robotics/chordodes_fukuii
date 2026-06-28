@@ -15,7 +15,7 @@ object RLPImplicitConversions {
   implicit def fromOptionalEncodeable[T: RLPDecoder]: (Option[RLPEncodeable]) => Option[T] = _.map(fromEncodeable[T])
 
   implicit def toRlpList[T](values: Seq[T])(implicit enc: RLPEncoder[T]): RLPList =
-    RLPList(values.map(v => toEncodeable[T](v)): _*)
+    RLPList(values.map(v => toEncodeable[T](v))*)
 
   def fromRlpList[T](rlpList: RLPList)(implicit dec: RLPDecoder[T]): Seq[T] =
     rlpList.items.map(dec.decode)

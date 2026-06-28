@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import java.lang.management.ManagementFactory
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 /** Windowed JVM garbage-collection pressure sampler for the post-SNAP frontier-rebuild walk (US2 / FR-007).
   *
@@ -25,7 +25,7 @@ import scala.jdk.CollectionConverters._
 class GcPressureSampler(
     gcCollectionTimeMsSupplier: () => Long = GcPressureSampler.defaultGcCollectionTimeMs,
     wallClockMsSupplier: () => Long = () => System.currentTimeMillis()
-) {
+):
 
   private val baselinePauseMs: Long = gcCollectionTimeMsSupplier()
   private val baselineWallMs: Long = wallClockMsSupplier()
@@ -37,15 +37,13 @@ class GcPressureSampler(
     *   `fraction = deltaPauseMs / max(1, wallMsSinceBaseline)` — guarded against divide-by-zero so a sample taken in
     *   the same millisecond as construction yields `fraction == 0.0` rather than throwing.
     */
-  def sample(): (Long, Double) = {
+  def sample(): (Long, Double) =
     val deltaPauseMs = math.max(0L, gcCollectionTimeMsSupplier() - baselinePauseMs)
     val wallMsSinceBaseline = math.max(0L, wallClockMsSupplier() - baselineWallMs)
     val fraction = deltaPauseMs.toDouble / math.max(1L, wallMsSinceBaseline).toDouble
     (deltaPauseMs, fraction)
-  }
-}
 
-object GcPressureSampler {
+object GcPressureSampler:
 
   /** Sum of every registered GC collector's cumulative collection time (ms). A collector reporting `-1` (collection
     * time unavailable) contributes 0 so it never drags the sum negative.
@@ -54,4 +52,3 @@ object GcPressureSampler {
     ManagementFactory.getGarbageCollectorMXBeans.asScala.iterator
       .map(bean => math.max(0L, bean.getCollectionTime))
       .sum
-}

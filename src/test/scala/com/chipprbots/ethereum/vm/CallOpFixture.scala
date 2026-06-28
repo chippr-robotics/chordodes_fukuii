@@ -2,17 +2,18 @@ package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.utils.ByteStringUtils._
-import com.chipprbots.ethereum.vm.MockWorldState._
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
+import com.chipprbots.ethereum.vm.MockWorldState.*
 
-class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
-  import config.feeSchedule._
+class CallOpFixture(val config: EvmConfig, val startState: MockWorldState):
+  import config.feeSchedule.*
 
   val ownerAddr: Address = Address(0xcafebabe)
   val extAddr: Address = Address(0xfacefeed)
@@ -111,13 +112,12 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
 
   val initialBalance: UInt256 = UInt256(1000)
 
-  val requiredGas: BigInt = {
+  val requiredGas: BigInt =
     val storageCost = 3 * G_sset
     val memCost = config.calcMemCost(0, 0, 32)
     val copyCost = G_copy * wordsForBytes(32)
 
     extCode.linearConstGas(config) + storageCost + memCost + copyCost
-  }
 
   val gasMargin = 13
 
@@ -127,7 +127,7 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
   val invalidProgram: Program = Program(concatByteStrings(extProgram.code.init, INVALID.code))
   val selfDestructProgram = selfDestructCode.program
   val sstoreWithClearProgram = sstoreWithClearCode.program
-  val accountWithCode: ByteString => Account = code => Account.empty().withCode(kec256(code))
+  val accountWithCode: ByteString => Account = code => Account.empty().withCode(CodeHash(kec256(code)))
 
   val worldWithoutExtAccount: MockWorldState = startState.saveAccount(ownerAddr, initialOwnerAccount)
 
@@ -195,7 +195,7 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
       outOffset: UInt256 = inputData.size,
       outSize: UInt256 = inputData.size / 2,
       toAlreadyAccessed: Boolean = false
-  ) extends CallResult {
+  ) extends CallResult:
 
     val vm = new TestVM
 
@@ -205,11 +205,11 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
 
     private val paramsForDelegate = params.take(4) ++ params.drop(5)
 
-    private val stack = Stack.empty().push(if (op == DELEGATECALL) paramsForDelegate else params)
+    private val stack = Stack.empty().push(if op == DELEGATECALL then paramsForDelegate else params)
     private val mem = Memory.empty.store(UInt256.Zero, inputData)
 
     val baseStateIn: PS = ProgramState(vm, context, env).withStack(stack).withMemory(mem)
-    val stateIn: PS = if (toAlreadyAccessed) baseStateIn.addAccessedAddress(to) else baseStateIn
+    val stateIn: PS = if toAlreadyAccessed then baseStateIn.addAccessedAddress(to) else baseStateIn
     val stateOut: PS = op.execute(stateIn)
     val world: MockWorldState = stateOut.world
 
@@ -218,10 +218,8 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
 
     val ownStorage: MockStorage = world.getStorage(env.ownerAddr)
     val extStorage: MockStorage = world.getStorage(to)
-  }
-}
 
-protected[vm] trait CallResult {
+protected[vm] trait CallResult:
   def inputData: ByteString
   def stateOut: PS
   def world: MockWorldState
@@ -232,4 +230,3 @@ protected[vm] trait CallResult {
   def outOffset: UInt256
   def outSize: UInt256
   def value: UInt256
-}

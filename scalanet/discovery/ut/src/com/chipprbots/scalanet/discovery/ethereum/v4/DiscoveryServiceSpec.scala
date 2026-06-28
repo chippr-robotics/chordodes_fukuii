@@ -1,6 +1,6 @@
 package com.chipprbots.scalanet.discovery.ethereum.v4
 
-import cats.implicits._
+import cats.implicits.*
 import cats.effect.Ref
 import com.chipprbots.scalanet.discovery.crypto.{PublicKey, Signature}
 import com.chipprbots.scalanet.discovery.ethereum.{EthereumNodeRecord, Node}
@@ -20,13 +20,13 @@ import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.Inspectors
 import org.scalatest.prop.TableDrivenPropertyChecks
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
 import java.net.InetAddress
 
 class DiscoveryServiceSpec extends AsyncFlatSpec with Matchers with TableDrivenPropertyChecks {
   import DiscoveryService.{State, BondingResults}
-  import DiscoveryServiceSpec._
+  import DiscoveryServiceSpec.*
   // Bring DefaultCodecs' given instances (Codec[Content], etc.) into scope.
   // Scala 3 wildcard imports do NOT carry given/implicit instances by default.
   import DefaultCodecs.{given, *}

@@ -1,8 +1,7 @@
 package com.chipprbots.ethereum.ethtest
 
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
-
-import com.chipprbots.ethereum.testing.Tags._
 
 /** Comprehensive state test suite using official Ethereum execution specs.
   *
@@ -34,7 +33,7 @@ import com.chipprbots.ethereum.testing.Tags._
   * @see
   *   GeneralStateTests documentation: https://github.com/ethereum/tests/tree/develop/GeneralStateTests
   */
-class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
+class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec:
 
   // Note: The ethereum/tests repository contains GeneralStateTests which are blockchain tests
   // in the BlockchainTests/GeneralStateTests directory. These use the BlockchainTest format
@@ -59,14 +58,13 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
       info(s"  Network fork: ${test.network}")
 
       val result = executeTest(test)
-      result match {
+      result match
         case Right(executionResult) =>
           info(s"  ✓ Execution spec test passed")
           info(s"  Blocks executed: ${executionResult.blocksExecuted}")
           info(s"  Final state root: ${executionResult.finalStateRoot.toHex}")
         case Left(error) =>
           fail(s"Execution spec test failed: $error")
-      }
     }
   }
 
@@ -89,13 +87,12 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
       info(s"  Network: ${test.network}")
 
       val result = executeTest(test)
-      result match {
+      result match
         case Right(executionResult) =>
           info(s"  ✓ State transition validated")
           info(s"  Blocks executed: ${executionResult.blocksExecuted}")
         case Left(error) =>
           fail(s"State transition test failed: $error")
-      }
     }
   }
 
@@ -114,13 +111,12 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
 
       suite.tests.foreach { case (testName, test) =>
         val result = executeTest(test)
-        result match {
+        result match
           case Right(_) =>
             info(s"  ✓ State root validated for $testName")
           // State root is computed and validated automatically by executeTest
           case Left(error) =>
             fail(s"State root validation failed for $testName: $error")
-        }
       }
     }
   }
@@ -137,7 +133,7 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
 
     suite.tests.foreach { case (_, test) =>
       val result = executeTest(test)
-      result shouldBe a[Right[_, _]]
+      result shouldBe a[Right[?, ?]]
     }
   }
 
@@ -154,12 +150,11 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
     suite.tests.foreach { case (_, test) =>
       info(s"  Testing fork: ${test.network}")
       val result = executeTest(test)
-      result match {
+      result match
         case Right(_) =>
           info(s"  ✓ Fork ${test.network} validated")
         case Left(error) =>
           fail(s"Fork ${test.network} validation failed: $error")
-      }
     }
   }
 
@@ -174,13 +169,12 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
 
     suite.tests.foreach { case (testName, test) =>
       val result = executeTest(test)
-      result match {
+      result match
         case Right(_) =>
           info(s"  ✓ Account state updated correctly for $testName")
         // Post-state validation is done automatically by executeTest
         case Left(error) =>
           fail(s"Account state update failed: $error")
-      }
     }
   }
 
@@ -197,7 +191,7 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
       val suite = loadTestSuite(testPath)
       suite.tests.foreach { case (_, test) =>
         val result = executeTest(test)
-        result shouldBe a[Right[_, _]]
+        result shouldBe a[Right[?, ?]]
       }
     }
   }
@@ -213,12 +207,11 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
 
     suite.tests.foreach { case (testName, test) =>
       val result = executeTest(test)
-      result match {
+      result match
         case Right(_) =>
           info(s"  ✓ Storage operations validated for $testName")
         case Left(error) =>
           fail(s"Storage operation failed: $error")
-      }
     }
   }
 
@@ -234,7 +227,7 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
 
     suite.tests.foreach { case (_, test) =>
       val result = executeTest(test)
-      result shouldBe a[Right[_, _]]
+      result shouldBe a[Right[?, ?]]
     }
   }
 
@@ -258,17 +251,15 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
       suite.tests.foreach { case (testName, test) =>
         totalTests += 1
         val result = executeTest(test)
-        result match {
+        result match
           case Right(_) =>
             passedTests += 1
             info(s"  ✓ $testName passed")
           case Left(error) =>
             info(s"  ✗ $testName failed: $error")
-        }
       }
     }
 
     info(s"Execution specs validation: $passedTests/$totalTests tests passed")
     passedTests should be > 0
   }
-}

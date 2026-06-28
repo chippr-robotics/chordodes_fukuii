@@ -3,38 +3,36 @@ package com.chipprbots.ethereum.jsonrpc
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.{TestKit, TestProbe}
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
 
 import cats.effect.unsafe.implicits.global
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.McpService._
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.jsonrpc.McpService.*
+import com.chipprbots.ethereum.network.PeerManagerActor
+import com.chipprbots.ethereum.utils.*
 
-class McpServiceSpec
-    extends TestKit(ActorSystem("McpServiceSpec"))
-    with AnyWordSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class McpServiceSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with Matchers:
 
-  override def afterAll(): Unit =
-    TestKit.shutdownActorSystem(system)
-
-  implicit val timeout: Timeout = Timeout(3.seconds)
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
+  implicit override val timeout: Timeout = Timeout(3.seconds)
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
+  implicit val scheduler: typed.Scheduler = system.scheduler
 
-  val peerManagerProbe = TestProbe()
-  val syncControllerProbe = TestProbe()
+  val peerManagerProbe: TestProbe = TestProbe()
+  val syncControllerProbe: TestProbe = TestProbe()
 
-  val testBlockchainConfig = BlockchainConfig(
+  val testBlockchainConfig: BlockchainConfig = BlockchainConfig(
     chainId = BigInt(61),
     networkId = 1,
     maxCodeSize = None,
@@ -52,7 +50,7 @@ class McpServiceSpec
 
   // Use null for dependencies not exercised in basic tests
   val service = new McpService(
-    peerManagerProbe.ref,
+    peerManagerProbe.ref.toTyped[PeerManagerActor.Command],
     syncControllerProbe.ref,
     null.asInstanceOf[BlockchainReader],
     testBlockchainConfig,
@@ -168,4 +166,3 @@ class McpServiceSpec
       result.description.get should include("Unknown prompt")
     }
   }
-}

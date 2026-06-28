@@ -1,8 +1,6 @@
 package com.chipprbots.ethereum.utils
 
-object StringUtils {
+object StringUtils:
 
   def drop0x(s: String): String =
-    if (s.startsWith("0x")) s.substring(2) else s
-
-}
+    if s.startsWith("0x") then s.substring(2) else s

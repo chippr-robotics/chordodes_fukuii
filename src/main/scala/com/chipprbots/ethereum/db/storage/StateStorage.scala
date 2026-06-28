@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import scala.concurrent.duration.FiniteDuration
 
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
 import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.cache.MapCache
 import com.chipprbots.ethereum.db.dataSource.DataSource
@@ -15,11 +16,10 @@ import com.chipprbots.ethereum.db.storage.StateStorage.GenesisDataLoad
 import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
 import com.chipprbots.ethereum.db.storage.pruning.PruningMode
 import com.chipprbots.ethereum.mpt.MptNode
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
 import com.chipprbots.ethereum.utils.NodeCacheConfig
 
 // scalastyle:off
-trait StateStorage {
+trait StateStorage:
   def getBackingStorage(bn: BigInt): MptStorage
   def getReadOnlyStorage: MptStorage
 
@@ -29,9 +29,8 @@ trait StateStorage {
   def saveNode(nodeHash: NodeHash, nodeEncoded: NodeEncoded, bn: BigInt): Unit
   def getNode(nodeHash: NodeHash): Option[MptNode]
   def forcePersist(reason: FlushSituation): Boolean
-}
 
-class ArchiveStateStorage(private val nodeStorage: NodeStorage) extends StateStorage {
+class ArchiveStateStorage(private val nodeStorage: NodeStorage) extends StateStorage:
 
   override def forcePersist(reason: FlushSituation): Boolean = true
 
@@ -52,24 +51,21 @@ class ArchiveStateStorage(private val nodeStorage: NodeStorage) extends StateSto
 
   override def getNode(nodeHash: NodeHash): Option[MptNode] =
     nodeStorage.get(nodeHash).map(_.toMptNode)
-}
 
 class ReferenceCountedStateStorage(
     private val nodeStorage: NodeStorage,
     private val pruningHistory: BigInt
-) extends StateStorage {
+) extends StateStorage:
   override def forcePersist(reason: FlushSituation): Boolean = true
 
-  override def onBlockSave(bn: BigInt, currentBestSavedBlock: BigInt)(updateBestBlocksData: () => Unit): Unit = {
+  override def onBlockSave(bn: BigInt, currentBestSavedBlock: BigInt)(updateBestBlocksData: () => Unit): Unit =
     val blockToPrune = bn - pruningHistory
     ReferenceCountNodeStorage.prune(blockToPrune, nodeStorage, inMemory = blockToPrune > currentBestSavedBlock)
     updateBestBlocksData()
-  }
 
-  override def onBlockRollback(bn: BigInt, currentBestSavedBlock: BigInt)(updateBestBlocksData: () => Unit): Unit = {
+  override def onBlockRollback(bn: BigInt, currentBestSavedBlock: BigInt)(updateBestBlocksData: () => Unit): Unit =
     ReferenceCountNodeStorage.rollback(bn, nodeStorage, inMemory = bn > currentBestSavedBlock)
     updateBestBlocksData()
-  }
 
   override def getBackingStorage(bn: BigInt): MptStorage =
     new SerializingMptStorage(new ReferenceCountNodeStorage(nodeStorage, bn))
@@ -82,39 +78,33 @@ class ReferenceCountedStateStorage(
 
   override def getNode(nodeHash: NodeHash): Option[MptNode] =
     new FastSyncNodeStorage(nodeStorage, 0).get(nodeHash).map(_.toMptNode)
-}
 
 class CachedReferenceCountedStateStorage(
     private val nodeStorage: NodeStorage,
     private val pruningHistory: Int,
     private val lruCache: LruCache[NodeHash, HeapEntry]
-) extends StateStorage {
+) extends StateStorage:
 
   private val changeLog = new ChangeLog(nodeStorage)
 
   override def forcePersist(reason: FlushSituation): Boolean =
-    reason match {
+    reason match
       case GenesisDataLoad => CachedReferenceCountedStorage.persistCache(lruCache, nodeStorage, forced = true)
-    }
 
-  override def onBlockSave(bn: BigInt, currentBestSavedBlock: BigInt)(updateBestBlocksData: () => Unit): Unit = {
+  override def onBlockSave(bn: BigInt, currentBestSavedBlock: BigInt)(updateBestBlocksData: () => Unit): Unit =
     val blockToPrune = bn - pruningHistory
     changeLog.persistChangeLog(bn)
     changeLog.getDeathRowFromStorage(blockToPrune).foreach { deathRow =>
       CachedReferenceCountedStorage.prune(deathRow, lruCache, blockToPrune)
     }
-    if (CachedReferenceCountedStorage.persistCache(lruCache, nodeStorage)) {
-      updateBestBlocksData()
-    }
+    if CachedReferenceCountedStorage.persistCache(lruCache, nodeStorage) then updateBestBlocksData()
     changeLog.removeBlockMetaData(blockToPrune)
-  }
 
-  override def onBlockRollback(bn: BigInt, currentBestSavedBlock: BigInt)(updateBestBlocksData: () => Unit): Unit = {
+  override def onBlockRollback(bn: BigInt, currentBestSavedBlock: BigInt)(updateBestBlocksData: () => Unit): Unit =
     changeLog.getChangeLogFromStorage(bn).foreach { changeLog =>
       CachedReferenceCountedStorage.rollback(lruCache, nodeStorage, changeLog, bn)
     }
     changeLog.removeBlockMetaData(bn)
-  }
 
   override def getReadOnlyStorage: MptStorage =
     new SerializingMptStorage(ReadOnlyNodeStorage(new NoHistoryCachedReferenceCountedStorage(nodeStorage, lruCache, 0)))
@@ -134,19 +124,17 @@ class CachedReferenceCountedStateStorage(
           .get(nodeHash)
           .map(enc => HeapEntry.fromBytes(enc).nodeEncoded.toMptNode)
       )
-}
 
-object StateStorage {
+object StateStorage:
   def apply(
       pruningMode: PruningMode,
       nodeStorage: NodeStorage,
       lruCache: LruCache[NodeHash, HeapEntry]
   ): StateStorage =
-    pruningMode match {
+    pruningMode match
       case ArchivePruning                   => new ArchiveStateStorage(nodeStorage)
       case pruning.BasicPruning(history)    => new ReferenceCountedStateStorage(nodeStorage, history)
       case pruning.InMemoryPruning(history) => new CachedReferenceCountedStateStorage(nodeStorage, history, lruCache)
-    }
 
   def getReadOnlyStorage(source: EphemDataSource): MptStorage =
     mptStorageFromNodeStorage(new NodeStorage(source))
@@ -157,12 +145,11 @@ object StateStorage {
   def createTestStateStorage(
       source: DataSource,
       pruningMode: PruningMode = ArchivePruning
-  ): (StateStorage, NodeStorage, CachedNodeStorage) = {
+  ): (StateStorage, NodeStorage, CachedNodeStorage) =
     val testCacheSize = 10000
-    val testCacheConfig = new NodeCacheConfig {
+    val testCacheConfig = new NodeCacheConfig:
       override val maxSize: Long = 10000
       override val maxHoldTime: FiniteDuration = FiniteDuration(10, TimeUnit.MINUTES)
-    }
     val nodeStorage = new NodeStorage(source)
     val cachedNodeStorage = new CachedNodeStorage(nodeStorage, MapCache.createTestCache(testCacheSize))
 
@@ -171,9 +158,6 @@ object StateStorage {
       nodeStorage,
       cachedNodeStorage
     )
-  }
 
   sealed abstract class FlushSituation
   case object GenesisDataLoad extends FlushSituation
-
-}

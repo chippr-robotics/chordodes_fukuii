@@ -6,35 +6,33 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.vm.MockWorldState._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.vm.MockWorldState.*
 
 import Fixtures.blockchainConfig
 
 class CallOpcodesPostBerlin(val config: EvmConfig = EvmConfig.BerlinConfigBuilder(blockchainConfig))
-    extends CallOpcodesPostEip2929Spec(config) {
+    extends CallOpcodesPostEip2929Spec(config):
   override val fxt = new Eip2929CallOpFixture(config, Fixtures.BerlinBlockNumber)
-}
 
 class CallOpcodesPostMagneto(val config: EvmConfig = EvmConfig.MagnetoConfigBuilder(blockchainConfig))
-    extends CallOpcodesPostEip2929Spec(config) {
+    extends CallOpcodesPostEip2929Spec(config):
   override val fxt = new Eip2929CallOpFixture(config, Fixtures.MagnetoBlockNumber)
-}
 
 abstract class CallOpcodesPostEip2929Spec(config: EvmConfig)
     extends AnyWordSpec
     with CallOpCodesBehaviors
     with Matchers
-    with ScalaCheckPropertyChecks {
+    with ScalaCheckPropertyChecks:
 
-  import config.feeSchedule._
+  import config.feeSchedule.*
 
-  protected[this] val fxt: CallOpFixture
+  protected val fxt: CallOpFixture
 
   "CALL" when {
 
@@ -544,19 +542,16 @@ abstract class CallOpcodesPostEip2929Spec(config: EvmConfig)
       }
     }
   }
-}
 
 class Eip2929CallOpFixture(config: EvmConfig, forkBlockHeight: Int)
-    extends CallOpFixture(config, MockWorldState(touchedAccounts = Set.empty)) {
+    extends CallOpFixture(config, MockWorldState(touchedAccounts = Set.empty)):
 
   override val fakeHeader: BlockHeader =
     BlockFixtures.ValidBlock.header.copy(number = forkBlockHeight, unixTimestamp = 0)
 
-  override val requiredGas: BigInt = {
+  override val requiredGas: BigInt =
     val storageCost = 3 * (config.feeSchedule.G_sset + config.feeSchedule.G_cold_sload)
     val memCost = config.calcMemCost(0, 0, 32)
     val copyCost = config.feeSchedule.G_copy * wordsForBytes(32)
 
     extCode.linearConstGas(config) + storageCost + memCost + copyCost
-  }
-}

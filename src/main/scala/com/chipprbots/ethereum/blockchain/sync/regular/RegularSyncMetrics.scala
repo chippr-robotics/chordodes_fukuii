@@ -3,12 +3,11 @@ package com.chipprbots.ethereum.blockchain.sync.regular
 import scala.concurrent.duration.NANOSECONDS
 
 import com.google.common.util.concurrent.AtomicDouble
-
 import io.micrometer.core.instrument.Timer
 
 import com.chipprbots.ethereum.metrics.MetricsContainer
 
-object RegularSyncMetrics extends MetricsContainer {
+object RegularSyncMetrics extends MetricsContainer:
   final private val blockPropagationTimer = "regularsync.blocks.propagation.timer"
 
   final val MinedBlockPropagationTimer: Timer =
@@ -41,4 +40,3 @@ object RegularSyncMetrics extends MetricsContainer {
   def incrementReorgTotal(): Unit = BranchReorgTotalCounter.increment()
   def incrementBranchResolutionRounds(): Unit = BranchResolutionRoundsCounter.increment()
   def setLastReorgDepth(n: Int): Unit = ReorgLastDepth.set(n.toDouble)
-}

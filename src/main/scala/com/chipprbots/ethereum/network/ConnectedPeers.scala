@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.network
 
 import java.net.InetSocketAddress
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.FiniteDuration
@@ -13,7 +13,7 @@ case class ConnectedPeers(
     private val handshakedPeers: Map[PeerId, Peer],
     private val pruningPeers: Map[PeerId, Peer],
     private val lastPruneTimestamp: Long
-) {
+):
 
   lazy val peers: Map[PeerId, Peer] = outgoingPendingPeers ++ handshakedPeers
 
@@ -52,13 +52,12 @@ case class ConnectedPeers(
   def getPeer(peerId: PeerId): Option[Peer] = peers.get(peerId)
 
   def addNewPendingPeer(pendingPeer: Peer): ConnectedPeers =
-    if (pendingPeer.incomingConnection)
+    if pendingPeer.incomingConnection then
       copy(incomingPendingPeers = incomingPendingPeers + (pendingPeer.id -> pendingPeer))
-    else
-      copy(outgoingPendingPeers = outgoingPendingPeers + (pendingPeer.id -> pendingPeer))
+    else copy(outgoingPendingPeers = outgoingPendingPeers + (pendingPeer.id -> pendingPeer))
 
   def promotePeerToHandshaked(peerAfterHandshake: Peer): ConnectedPeers =
-    if (peerAfterHandshake.incomingConnection)
+    if peerAfterHandshake.incomingConnection then
       copy(
         incomingPendingPeers = incomingPendingPeers - PeerId.fromRef(peerAfterHandshake.ref),
         handshakedPeers = handshakedPeers + (peerAfterHandshake.id -> peerAfterHandshake)
@@ -69,7 +68,7 @@ case class ConnectedPeers(
         handshakedPeers = handshakedPeers + (peerAfterHandshake.id -> peerAfterHandshake)
       )
 
-  def removeTerminatedPeer(peerRef: ActorRef): (Iterable[PeerId], ConnectedPeers) = {
+  def removeTerminatedPeer(peerRef: typed.ActorRef[PeerActor.Command]): (Iterable[PeerId], ConnectedPeers) =
     val peersId = allPeers.collect { case (id, peer) if peer.ref == peerRef => id }
 
     (
@@ -82,7 +81,6 @@ case class ConnectedPeers(
         lastPruneTimestamp = lastPruneTimestamp
       )
     )
-  }
 
   def prunePeers(
       minAge: FiniteDuration,
@@ -91,12 +89,12 @@ case class ConnectedPeers(
       incoming: Boolean = true,
       currentTimeMillis: Long = System.currentTimeMillis,
       excludedNodeIds: Set[ByteString] = Set.empty
-  ): (Seq[Peer], ConnectedPeers) = {
+  ): (Seq[Peer], ConnectedPeers) =
     val ageThreshold = currentTimeMillis - minAge.toMillis
-    if (lastPruneTimestamp > ageThreshold || numPeers == 0) {
+    if lastPruneTimestamp > ageThreshold || numPeers == 0 then
       // Protect against hostile takeovers by limiting the frequency of pruning.
       (Seq.empty, this)
-    } else {
+    else
       val candidates = handshakedPeers.values.filter(canPrune(incoming, ageThreshold, excludedNodeIds)).toSeq
 
       val toPrune = candidates.sortBy(peer => priority(peer.id)).take(numPeers)
@@ -105,12 +103,10 @@ case class ConnectedPeers(
         pruningPeers = toPrune.foldLeft(pruningPeers) { case (acc, peer) =>
           acc + (peer.id -> peer)
         },
-        lastPruneTimestamp = if (toPrune.nonEmpty) currentTimeMillis else lastPruneTimestamp
+        lastPruneTimestamp = if toPrune.nonEmpty then currentTimeMillis else lastPruneTimestamp
       )
 
       (toPrune, pruned)
-    }
-  }
 
   private def canPrune(incoming: Boolean, minCreateTimeMillis: Long, excludedNodeIds: Set[ByteString])(
       peer: Peer
@@ -119,8 +115,6 @@ case class ConnectedPeers(
       peer.createTimeMillis <= minCreateTimeMillis &&
       !pruningPeers.contains(peer.id) &&
       peer.nodeId.forall(nid => !excludedNodeIds.contains(nid))
-}
 
-object ConnectedPeers {
+object ConnectedPeers:
   def empty: ConnectedPeers = ConnectedPeers(Map.empty, Map.empty, Map.empty, Map.empty, 0L)
-}

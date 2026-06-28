@@ -4,20 +4,20 @@ import javax.net.ssl.SSLContext
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.javadsl.CorsRejection
-import org.apache.pekko.http.cors.scaladsl.CorsDirectives._
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
-import org.apache.pekko.http.scaladsl.model._
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.server.*
+import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.syntax.all._
+import cats.syntax.all.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 import org.json4s.DefaultFormats
 import org.json4s.Formats
 import org.json4s.JInt
@@ -27,7 +27,7 @@ import org.json4s.native.Serialization
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetJsonRpcController
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
 import com.chipprbots.ethereum.healthcheck.HealthcheckResult
-import com.chipprbots.ethereum.jsonrpc._
+import com.chipprbots.ethereum.jsonrpc.*
 import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLService
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
@@ -37,7 +37,7 @@ import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.ConfigUtils
 import com.chipprbots.ethereum.utils.Logger
 
-trait JsonRpcHttpServer extends Json4sSupport with Logger {
+trait JsonRpcHttpServer extends Json4sSupport with Logger:
   val jsonRpcController: JsonRpcBaseController
   val jsonRpcHealthChecker: JsonRpcHealthChecker
   val config: JsonRpcHttpServerConfig
@@ -45,10 +45,10 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
   /** Optional GraphQL endpoint, mounted at `POST /graphql` when defined. */
   val graphQLService: Option[GraphQLService] = None
 
-  implicit val runtime: IORuntime = IORuntime.global
-  implicit val serialization: Serialization.type = native.Serialization
+  given runtime: IORuntime = IORuntime.global
+  given serialization: Serialization.type = native.Serialization
 
-  implicit val formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
+  given formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
 
   def corsAllowedOrigins: HttpOriginMatcher
 
@@ -84,7 +84,7 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
         handleBuildInfo()
       } ~ path("graphql") {
         post {
-          graphQLService match {
+          graphQLService match
             case Some(svc) =>
               extractStrictEntity(5.seconds) { entity =>
                 val body = entity.data.utf8String
@@ -98,7 +98,6 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
                     HttpEntity(ContentTypes.`application/json`, """{"errors":[{"message":"graphql disabled"}]}""")
                 )
               )
-          }
         }
       } ~ (pathEndOrSingleSlash & post) {
         entity(as[JsonRpcRequest]) {
@@ -126,18 +125,17 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
     complete(handleResponse(jsonRpcController.handleRequest(request)).unsafeToFuture())
 
   private def handleResponse(f: IO[JsonRpcResponse]): IO[(StatusCode, JsonRpcResponse)] = f.map { jsonRpcResponse =>
-    jsonRpcResponse.error match {
+    jsonRpcResponse.error match
       case Some(JsonRpcError(error, _, _)) if jsonRpcErrorCodes.contains(error) =>
         (StatusCodes.BadRequest, jsonRpcResponse)
       case _ => (StatusCodes.OK, jsonRpcResponse)
-    }
   }
 
   /** Try to start JSON RPC server
     */
   def run(): Unit
 
-  private def handleHealth(): StandardRoute = {
+  private def handleHealth(): StandardRoute =
     // Simple liveness check - if server responds, it's alive
     val healthResponse = HealthcheckResponse(
       List(
@@ -150,9 +148,8 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
         entity = HttpEntity(ContentTypes.`application/json`, serialization.writePretty(healthResponse))
       )
     )
-  }
 
-  private def handleReadiness(): StandardRoute = {
+  private def handleReadiness(): StandardRoute =
     val responseF = jsonRpcHealthChecker.readinessCheck()
     val httpResponseF =
       responseF.map {
@@ -168,10 +165,9 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
           )
       }
     complete(httpResponseF.unsafeToFuture()(runtime))
-  }
 
-  private def handleHealthcheck(): StandardRoute = {
-    val responseF = jsonRpcHealthChecker.healthCheck()
+  private def handleHealthcheck(): StandardRoute =
+    val responseF = jsonRpcHealthChecker.healthCheck
     val httpResponseF =
       responseF.map {
         case response if response.isOK =>
@@ -186,10 +182,9 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
           )
       }
     complete(httpResponseF.unsafeToFuture()(runtime))
-  }
 
   private def handleGraphQL(svc: GraphQLService, body: String): StandardRoute =
-    GraphQLService.parseJsonBody(body) match {
+    GraphQLService.parseJsonBody(body) match
       case Left(msg) =>
         val escaped = msg.replace("\\", "\\\\").replace("\"", "\\\"")
         val errJson = s"""{"errors":[{"message":"$escaped"}]}"""
@@ -198,19 +193,17 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
         val fut = svc
           .execute(req.query, req.variables, req.operationName)
           .map { case (statusCode, json) =>
-            val httpStatus = statusCode match {
+            val httpStatus = statusCode match
               case 200 => StatusCodes.OK
               case 400 => StatusCodes.BadRequest
               case 500 => StatusCodes.InternalServerError
               case _   => StatusCodes.OK
-            }
             HttpResponse(httpStatus, entity = HttpEntity(ContentTypes.`application/json`, json.noSpaces))
           }
           .unsafeToFuture()
         complete(fut)
-    }
 
-  private def handleBuildInfo(): StandardRoute = {
+  private def handleBuildInfo(): StandardRoute =
     val buildInfo = Serialization.writePretty(BuildInfo.toMap)(DefaultFormats)
     complete(
       HttpResponse(
@@ -218,11 +211,8 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
         entity = HttpEntity(ContentTypes.`application/json`, buildInfo)
       )
     )
-  }
 
-}
-
-object JsonRpcHttpServer extends Logger {
+object JsonRpcHttpServer extends Logger:
 
   def apply(
       jsonRpcController: JsonRpcBaseController,
@@ -231,7 +221,7 @@ object JsonRpcHttpServer extends Logger {
       fSslContext: () => Either[SSLError, SSLContext],
       graphQLService: Option[GraphQLService] = None
   )(implicit actorSystem: ActorSystem): Either[String, JsonRpcHttpServer] =
-    config.mode match {
+    config.mode match
       case "http" =>
         Right(
           new InsecureJsonRpcHttpServer(jsonRpcController, jsonRpcHealthchecker, config, graphQLService)(actorSystem)
@@ -243,38 +233,33 @@ object JsonRpcHttpServer extends Logger {
           )
         )
       case _ => Left(s"Cannot start JSON RPC server: Invalid mode ${config.mode} selected")
-    }
 
-  trait RateLimitConfig {
+  trait RateLimitConfig:
     val enabled: Boolean
     val minRequestInterval: FiniteDuration
     val latestTimestampCacheSize: Int
-  }
 
-  object RateLimitConfig {
+  object RateLimitConfig:
     def apply(rateLimitConfig: TypesafeConfig): RateLimitConfig =
-      new RateLimitConfig {
+      new RateLimitConfig:
         override val enabled: Boolean = rateLimitConfig.getBoolean("enabled")
         override val minRequestInterval: FiniteDuration =
           rateLimitConfig.getDuration("min-request-interval").toMillis.millis
         override val latestTimestampCacheSize: Int = rateLimitConfig.getInt("latest-timestamp-cache-size")
-      }
-  }
 
-  trait JsonRpcHttpServerConfig {
+  trait JsonRpcHttpServerConfig:
     val mode: String
     val enabled: Boolean
     val interface: String
     val port: Int
     val corsAllowedOrigins: HttpOriginMatcher
     val rateLimit: RateLimitConfig
-  }
 
-  object JsonRpcHttpServerConfig {
-    def apply(fukuiiConfig: TypesafeConfig): JsonRpcHttpServerConfig = {
+  object JsonRpcHttpServerConfig:
+    def apply(fukuiiConfig: TypesafeConfig): JsonRpcHttpServerConfig =
       val rpcHttpConfig = fukuiiConfig.getConfig("network.rpc.http")
 
-      new JsonRpcHttpServerConfig {
+      new JsonRpcHttpServerConfig:
         override val mode: String = rpcHttpConfig.getString("mode")
         override val enabled: Boolean = rpcHttpConfig.getBoolean("enabled")
         override val interface: String = rpcHttpConfig.getString("interface")
@@ -284,7 +269,3 @@ object JsonRpcHttpServer extends Logger {
           ConfigUtils.parseCorsAllowedOrigins(rpcHttpConfig, "cors-allowed-origins")
 
         override val rateLimit: RateLimitConfig = RateLimitConfig(rpcHttpConfig.getConfig("rate-limit"))
-      }
-    }
-  }
-}

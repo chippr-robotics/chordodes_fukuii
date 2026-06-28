@@ -21,14 +21,15 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
 import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockValid
 import com.chipprbots.ethereum.crypto.ECDSASignature
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps._
-import com.chipprbots.ethereum.utils.ByteStringUtils._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps.*
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.utils.Hex
 import com.chipprbots.ethereum.vm.OutOfGas
-
-import com.chipprbots.ethereum.testing.Tags._
 
 // SCALA 3 MIGRATION: Fixed by having test class extend MockFactory, which satisfies inner trait self-type constraints
 // scalastyle:off magic.number
@@ -36,19 +37,19 @@ class BlockExecutionSpec
     extends AnyWordSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   "BlockExecution" should {
 
     "correctly run executeBlocks" when {
 
-      "two blocks with txs (that first one has invalid tx)" taggedAs (UnitTest, StateTest) in new BlockchainSetup {
-        val invalidStx = SignedTransaction(validTx, ECDSASignature(1, 2, 3))
+      "two blocks with txs (that first one has invalid tx)" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
+        val invalidStx: SignedTransaction = SignedTransaction(validTx, ECDSASignature(1, 2, 3))
         val block1BodyWithTxs: BlockBody = validBlockBodyWithNoTxs.copy(transactionList = Seq(invalidStx))
-        val block1 = Block(validBlockHeader, block1BodyWithTxs)
+        val block1: Block = Block(validBlockHeader, block1BodyWithTxs)
         val block2BodyWithTxs: BlockBody =
           validBlockBodyWithNoTxs.copy(transactionList = Seq(validStxSignedByOrigin))
-        val block2 = Block(
+        val block2: Block = Block(
           validBlockHeader.copy(parentHash = validBlockHeader.hash, number = validBlockHeader.number + 1),
           block2BodyWithTxs
         )
@@ -83,15 +84,14 @@ class BlockExecutionSpec
         // No block should be executed if first one has invalid transactions
         blocks.isEmpty shouldBe true
         error.isDefined shouldBe true
-      }
 
-      "two blocks with txs (that last one has invalid tx)" taggedAs (UnitTest, StateTest) in new BlockchainSetup {
-        val invalidStx = SignedTransaction(validTx, ECDSASignature(1, 2, 3))
+      "two blocks with txs (that last one has invalid tx)" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
+        val invalidStx: SignedTransaction = SignedTransaction(validTx, ECDSASignature(1, 2, 3))
         val block1BodyWithTxs: BlockBody =
           validBlockBodyWithNoTxs.copy(transactionList = Seq(validStxSignedByOrigin))
-        val block1 = Block(validBlockHeader, block1BodyWithTxs)
+        val block1: Block = Block(validBlockHeader, block1BodyWithTxs)
         val block2BodyWithTxs: BlockBody = validBlockBodyWithNoTxs.copy(transactionList = Seq(invalidStx))
-        val block2 = Block(
+        val block2: Block = Block(
           validBlockHeader.copy(parentHash = validBlockHeader.hash, number = validBlockHeader.number + 1),
           block2BodyWithTxs
         )
@@ -126,10 +126,9 @@ class BlockExecutionSpec
         blocks.size shouldBe 1
         blocks.head.block shouldBe block1
         error.isDefined shouldBe true
-      }
 
-      "executing a long branch where the last block is invalid" taggedAs (UnitTest, StateTest) in new BlockchainSetup {
-        val chain = BlockHelpers.generateChain(10, validBlockParentBlock)
+      "executing a long branch where the last block is invalid" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
+        val chain: List[Block] = BlockHelpers.generateChain(10, validBlockParentBlock)
 
         val mockVm = new MockVM(c =>
           createResult(
@@ -160,13 +159,12 @@ class BlockExecutionSpec
         // All blocks but the last should be executed, and they should be returned in incremental order
         blocks.map(_.block) shouldBe chain.init
         error.isDefined shouldBe true
-      }
 
     }
 
     "correctly run executeBlockTransactions" when {
-      "block without txs" taggedAs (UnitTest, StateTest) in new BlockExecutionTestSetup {
-        val block = Block(validBlockHeader, validBlockBodyWithNoTxs)
+      "block without txs" taggedAs (UnitTest, StateTest) in new BlockExecutionTestSetup:
+        val block: Block = Block(validBlockHeader, validBlockBodyWithNoTxs)
 
         val txsExecResult: Either[BlockExecutionError, BlockResult] =
           blockExecution.executeBlockTransactions(block, initialWorld)
@@ -176,12 +174,11 @@ class BlockExecutionSpec
         val BlockResult(_, resultingGasUsed, resultingReceipts, _) = txsExecResult.toOption.get
         resultingGasUsed shouldBe 0
         resultingReceipts shouldBe Nil
-      }
 
-      "block with one tx (that produces OutOfGas)" taggedAs (UnitTest, StateTest) in new BlockchainSetup {
+      "block with one tx (that produces OutOfGas)" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
 
         val blockBodyWithTxs: BlockBody = validBlockBodyWithNoTxs.copy(transactionList = Seq(validStxSignedByOrigin))
-        val block = Block(validBlockHeader, blockBodyWithTxs)
+        val block: Block = Block(validBlockHeader, blockBodyWithTxs)
 
         val mockVm = new MockVM(c =>
           createResult(
@@ -217,13 +214,13 @@ class BlockExecutionSpec
 
         val transaction: Transaction = validStxSignedByOrigin.tx
         // Check valid world
-        val minerPaymentForTxs = UInt256(transaction.gasLimit * transaction.gasPrice)
-        val changes = Seq(
+        val minerPaymentForTxs: UInt256 = UInt256(transaction.gasLimit * transaction.gasPrice)
+        val changes: Seq[(Address, IncreaseNonce.type | UpdateBalance)] = Seq(
           originAddress -> IncreaseNonce,
           originAddress -> UpdateBalance(-minerPaymentForTxs), // Origin payment for tx execution and nonce increase
           minerAddress -> UpdateBalance(minerPaymentForTxs) // Miner reward for tx execution
         )
-        val expectedStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot, changes)
+        val expectedStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot.value, changes)
         expectedStateRoot shouldBe InMemoryWorldStateProxy.persistState(resultingWorldState).stateRootHash
 
         // Check valid gasUsed
@@ -235,11 +232,10 @@ class BlockExecutionSpec
           resultingReceipts.head: @unchecked
         rootHashReceipt shouldBe HashOutcome(expectedStateRoot)
         gasUsedReceipt shouldBe resultingGasUsed
-        logsBloomFilterReceipt shouldBe BloomFilter.create(Nil)
+        logsBloomFilterReceipt shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(Nil))
         logsReceipt shouldBe Nil
-      }
 
-      "block with one tx (that produces no errors)" taggedAs (UnitTest, StateTest) in new BlockchainSetup {
+      "block with one tx (that produces no errors)" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
 
         val table: TableFor4[BigInt, Seq[TxLogEntry], Set[Address], Boolean] =
           Table[BigInt, Seq[TxLogEntry], Set[Address], Boolean](
@@ -263,7 +259,7 @@ class BlockExecutionSpec
           val block = Block(blockHeader, blockBodyWithTxs)
 
           val mockValidators =
-            if (txValidAccordingToValidators) Mocks.MockValidatorsAlwaysSucceed else Mocks.MockValidatorsAlwaysFail
+            if txValidAccordingToValidators then Mocks.MockValidatorsAlwaysSucceed else Mocks.MockValidatorsAlwaysFail
           val mockVm = new MockVM(c =>
             createResult(
               context = c,
@@ -291,7 +287,7 @@ class BlockExecutionSpec
           val txsExecResult = blockExecution.executeBlockTransactions(block, initialWorld)
 
           txsExecResult.isRight shouldBe txValidAccordingToValidators
-          if (txsExecResult.isRight) {
+          if txsExecResult.isRight then
             val BlockResult(resultingWorldState, resultingGasUsed, resultingReceipts, _) = txsExecResult.toOption.get
 
             val transaction = stx.tx.tx
@@ -302,7 +298,7 @@ class BlockExecutionSpec
               originAddress -> UpdateBalance(-minerPaymentForTxs), // Origin payment for tx execution and nonce increase
               minerAddress -> UpdateBalance(minerPaymentForTxs) // Miner reward for tx execution
             ) ++ addressesToDelete.map(address => address -> DeleteAccount) // Delete all accounts to be deleted
-            val expectedStateRoot = applyChanges(validBlockParentHeader.stateRoot, changes)
+            val expectedStateRoot = applyChanges(validBlockParentHeader.stateRoot.value, changes)
             expectedStateRoot shouldBe InMemoryWorldStateProxy.persistState(resultingWorldState).stateRootHash
 
             // Check valid gasUsed
@@ -314,40 +310,36 @@ class BlockExecutionSpec
               resultingReceipts.head: @unchecked
             rootHashReceipt shouldBe HashOutcome(expectedStateRoot)
             gasUsedReceipt shouldBe resultingGasUsed
-            logsBloomFilterReceipt shouldBe BloomFilter.create(logs)
+            logsBloomFilterReceipt shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(logs))
             logsReceipt shouldBe logs
-          }
         }
-      }
 
-      "last one wasn't executed correctly" taggedAs (UnitTest, StateTest) in new BlockExecutionTestSetup {
-        val invalidStx = SignedTransaction(validTx, ECDSASignature(1, 2, 3))
+      "last one wasn't executed correctly" taggedAs (UnitTest, StateTest) in new BlockExecutionTestSetup:
+        val invalidStx: SignedTransaction = SignedTransaction(validTx, ECDSASignature(1, 2, 3))
         val blockBodyWithTxs: BlockBody =
           validBlockBodyWithNoTxs.copy(transactionList = Seq(validStxSignedByOrigin, invalidStx))
-        val block = Block(validBlockHeader, blockBodyWithTxs)
+        val block: Block = Block(validBlockHeader, blockBodyWithTxs)
 
         val txsExecResult: Either[BlockExecutionError, BlockResult] =
           blockExecution.executeBlockTransactions(block, initialWorld)
 
         txsExecResult.isLeft shouldBe true
-      }
 
-      "first one wasn't executed correctly" taggedAs (UnitTest, StateTest) in new BlockExecutionTestSetup {
-        val invalidStx = SignedTransaction(validTx, ECDSASignature(1, 2, 3))
+      "first one wasn't executed correctly" taggedAs (UnitTest, StateTest) in new BlockExecutionTestSetup:
+        val invalidStx: SignedTransaction = SignedTransaction(validTx, ECDSASignature(1, 2, 3))
         val blockBodyWithTxs: BlockBody =
           validBlockBodyWithNoTxs.copy(transactionList = Seq(invalidStx, validStxSignedByOrigin))
-        val block = Block(validBlockHeader, blockBodyWithTxs)
+        val block: Block = Block(validBlockHeader, blockBodyWithTxs)
 
         val txsExecResult: Either[BlockExecutionError, BlockResult] =
           blockExecution.executeBlockTransactions(block, initialWorld)
 
         txsExecResult.isLeft shouldBe true
-      }
     }
 
     // migrated from old LedgerSpec
 
-    "correctly run executeBlock for a valid block without txs" taggedAs (UnitTest, StateTest) in new BlockchainSetup {
+    "correctly run executeBlock for a valid block without txs" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
 
       val table: TableFor2[Int, BigInt] = Table[Int, BigInt](
         ("ommersSize", "ommersBlockDifference"),
@@ -384,9 +376,9 @@ class BlockExecutionSpec
           ommerAddress -> UpdateBalance(UInt256(ommerReward))
         }
 
-        val expectedStateRoot = applyChanges(validBlockParentHeader.stateRoot, changes)
+        val expectedStateRoot = applyChanges(validBlockParentHeader.stateRoot.value, changes)
 
-        val blockHeader: BlockHeader = validBlockHeader.copy(stateRoot = expectedStateRoot)
+        val blockHeader: BlockHeader = validBlockHeader.copy(stateRoot = TrieRoot(expectedStateRoot))
         val blockBodyWithOmmers = validBlockBodyWithNoTxs.copy(
           uncleNodesList = ommersAddresses.map(ommerAddress =>
             defaultBlockHeader.copy(
@@ -400,25 +392,21 @@ class BlockExecutionSpec
         val blockExecResult = blockExecution.executeAndValidateBlock(block)
         assert(blockExecResult.isRight)
       }
-    }
 
     "fail to run executeBlock if a block is invalid before executing it" taggedAs (
       UnitTest,
       StateTest
-    ) in new BlockchainSetup {
-      object validatorsOnlyFailsBlockValidator extends Mocks.MockValidatorsAlwaysSucceed {
+    ) in new BlockchainSetup:
+      object validatorsOnlyFailsBlockValidator extends Mocks.MockValidatorsAlwaysSucceed:
         override val blockValidator: BlockValidator = Mocks.MockValidatorsAlwaysFail.blockValidator
-      }
 
-      object validatorsOnlyFailsBlockHeaderValidator extends Mocks.MockValidatorsAlwaysSucceed {
+      object validatorsOnlyFailsBlockHeaderValidator extends Mocks.MockValidatorsAlwaysSucceed:
         override val blockHeaderValidator: BlockHeaderValidator = Mocks.MockValidatorsAlwaysFail.blockHeaderValidator
-      }
 
-      object validatorsOnlyFailsOmmersValidator extends Mocks.MockValidatorsAlwaysSucceed {
+      object validatorsOnlyFailsOmmersValidator extends Mocks.MockValidatorsAlwaysSucceed:
         override val ommersValidator: OmmersValidator = Mocks.MockValidatorsAlwaysFail.ommersValidator
-      }
 
-      val seqFailingValidators = Seq(
+      val seqFailingValidators: Seq[MockValidatorsAlwaysSucceed] = Seq(
         validatorsOnlyFailsBlockHeaderValidator,
         validatorsOnlyFailsBlockValidator,
         validatorsOnlyFailsOmmersValidator
@@ -439,12 +427,12 @@ class BlockExecutionSpec
       val blockReward: BigInt =
         mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number, 0)
 
-      val changes = Seq(
+      val changes: Seq[(Address, UpdateBalance)] = Seq(
         minerAddress -> UpdateBalance(UInt256(blockReward)) // Paying miner for block processing
       )
-      val expectedStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot, changes)
-      val blockHeader: BlockHeader = validBlockHeader.copy(stateRoot = expectedStateRoot)
-      val block = Block(blockHeader, validBlockBodyWithNoTxs)
+      val expectedStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot.value, changes)
+      val blockHeader: BlockHeader = validBlockHeader.copy(stateRoot = TrieRoot(expectedStateRoot))
+      val block: Block = Block(blockHeader, validBlockBodyWithNoTxs)
 
       assert(seqFailingValidators.forall { _ =>
         val blockExecResult = blockExecution.executeAndValidateBlock(block)
@@ -454,21 +442,24 @@ class BlockExecutionSpec
           case _                                                => false
         }
       })
-    }
 
     "fail to run executeBlock if a block is invalid after executing it" taggedAs (
       UnitTest,
       StateTest
-    ) in new BlockchainSetup {
+    ) in new BlockchainSetup:
 
-      object validatorsFailsBlockValidatorWithReceipts extends Mocks.MockValidatorsAlwaysSucceed {
-        override val blockValidator: BlockValidator = new BlockValidator {
-          override def validateHeaderAndBody(blockHeader: BlockHeader, blockBody: BlockBody) =
+      object validatorsFailsBlockValidatorWithReceipts extends Mocks.MockValidatorsAlwaysSucceed:
+        override val blockValidator: BlockValidator = new BlockValidator:
+          override def validateHeaderAndBody(
+              blockHeader: BlockHeader,
+              blockBody: BlockBody
+          ): Either[BlockError, BlockValid] =
             Right(StdBlockValidator.BlockValid)
-          override def validateBlockAndReceipts(blockHeader: BlockHeader, receipts: Seq[Receipt]) =
+          override def validateBlockAndReceipts(
+              blockHeader: BlockHeader,
+              receipts: Seq[Receipt]
+          ): Either[BlockError, BlockValid] =
             Left(StdBlockValidator.BlockTransactionsHashError)
-        }
-      }
 
       override lazy val vm: VMImpl = new MockVM(c =>
         createResult(
@@ -485,8 +476,9 @@ class BlockExecutionSpec
       val blockReward: BigInt =
         mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number, 0)
 
-      val changes = Seq(minerAddress -> UpdateBalance(UInt256(blockReward))) // Paying miner for block processing
-      val correctStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot, changes)
+      val changes: Seq[(Address, UpdateBalance)] =
+        Seq(minerAddress -> UpdateBalance(UInt256(blockReward))) // Paying miner for block processing
+      val correctStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot.value, changes)
 
       val correctGasUsed: BigInt = 0
       val incorrectStateRoot: ByteString =
@@ -501,19 +493,18 @@ class BlockExecutionSpec
       forAll(table) { (stateRootHash, cumulativeGasUsedBlock, validators) =>
         val blockExecution = mkBlockExecution(validators = validators)
         val blockHeader: BlockHeader =
-          validBlockHeader.copy(gasUsed = cumulativeGasUsedBlock, stateRoot = stateRootHash)
+          validBlockHeader.copy(gasUsed = cumulativeGasUsedBlock, stateRoot = TrieRoot(stateRootHash))
         val block = Block(blockHeader, validBlockBodyWithNoTxs)
 
         val blockExecResult = blockExecution.executeAndValidateBlock(block)
 
-        assert(blockExecResult match {
+        assert(blockExecResult match
           case Left(_: BlockExecutionError.ValidationAfterExecError) => true
           case _                                                     => false
-        })
+        )
       }
-    }
 
-    "correctly run a block with more than one tx" taggedAs (UnitTest, StateTest) in new BlockchainSetup {
+    "correctly run a block with more than one tx" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
       val table: TableFor4[Address, Address, Address, Address] = Table[Address, Address, Address, Address](
         ("origin1Address", "receiver1Address", "origin2Address", "receiver2Address"),
         (originAddress, minerAddress, receiverAddress, minerAddress),
@@ -533,14 +524,14 @@ class BlockExecutionSpec
 
       forAll(table) { (origin1Address, receiver1Address, origin2Address, receiver2Address) =>
         def keyPair(address: Address): AsymmetricCipherKeyPair =
-          if (address == originAddress) originKeyPair else receiverKeyPair
+          if address == originAddress then originKeyPair else receiverKeyPair
 
         val tx1 = validTx.copy(value = 100, receivingAddress = Some(receiver1Address), gasLimit = defaultGasLimit)
         val tx2 = validTx.copy(
           value = 50,
           receivingAddress = Some(receiver2Address),
           gasLimit = defaultGasLimit * 2,
-          nonce = validTx.nonce + (if (origin1Address == origin2Address) 1 else 0)
+          nonce = validTx.nonce + (if origin1Address == origin2Address then 1 else 0)
         )
         val keyPair1 = keyPair(origin1Address)
         val keyPair2 = keyPair(origin2Address)
@@ -574,13 +565,13 @@ class BlockExecutionSpec
           origin1Address -> UpdateBalance(-minerPaymentForTx1), // Origin payment for tx execution and nonce increase
           minerAddress -> UpdateBalance(minerPaymentForTx1) // Miner reward for tx execution
         )
-        val expectedStateRootTx1 = applyChanges(validBlockParentHeader.stateRoot, changesTx1)
+        val expectedStateRootTx1 = applyChanges(validBlockParentHeader.stateRoot.value, changesTx1)
 
         val LegacyReceipt(rootHashReceipt1, gasUsedReceipt1, logsBloomFilterReceipt1, logsReceipt1) =
           receipt1: @unchecked
         rootHashReceipt1 shouldBe HashOutcome(expectedStateRootTx1)
         gasUsedReceipt1 shouldBe stx1.tx.tx.gasLimit
-        logsBloomFilterReceipt1 shouldBe BloomFilter.create(Nil)
+        logsBloomFilterReceipt1 shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(Nil))
         logsReceipt1 shouldBe Nil
 
         // Check receipt2
@@ -596,7 +587,7 @@ class BlockExecutionSpec
           receipt2: @unchecked
         rootHashReceipt2 shouldBe HashOutcome(expectedStateRootTx2)
         gasUsedReceipt2 shouldBe (transaction1.gasLimit + transaction2.gasLimit)
-        logsBloomFilterReceipt2 shouldBe BloomFilter.create(Nil)
+        logsBloomFilterReceipt2 shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(Nil))
         logsReceipt2 shouldBe Nil
 
         // Check world
@@ -610,15 +601,14 @@ class BlockExecutionSpec
         val blockExpectedStateRoot = applyChanges(expectedStateRootTx2, changes)
 
         val blockWithCorrectStateAndGasUsed = block.copy(
-          header = block.header.copy(stateRoot = blockExpectedStateRoot, gasUsed = gasUsedReceipt2)
+          header = block.header.copy(stateRoot = TrieRoot(blockExpectedStateRoot), gasUsed = gasUsedReceipt2)
         )
         assert(blockExecution.executeAndValidateBlock(blockWithCorrectStateAndGasUsed).isRight)
       }
-    }
 
     "executeForProposer" should {
 
-      "not persist state changes to the backing MPT storage" taggedAs UnitTest in new BlockExecutionTestSetup {
+      "not persist state changes to the backing MPT storage" taggedAs UnitTest in new BlockExecutionTestSetup:
         // Regression: Engine API forkchoiceUpdated payload-build path used to commit tx effects to
         // RocksDB. A subsequent newPayload for a tampered sibling block would then fail with
         // NONCE_MISMATCH_TOO_LOW instead of the expected stateRoot/receiptsRoot mismatch.
@@ -627,96 +617,93 @@ class BlockExecutionSpec
         val validBlockBodyWithTxs: BlockBody = validBlockBodyWithNoTxs.copy(
           transactionList = Seq(validStxSignedByOrigin)
         )
-        val block = Block(validBlockHeader, validBlockBodyWithTxs)
+        val block: Block = Block(validBlockHeader, validBlockBodyWithTxs)
 
-        val nonceBefore = readOnceAtParent.getAccount(originAddress).map(_.nonce.toBigInt).getOrElse(BigInt(-1))
+        val nonceBefore: BigInt = readOnceAtParent.getAccount(originAddress).map(_.nonce.toBigInt).getOrElse(BigInt(-1))
 
-        val result = blockExecution.executeForProposer(block)
+        val result: Either[BlockExecutionError, BlockResult] = blockExecution.executeForProposer(block)
         assert(result.isRight, s"executeForProposer failed: $result")
 
         // Origin nonce must be unchanged in committed state — proposer build is ephemeral.
-        val nonceAfter = readOnceAtParent.getAccount(originAddress).map(_.nonce.toBigInt).getOrElse(BigInt(-1))
+        val nonceAfter: BigInt = readOnceAtParent.getAccount(originAddress).map(_.nonce.toBigInt).getOrElse(BigInt(-1))
 
         nonceAfter shouldBe nonceBefore
-      }
 
       "be idempotent — calling twice with the same block produces the same stateRoot" taggedAs UnitTest in
-        new BlockExecutionTestSetup {
+        new BlockExecutionTestSetup:
           // If state leaked between calls, the second executeForProposer would see a post-tx nonce
           // and return a different stateRoot (or fail outright with NONCE_MISMATCH_TOO_LOW).
           val validBlockBodyWithTxs: BlockBody = validBlockBodyWithNoTxs.copy(
             transactionList = Seq(validStxSignedByOrigin)
           )
-          val block = Block(validBlockHeader, validBlockBodyWithTxs)
+          val block: Block = Block(validBlockHeader, validBlockBodyWithTxs)
 
-          val firstResult = blockExecution.executeForProposer(block)
-          val secondResult = blockExecution.executeForProposer(block)
+          val firstResult: Either[BlockExecutionError, BlockResult] = blockExecution.executeForProposer(block)
+          val secondResult: Either[BlockExecutionError, BlockResult] = blockExecution.executeForProposer(block)
 
           assert(firstResult.isRight && secondResult.isRight)
           firstResult.toOption.get.worldState.stateRootHash shouldBe
             secondResult.toOption.get.worldState.stateRootHash
-        }
 
     }
 
     "EIP-4895 withdrawal processing" should {
 
-      "credit the withdrawal amount exactly once per block" taggedAs UnitTest in new BlockExecutionTestSetup {
+      "credit the withdrawal amount exactly once per block" taggedAs UnitTest in new BlockExecutionTestSetup:
         // Regression: processWithdrawals used to run twice — once inside BlockPreparator.payBlockReward
         // for post-merge blocks, and again in BlockExecution.executeBlock after payBlockReward
         // returned. Every withdrawal credited 2× Gwei → 2× Wei, state root diverged, and the
         // ethereum/engine-withdrawals hive suite stuck at 1/35. Check exactly-once semantics by
         // calling payBlockReward (which for post-merge must be a no-op) and confirming the
         // withdrawal recipient's balance has not changed under it.
-        val recipient = Address(ByteString(Array.fill[Byte](20)(0x42.toByte)))
-        val withdrawal = com.chipprbots.ethereum.domain.Withdrawal(
+        val recipient: Address = Address(ByteString(Array.fill[Byte](20)(0x42.toByte)))
+        val withdrawal: Withdrawal = com.chipprbots.ethereum.domain.Withdrawal(
           index = BigInt(0),
           validatorIndex = BigInt(0),
           address = recipient,
           amount = BigInt(1) // 1 Gwei
         )
 
-        // Build a post-merge header (difficulty=0, baseFee set → isPostMerge = true)
-        val postMergeHeader = validBlockParentHeader.copy(
+        // Build a post-merge header (difficulty=0, baseFee set → isPoS = true)
+        val poSHeader: BlockHeader = validBlockParentHeader.copy(
           parentHash = validBlockParentHeader.hash,
           number = validBlockParentHeader.number + 1,
-          difficulty = 0,
+          difficulty = Difficulty.Zero,
           extraFields = com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai(
             baseFee = BigInt(1000000000),
             withdrawalsRoot = com.chipprbots.ethereum.domain.BlockHeader.EmptyMpt
           )
         )
-        val block = Block(
-          postMergeHeader,
+        val block: Block = Block(
+          poSHeader,
           BlockBody(transactionList = Nil, uncleNodesList = Nil, withdrawals = Some(Seq(withdrawal)))
         )
 
         val world = readOnceAtParent
-        val balanceBefore = world.getAccount(recipient).map(_.balance.toBigInt).getOrElse(BigInt(0))
+        val balanceBefore: BigInt = world.getAccount(recipient).map(_.balance.toBigInt).getOrElse(BigInt(0))
 
         // payBlockReward on a post-merge block must now be a no-op — withdrawals are applied
         // by BlockExecution after payBlockReward returns.
-        val worldAfter = mining.blockPreparator.payBlockReward(block, world)
-        val balanceAfterReward =
+        val worldAfter: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, world)
+        val balanceAfterReward: BigInt =
           worldAfter.getAccount(recipient).map(_.balance.toBigInt).getOrElse(BigInt(0))
 
         balanceAfterReward shouldBe balanceBefore
-      }
 
     }
 
   }
 
-  trait BlockExecutionTestSetup extends BlockchainSetup {
+  trait BlockExecutionTestSetup extends BlockchainSetup:
 
     /** Read-only view of the account trie rooted at the parent block's stateRoot. */
     def readOnceAtParent: InMemoryWorldStateProxy =
       InMemoryWorldStateProxy(
         evmCodeStorage = blockchainStorages.evmCodeStorage,
         mptStorage = blockchain.getReadOnlyMptStorage(),
-        getBlockHashByNumber = (n: BigInt) => blockchainReader.getBlockHeaderByNumber(n).map(_.hash),
+        getBlockHashByNumber = (n: BigInt) => blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value),
         accountStartNonce = blockchainConfig.accountStartNonce,
-        stateRootHash = validBlockParentHeader.stateRoot,
+        stateRootHash = validBlockParentHeader.stateRoot.value,
         noEmptyAccounts = false,
         ethCompatibleStorage = true
       )
@@ -732,6 +719,3 @@ class BlockExecutionSpec
         mining.blockPreparator,
         blockValidation
       )
-
-  }
-}

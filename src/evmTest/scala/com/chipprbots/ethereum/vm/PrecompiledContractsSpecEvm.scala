@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.SignedTransaction.{FirstByteOfAddress, LastByteOfAddress}
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.vm.utils.EvmTestEnv

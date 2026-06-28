@@ -1,14 +1,14 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.TestSyncConfig
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig {
+class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig:
 
   "FetchRequest backoff" - {
 
@@ -17,11 +17,10 @@ class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig {
       val maxDelay = syncConfig.maxRetryDelay // 30.seconds in test config
 
       // Helper to compute expected delay
-      def expectedDelay(retryCount: Int): FiniteDuration = {
+      def expectedDelay(retryCount: Int): FiniteDuration =
         val multiplier = math.pow(2.0, retryCount.toDouble).toLong
         val delay = base * multiplier
-        if (delay > maxDelay) maxDelay else delay
-      }
+        if delay > maxDelay then maxDelay else delay
 
       // retry 0: 1s * 2^0 = 1s
       expectedDelay(0) shouldBe 1.second
@@ -42,12 +41,11 @@ class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig {
     "should respect maxRetryDelay cap" taggedAs UnitTest in {
       val configWith2sCap = syncConfig.copy(maxRetryDelay = 2.seconds)
 
-      def expectedDelay(retryCount: Int): FiniteDuration = {
+      def expectedDelay(retryCount: Int): FiniteDuration =
         val base = configWith2sCap.syncRetryInterval
         val multiplier = math.pow(2.0, retryCount.toDouble).toLong
         val delay = base * multiplier
-        if (delay > configWith2sCap.maxRetryDelay) configWith2sCap.maxRetryDelay else delay
-      }
+        if delay > configWith2sCap.maxRetryDelay then configWith2sCap.maxRetryDelay else delay
 
       expectedDelay(0) shouldBe 1.second
       expectedDelay(1) shouldBe 2.seconds
@@ -67,7 +65,7 @@ class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig {
   "PeersClient.ExcludingPeers" - {
 
     "should be a valid PeerSelector" taggedAs UnitTest in {
-      import com.chipprbots.ethereum.blockchain.sync.PeersClient._
+      import com.chipprbots.ethereum.blockchain.sync.PeersClient.*
       import com.chipprbots.ethereum.network.PeerId
 
       val peerId = PeerId("test-peer-1")
@@ -77,7 +75,7 @@ class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig {
     }
 
     "should create with empty set" taggedAs UnitTest in {
-      import com.chipprbots.ethereum.blockchain.sync.PeersClient._
+      import com.chipprbots.ethereum.blockchain.sync.PeersClient.*
 
       val selector = ExcludingPeers(Set.empty)
       selector.exclude shouldBe empty
@@ -137,4 +135,3 @@ class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig {
       fetch.retryCount shouldBe 0
     }
   }
-}

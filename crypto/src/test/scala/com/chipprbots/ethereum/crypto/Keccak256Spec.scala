@@ -5,7 +5,7 @@ import java.util.concurrent.Executors
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.apache.pekko.util.ByteString
 
@@ -14,7 +14,7 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Spec 007 US1 — keccak-256 ThreadLocal digest reuse parity (FR-001..FR-005, INV-1..4).
   *

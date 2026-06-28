@@ -1,16 +1,15 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
@@ -18,34 +17,33 @@ import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** The scan-actor wrapper must run the combined parallel scan once and emit BOTH gap sets to its parent, exactly as the
   * underlying scanner computes them — so the controller can drive the downloads.
   */
-class CombinedRecoveryScanActorSpec
-    extends TestKit(ActorSystem("CombinedRecoveryScanActorSpec_System"))
-    with AnyFlatSpecLike
-    with WithActorSystemShutDown
-    with Matchers {
+class CombinedRecoveryScanActorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers:
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   private def fixtures()
-      : (StateStorage, EvmCodeStorage, AppStateStorage, ByteString, Set[ByteString], Set[ByteString]) = {
+      : (StateStorage, EvmCodeStorage, AppStateStorage, ByteString, Set[ByteString], Set[ByteString]) =
     val ds = EphemDataSource()
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(ds)
     val evm = new EvmCodeStorage(ds)
     val appState = new AppStateStorage(EphemDataSource())
     val build = stateStorage.getBackingStorage(0)
 
-    def presentCode(seed: Int): ByteString = {
+    def presentCode(seed: Int): ByteString =
       val code = Array.fill[Byte](8)(seed.toByte)
       val h = ByteString(kec256(code))
       evm.put(h, ByteString(code)).commit()
       h
-    }
     def missingCode(seed: Int): ByteString = ByteString(kec256(Array[Byte](seed.toByte, 0x5a)))
     def presentStorage(seed: Int): ByteString =
       ByteString(
@@ -55,17 +53,17 @@ class CombinedRecoveryScanActorSpec
       )
     def missingStorage(seed: Int): ByteString = ByteString(kec256(Array[Byte](seed.toByte, 0x3c)))
     def acct(seed: Int): ByteString = ByteString(kec256(Array[Byte](seed.toByte)))
-    def account(storageRoot: ByteString, codeHash: ByteString): Account =
+    def account(storageRoot: TrieRoot, codeHash: CodeHash): Account =
       Account(nonce = UInt256.Zero, storageRoot = storageRoot, codeHash = codeHash)
 
     val mCode2 = missingCode(2)
     val mStor3 = missingStorage(3)
     val mCode5 = missingCode(5)
     val accounts = Seq(
-      acct(1) -> account(presentStorage(1), presentCode(1)),
-      acct(2) -> account(Account.EmptyStorageRootHash, mCode2),
-      acct(3) -> account(mStor3, Account.EmptyCodeHash),
-      acct(5) -> account(presentStorage(5), mCode5),
+      acct(1) -> account(TrieRoot(presentStorage(1)), CodeHash(presentCode(1))),
+      acct(2) -> account(Account.EmptyStorageRootHash, CodeHash(mCode2)),
+      acct(3) -> account(TrieRoot(mStor3), Account.EmptyCodeHash),
+      acct(5) -> account(TrieRoot(presentStorage(5)), CodeHash(mCode5)),
       acct(6) -> Account.empty()
     )
     val root = ByteString(
@@ -76,22 +74,22 @@ class CombinedRecoveryScanActorSpec
         .getRootHash
     )
     (stateStorage, evm, appState, root, Set(mCode2, mCode5), Set(mStor3))
-  }
 
   "CombinedRecoveryScanActor" should "scan once and emit both gap sets to its parent" taggedAs (UnitTest, SyncTest) in {
     val (stateStorage, evm, appState, root, expectedCode, expectedStorageRoots) = fixtures()
     val parent = TestProbe("parent")
 
-    parent.childActorOf(
-      CombinedRecoveryScanActor.props(
+    testKit.spawn(
+      CombinedRecoveryScanActor(
         stateRoot = root,
         stateStorage = stateStorage,
         evmCodeStorage = evm,
         appStateStorage = appState,
-        syncController = parent.ref,
+        syncController = parent.ref.toTyped[Any],
         pivotBlockNumber = BigInt(0),
         snapSyncConfig = SNAPSyncConfig(recoveryScanConcurrency = 2, recoveryScanShardDepth = 1)
-      )
+      ),
+      "combined-recovery-scan-spec-t1"
     )
 
     val msg = parent.expectMsgType[CombinedRecoveryScanActor.CombinedScanComplete](10.seconds)
@@ -99,4 +97,3 @@ class CombinedRecoveryScanActorSpec
     msg.missingStorageTries.map(_._2).toSet shouldBe expectedStorageRoots
     msg.missingStorageTries.size shouldBe 1
   }
-}

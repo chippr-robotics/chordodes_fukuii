@@ -4,18 +4,18 @@ import scala.util.Try
 
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect._
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello._
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping._
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong._
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol._
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong.*
 
-import MessageDecoder._
+import MessageDecoder.*
 
-object NetworkMessageDecoder extends MessageDecoder {
+object NetworkMessageDecoder extends MessageDecoder:
 
   override def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case Disconnect.code =>
         Try(payload.toDisconnect).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -33,29 +33,26 @@ object NetworkMessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown network message type: $msgCode"))
-    }
-
-}
 
 /** ETH/68 decoder. Imports exclusively from ETHPackets — zero dependency on ETH62-67.
   *
   * Equivalent to: go-ethereum var eth68 = map[uint64]msgHandler{...} (handler.go) Erigon ProtoIds[Protocol_ETH68]
   * (libsentry/protocol.go)
   */
-object ETH68MessageDecoder extends MessageDecoder {
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68._ // toStatus68
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewPooledTransactionHashes._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.PooledTransactions._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts68._
+object ETH68MessageDecoder extends MessageDecoder:
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68.* // toStatus68
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewPooledTransactionHashes.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.PooledTransactions.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts68.*
 
   // Explicit positive allowlist — equivalent of go-ethereum's handler map keys
   // and Erigon's ProtoIds[ETH68] set. 13 messages.
@@ -76,7 +73,7 @@ object ETH68MessageDecoder extends MessageDecoder {
   )
 
   def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case Codes.StatusCode =>
         Try(payload.toStatus68).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -132,29 +129,27 @@ object ETH68MessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown eth/68 message type: $msgCode"))
-    }
-}
 
 /** ETH/69 decoder. ETH69 adds Status69 (no TD), BlockRangeUpdate, and uses bloom-absent Receipts69.
   *
   * Imports exclusively from ETHPackets — zero dependency on ETH62-67. Key fix: ReceiptsCode uses ETHPackets.Receipts69
   * (bloom-absent) not ETHPackets.Receipts68 (bloom-inclusive).
   */
-object ETH69MessageDecoder extends MessageDecoder {
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status69.Status69._ // toStatus69
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewPooledTransactionHashes._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.PooledTransactions._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts69._ // distinct ETH69 type → bloom-absent response
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts69._ // EIP-7642: bloom-absent
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate._
+object ETH69MessageDecoder extends MessageDecoder:
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status69.Status69.* // toStatus69
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewPooledTransactionHashes.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.PooledTransactions.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts69.* // distinct ETH69 type → bloom-absent response
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts69.* // EIP-7642: bloom-absent
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate.*
 
   // ETH69 adds BlockRangeUpdate (0x11) = 14 messages total. Explicit set (not delegating to
   // ETH68MessageDecoder) so this decoder stays self-contained if ETH68 is ever retired.
@@ -176,7 +171,7 @@ object ETH69MessageDecoder extends MessageDecoder {
   )
 
   def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case Codes.StatusCode =>
         Try(payload.toStatus69).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -236,29 +231,27 @@ object ETH69MessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown eth/69 message type: $msgCode"))
-    }
-}
 
 /** ETH/70 decoder. ETH70 adds partial receipt delivery via firstBlockReceiptIndex (GetReceipts70) and
   * lastBlockIncomplete (Receipts70). All other message types are identical to ETH69.
   *
   * Reference: EIP-7706 / go-ethereum eth/protocols/eth/protocol.go
   */
-object ETH70MessageDecoder extends MessageDecoder {
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status70.Status70._ // ETH70-owned Status type
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewPooledTransactionHashes._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.PooledTransactions._
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts70._ // ETH70: partial receipt resume
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts70._ // ETH70: lastBlockIncomplete flag
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate._ // introduced in ETH69, still present
+object ETH70MessageDecoder extends MessageDecoder:
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status70.Status70.* // ETH70-owned Status type
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewPooledTransactionHashes.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.PooledTransactions.*
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts70.* // ETH70: partial receipt resume
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts70.* // ETH70: lastBlockIncomplete flag
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate.* // introduced in ETH69, still present
 
   // Explicit set — no cross-decoder delegation. Self-contained if ETH68 or ETH69 decoders are retired.
   // ETH70 message set = ETH68 base (13) + BlockRangeUpdate (ETH69 addition) = 14 messages.
@@ -280,7 +273,7 @@ object ETH70MessageDecoder extends MessageDecoder {
   )
 
   def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case Codes.StatusCode =>
         Try(payload.toStatus70).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -340,40 +333,36 @@ object ETH70MessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown eth/70 message type: $msgCode"))
-    }
-}
 
 // scalastyle:off
-object EthereumMessageDecoder {
+object EthereumMessageDecoder:
   def ethMessageDecoder(protocolVersion: Capability): MessageDecoder =
-    protocolVersion match {
+    protocolVersion match
       case Capability.ETH68 => ETH68MessageDecoder
       case Capability.ETH69 => ETH69MessageDecoder
       case Capability.ETH70 => ETH70MessageDecoder
       case Capability.SNAP1 => SNAPMessageDecoder
       case unsupported      => throw new IllegalArgumentException(s"Unsupported protocol version: $unsupported")
-    }
-}
 
 /** SNAP/1 protocol message decoder
   *
   * Decodes SNAP/1 protocol messages (satellite protocol for state sync). SNAP is used alongside ETH protocol, not as a
   * replacement.
   */
-object SNAPMessageDecoder extends MessageDecoder {
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP._
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes._
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.GetAccountRangeDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.AccountRangeDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetStorageRanges.GetStorageRangesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.StorageRangesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.GetByteCodesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes.ByteCodesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes.GetTrieNodesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.TrieNodesDec
+object SNAPMessageDecoder extends MessageDecoder:
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetStorageRanges.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.*
 
   def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case GetAccountRangeCode =>
         Try(payload.toGetAccountRange).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -407,5 +396,3 @@ object SNAPMessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown snap/1 message type: $msgCode"))
-    }
-}

@@ -4,12 +4,11 @@ final case class HealthcheckResult private (
     name: String,
     status: String,
     info: Option[String]
-) {
+):
 
   def isOK: Boolean = status == HealthcheckStatus.OK
-}
 
-object HealthcheckResult {
+object HealthcheckResult:
 
   def ok(name: String, info: Option[String] = None): HealthcheckResult =
     new HealthcheckResult(
@@ -24,4 +23,3 @@ object HealthcheckResult {
       status = HealthcheckStatus.ERROR,
       info = Some(error)
     )
-}

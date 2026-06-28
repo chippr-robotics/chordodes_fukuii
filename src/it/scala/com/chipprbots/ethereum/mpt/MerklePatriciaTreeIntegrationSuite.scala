@@ -10,29 +10,26 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.ObjectGenerators
-import com.chipprbots.ethereum.mpt.MerklePatriciaTrie._
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Logger
-
-import com.chipprbots.ethereum.testing.Tags._
 
 class MerklePatriciaTreeIntegrationSuite
     extends AnyFunSuite
     with ScalaCheckPropertyChecks
     with ObjectGenerators
     with Logger
-    with PersistentStorage {
+    with PersistentStorage:
 
   val KeySize: Int = 32 + 1 /* Hash size + prefix */
 
-  implicit val intByteArraySerializable: ByteArraySerializable[Int] = new ByteArraySerializable[Int] {
-    override def toBytes(input: Int): Array[Byte] = {
+  implicit val intByteArraySerializable: ByteArraySerializable[Int] = new ByteArraySerializable[Int]:
+    override def toBytes(input: Int): Array[Byte] =
       val b: ByteBuffer = ByteBuffer.allocate(4)
       b.putInt(input)
       b.array
-    }
 
     override def fromBytes(bytes: Array[Byte]): Int = ByteBuffer.wrap(bytes).getInt()
-  }
 
   def md5(bytes: Array[Byte]): Array[Byte] =
     MessageDigest.getInstance("MD5").digest(bytes)
@@ -102,7 +99,7 @@ class MerklePatriciaTreeIntegrationSuite
       // We slice some of the keys so that me test more code coverage (if not we only test keys with the same length)
       val slicedKeys = keys.zipWithIndex.map { case (key, index) =>
         val hashedKey = md5(key)
-        if (index % 2 == 0) hashedKey.take(hashedKey.length / 2) else hashedKey
+        if index % 2 == 0 then hashedKey.take(hashedKey.length / 2) else hashedKey
       }
       val keyValuePairs = slicedKeys.zip(keys)
 
@@ -125,7 +122,7 @@ class MerklePatriciaTreeIntegrationSuite
       // We slice some of the keys so that me test more code coverage (if not we only test keys with the same length)
       val slicedKeys = keys.zipWithIndex.map { case (key, index) =>
         val hashedKey = md5(key)
-        if (index % 2 == 0) hashedKey.take(hashedKey.length / 2) else hashedKey
+        if index % 2 == 0 then hashedKey.take(hashedKey.length / 2) else hashedKey
       }
       val keyValuePairs = slicedKeys.zip(keys)
 
@@ -147,4 +144,3 @@ class MerklePatriciaTreeIntegrationSuite
       log.debug("Time taken(ms): " + (System.currentTimeMillis - start))
     }
   }
-}

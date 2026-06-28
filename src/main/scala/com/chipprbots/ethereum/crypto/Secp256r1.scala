@@ -13,13 +13,12 @@ import scala.util.Try
 
 /** EIP-7951: P-256 (secp256r1) signature verification using JDK's java.security API.
   */
-object Secp256r1 {
+object Secp256r1:
 
-  private lazy val ecParams: ECParameterSpec = {
+  private lazy val ecParams: ECParameterSpec =
     val params = AlgorithmParameters.getInstance("EC")
     params.init(new ECGenParameterSpec("secp256r1"))
     params.getParameterSpec(classOf[ECParameterSpec])
-  }
 
   /** Verify a P-256 ECDSA signature.
     *
@@ -55,7 +54,7 @@ object Secp256r1 {
     }.getOrElse(false)
 
   /** Encode r, s as DER-encoded ECDSA signature */
-  private def toDerSignature(r: BigInteger, s: BigInteger): Array[Byte] = {
+  private def toDerSignature(r: BigInteger, s: BigInteger): Array[Byte] =
     val rBytes = toUnsignedByteArray(r)
     val sBytes = toUnsignedByteArray(s)
 
@@ -72,16 +71,11 @@ object Secp256r1 {
     der(offset) = sBytes.length.toByte; offset += 1
     System.arraycopy(sBytes, 0, der, offset, sBytes.length)
     der
-  }
 
   /** Convert BigInteger to minimal unsigned byte array (with leading 0 if high bit set) */
-  private def toUnsignedByteArray(value: BigInteger): Array[Byte] = {
+  private def toUnsignedByteArray(value: BigInteger): Array[Byte] =
     val bytes = value.toByteArray
-    if (bytes.length > 1 && bytes(0) == 0 && (bytes(1) & 0x80) == 0) {
+    if bytes.length > 1 && bytes(0) == 0 && (bytes(1) & 0x80) == 0 then
       // Strip unnecessary leading zero
       bytes.drop(1)
-    } else {
-      bytes
-    }
-  }
-}
+    else bytes

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
 import com.chipprbots.ethereum.utils.Logger
 
@@ -13,36 +13,33 @@ import com.chipprbots.ethereum.utils.Logger
   * Takes the fukuii-namespaced TypesafeConfig (i.e. Config.config). Returns fatal error messages; non-fatal issues are
   * logged as warnings. Callers should abort startup if the returned list is non-empty.
   */
-object ConfigValidator extends Logger {
+object ConfigValidator extends Logger:
 
-  def validate(config: TypesafeConfig): List[String] = {
+  def validate(config: TypesafeConfig): List[String] =
     val errors = List.newBuilder[String]
 
     validateSync(config, errors)
     checkPortClash(config, errors)
 
     errors.result()
-  }
 
-  private def validateSync(config: TypesafeConfig, errors: collection.mutable.Builder[String, List[String]]): Unit = {
+  private def validateSync(config: TypesafeConfig, errors: collection.mutable.Builder[String, List[String]]): Unit =
     val doFastSync = config.getBoolean("sync.do-fast-sync")
     val doSnapSync = config.getBoolean("sync.do-snap-sync")
-    if (doSnapSync && !doFastSync)
+    if doSnapSync && !doFastSync then
       errors += "SNAP sync (sync.do-snap-sync = true) requires fast sync to be enabled (sync.do-fast-sync = true)"
-  }
 
   /** Besu reference: BesuCommand.checkPortClash() (line 2711) — Set-based duplicate detection. Collects all enabled
     * service ports into a Set; any port appearing more than once is a conflict. Checks P2P, JSON-RPC HTTP, JSON-RPC WS,
     * and Engine API ports.
     */
-  private def checkPortClash(config: TypesafeConfig, errors: collection.mutable.Builder[String, List[String]]): Unit = {
+  private def checkPortClash(config: TypesafeConfig, errors: collection.mutable.Builder[String, List[String]]): Unit =
     val seen = collection.mutable.Set.empty[Int]
 
     def addIfEnabled(port: Int, enabled: Boolean, label: String): Unit =
-      if (enabled && port > 0) {
-        if (!seen.add(port))
+      if enabled && port > 0 then
+        if !seen.add(port) then
           errors += s"Port number '$port' has been specified multiple times. Please review the supplied configuration. ($label)"
-      }
 
     def getBool(path: String, default: Boolean): Boolean =
       scala.util.Try(config.getBoolean(path)).getOrElse(default)
@@ -67,5 +64,3 @@ object ConfigValidator extends Logger {
     addIfEnabled(httpPort, httpEnabled, "JSON-RPC HTTP")
     addIfEnabled(wsPort, wsEnabled, "JSON-RPC WS")
     addIfEnabled(enginePort, engineEnabled, "Engine API")
-  }
-}

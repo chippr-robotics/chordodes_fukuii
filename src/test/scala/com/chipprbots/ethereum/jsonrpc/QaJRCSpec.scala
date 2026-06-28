@@ -3,7 +3,9 @@ package com.chipprbots.ethereum.jsonrpc
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import org.json4s.JsonAST._
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.json4s.JsonAST.*
 import org.scalamock.handlers.CallHandler1
 import org.scalatest.concurrent.PatienceConfiguration
 import org.scalatest.matchers.should.Matchers
@@ -15,9 +17,10 @@ import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponse
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.jsonrpc.QAService.MineBlocksResponse.MinerResponseType._
-import com.chipprbots.ethereum.jsonrpc.QAService._
+import com.chipprbots.ethereum.jsonrpc.QAService.*
+import com.chipprbots.ethereum.jsonrpc.QAService.MineBlocksResponse.MinerResponseType.*
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.utils.Config
@@ -28,63 +31,57 @@ class QaJRCSpec
     with PatienceConfiguration
     with NormalPatience
     with JsonMethodsImplicits
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   implicit val runtime: IORuntime = IORuntime.global
 
   "QaJRC" should {
     "request block mining and return valid response with correct message" when {
-      "mining ordered" in new TestSetup {
+      "mining ordered" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MiningOrdered)
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MiningOrdered), nullMessage)
-      }
 
-      "miner is working" in new TestSetup {
+      "miner is working" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MinerIsWorking)
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MinerIsWorking), nullMessage)
-      }
 
-      "miner doesn't exist" in new TestSetup {
+      "miner doesn't exist" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MinerNotExist)
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MinerNotExist), nullMessage)
-      }
 
-      "miner not support current msg" in new TestSetup {
+      "miner not support current msg" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MinerNotSupported(MineBlocks(1, true)))
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MinerNotSupport), msg("MineBlocks(1,true,None)"))
-      }
 
-      "miner return error" in new TestSetup {
+      "miner return error" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MiningError("error"))
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MiningError), msg("error"))
-      }
     }
 
     "request block mining and return InternalError" when {
-      "communication with miner failed" in new TestSetup {
-        (qaService.mineBlocks _)
+      "communication with miner failed" in new TestSetup:
+        qaService.mineBlocks
           .expects(mineBlocksReq)
           .returning(IO.raiseError(new ClassCastException("error")))
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveError(JsonRpcError.InternalError)
-      }
     }
 
   }
@@ -96,13 +93,14 @@ class QaJRCSpec
       with ByteGenerators
       with BlockchainConfigBuilder
       with ApisBuilder
-      with com.chipprbots.ethereum.TestInstanceConfigProvider {
+      with com.chipprbots.ethereum.TestInstanceConfigProvider:
     def config: JsonRpcConfig = JsonRpcConfig(Config.config, available)
 
     val appStateStorage: AppStateStorage = mock[AppStateStorage]
     val web3Service: Web3Service = mock[Web3Service]
     // MIGRATION: Scala 3 mock cannot infer AtomicReference type parameter - create real instance
     implicit val testSystem: org.apache.pekko.actor.ActorSystem = org.apache.pekko.actor.ActorSystem("QaJRCSpec-test")
+    implicit val scheduler: typed.Scheduler = testSystem.toTyped.scheduler
     val netService: NetService = new NetService(
       new java.util.concurrent.atomic.AtomicReference(
         com.chipprbots.ethereum.utils.NodeStatus(
@@ -111,7 +109,7 @@ class QaJRCSpec
           com.chipprbots.ethereum.utils.ServerStatus.NotListening
         )
       ),
-      org.apache.pekko.testkit.TestProbe().ref,
+      org.apache.pekko.testkit.TestProbe().ref.toTyped[PeerManagerActor.Command],
       com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist.empty(100),
       com.chipprbots.ethereum.jsonrpc.NetService.NetServiceConfig(scala.concurrent.duration.DurationInt(5).seconds)
     )
@@ -125,18 +123,15 @@ class QaJRCSpec
     val ethUserService: EthUserService = mock[EthUserService]
     val ethFilterService: EthFilterService = mock[EthFilterService]
     val fukuiiService: FukuiiService = mock[FukuiiService]
-    val mcpService: McpService = {
-      implicit val testSystem: org.apache.pekko.actor.ActorSystem =
-        org.apache.pekko.actor.ActorSystem("QaJRCSpec-mcp")
+    val mcpService: McpService =
       new McpService(
-        org.apache.pekko.testkit.TestProbe().ref,
+        org.apache.pekko.testkit.TestProbe().ref.toTyped[PeerManagerActor.Command],
         org.apache.pekko.testkit.TestProbe().ref,
         null,
         null,
         new java.util.concurrent.atomic.AtomicReference[com.chipprbots.ethereum.utils.NodeStatus](),
         null
       )(scala.concurrent.ExecutionContext.global)
-    }
     val qaService: QAService = mock[QAService]
 
     val jsonRpcController =
@@ -161,7 +156,8 @@ class QaJRCSpec
         null: TxPoolService,
         null: DebugTracingService,
         null: TraceService,
-        config
+        config,
+        testSystem
       )
 
     val mineBlocksReq: MineBlocksRequest = MineBlocksRequest(1, withTransactions = true, None)
@@ -189,10 +185,8 @@ class QaJRCSpec
     def mockSuccessfulMineBlocksBehaviour(
         resp: MockedMinerResponse
     ): CallHandler1[MineBlocksRequest, IO[Either[JsonRpcError, MineBlocksResponse]]] =
-      (qaService.mineBlocks _)
+      qaService.mineBlocks
         .expects(mineBlocksReq)
         .returning(IO.pure(Right(MineBlocksResponse(resp))))
 
     val fakeChainId: Byte = 42.toByte
-  }
-}

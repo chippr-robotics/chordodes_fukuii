@@ -1,15 +1,16 @@
 package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
+
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 import Fixtures.blockchainConfig
 
@@ -18,12 +19,12 @@ import Fixtures.blockchainConfig
   * Post-Olympia: SELFDESTRUCT only deletes the contract if it was created in the same transaction. Pre-existing
   * contracts only have their balance transferred to the beneficiary.
   */
-class OlympiaSelfDestructSpec extends AnyWordSpec with Matchers {
+class OlympiaSelfDestructSpec extends AnyWordSpec with Matchers:
 
   val configPreOlympia: EvmConfig = EvmConfig.SpiralConfigBuilder(blockchainConfig)
   val configOlympia: EvmConfig = EvmConfig.OlympiaConfigBuilder(blockchainConfig)
 
-  object fxt {
+  object fxt:
     val ownerAddr: Address = Address(0xcafe)
     val beneficiaryAddr: Address = Address(0xface)
     val callerAddr: Address = Address(0xca11)
@@ -87,9 +88,8 @@ class OlympiaSelfDestructSpec extends AnyWordSpec with Matchers {
     // Original world WITHOUT the owner — simulates "created in this tx"
     val originalWorldWithoutOwner: MockWorldState = MockWorldState()
       .saveAccount(beneficiaryAddr, Account(balance = beneficiaryBalance))
-  }
 
-  import fxt._
+  import fxt.*
 
   "EIP-6780 SELFDESTRUCT restrictions" when {
 
@@ -229,4 +229,3 @@ class OlympiaSelfDestructSpec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

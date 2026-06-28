@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.vm
 import java.util.Arrays.copyOfRange
 
 // scalastyle:off magic.number
-object Blake2bCompression {
+object Blake2bCompression:
   val MessageBytesLength = 213
 
   import org.bouncycastle.util.Pack
@@ -46,52 +46,45 @@ object Blake2bCompression {
     * @return
     *   all parsed inputs from input array: (rounds, h, m, t, f)
     */
-  private def parseInput(input: Array[Byte]): (Long, Array[Long], Array[Long], Array[Long], Boolean) = {
+  private def parseInput(input: Array[Byte]): (Long, Array[Long], Array[Long], Array[Long], Boolean) =
     val rounds = parseNumberOfRounds(input)
     val h = new Array[Long](8)
     val m = new Array[Long](16)
     val t = new Array[Long](2)
 
     var i = 0
-    while (i < h.length) {
+    while i < h.length do
       val offset = 4 + i * 8
       h(i) = bytesToLong(copyOfRange(input, offset, offset + 8))
       i += 1
-    }
 
     var j = 0
-    while (j < 16) {
+    while j < 16 do
       val offset = 68 + j * 8
       m(j) = bytesToLong(copyOfRange(input, offset, offset + 8))
       j += 1
-    }
 
     t(0) = bytesToLong(copyOfRange(input, 196, 204))
     t(1) = bytesToLong(copyOfRange(input, 204, 212))
     val f = input(212) != 0
     (rounds, h, m, t, f)
-  }
 
   def blake2bCompress(input: Array[Byte]): Option[Array[Byte]] =
-    if (isValidInput(input)) {
+    if isValidInput(input) then
       val (rounds, h, m, t, f) = parseInput(input)
       compress(rounds, h, m, t, f)
       Some(convertToBytes(h))
-    } else {
-      None
-    }
+    else None
 
-  private def convertToBytes(h: Array[Long]): Array[Byte] = {
+  private def convertToBytes(h: Array[Long]): Array[Byte] =
     var i = 0
     val out = new Array[Byte](h.length * 8)
-    while (i < h.length) {
+    while i < h.length do
       System.arraycopy(Pack.longToLittleEndian(h(i)), 0, out, i * 8, 8)
       i += 1
-    }
     out
-  }
 
-  private def compress(rounds: Long, h: Array[Long], m: Array[Long], t: Array[Long], f: Boolean): Unit = {
+  private def compress(rounds: Long, h: Array[Long], m: Array[Long], t: Array[Long], f: Boolean): Unit =
     val v = new Array[Long](16)
     val t0 = t(0)
     val t1 = t(1)
@@ -100,12 +93,10 @@ object Blake2bCompression {
     v(12) ^= t0
     v(13) ^= t1
 
-    if (f) {
-      v(14) ^= 0xffffffffffffffffL
-    }
+    if f then v(14) ^= 0xffffffffffffffffL
 
     var j = 0L
-    while (j < rounds) {
+    while j < rounds do
       val s: Array[Byte] = PRECOMPUTED((j % 10).toInt)
       mix(v, m(s(0)), m(s(4)), 0, 4, 8, 12)
       mix(v, m(s(1)), m(s(5)), 1, 5, 9, 13)
@@ -116,17 +107,14 @@ object Blake2bCompression {
       mix(v, m(s(10)), m(s(14)), 2, 7, 8, 13)
       mix(v, m(s(11)), m(s(15)), 3, 4, 9, 14)
       j += 1
-    }
 
     // update h:
     var offset = 0
-    while (offset < h.length) {
+    while offset < h.length do
       h(offset) ^= v(offset) ^ v(offset + 8)
       offset += 1
-    }
-  }
 
-  private def mix(v: Array[Long], a: Long, b: Long, i: Int, j: Int, k: Int, l: Int): Unit = {
+  private def mix(v: Array[Long], a: Long, b: Long, i: Int, j: Int, k: Int, l: Int): Unit =
     v(i) += a + v(j)
     v(l) = java.lang.Long.rotateLeft(v(l) ^ v(i), -32)
     v(k) += v(l)
@@ -135,5 +123,3 @@ object Blake2bCompression {
     v(l) = java.lang.Long.rotateLeft(v(l) ^ v(i), -16)
     v(k) += v(l)
     v(j) = java.lang.Long.rotateLeft(v(j) ^ v(k), -63)
-  }
-}

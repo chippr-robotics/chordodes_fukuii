@@ -3,11 +3,11 @@ package com.chipprbots.ethereum
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.console._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.console.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for TuiRenderer - rendering logic for terminal output. */
-class TuiRendererSpec extends AnyFlatSpec with Matchers {
+class TuiRendererSpec extends AnyFlatSpec with Matchers:
 
   val defaultConfig: TuiConfig = TuiConfig.default
   val minimalConfig: TuiConfig = TuiConfig.minimal
@@ -210,4 +210,3 @@ class TuiRendererSpec extends AnyFlatSpec with Matchers {
     lines should not be empty
     lines.length should be >= height - 1
   }
-}

@@ -2,8 +2,8 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern.ask
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
 
@@ -17,8 +17,7 @@ import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.SpecFixtures
-import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync
@@ -26,45 +25,42 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.Transaction
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.rlp.RLPList
+import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.rlp.encode
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.GenOps.GenOps
 
-class FastSyncSpec
-    extends TestKit(ActorSystem("FastSync_testing"))
-    with FreeSpecBase
-    with SpecFixtures
-    with WithActorSystemShutDown { self =>
-  implicit val timeout: Timeout = Timeout(60.seconds)
+class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with SpecFixtures:
+  self =>
+  implicit override val timeout: Timeout = Timeout(60.seconds)
 
-  class Fixture extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers {
-    implicit override lazy val system: ActorSystem = self.system
+  class Fixture extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers:
+    implicit override lazy val system: ActorSystem = self.system.classicSystem
 
     val blacklistMaxElems: Int = 100
     val blacklist: CacheBasedBlacklist = CacheBasedBlacklist.empty(blacklistMaxElems)
 
     override lazy val syncConfig: SyncConfig =
       defaultSyncConfig.copy(pivotBlockOffset = 5, fastSyncBlockValidationX = 5, fastSyncThrottle = 1.millis)
-    lazy val (stateRoot, trieProvider) = {
+    lazy val (stateRoot, trieProvider) =
       val stateNodesData = ObjectGenerators.genMultipleNodeData(20).pickValue
 
       lazy val trieProvider = StateSyncUtils.TrieProvider()
       lazy val stateRoot = trieProvider.buildWorld(stateNodesData)
 
       (stateRoot, trieProvider)
-    }
 
     lazy val testBlocks: List[Block] = BlockHelpers.generateChain(
       20,
       BlockHelpers.genesis,
-      block => block.copy(header = block.header.copy(stateRoot = stateRoot))
+      block => block.copy(header = block.header.copy(stateRoot = TrieRoot(stateRoot)))
     )
 
     lazy val bestBlockAtStart: Block = testBlocks(10)
@@ -73,36 +69,42 @@ class FastSyncSpec
     lazy val testPeers: Map[Peer, NetworkPeerManagerActor.PeerInfo] = twoAcceptedPeers.map { case (k, peerInfo) =>
       val lastBlock = bestBlockAtStart
       k -> peerInfo
-        .withBestBlockData(lastBlock.number, lastBlock.hash)
-        .copy(remoteStatus = peerInfo.remoteStatus.copy(bestHash = lastBlock.hash))
+        .withBestBlockData(lastBlock.number, lastBlock.hash.value)
+        .copy(remoteStatus = peerInfo.remoteStatus.copy(bestHash = lastBlock.hash.value))
     }
     lazy val networkPeerManager =
       new NetworkPeerManagerFake(
         syncConfig,
         testPeers,
-        testBlocks
+        // ETH69 G5 — include genesis so the pivot's parent-chain backlink probe (reverse from the pivot) can
+        // walk back to genesis, which is the only block in the local canonical chain at sync start. Without it
+        // the backlink finds no canonical ancestor and the pivot is (correctly) rejected.
+        BlockHelpers.genesis :: testBlocks
       )
     lazy val peerEventBus: TestProbe = TestProbe("peer_event-bus")
-    lazy val fastSync: ActorRef = system.actorOf(
-      FastSync.props(
-        fastSyncStateStorage = storagesInstance.storages.fastSyncStateStorage,
-        appStateStorage = storagesInstance.storages.appStateStorage,
-        blockNumberMappingStorage = storagesInstance.storages.blockNumberMappingStorage,
-        blockchain = blockchain,
-        blockchainReader = blockchainReader,
-        blockchainWriter = blockchainWriter,
-        evmCodeStorage = storagesInstance.storages.evmCodeStorage,
-        nodeStorage = storagesInstance.storages.nodeStorage,
-        stateStorage = storagesInstance.storages.stateStorage,
-        validators = validators,
-        peerEventBus = peerEventBus.ref,
-        networkPeerManager = networkPeerManager.ref,
-        blacklist = blacklist,
-        syncConfig = syncConfig,
-        scheduler = system.scheduler,
-        configBuilder = this
+    lazy val syncControllerProbe: TestProbe = TestProbe("sync-controller")
+    lazy val fastSync: ActorRef = self.testKit
+      .spawn(
+        FastSync.behavior(
+          fastSyncStateStorage = storagesInstance.storages.fastSyncStateStorage,
+          appStateStorage = storagesInstance.storages.appStateStorage,
+          blockNumberMappingStorage = storagesInstance.storages.blockNumberMappingStorage,
+          blockchain = blockchain,
+          blockchainReader = blockchainReader,
+          blockchainWriter = blockchainWriter,
+          evmCodeStorage = storagesInstance.storages.evmCodeStorage,
+          nodeStorage = storagesInstance.storages.nodeStorage,
+          stateStorage = storagesInstance.storages.stateStorage,
+          validators = validators,
+          peerEventBus = peerEventBus.ref,
+          networkPeerManager = networkPeerManager.ref,
+          blacklist = blacklist,
+          syncConfig = syncConfig,
+          configBuilder = this,
+          syncController = syncControllerProbe.ref
+        )
       )
-    )
+      .toClassic
 
     val saveGenesis: IO[Unit] = IO {
       blockchainWriter.save(
@@ -129,11 +131,13 @@ class FastSyncSpec
       ()
     }
 
-    val startSync: IO[Unit] = IO(fastSync ! SyncProtocol.Start)
+    val startSync: IO[Unit] = IO(fastSync ! FastSync.WrappedSyncProtocol(SyncProtocol.Start))
 
-    val getSyncStatus: IO[Status] =
-      IO.fromFuture(IO((fastSync ? SyncProtocol.GetStatus).mapTo[Status]))
-  }
+    val getSyncStatus: IO[Status] = IO.async_[Status] { cb =>
+      val replyProbe = TestProbe("get-status-reply")
+      fastSync ! FastSync.WrappedSyncProtocol(SyncProtocol.GetStatus(replyProbe.ref.toTyped[Status]))
+      cb(Right(replyProbe.expectMsgClass(timeout.duration, classOf[Status])))
+    }
 
   override def createFixture(): Fixture = new Fixture
 
@@ -143,9 +147,9 @@ class FastSyncSpec
         UnitTest,
         SyncTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
-        (for {
+        (for
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
           // Subscribe BEFORE startSync so no topic events can be missed under load.
@@ -159,7 +163,7 @@ class FastSyncSpec
           _ <- networkPeerManager.onPeersConnected
           _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
           _ <- blocksFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("blocks fiber canceled")))
-        } yield {
+        yield
           val peer = testPeers.keys.head
 
           // Simulate a typed receipt coming over the ETH66 Receipts message as:
@@ -185,12 +189,12 @@ class FastSyncSpec
 
           val watcher = TestProbe()
           watcher.watch(fastSync)
-          fastSync ! ResponseReceived(peer, msg, timeTaken = 0L)
+          fastSync ! FastSync.WrappedPrhResult(ResponseReceived(peer, msg, timeTaken = 0L))
 
           // If the actor crashes, we'll receive Terminated.
           watcher.expectNoMessage(500.millis)
           assert(true)
-        }).timeout(timeout.duration)
+        ).timeout(timeout.duration)
       }
     }
 
@@ -237,11 +241,10 @@ class FastSyncSpec
       // Termination of fastSync is our regression signal: it proves the handler ran.
       "actor exits syncing loop on NetworkIncompatible — ETH68-only network escape valve" taggedAs (
         UnitTest,
-        SyncTest,
-        FlakyTest
+        SyncTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
-        (for {
+        import fixture.*
+        (for
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
           // Subscribe BEFORE startSync — see companion test for race condition explanation.
@@ -261,7 +264,7 @@ class FastSyncSpec
             // idle receives Terminated → DeathPactException → FastSync terminates.
             watcher.expectTerminated(fastSync, timeout.duration)
           }
-        } yield succeed).timeout(timeout.duration)
+        yield succeed).timeout(timeout.duration)
       }
     }
 
@@ -270,67 +273,77 @@ class FastSyncSpec
         UnitTest,
         SyncTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
-        (for {
+        (for
           _ <- startSync
           status <- getSyncStatus
-        } yield assert(status === Status.NotSyncing)).timeout(timeout.duration)
+        yield assert(status === Status.NotSyncing)).timeout(timeout.duration)
       }
 
       "returns Syncing when pivot block is selected and started fetching data" taggedAs (
         UnitTest,
-        SyncTest,
-        FlakyTest
+        SyncTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
-        (for {
-          _ <- startSync
+        (for
           _ <- saveGenesis
+          _ <- saveTestBlocksWithWeights
+          pivotFiber <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError.start
+          _ <- cats.effect.IO.cede
+          _ <- startSync
           _ <- networkPeerManager.onPeersConnected
-          _ <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError
-          _ <- networkPeerManager.fetchedHeaders.head.compile.lastOrError
-          status <- getSyncStatus
-        } yield status match {
+          _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
+          // Poll until SSA has replied with initial stats — proves the Typed reply chain works
+          status <- Stream
+            .awakeEvery[IO](10.millis)
+            .evalMap(_ => getSyncStatus)
+            .collect { case stat @ Status.Syncing(_, _, Some(_)) => stat: Status }
+            .head
+            .compile
+            .lastOrError
+        yield status match
           case Status.Syncing(startingBlockNumber, blocksProgress, stateNodesProgress) =>
             assert(startingBlockNumber === BigInt(0))
             assert(blocksProgress.target === expectedPivotBlockNumber)
-            assert(stateNodesProgress === Some(Progress(0, 1)))
+            assert(stateNodesProgress.isDefined)
           case Status.NotSyncing | Status.SyncDone => fail("Expected syncing status")
-        })
-          .timeout(timeout.duration)
+        ).timeout(timeout.duration)
       }
 
       "returns Syncing with block progress once both header and body is fetched" taggedAs (
         UnitTest,
-        SyncTest,
-        FlakyTest
+        SyncTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
-        (for {
+        (for
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
+          // Subscribe BEFORE startSync so no topic events can be missed under load.
+          pivotFiber <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError.start
+          blocksFiber <- networkPeerManager.fetchedBlocks.head.compile.lastOrError.start
+          _ <- cats.effect.IO.cede // yield: allow subscription fibers to register before Pekko dispatch
           _ <- startSync
           _ <- networkPeerManager.onPeersConnected
-          _ <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError
-          blocksBatch <- networkPeerManager.fetchedBlocks.head.compile.lastOrError
+          _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
+          blocksBatch <- blocksFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("blocks fiber canceled")))
           status <- getSyncStatus
           lastBlockFromBatch = blocksBatch.lastOption.map(_.number).getOrElse(BigInt(0))
-        } yield status match {
+        yield status match
           case Status.Syncing(startingBlockNumber, blocksProgress, stateNodesProgress) =>
             assert(startingBlockNumber === BigInt(0))
             assert(blocksProgress.current >= lastBlockFromBatch)
             assert(blocksProgress.target === expectedPivotBlockNumber)
             assert(stateNodesProgress === Some(Progress(0, 1)))
           case Status.NotSyncing | Status.SyncDone => fail("Expected other state")
-        })
+        )
           .timeout(timeout.duration)
       }
 
-      "returns Syncing with state nodes progress" taggedAs (UnitTest, SyncTest, FlakyTest) in customTestCaseM(
-        new Fixture {
+      "returns Syncing with state nodes progress" taggedAs (UnitTest, SyncTest) in customTestCaseM(
+        new Fixture:
           override lazy val syncConfig: SyncConfig =
             defaultSyncConfig.copy(
               peersScanInterval = 1.second,
@@ -338,16 +351,18 @@ class FastSyncSpec
               fastSyncBlockValidationX = 1,
               fastSyncThrottle = 1.millis
             )
-        }
       ) { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
-        (for {
+        (for
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
+          // Subscribe BEFORE startSync so no topic events can be missed under load.
+          pivotFiber <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError.start
+          _ <- cats.effect.IO.cede // yield: allow subscription fibers to register before Pekko dispatch
           _ <- startSync
           _ <- networkPeerManager.onPeersConnected
-          _ <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError
+          _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
           _ <- Stream
             .awakeEvery[IO](10.millis)
             .evalMap(_ => getSyncStatus)
@@ -366,15 +381,14 @@ class FastSyncSpec
             .head
             .compile
             .lastOrError
-        } yield {
+        yield
           // Validate state nodes progress is reported correctly
           val Status.Syncing(_, _, maybeStateProgress) = status
           val stateProgress = maybeStateProgress.getOrElse(fail("State nodes progress should be defined"))
           assert(stateProgress.target >= 1, "State nodes target should be at least 1")
           assert(stateProgress.current >= 0, "State nodes current should be non-negative")
           succeed
-        }).timeout(timeout.duration)
+        ).timeout(timeout.duration)
       }
     }
   }
-}

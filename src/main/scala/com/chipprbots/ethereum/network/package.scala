@@ -13,29 +13,25 @@ import org.bouncycastle.crypto.params.ECPublicKeyParameters
 import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 
-package object network {
+package object network:
 
   val ProtocolVersion = 4
 
-  implicit class ECPublicKeyParametersNodeId(val pubKey: ECPublicKeyParameters) extends AnyVal {
+  extension (pubKey: ECPublicKeyParameters)
     def toNodeId: Array[Byte] =
-      pubKey
-        .asInstanceOf[ECPublicKeyParameters]
-        .getQ
+      pubKey.getQ
         .getEncoded(false)
         .drop(1) // drop type info
-  }
 
-  def publicKeyFromNodeId(nodeId: String): ECPoint = {
+  def publicKeyFromNodeId(nodeId: String): ECPoint =
     val bytes = ECDSASignature.UncompressedIndicator +: Hex.decode(nodeId)
     curve.getCurve.decodePoint(bytes)
-  }
 
-  def loadAsymmetricCipherKeyPair(filePath: String, secureRandom: SecureRandom): AsymmetricCipherKeyPair = {
+  def loadAsymmetricCipherKeyPair(filePath: String, secureRandom: SecureRandom): AsymmetricCipherKeyPair =
     val file = new File(filePath)
-    if (!file.exists()) {
+    if !file.exists() then
       val keysValuePair = generateKeyPair(secureRandom)
 
       // Write keys to file
@@ -46,14 +42,12 @@ package object network {
       finally writer.close()
 
       keysValuePair
-    } else {
+    else
       val reader = Source.fromFile(filePath)
-      try {
+      try
         val privHex = reader.getLines().next()
         keyPairFromPrvKey(Hex.decode(privHex))
-      } finally reader.close()
-    }
-  }
+      finally reader.close()
 
   /** Given an address, returns the corresponding host name for the URI. All IPv6 addresses are enclosed in square
     * brackets.
@@ -63,12 +57,8 @@ package object network {
     * @return
     *   host name associated with the address
     */
-  def getHostName(address: InetAddress): String = {
+  def getHostName(address: InetAddress): String =
     val hostName = address.getHostAddress
-    address match {
+    address match
       case _: Inet6Address => s"[$hostName]"
       case _               => hostName
-    }
-  }
-
-}

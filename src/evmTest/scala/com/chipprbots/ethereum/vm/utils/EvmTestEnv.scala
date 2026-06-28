@@ -4,10 +4,10 @@ import java.io.File
 
 import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.{Account, Address, UInt256}
-import com.chipprbots.ethereum.vm.MockWorldState._
-import com.chipprbots.ethereum.vm._
+import com.chipprbots.ethereum.vm.MockWorldState.*
+import com.chipprbots.ethereum.vm.*
 
 import scala.language.dynamics
 import scala.util.Random
@@ -19,7 +19,7 @@ object EvmTestEnv {
 // scalastyle:off magic.number
 trait EvmTestEnv {
 
-  import EvmTestEnv._
+  import EvmTestEnv.*
 
   val config = EvmConfig.ConstantinopleConfigBuilder(Fixtures.blockchainConfig)
 
@@ -90,14 +90,14 @@ trait EvmTestEnv {
   class Contract(val name: String, val address: Address) extends Dynamic {
 
     def applyDynamic(methodName: String)(args: Any*): ContractMethodCall = {
-      callMethod(methodName)(args: _*)
+      callMethod(methodName)(args*)
     }
 
     def callMethod(methodName: String)(args: Any*): ContractMethodCall = {
       if (methodName.contains("("))
-        callWithSignature(methodName)(args: _*)
+        callWithSignature(methodName)(args*)
       else
-        callWithMethodName(methodName)(args: _*)
+        callWithMethodName(methodName)(args*)
     }
 
     private def callWithMethodName(methodName: String)(args: Any*): ContractMethodCall = {
@@ -110,7 +110,7 @@ trait EvmTestEnv {
         throw new RuntimeException("More than one matching ABI found. Please specify the signature")
       else {
         val abi = matchedAbis.head
-        callWithSignature(s"$methodName(${abi.inputs.map(_.`type`).mkString(",")})")(args: _*)
+        callWithSignature(s"$methodName(${abi.inputs.map(_.`type`).mkString(",")})")(args*)
       }
     }
 

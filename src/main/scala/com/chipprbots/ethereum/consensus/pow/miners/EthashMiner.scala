@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -14,12 +14,12 @@ import com.chipprbots.ethereum.consensus.pow.EthashUtils
 import com.chipprbots.ethereum.consensus.pow.PoWBlockCreator
 import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator
 import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.CoordinatorProtocol
-import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol._
+import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol.*
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
-import com.chipprbots.ethereum.utils.BigIntExtensionMethods._
+import com.chipprbots.ethereum.utils.BigIntExtensionMethods.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.Logger
@@ -30,17 +30,17 @@ import com.chipprbots.ethereum.utils.Logger
 class EthashMiner(
     dagManager: EthashDAGManager,
     blockCreator: PoWBlockCreator,
-    syncController: ClassicActorRef,
+    syncController: TypedActorRef[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
     ethMiningService: EthMiningService
 )(implicit scheduler: IORuntime)
     extends Miner
-    with Logger {
+    with Logger:
 
-  import EthashMiner._
+  import EthashMiner.*
 
   def processMining(
       bestBlock: Block
-  )(implicit blockchainConfig: BlockchainConfig): Future[CoordinatorProtocol] = {
+  )(implicit blockchainConfig: BlockchainConfig): Future[CoordinatorProtocol] =
     log.debug("Starting mining with parent block {}", bestBlock.number)
     blockCreator
       .getBlockForMining(bestBlock)
@@ -56,11 +56,10 @@ class EthashMiner(
         PoWMiningCoordinator.MiningUnsuccessful
       }
       .unsafeToFuture()
-  }
 
   private def doMining(blockNumber: Long, block: Block)(implicit
       blockchainConfig: BlockchainConfig
-  ): (Long, MiningResult) = {
+  ): (Long, MiningResult) =
     val epoch =
       EthashUtils.epoch(blockNumber, blockchainConfig.forkBlockNumbers.ecip1099BlockNumber.toLong)
     val (dag, dagSize) = dagManager.calculateDagSize(blockNumber, epoch)
@@ -69,7 +68,6 @@ class EthashMiner(
     val mineResult =
       mineEthash(headerHash, block.header.difficulty.toLong, dagSize, dag, blockCreator.miningConfig.mineRounds)
     (startTime, mineResult)
-  }
 
   private def mineEthash(
       headerHash: Array[Byte],
@@ -77,7 +75,7 @@ class EthashMiner(
       dagSize: Long,
       dag: Array[Array[Int]],
       numRounds: Int
-  ): MiningResult = {
+  ): MiningResult =
     val initNonce = BigInt(NumBits, new Random())
 
     (0 to numRounds).iterator
@@ -89,10 +87,8 @@ class EthashMiner(
       }
       .collectFirst { case (true, pow, nonceBytes, n) => MiningSuccessful(n + 1, pow.mixHash, nonceBytes) }
       .getOrElse(MiningUnsuccessful(numRounds))
-  }
-}
 
-object EthashMiner {
+object EthashMiner:
   final val BlockForgerDispatcherId = "fukuii.async.dispatchers.block-forger"
 
   // scalastyle:off magic.number
@@ -101,4 +97,3 @@ object EthashMiner {
   final val NumBits: Int = 64
 
   final val DagFilePrefix: ByteString = ByteString(Array(0xfe, 0xca, 0xdd, 0xba, 0xad, 0xde, 0xe1, 0xfe).map(_.toByte))
-}

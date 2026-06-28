@@ -12,13 +12,13 @@ import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPSerializable
 import com.chipprbots.ethereum.rlp.rawDecode
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class FrameCodecSpec extends AnyFlatSpec with Matchers {
+class FrameCodecSpec extends AnyFlatSpec with Matchers:
 
-  import DummyMsg._
+  import DummyMsg.*
 
-  it should "send message and receive a response" taggedAs (UnitTest, NetworkTest) in new SecureChannelSetup {
+  it should "send message and receive a response" taggedAs (UnitTest, NetworkTest) in new SecureChannelSetup:
     val frameCodec = new FrameCodec(secrets)
     val remoteFrameCodec = new FrameCodec(remoteSecrets)
 
@@ -34,39 +34,29 @@ class FrameCodecSpec extends AnyFlatSpec with Matchers {
     val sampleMessageReadMessage: DummyMsg = sampleMessageReadFrames.head.payload.toArray[Byte].toSample
 
     sampleMessageReadMessage shouldBe sampleMessage
-  }
 
-  object DummyMsg {
+  object DummyMsg:
     val code: Int = 2323
 
-    implicit class DummyMsgEnc(val underlyingMsg: DummyMsg) extends MessageSerializable with RLPSerializable {
+    implicit class DummyMsgEnc(val underlyingMsg: DummyMsg) extends MessageSerializable with RLPSerializable:
       override def code: Int = DummyMsg.code
 
-      override def toRLPEncodable: RLPEncodeable = {
+      override def toRLPEncodable: RLPEncodeable =
         import com.chipprbots.ethereum.rlp.RLPImplicits.{intEncDec, byteStringEncDec}
         RLPList(
           intEncDec.encode(underlyingMsg.aField),
           byteStringEncDec.encode(underlyingMsg.anotherField)
         )
-      }
       override def toShortString: String = underlyingMsg.toShortString
-    }
 
-    implicit class DummyMsgDec(val bytes: Array[Byte]) {
-      def toSample: DummyMsg = {
+    implicit class DummyMsgDec(val bytes: Array[Byte]):
+      def toSample: DummyMsg =
         import com.chipprbots.ethereum.rlp.RLPImplicits.{intEncDec, byteArrayEncDec}
-        rawDecode(bytes) match {
+        rawDecode(bytes) match
           case RLPList(aField, anotherField) =>
             DummyMsg(aField.decodeAs[Int]("aField"), ByteString(anotherField.decodeAs[Array[Byte]]("anotherField")))
           case _ => throw new RuntimeException("Cannot decode Status")
-        }
-      }
-    }
-  }
 
-  case class DummyMsg(aField: Int, anotherField: ByteString) extends Message {
+  case class DummyMsg(aField: Int, anotherField: ByteString) extends Message:
     override def code: Int = DummyMsg.code
     override def toShortString: String = toString
-  }
-
-}

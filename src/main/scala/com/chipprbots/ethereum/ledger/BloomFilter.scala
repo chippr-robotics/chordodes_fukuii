@@ -2,12 +2,12 @@ package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.ByteUtils.or
 
-object BloomFilter {
+object BloomFilter:
 
   val BloomFilterByteSize: Int = 256
   private val BloomFilterBitSize: Int = BloomFilterByteSize * 8
@@ -29,37 +29,30 @@ object BloomFilter {
     * @return
     *   bloom filter associated with the logs
     */
-  def create(logs: Seq[TxLogEntry]): ByteString = {
+  def create(logs: Seq[TxLogEntry]): ByteString =
     val bloomFilters = logs.map(createBloomFilterForLogEntry)
-    if (bloomFilters.isEmpty)
-      EmptyBloomFilter
-    else
-      ByteString(or(bloomFilters: _*))
-  }
+    if bloomFilters.isEmpty then EmptyBloomFilter
+    else ByteString(or(bloomFilters*))
 
   // Bloom filter function that reduces a log to a single 256-byte hash based on equation 24 from the YP
-  private def createBloomFilterForLogEntry(logEntry: TxLogEntry): Array[Byte] = {
+  private def createBloomFilterForLogEntry(logEntry: TxLogEntry): Array[Byte] =
     val dataForBloomFilter = logEntry.loggerAddress.bytes +: logEntry.logTopics
     val bloomFilters = dataForBloomFilter.map(bytes => bloomFilter(bytes.toArray))
 
-    or(bloomFilters: _*)
-  }
+    or(bloomFilters*)
 
   // Bloom filter that sets 3 bits out of 2048 based on equations 25-28 from the YP
-  private def bloomFilter(bytes: Array[Byte]): Array[Byte] = {
+  private def bloomFilter(bytes: Array[Byte]): Array[Byte] =
     val hashedBytes = kec256(bytes)
     val bitsToSet = IntIndexesToAccess.map { i =>
       val index16bit = (hashedBytes(i + 1) & 0xff) + ((hashedBytes(i) & 0xff) << 8)
       index16bit % BloomFilterBitSize // Obtain only 11 bits from the index
     }
     bitsToSet.foldLeft(EmptyBloomFilter.toArray) { case (prevBloom, index) => setBit(prevBloom, index) }.reverse
-  }
 
-  private def setBit(bytes: Array[Byte], bitIndex: Int): Array[Byte] = {
+  private def setBit(bytes: Array[Byte], bitIndex: Int): Array[Byte] =
     require(bitIndex / 8 < bytes.length, "Only bits between the bytes array should be set")
 
     val byteIndex = bitIndex / 8
     val newByte: Byte = (bytes(byteIndex) | 1 << (bitIndex % 8).toByte).toByte
     bytes.updated(byteIndex, newByte)
-  }
-}

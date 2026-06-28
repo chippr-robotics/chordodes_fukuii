@@ -91,6 +91,23 @@ Do NOT recommend ETH-mainnet procedures for ETC networks, or ETC/PoW procedures 
 ETH/Sepolia networks. Always identify the target chain before advising on consensus,
 mining, fee, or fork-related operations.
 
+## 6. Reference repos for Spec Kit skills
+
+All `speckit-*` skills should sync the upstream Spec Kit repo before starting a
+spec, plan, or implement session. New releases add templates, workflow patterns,
+and integration architecture changes.
+
+```bash
+REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
+git -C "$REFS/spec-kit" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
+```
+
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| spec-kit | https://github.com/github/spec-kit | `CHANGELOG.md` before starting a new spec or plan; `templates/` for the latest spec templates; `AGENTS.md` for integration architecture changes; `docs/` for workflow guidance |
+
+Full index: [`.claude/skills/REFERENCES.md`](REFERENCES.md)
+
 ## Skill authoring template
 
 ```markdown

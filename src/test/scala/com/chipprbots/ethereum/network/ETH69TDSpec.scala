@@ -7,12 +7,12 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
-import com.chipprbots.ethereum.forkid.ForkId
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for ETH/69 TD handling.
   *
@@ -22,10 +22,10 @@ import com.chipprbots.ethereum.testing.Tags._
   *   - `PeerInfo.apply` initialises maxBlockNumber from latestBlock (not from chainWeight.totalDifficulty)
   *   - The fallback path (peer ahead of us) uses block-number proxy correctly
   */
-class ETH69TDSpec extends AnyFlatSpec with Matchers {
+class ETH69TDSpec extends AnyFlatSpec with Matchers:
 
-  private val genesisHash = Fixtures.Blocks.Genesis.header.hash
-  private val latestHash = Fixtures.Blocks.Block3125369.header.hash
+  private val genesisHash = Fixtures.Blocks.Genesis.header.hash.value
+  private val latestHash = Fixtures.Blocks.Block3125369.header.hash.value
   private val latestBlockNr = Fixtures.Blocks.Block3125369.header.number
 
   private val dummyForkId = ForkId(0L, None)
@@ -67,7 +67,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
     val status = eth69Status(latestBlockNr, latestHash)
     val remoteStatus = RemoteStatus.fromETH69Status(status, Capability.ETH69, false, Nil, proxy)
 
-    remoteStatus.chainWeight.totalDifficulty shouldBe latestBlockNr
+    remoteStatus.chainWeight.totalDifficulty.value shouldBe latestBlockNr
     remoteStatus.latestBlock shouldBe Some(latestBlockNr)
   }
 
@@ -149,7 +149,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
       genesisHash = genesisHash
     )
 
-    eth68RemoteStatus.chainWeight.totalDifficulty shouldBe wireTD
+    eth68RemoteStatus.chainWeight.totalDifficulty.value shouldBe wireTD
     eth68RemoteStatus.latestBlock shouldBe None
   }
 
@@ -166,7 +166,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
     val peerInfo = PeerInfo(eth68RemoteStatus, forkAccepted = true)
 
     peerInfo.maxBlockNumber shouldBe BigInt(0)
-    peerInfo.chainWeight.totalDifficulty shouldBe BigInt("100000000000000000000000000")
+    peerInfo.chainWeight.totalDifficulty.value shouldBe BigInt("100000000000000000000000000")
   }
 
   it should "ETH68: chainWeight.totalDifficulty is the actual wire TD, not a block number" taggedAs UnitTest in {
@@ -181,8 +181,8 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
     val peerInfo = PeerInfo(eth68RemoteStatus, forkAccepted = true)
 
     // For ETH68 the TD comparison in BlockBroadcast uses peerInfo.chainWeight — it must be accurate
-    peerInfo.chainWeight.totalDifficulty shouldBe wireTD
-    peerInfo.chainWeight.totalDifficulty should be > BigInt(100_000_000L) // clearly not a block number
+    peerInfo.chainWeight.totalDifficulty.value shouldBe wireTD
+    peerInfo.chainWeight.totalDifficulty.value should be > BigInt(100_000_000L) // clearly not a block number
   }
 
   // -------------------------------------------------------------------------
@@ -204,7 +204,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
   // -------------------------------------------------------------------------
 
   it should "encode ETH/69 STATUS as 7 fields per EIP-7642 (geth/besu canonical)" taggedAs UnitTest in {
-    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status._
+    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status.*
     import com.chipprbots.ethereum.rlp.{RLPList, rawDecode}
 
     val status = eth69Status(latestBlockNr, latestHash)
@@ -217,7 +217,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "round-trip through the spec-compliant 7-field wire format" taggedAs UnitTest in {
-    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status._
+    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status.*
 
     val original = eth69Status(latestBlockNr, latestHash).copy(earliestBlock = BigInt(0))
     val encoded: Array[Byte] = original.toBytes
@@ -233,7 +233,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "preserve a non-zero earliestBlock through the 7-field round-trip" taggedAs UnitTest in {
-    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status._
+    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status.*
 
     val original = eth69Status(latestBlockNr, latestHash).copy(earliestBlock = BigInt(123))
     val encoded: Array[Byte] = original.toBytes
@@ -245,10 +245,10 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "decode legacy 6-field fukuii STATUS shape (backward compat with pre-fix peers)" taggedAs UnitTest in {
-    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status._
+    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status.*
     import com.chipprbots.ethereum.rlp.{RLPList, RLPValue, encode}
     import com.chipprbots.ethereum.utils.ByteUtils
-    import com.chipprbots.ethereum.forkid.ForkId._
+    import com.chipprbots.ethereum.forkid.ForkId.*
 
     // Hand-build the 6-field legacy shape used by pre-fix fukuii.
     val legacyRlp = RLPList(
@@ -271,7 +271,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "reject malformed STATUS payloads with the canonical error message" taggedAs UnitTest in {
-    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status._
+    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status.*
     import com.chipprbots.ethereum.rlp.{RLPList, RLPValue, encode}
 
     val garbage: Array[Byte] = encode(RLPList(RLPValue(Array[Byte](0x01)), RLPValue(Array[Byte](0x02))))
@@ -286,10 +286,10 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
   // Post-fix the decode succeeds; the peer is then rejected at the genesis-hash check downstream
   // as `Useless peer`, which is the correct behaviour for wrong-chain interop.
   it should "decode ETH/68-shape STATUS sent on ETH/69 channel by non-spec peers (Holesky-style payload)" taggedAs UnitTest in {
-    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status._
+    import com.chipprbots.ethereum.network.p2p.messages.ETH69.Status.*
     import com.chipprbots.ethereum.rlp.{RLPList, RLPValue, encode}
     import com.chipprbots.ethereum.utils.ByteUtils
-    import com.chipprbots.ethereum.forkid.ForkId._
+    import com.chipprbots.ethereum.forkid.ForkId.*
 
     val holeskyGenesis = ByteString(
       org.bouncycastle.util.encoders.Hex.decode(
@@ -324,4 +324,3 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
     decoded.latestBlock shouldBe BigInt(0)
     decoded.earliestBlock shouldBe BigInt(0)
   }
-}

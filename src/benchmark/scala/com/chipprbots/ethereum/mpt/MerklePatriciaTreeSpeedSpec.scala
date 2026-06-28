@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.mpt
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.{ArchiveNodeStorage, MptStorage, NodeStorage, SerializingMptStorage}
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.{ObjectGenerators, crypto}
 import org.bouncycastle.util.encoders.Hex

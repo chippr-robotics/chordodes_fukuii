@@ -4,6 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.Receipt
@@ -14,7 +15,7 @@ class BlockValidation(
     mining: Mining,
     blockchainReader: BlockchainReader,
     blockQueue: BlockQueue
-) {
+):
 
   def validateBlockBeforeExecution(
       block: Block
@@ -26,15 +27,16 @@ class BlockValidation(
     )
 
   private def getBlockHeaderFromChainOrQueue(hash: ByteString): Option[BlockHeader] =
-    blockchainReader.getBlockHeaderByHash(hash).orElse(blockQueue.getBlockByHash(hash).map(_.header))
+    blockchainReader
+      .getBlockHeaderByHash(BlockHash(hash))
+      .orElse(blockQueue.getBlockByHash(BlockHash(hash)).map(_.header))
 
-  private def getNBlocksBackFromChainOrQueue(hash: ByteString, n: Int): List[Block] = {
-    val queuedBlocks = blockQueue.getBranch(hash, dequeue = false).takeRight(n)
-    if (queuedBlocks.length == n) {
-      queuedBlocks
-    } else {
-      val chainedBlockHash = queuedBlocks.headOption.map(_.header.parentHash).getOrElse(hash)
-      blockchainReader.getBlockByHash(chainedBlockHash) match {
+  private def getNBlocksBackFromChainOrQueue(hash: ByteString, n: Int): List[Block] =
+    val queuedBlocks = blockQueue.getBranch(BlockHash(hash), dequeue = false).takeRight(n)
+    if queuedBlocks.length == n then queuedBlocks
+    else
+      val chainedBlockHash = queuedBlocks.headOption.map(_.header.parentHash).getOrElse(BlockHash(hash))
+      blockchainReader.getBlockByHash(chainedBlockHash) match
         case None =>
           // The in memory blocks aren't connected to the db ones, we don't have n blocks to return so we return none
           Nil
@@ -51,9 +53,6 @@ class BlockValidation(
             .collect { case Some(block) => block }
             .toList
           (remainingBlocks :+ highestBlockInStorage) ::: queuedBlocks
-      }
-    }
-  }
 
   def validateBlockAfterExecution(
       block: Block,
@@ -67,4 +66,3 @@ class BlockValidation(
       receipts = receipts,
       gasUsed = gasUsed
     )
-}

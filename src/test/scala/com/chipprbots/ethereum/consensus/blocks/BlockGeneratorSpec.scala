@@ -16,26 +16,26 @@ import com.chipprbots.ethereum.blockchain.data.GenesisDataLoader
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.mining.MiningConfig
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
-import com.chipprbots.ethereum.consensus.validators._
+import com.chipprbots.ethereum.consensus.validators.*
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.SignedTransaction.FirstByteOfAddress
-import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation
-import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
-import com.chipprbots.ethereum.utils._
 import com.chipprbots.ethereum.ledger.TxResult
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.*
 
-class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
+class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
   implicit val testContext: IORuntime = IORuntime.global
 
   "BlockGenerator" should "generate correct block with empty transactions" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val pendingBlock: PendingBlock =
       blockGenerator.generateBlock(bestBlock.get, Nil, Address(testAddress), blockGenerator.emptyX, None).pendingBlock
 
@@ -48,20 +48,19 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.header.extraData shouldBe headerExtraData
-  }
 
-  it should "generate correct block with transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+  it should "generate correct block with transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
     val pendingBlock: PendingBlock =
       blockGenerator
         .generateBlock(bestBlock.get, Seq(signedTransaction), Address(testAddress), blockGenerator.emptyX, None)
@@ -76,23 +75,22 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.header.extraData shouldBe headerExtraData
-  }
 
   it should "be possible to simulate transaction, on world returned with pending block" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val pendingBlock: PendingBlock =
       blockGenerator
         .generateBlock(bestBlock.get, Seq(signedTransaction), Address(testAddress), blockGenerator.emptyX, None)
@@ -107,7 +105,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
@@ -118,7 +116,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
 
     // Create new pending block, with updated stateRootHash
     val pendBlockAndState: PendingBlockAndState = blockGenerator.generateBlock(
-      blockchainReader.getBestBlock().get,
+      blockchainReader.getBestBlock.get,
       Seq(signedTransaction),
       Address(testAddress),
       blockGenerator.emptyX,
@@ -139,9 +137,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
 
     // Check if transaction was valid
     simulationResult.vmError shouldBe None
-  }
 
-  it should "filter out failing transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+  it should "filter out failing transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
     val pendingBlock: PendingBlock =
       blockGenerator
         .generateBlock(
@@ -162,25 +159,24 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
 
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
-  }
 
   it should "filter out transactions exceeding block gas limit and include correct transactions" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val txWitGasTooBigGasLimit: SignedTransaction = SignedTransaction
       .sign(
         transaction.copy(gasLimit = BigInt(2).pow(100000), nonce = signedTransaction.tx.nonce + 1),
@@ -204,7 +200,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
@@ -212,17 +208,16 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
 
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
-  }
 
   it should "generate block before eip155 and filter out chain specific tx" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     implicit override lazy val blockchainConfig: BlockchainConfig = BlockchainConfig(
       chainId = 0x3d,
       networkId = 1,
@@ -275,24 +270,23 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       pendingBlock.block.copy(
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
-          mixHash = minedMixHash,
+          mixHash = BlockHash(minedMixHash),
           unixTimestamp = miningTimestamp,
           gasLimit = generatedBlockGasLimit
         )
       )
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(generalTx)
     fullBlock.header.extraData shouldBe headerExtraData
-  }
 
   it should "generate correct block with (without empty accounts) after EIP-161" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     implicit override lazy val blockchainConfig: BlockchainConfig = BlockchainConfig(
       forkBlockNumbers = ForkBlockNumbers.Empty.copy(
         frontierBlockNumber = 0,
@@ -342,13 +336,12 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
         .generateBlock(bestBlock.get, Seq(generalTx), Address(testAddress), blockGenerator.emptyX, None)
         .pendingBlock
 
-    blockExecution.executeAndValidateBlock(generatedBlock.block, true) shouldBe a[Right[_, Seq[Receipt]]]
-  }
+    blockExecution.executeAndValidateBlock(generatedBlock.block, true) shouldBe a[Right[?, Seq[Receipt]]]
 
   it should "generate block after eip155 and allow both chain specific and general transactions" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val generalTx: SignedTransaction =
       SignedTransaction.sign(transaction.copy(nonce = transaction.nonce + 1), keyPair, None)
 
@@ -373,20 +366,22 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       pendingBlock.block.copy(
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
-          mixHash = minedMixHash,
+          mixHash = BlockHash(minedMixHash),
           unixTimestamp = miningTimestamp,
           gasLimit = generatedBlockGasLimit
         )
       )
-    validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
+    validators.blockHeaderValidator.validate(
+      fullBlock.header,
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) shouldBe Right(
       BlockHeaderValid
     )
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction, generalTx)
     fullBlock.header.extraData shouldBe headerExtraData
-  }
 
-  it should "include consecutive transactions from single sender" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+  it should "include consecutive transactions from single sender" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
     val nextTransaction: SignedTransaction =
       SignedTransaction.sign(transaction.copy(nonce = signedTransaction.tx.nonce + 1), keyPair, Some(BigInt(0x3d)))
 
@@ -411,23 +406,25 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       pendingBlock.block.copy(
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
-          mixHash = minedMixHash,
+          mixHash = BlockHash(minedMixHash),
           unixTimestamp = miningTimestamp,
           gasLimit = generatedBlockGasLimit
         )
       )
-    validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
+    validators.blockHeaderValidator.validate(
+      fullBlock.header,
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) shouldBe Right(
       BlockHeaderValid
     )
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction, nextTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
-  }
 
   it should "filter out failing transaction from the middle of tx list" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val nextTransaction: SignedTransaction =
       SignedTransaction.sign(transaction.copy(nonce = signedTransaction.tx.nonce + 1), keyPair, Some(BigInt(0x3d)))
 
@@ -465,23 +462,25 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
-    validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
+    validators.blockHeaderValidator.validate(
+      fullBlock.header,
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) shouldBe Right(
       BlockHeaderValid
     )
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction, nextTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
-  }
 
   it should "include transaction with higher gas price if nonce is the same" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val txWitSameNonceButLowerGasPrice: SignedTransaction = SignedTransaction
       .sign(transaction.copy(gasPrice = signedTransaction.tx.gasPrice - 1), keyPair, Some(BigInt(0x3d)))
 
@@ -505,20 +504,22 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
-    validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
+    validators.blockHeaderValidator.validate(
+      fullBlock.header,
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) shouldBe Right(
       BlockHeaderValid
     )
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
-  }
 
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
 
     val testAddress = 42
     val privateKey: BigInt = BigInt(1, Hex.decode("f3202185c84325302d43887e90a2e23e7bc058d0450bb58ef2f7585765d7d48b"))
@@ -595,7 +596,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       )
     genesisDataLoader.loadGenesisData()
 
-    val bestBlock: Option[Block] = blockchainReader.getBestBlock()
+    val bestBlock: Option[Block] = blockchainReader.getBestBlock
 
     lazy val blockTimestampProvider = new FakeBlockTimestampProvider
 
@@ -623,13 +624,10 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       )
 
     val generatedBlockGasLimit = 16733003
-  }
-}
 
-class FakeBlockTimestampProvider extends BlockTimestampProvider {
+class FakeBlockTimestampProvider extends BlockTimestampProvider:
   private var timestamp = Instant.now.getEpochSecond
 
   def advance(seconds: Long): Unit = timestamp += seconds
 
   override def getEpochSecond: Long = timestamp
-}

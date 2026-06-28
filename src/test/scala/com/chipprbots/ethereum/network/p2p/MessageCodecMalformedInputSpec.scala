@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.network.rlpx.FrameCodec
 import com.chipprbots.ethereum.network.rlpx.Header
 import com.chipprbots.ethereum.network.rlpx.MessageCodec
 import com.chipprbots.ethereum.network.rlpx.MessageCodec.CompressionPolicy
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Malformed-input resilience tests for MessageCodec.readFrames and FrameCodec.readFrames.
   *
@@ -30,7 +30,7 @@ class MessageCodecMalformedInputSpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with SecureChannelSetup {
+    with SecureChannelSetup:
 
   // Fresh codec per call: FrameCodec is stateful (accumulates unprocessedData across readFrames calls).
   // Using a def ensures each test gets an isolated instance with no carry-over bytes.
@@ -60,7 +60,7 @@ class MessageCodecMalformedInputSpec
     val frames = Seq(frame(0x10, Array.emptyByteArray)) // StatusCode
     val results = noCompressionCodec.readFrames(frames)
     results should have size 1
-    results.head shouldBe a[Left[_, _]]
+    results.head shouldBe a[Left[?, ?]]
   }
 
   it should "return Left for an empty payload on a network-layer message type code" taggedAs (
@@ -70,7 +70,7 @@ class MessageCodecMalformedInputSpec
     val frames = Seq(frame(0x01, Array.emptyByteArray)) // Ping
     val results = noCompressionCodec.readFrames(frames)
     results should have size 1
-    results.head shouldBe a[Left[_, _]]
+    results.head shouldBe a[Left[?, ?]]
   }
 
   // -----------------------------------------------------------------------
@@ -83,15 +83,15 @@ class MessageCodecMalformedInputSpec
     val frames = Seq(frame(0xff, Array[Byte](0xc0.toByte)))
     val results = noCompressionCodec.readFrames(frames)
     results should have size 1
-    results.head shouldBe a[Left[_, _]]
-    results.head.left.get shouldBe a[MessageDecoder.UnknownMessageTypeError]
+    results.head shouldBe a[Left[?, ?]]
+    results.head.swap.getOrElse(fail("Expected Left")) shouldBe a[MessageDecoder.UnknownMessageTypeError]
   }
 
   it should "return Left for type code 0x1000 (above all registered protocols)" taggedAs (UnitTest, NetworkTest) in {
     val frames = Seq(frame(0x1000, Array[Byte](0xc0.toByte)))
     val results = noCompressionCodec.readFrames(frames)
     results should have size 1
-    results.head shouldBe a[Left[_, _]]
+    results.head shouldBe a[Left[?, ?]]
   }
 
   it should "return Left for type code 0x00 (wire Hello — never sent post-handshake)" taggedAs (
@@ -101,7 +101,7 @@ class MessageCodecMalformedInputSpec
     val frames = Seq(frame(0x00, Array[Byte](0xc0.toByte)))
     val results = noCompressionCodec.readFrames(frames)
     results should have size 1
-    results.head shouldBe a[Left[_, _]]
+    results.head shouldBe a[Left[?, ?]]
   }
 
   // -----------------------------------------------------------------------
@@ -115,7 +115,7 @@ class MessageCodecMalformedInputSpec
     val frames = Seq(frame(0x10, garbage))
     val results = noCompressionCodec.readFrames(frames)
     results should have size 1
-    results.head shouldBe a[Left[_, _]]
+    results.head shouldBe a[Left[?, ?]]
   }
 
   it should "return Left for a single-byte 0xFF payload on GetBlockHeadersCode (0x13)" taggedAs
@@ -123,7 +123,7 @@ class MessageCodecMalformedInputSpec
       val frames = Seq(frame(0x13, Array[Byte](0xff.toByte)))
       val results = noCompressionCodec.readFrames(frames)
       results should have size 1
-      results.head shouldBe a[Left[_, _]]
+      results.head shouldBe a[Left[?, ?]]
     }
 
   it should "return Left for a valid RLP null (0x80) payload on BlockHeadersCode (0x14)" taggedAs
@@ -132,7 +132,7 @@ class MessageCodecMalformedInputSpec
       val frames = Seq(frame(0x14, Array[Byte](0x80.toByte)))
       val results = noCompressionCodec.readFrames(frames)
       results should have size 1
-      results.head shouldBe a[Left[_, _]]
+      results.head shouldBe a[Left[?, ?]]
     }
 
   // -----------------------------------------------------------------------
@@ -150,7 +150,7 @@ class MessageCodecMalformedInputSpec
       )
       val results = noCompressionCodec.readFrames(allGarbage)
       results should have size 3
-      all(results) shouldBe a[Left[_, _]]
+      all(results) shouldBe a[Left[?, ?]]
     }
 
   // -----------------------------------------------------------------------
@@ -160,11 +160,11 @@ class MessageCodecMalformedInputSpec
   behavior of "MessageCodec.readFrames (property-based)"
 
   it should "never throw for any payload on any type code" taggedAs (UnitTest, NetworkTest) in {
-    val frameGen = for {
+    val frameGen = for
       typeCode <- Gen.choose(0x00, 0x1fff)
       payloadSize <- Gen.choose(0, 512)
       payload <- Gen.listOfN(payloadSize, Arbitrary.arbitrary[Byte])
-    } yield frame(typeCode, payload.toArray)
+    yield frame(typeCode, payload.toArray)
 
     forAll(Gen.nonEmptyListOf(frameGen)) { (frames: List[Frame]) =>
       noException should be thrownBy {
@@ -175,10 +175,10 @@ class MessageCodecMalformedInputSpec
 
   it should "return Left for every frame with random-byte payloads on a known type code" taggedAs
     (UnitTest, NetworkTest) in {
-      val payloadGen: Gen[Array[Byte]] = for {
+      val payloadGen: Gen[Array[Byte]] = for
         size <- Gen.choose(1, 256)
         bytes <- Gen.listOfN(size, Arbitrary.arbitrary[Byte])
-      } yield bytes.toArray
+      yield bytes.toArray
 
       forAll(payloadGen) { (payload: Array[Byte]) =>
         // 0x10 = StatusCode — any non-conforming payload must decode to Left
@@ -222,4 +222,3 @@ class MessageCodecMalformedInputSpec
       }
     }
   }
-}

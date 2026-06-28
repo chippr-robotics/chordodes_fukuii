@@ -3,14 +3,14 @@ package com.chipprbots.scalanet.discovery.ethereum.codecs
 import java.net.InetAddress
 
 import scala.collection.SortedMap
-import scala.math.Ordering.Implicits._
+import scala.math.Ordering.Implicits.*
 
 import com.chipprbots.scalanet.discovery.crypto.PublicKey
 import com.chipprbots.scalanet.discovery.crypto.Signature
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 import com.chipprbots.scalanet.discovery.ethereum.Node
 import com.chipprbots.scalanet.discovery.ethereum.v4.Payload
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload._
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.*
 import com.chipprbots.scalanet.discovery.hash.Hash
 import scodec.Codec
 import scodec.bits.BitVector
@@ -59,7 +59,7 @@ object DefaultCodecs {
 
   given sortedMapCodec[K: Codec: Ordering, V: Codec]: Codec[SortedMap[K, V]] =
     list(Codec[(K, V)]).xmap(
-      (kvs: List[(K, V)]) => SortedMap(kvs: _*),
+      (kvs: List[(K, V)]) => SortedMap(kvs*),
       (sm: SortedMap[K, V]) => sm.toList
     )
 

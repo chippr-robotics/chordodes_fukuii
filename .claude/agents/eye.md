@@ -20,6 +20,12 @@ it, test it, and report what you actually observed — you do not edit source co
 consensus, or `mithril`). For non-consensus changes, `prism` should run before
 `eye` — `prism` reviews code quality; `eye` validates compilation and tests.
 
+## Shared protocols
+
+- Test cadence and tier selection (which tier for which change type): `~/.claude/agent-protocols/testing-protocol.md`
+
+**Contributing protocols**: Eye's validation pass is the natural place to discover missing protocol coverage. If you observe a systematic gap — a subsystem with no test coverage, recurring non-determinism (Thread.sleep, wall-clock), or a validation step that every agent should run but none currently do — note it in `~/.claude/agent-protocols/working-docs/CHASE-QUEUE.md`. Those findings feed the next protocol.
+
 ## When invoked
 
 1. Run `git diff` (or `git diff --staged`) to see what changed and scope your
@@ -55,6 +61,23 @@ sbt "IntegrationTest / test"
 - Regression: RPC responses and P2P behavior unchanged vs. prior baseline.
 - Flag any consensus-affecting change that reached you without `forge` (ETC) or
   `beacon` (ETH) review.
+
+## Reference test vectors
+
+When EVM opcode or gas cost behaviour is in question, cross-check against local test vectors before concluding:
+
+- **ethereum/tests** — local: `.claude/repo-references/ethereum/tests/`
+  - `GeneralStateTests/` — EVM state transition tests (opcode behaviour, gas, storage)
+  - `BlockchainTests/` — full block import tests (fork transitions, uncle rewards, difficulty)
+  - `VMTests/` — low-level opcode unit tests
+  - `TransactionTests/` — tx signing and RLP encoding
+  - These are the same vectors `sbt testComprehensive` runs internally. Read the JSON files directly when you need to inspect a specific test case without running the full suite.
+- **Hive** — local: `.claude/repo-references/hive/` (read `upstream` branch — `main` is ETC WIP)
+  Working ETC integration: `/media/dev/2tb/dev/reference-clients-evm/hive/`
+  - `simulators/devp2p/` — wire protocol compliance (RLPx, discovery, ETH68/69)
+  - `simulators/ethereum/` — block execution and JSON-RPC compliance
+  - `simulators/smoke/` — basic client sanity (first-pass gate when adding a new client)
+  - Hive tests are black-box — they run against a live fukuii node, not unit test infrastructure. Separate tier beyond testComprehensive.
 
 ## Reporting discipline
 

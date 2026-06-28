@@ -2,8 +2,8 @@ package com.chipprbots.ethereum.network
 
 import java.time.Clock
 
-import cats._
-import cats.implicits._
+import cats.*
+import cats.implicits.*
 
 import scala.annotation.tailrec
 import scala.concurrent.duration.Duration
@@ -17,32 +17,30 @@ class TimeSlotStats[K, V: Monoid] private (
     val lastIdx: Int,
     // Ring buffer of slots statistics.
     val buffer: TimeSlotStats.Buffer[K, V]
-)(implicit clock: Clock) {
-  import TimeSlotStats._
+)(implicit clock: Clock):
+  import TimeSlotStats.*
 
   /** Overall length of the timewindow. */
   def duration: FiniteDuration = slotDuration * slotCount
   def slotCount: Int = buffer.size
 
   /** Merge new stats for a given key in the current timestamp. */
-  def add(key: K, stat: V): TimeSlotStats[K, V] = {
+  def add(key: K, stat: V): TimeSlotStats[K, V] =
     val currSlotId = slotId(currentTimeMillis)
     val lastEntry = buffer(lastIdx)
 
-    if (currSlotId == lastEntry.slotId) {
+    if currSlotId == lastEntry.slotId then
       // We're still in the same timeslot, so just append stats.
       val newEntry = lastEntry.add(key, stat)
       updated(lastIdx, newEntry)
-    } else if (currSlotId > lastEntry.slotId) {
+    else if currSlotId > lastEntry.slotId then
       // Go to the next slot.
       val newIdx = succ(lastIdx)
       val newEntry = Entry(currSlotId, Map(key -> stat))
       updated(newIdx, newEntry)
-    } else {
+    else
       // Going backwards in time, just ignore it.
       this
-    }
-  }
 
   /** Forget all statistics about a given key. */
   def remove(key: K): TimeSlotStats[K, V] =
@@ -60,23 +58,19 @@ class TimeSlotStats[K, V: Monoid] private (
       acc |+| stats
     }
 
-  private def fold[A](init: A, window: Duration)(f: (A, Map[K, V]) => A) = {
+  private def fold[A](init: A, window: Duration)(f: (A, Map[K, V]) => A) =
     val (start, end) = slotRange(currentTimeMillis, window)
 
     @tailrec
-    def loop(idx: Int, acc: List[Map[K, V]]): List[Map[K, V]] = {
+    def loop(idx: Int, acc: List[Map[K, V]]): List[Map[K, V]] =
       val entry = buffer(idx)
-      if (entry.slotId < start || end < entry.slotId)
-        acc
-      else {
+      if entry.slotId < start || end < entry.slotId then acc
+      else
         val nextAcc = entry.slotStats :: acc
         val nextIdx = pred(idx)
-        if (nextIdx == lastIdx) nextAcc else loop(nextIdx, nextAcc)
-      }
-    }
+        if nextIdx == lastIdx then nextAcc else loop(nextIdx, nextAcc)
 
     loop(lastIdx, Nil).foldLeft(init)(f)
-  }
 
   private def currentTimeMillis: Timestamp =
     clock.millis()
@@ -86,14 +80,13 @@ class TimeSlotStats[K, V: Monoid] private (
     timestamp - timestamp % slotDuration.toMillis
 
   /** The range of time slots based on the current timestamp and the buffer duration. */
-  def slotRange(timestamp: Timestamp, window: Duration): (Timestamp, Timestamp) = {
+  def slotRange(timestamp: Timestamp, window: Duration): (Timestamp, Timestamp) =
     val end = slotId(timestamp)
     val start = slotId(timestamp - window.toMillis)
     start -> end
-  }
 
   private def succ(idx: Int): Int = (idx + 1) % slotCount
-  private def pred(idx: Int): Int = if (idx == 0) slotCount - 1 else idx - 1
+  private def pred(idx: Int): Int = if idx == 0 then slotCount - 1 else idx - 1
 
   private def updated(
       lastIdx: Int,
@@ -106,9 +99,8 @@ class TimeSlotStats[K, V: Monoid] private (
       buffer: Buffer[K, V]
   ): TimeSlotStats[K, V] =
     new TimeSlotStats[K, V](slotDuration, lastIdx, buffer)
-}
 
-object TimeSlotStats {
+object TimeSlotStats:
 
   // Milliseconds since epoch.
   type Timestamp = Long
@@ -118,19 +110,18 @@ object TimeSlotStats {
   case class Entry[K, V: Monoid](
       slotId: Timestamp,
       slotStats: Map[K, V]
-  ) {
+  ):
     def add(key: K, stat: V): Entry[K, V] =
       copy(slotStats = slotStats |+| Map(key -> stat))
 
     def remove(key: K): Entry[K, V] =
       copy(slotStats = slotStats - key)
-  }
 
   def apply[K, V: Monoid](
       slotDuration: FiniteDuration,
       slotCount: Int
   )(implicit clock: Clock): Option[TimeSlotStats[K, V]] =
-    if (slotDuration == Duration.Zero || slotCount <= 0) None
+    if slotDuration == Duration.Zero || slotCount <= 0 then None
     else
       Some {
         new TimeSlotStats[K, V](
@@ -139,4 +130,3 @@ object TimeSlotStats {
           buffer = Range(0, slotCount).map(_ -> Entry(0L, Map.empty[K, V])).toMap
         )
       }
-}

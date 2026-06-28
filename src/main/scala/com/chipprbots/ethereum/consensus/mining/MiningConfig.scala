@@ -2,10 +2,10 @@ package com.chipprbots.ethereum.consensus.mining
 
 import org.apache.pekko.util.ByteString
 
-import com.typesafe.config.{Config => TypesafeConfig}
-
 import scala.concurrent.duration.FiniteDuration
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
+
+import com.typesafe.config.Config as TypesafeConfig
 
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.domain.Address
@@ -36,8 +36,8 @@ final case class MiningConfig(
     recommitInterval: FiniteDuration
 )
 
-object MiningConfig extends Logger {
-  object Keys {
+object MiningConfig extends Logger:
+  object Keys:
     final val Mining = "mining"
     final val Protocol = "protocol"
     final val Coinbase = "coinbase"
@@ -48,7 +48,6 @@ object MiningConfig extends Logger {
     final val NotifyUrls = "notify-urls"
     final val StaleThreshold = "stale-threshold"
     final val RecommitInterval = "recommit-interval"
-  }
 
   final val AllowedProtocols: Set[String] = Protocol.KnownProtocolNames
 
@@ -58,20 +57,18 @@ object MiningConfig extends Logger {
       " but it should be one of " +
       AllowedProtocols.map("'" + _ + "'").mkString(",")
 
-  private def readProtocol(miningConfig: TypesafeConfig): Protocol = {
+  private def readProtocol(miningConfig: TypesafeConfig): Protocol =
     val protocol = miningConfig.getString(Keys.Protocol)
 
     // If the mining protocol is not a known one, then it is a fatal error
     // and the application must exit.
-    if (!AllowedProtocols(protocol)) {
+    if !AllowedProtocols(protocol) then
       val error = AllowedProtocolsError(protocol)
       throw new RuntimeException(error)
-    }
 
     Protocol(protocol)
-  }
 
-  def apply(fukuiiConfig: TypesafeConfig): MiningConfig = {
+  def apply(fukuiiConfig: TypesafeConfig): MiningConfig =
     val config = fukuiiConfig.getConfig(Keys.Mining)
 
     val protocol = readProtocol(config)
@@ -82,16 +79,16 @@ object MiningConfig extends Logger {
     val blockCacheSize = config.getInt(Keys.BlockCacheSize)
     val miningEnabled = config.getBoolean(Keys.MiningEnabled)
     val gasLimitTarget =
-      if (config.hasPath(Keys.GasLimitTarget)) BigInt(config.getLong(Keys.GasLimitTarget))
+      if config.hasPath(Keys.GasLimitTarget) then BigInt(config.getLong(Keys.GasLimitTarget))
       else BigInt(8_000_000) // ETC mainnet default
     val notifyUrls =
-      if (config.hasPath(Keys.NotifyUrls)) config.getStringList(Keys.NotifyUrls).asScala.toSeq
+      if config.hasPath(Keys.NotifyUrls) then config.getStringList(Keys.NotifyUrls).asScala.toSeq
       else Seq.empty
     val staleThreshold =
-      if (config.hasPath(Keys.StaleThreshold)) config.getInt(Keys.StaleThreshold)
+      if config.hasPath(Keys.StaleThreshold) then config.getInt(Keys.StaleThreshold)
       else 7 // core-geth default
     val recommitInterval =
-      if (config.hasPath(Keys.RecommitInterval))
+      if config.hasPath(Keys.RecommitInterval) then
         FiniteDuration(config.getDuration(Keys.RecommitInterval).toNanos, "nanos")
       else FiniteDuration(0, "seconds")
 
@@ -106,5 +103,3 @@ object MiningConfig extends Logger {
       staleThreshold = staleThreshold,
       recommitInterval = recommitInterval
     )
-  }
-}

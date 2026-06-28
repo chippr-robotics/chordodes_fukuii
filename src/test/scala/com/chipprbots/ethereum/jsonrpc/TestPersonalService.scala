@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.jsonrpc
 
 import cats.effect.IO
 
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 
 /** Manual test double for PersonalServiceAPI.
   *
@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.jsonrpc.PersonalService._
   *
   * Usage: assign the `*Fn` var for each method that the test exercises. Unassigned methods raise NotImplementedError.
   */
-class TestPersonalService extends PersonalServiceAPI {
+class TestPersonalService extends PersonalServiceAPI:
 
   var importRawKeyFn: ImportRawKeyRequest => ServiceResponse[ImportRawKeyResponse] =
     _ => IO.raiseError(new NotImplementedError("TestPersonalService.importRawKey not configured"))
@@ -57,4 +57,3 @@ class TestPersonalService extends PersonalServiceAPI {
   ): ServiceResponse[SendTransactionWithPassphraseResponse] = sendTransactionWithPassphraseFn(request)
   override def sendTransaction(request: SendTransactionRequest): ServiceResponse[SendTransactionResponse] =
     sendTransactionFn(request)
-}

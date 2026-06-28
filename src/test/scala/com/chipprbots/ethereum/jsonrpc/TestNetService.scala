@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.jsonrpc
 
 import cats.effect.IO
 
-import com.chipprbots.ethereum.jsonrpc.NetService._
+import com.chipprbots.ethereum.jsonrpc.NetService.*
 
 /** Manual test double for NetServiceAPI.
   *
@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.jsonrpc.NetService._
   *
   * Usage: assign the `*Fn` var for each method that the test exercises. Unassigned methods raise NotImplementedError.
   */
-class TestNetService extends NetServiceAPI {
+class TestNetService extends NetServiceAPI:
 
   var versionFn: VersionRequest => ServiceResponse[VersionResponse] =
     _ => IO.raiseError(new NotImplementedError("TestNetService.version not configured"))
@@ -59,4 +59,3 @@ class TestNetService extends NetServiceAPI {
   )
   override def removeFromBlacklist(req: RemoveFromBlacklistRequest): ServiceResponse[RemoveFromBlacklistResponse] =
     removeFromBlacklistFn(req)
-}

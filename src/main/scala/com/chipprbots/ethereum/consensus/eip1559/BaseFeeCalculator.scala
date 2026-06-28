@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
   * Calculates the baseFee for a block given its parent header. The baseFee adjusts dynamically based on how full the
   * parent block was relative to the gas target (gasLimit / elasticityMultiplier).
   */
-object BaseFeeCalculator {
+object BaseFeeCalculator:
   val InitialBaseFee: BigInt = 1000000000 // 1 gwei
   val ElasticityMultiplier: Int = 2
   val BaseFeeChangeDenominator: Int = 8
@@ -22,27 +22,23 @@ object BaseFeeCalculator {
     * @return
     *   the expected baseFee for the child block
     */
-  def calcBaseFee(parent: BlockHeader, blockchainConfig: BlockchainConfig): BigInt = {
+  def calcBaseFee(parent: BlockHeader, blockchainConfig: BlockchainConfig): BigInt =
     val isParentOlympia = parent.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-    if (!isParentOlympia) return InitialBaseFee
+    if !isParentOlympia then return InitialBaseFee
 
     val parentBaseFee = parent.baseFee.getOrElse(InitialBaseFee)
     val parentGasTarget = parent.gasLimit / ElasticityMultiplier
 
-    if (parent.gasUsed == parentGasTarget) {
-      parentBaseFee
-    } else if (parent.gasUsed > parentGasTarget) {
+    if parent.gasUsed == parentGasTarget then parentBaseFee
+    else if parent.gasUsed > parentGasTarget then
       // Parent used more gas than target — baseFee increases
       // max(1, parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator)
       val gasUsedDelta = parent.gasUsed - parentGasTarget
       val baseFeeDelta = (parentBaseFee * gasUsedDelta / parentGasTarget / BaseFeeChangeDenominator).max(1)
       parentBaseFee + baseFeeDelta
-    } else {
+    else
       // Parent used less gas than target — baseFee decreases.
       // Floor at baseFeeFloor from chain config (1 gwei for ETC/Mordor per ECIP-1111).
       val gasUsedDelta = parentGasTarget - parent.gasUsed
       val baseFeeDelta = (parentBaseFee * gasUsedDelta / parentGasTarget / BaseFeeChangeDenominator).max(1)
       (parentBaseFee - baseFeeDelta).max(blockchainConfig.baseFeeFloor)
-    }
-  }
-}

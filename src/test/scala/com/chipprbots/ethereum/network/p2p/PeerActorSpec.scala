@@ -1,3 +1,4 @@
+// §8a-retro batch E6: migrated to ActorTestKit + ManualTime (PeerActor Typed, Wave 3 gate met)
 package com.chipprbots.ethereum.network.p2p
 
 import java.net.InetSocketAddress
@@ -5,145 +6,142 @@ import java.net.URI
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.PoisonPill
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.Terminated
-import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
-import org.apache.pekko.testkit.TestActorRef
-import org.apache.pekko.testkit.TestKit
-import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.apache.pekko.actor.testkit.typed.scaladsl.ManualTime
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.language.postfixOps
 
-import com.typesafe.config.ConfigFactory
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.bouncycastle.crypto.params.ECPublicKeyParameters
 import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum._
-import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
+import com.chipprbots.ethereum.*
+import com.chipprbots.ethereum.TestInstanceConfigProvider
 import com.chipprbots.ethereum.crypto.generateKeyPair
+import com.chipprbots.ethereum.db.components.EphemDataSourceComponent
+import com.chipprbots.ethereum.db.components.Storages
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
+import com.chipprbots.ethereum.db.storage.pruning.PruningMode
+import com.chipprbots.ethereum.nodebuilder.PruningConfigBuilder
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.forkid.ForkId
+import com.chipprbots.ethereum.network.*
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.PeerActor.GetStatus
 import com.chipprbots.ethereum.network.PeerActor.Status.Handshaked
 import com.chipprbots.ethereum.network.PeerActor.StatusResponse
 import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguration
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
-import com.chipprbots.ethereum.network._
-import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshakerConfiguration
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68.Status68Enc
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.{Status68 => Status}
-import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68 as Status
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.DisconnectEnc
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.Reasons
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello.HelloEnc
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong.PongEnc
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol._
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
 import com.chipprbots.ethereum.security.SecureRandomBuilder
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
-import org.apache.pekko.actor.Actor
 
-class PeerActorSpec
-    extends TestKit(
-      ActorSystem("PeerActorSpec_System", ConfigFactory.load("explicit-scheduler"))
-    )
-    with AnyFlatSpecLike
-    with WithActorSystemShutDown
-    with Matchers {
+class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with AnyFlatSpecLike with Matchers:
+
+  val manualTime: ManualTime = ManualTime()
 
   val remoteNodeKey: AsymmetricCipherKeyPair = generateKeyPair(new SecureRandom)
   val remoteNodeId: ByteString = ByteString(remoteNodeKey.getPublic.asInstanceOf[ECPublicKeyParameters].toNodeId)
 
   val blockchainConfig = Config.blockchains.blockchainConfig
 
-  "PeerActor" should "create rlpx connection and send hello message" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  "PeerActor" should "create rlpx connection and send hello message" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
-    rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) =>
-      ()
-    }
-  }
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.SendMessage]
 
-  it should "retry failed rlpx connection" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "retry failed rlpx connection" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
-    rlpxConnection.watch(peer)
+    val deathProbe = testKit.createTestProbe[Any]()
 
     (0 to 3).foreach { _ =>
-      testScheduler.timePasses(5.seconds)
-      rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-      rlpxConnection.reply(RLPxConnectionHandler.ConnectionFailed)
+      manualTime.timePasses(5.seconds)
+      rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+      peer ! RLPxConnectionHandler.ConnectionFailed
     }
 
-    rlpxConnection.expectMsgClass(classOf[Terminated])
-  }
+    deathProbe.expectTerminated(peer)
 
   it should "try to reconnect on broken rlpx connection" taggedAs (UnitTest, NetworkTest) in new NodeStatusSetup
-    with HandshakerSetup {
-    implicit override lazy val system: ActorSystem =
-      ActorSystem("PeerActorSpec_System", ConfigFactory.load("explicit-scheduler"))
+    with HandshakerSetup:
     override def protocol: Capability = Capability.ETH63
 
-    def testScheduler: ExplicitlyTriggeredScheduler = system.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
+    // Test probes live under /system and cannot be stopped via testKit.stop(), which routes
+    // through the /user guardian (can only stop its direct children). Spawning user actors
+    // lets testKit.stop() work correctly. Spy probes capture messages PeerActor sends.
+    val conn1Spy = testKit.createTestProbe[RLPxConnectionHandler.Command]()
+    val conn2Spy = testKit.createTestProbe[RLPxConnectionHandler.Command]()
+    val conn1: ActorRef[RLPxConnectionHandler.Command] = testKit.spawn(
+      Behaviors.receiveMessage[RLPxConnectionHandler.Command] { msg =>
+        conn1Spy.ref ! msg; Behaviors.same
+      },
+      s"rlpx-conn-1-${java.util.UUID.randomUUID()}"
+    )
+    val conn2: ActorRef[RLPxConnectionHandler.Command] = testKit.spawn(
+      Behaviors.receiveMessage[RLPxConnectionHandler.Command] { msg =>
+        conn2Spy.ref ! msg; Behaviors.same
+      },
+      s"rlpx-conn-2-${java.util.UUID.randomUUID()}"
+    )
+    val connQueue = new java.util.concurrent.LinkedBlockingQueue[ActorRef[RLPxConnectionHandler.Command]]()
+    connQueue.add(conn1)
+    connQueue.add(conn2)
 
-    val peerMessageBus: ActorRef = system.actorOf(PeerEventBusActor.props)
-    var rlpxConnection: TestProbe = TestProbe() // var as we actually need new instances
-    val knownNodesManager: TestProbe = TestProbe()
+    val peerMessageBus = testKit.spawn(PeerEventBusActor.behavior(), s"peer-event-bus-${java.util.UUID.randomUUID()}")
+    val knownNodesManager: TestProbe[KnownNodesManager.Command] = testKit.createTestProbe()
 
-    val peer: TestActorRef[Actor] = TestActorRef(
-      Props(
-        new PeerActor(
-          new InetSocketAddress("127.0.0.1", 0),
-          _ => {
-            rlpxConnection = TestProbe()
-            rlpxConnection.ref
-          },
-          peerConf,
-          peerMessageBus,
-          knownNodesManager.ref,
-          false,
-          Some(testScheduler),
-          handshaker
-        )
+    val peer: ActorRef[PeerActor.Command] = testKit.spawn(
+      PeerActor.apply(
+        new InetSocketAddress("127.0.0.1", 0),
+        _ => connQueue.poll(),
+        peerConf,
+        peerMessageBus,
+        knownNodesManager.ref,
+        false,
+        handshaker
       )
     )
 
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    conn1Spy.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
+    conn1Spy.expectMessageType[RLPxConnectionHandler.SendMessage]
 
-    rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) =>
-      ()
-    }
+    // Stop conn1 (user actor) → PeerActor deathwatch fires RlpxTerminated → retry scheduled
+    testKit.stop(conn1)
+    manualTime.timePasses(2.seconds)
+    // After timer fires, factory returns conn2 → PeerActor sends ConnectTo to conn2
+    conn2Spy.expectMessageType[RLPxConnectionHandler.ConnectTo]
 
-    rlpxConnection.ref ! PoisonPill
-    peer.unwatch(rlpxConnection.ref)
-    testScheduler.timePasses(2.seconds)
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-  }
-
-  it should "successfully connect to ETC peer" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "successfully connect to ETC peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val uri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@localhost:9000")
     val completeUri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@127.0.0.1:9000?discport=9000")
 
@@ -152,8 +150,8 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(uri)
     peer ! PeerActor.ConnectTo(uri)
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -162,35 +160,33 @@ class PeerActorSpec
     // ETH68+: ForkId validation replaces fork-block exchange — no GetBlockHeaders step
 
     // Check that peer is connected
-    rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(Ping()))
-    rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Pong()))
+    peer ! RLPxConnectionHandler.MessageReceived(Ping())
+    rlpxConnection.expectMessage(RLPxConnectionHandler.SendMessage(Pong()))
 
-    knownNodesManager.expectMsg(KnownNodesManager.AddKnownNode(completeUri))
+    knownNodesManager.expectMessage(KnownNodesManager.AddKnownNode(completeUri))
     knownNodesManager.expectNoMessage()
-  }
 
-  it should "fail handshake with peer that has a wrong genesis hash" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "fail handshake with peer that has a wrong genesis hash" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val uri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@localhost:9000")
     peer ! PeerActor.ConnectTo(uri)
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
       remoteStatus = etcStatus68(genesisHash = genesisHash.drop(2))
     )
 
-    rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: DisconnectEnc) => () }
-  }
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.SendMessage]
 
-  it should "successfully connect to ETH peer with protocol 68" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "successfully connect to ETH peer with protocol 68" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     override def protocol: Capability = Capability.ETH68
     val uri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@localhost:9000")
     val completeUri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@127.0.0.1:9000?discport=9000")
 
     // Ensure local chain is past the fork so ForkId validation succeeds by persisting the DAO fork block as best
-    val daoForkChainWeight = ChainWeight.totalDifficultyOnly(daoForkBlockChainTotalDifficulty)
+    val daoForkChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(daoForkBlockChainTotalDifficulty)
     blockchainWriter.save(
       Fixtures.Blocks.DaoForkBlock.block,
       Seq.empty,
@@ -201,14 +197,14 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(uri)
     peer ! PeerActor.ConnectTo(uri)
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
     // Hello exchange
     val remoteHello: Hello =
       Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused"))
-    rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) => () }
-    rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(remoteHello))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.SendMessage]
+    peer ! RLPxConnectionHandler.MessageReceived(remoteHello)
 
     val remoteStatus: ETHPackets.Status68.Status68 = ETHPackets.Status68.Status68(
       protocolVersion = Capability.ETH68.version,
@@ -220,19 +216,18 @@ class PeerActorSpec
     )
     // Node status exchange
     expectStatusMessage()
-    rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(remoteStatus))
+    peer ! RLPxConnectionHandler.MessageReceived(remoteStatus)
     // Fork block exchange is skipped for ETH64+ peers per EIP-2124 (ForkId validation replaces it)
     rlpxConnection.expectNoMessage(200.milliseconds)
 
     // Check that peer is connected
-    rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(Ping()))
-    rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Pong()))
+    peer ! RLPxConnectionHandler.MessageReceived(Ping())
+    rlpxConnection.expectMessage(RLPxConnectionHandler.SendMessage(Pong()))
 
-    knownNodesManager.expectMsg(KnownNodesManager.AddKnownNode(completeUri))
+    knownNodesManager.expectMessage(KnownNodesManager.AddKnownNode(completeUri))
     knownNodesManager.expectNoMessage()
-  }
 
-  it should "successfully connect to and IPv6 peer" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "successfully connect to and IPv6 peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val uri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@[::]:9000")
     val completeUri =
       new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@[0:0:0:0:0:0:0:0]:9000?discport=9000")
@@ -241,8 +236,8 @@ class PeerActorSpec
 
     peer ! PeerActor.ConnectTo(uri)
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -250,77 +245,71 @@ class PeerActorSpec
     )
 
     // Check that peer is connected
-    rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(Ping()))
-    rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Pong()))
+    peer ! RLPxConnectionHandler.MessageReceived(Ping())
+    rlpxConnection.expectMessage(RLPxConnectionHandler.SendMessage(Pong()))
 
-    knownNodesManager.expectMsg(KnownNodesManager.AddKnownNode(completeUri))
+    knownNodesManager.expectMessage(KnownNodesManager.AddKnownNode(completeUri))
     knownNodesManager.expectNoMessage()
-  }
 
-  it should "disconnect from non-ETC peer" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "disconnect from non-ETC peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     // ETH68+: ForkId validation detects non-ETC peers. A wrong genesis hash causes
     // immediate Disconnect(UselessPeer) at Status validation (ETH mainnet shares the
     // same genesis as ETC, but a clearly-wrong hash is sufficient for this test).
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
       remoteStatus = etcStatus68(genesisHash = genesisHash.drop(2))
     )
 
-    rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.UselessPeer)))
-  }
+    rlpxConnection.expectMessage(RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.UselessPeer)))
 
   it should "disconnect from non-ETC peer (when node is before fork)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // ETH68+: even when our node is at genesis (before the fork), a wrong genesis hash
     // from a non-ETC peer triggers Disconnect(UselessPeer) at the Status validation step.
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
       remoteStatus = etcStatus68(genesisHash = genesisHash.drop(2))
     )
 
-    rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.UselessPeer)))
-  }
+    rlpxConnection.expectMessage(RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.UselessPeer)))
 
-  it should "disconnect on Hello timeout" taggedAs (UnitTest, NetworkTest) in new TestSetup {
-    val connection: TestProbe = TestProbe()
+  it should "disconnect on Hello timeout" taggedAs (UnitTest, NetworkTest) in new TestSetup:
+    val connection: TestProbe[Nothing] = testKit.createTestProbe()
 
-    peer ! PeerActor.HandleConnection(connection.ref, new InetSocketAddress("localhost", 9000))
+    peer ! PeerActor.HandleConnection(connection.ref.toClassic, new InetSocketAddress("localhost", 9000))
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.HandleConnection])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
-    rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) => () }
-    testScheduler.timePasses(5.seconds)
-    rlpxConnection.expectMsg(
-      Timeouts.normalTimeout,
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.HandleConnection]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.SendMessage]
+    manualTime.timePasses(5.seconds)
+    rlpxConnection.expectMessage(
       RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.TimeoutOnReceivingAMessage))
     )
-
-  }
 
   it should "be fully connected and respond to pings after ETH68 handshake (replaces ETH63 fork-block exchange)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // ETH68+: ForkId validation replaces the ETH63 fork-block exchange. After the Status
     // exchange completes, the peer is immediately in Handshaked state.
     saveEtcChainAtDaoFork()
 
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -328,23 +317,22 @@ class PeerActorSpec
     )
 
     // Handshake complete — verify peer is Handshaked
-    val probe = TestProbe()
-    probe.send(peer, GetStatus)
-    probe.expectMsg(StatusResponse(Handshaked))
+    val probe: TestProbe[StatusResponse] = testKit.createTestProbe()
+    peer ! GetStatus(probe.ref)
+    probe.expectMessage(StatusResponse(Handshaked))
 
     // And responds to pings normally
-    rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(Ping()))
-    rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Pong()))
-  }
+    peer ! RLPxConnectionHandler.MessageReceived(Ping())
+    rlpxConnection.expectMessage(RLPxConnectionHandler.SendMessage(Pong()))
 
-  it should "stash disconnect message until handshaked" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "stash disconnect message until handshaked" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     saveEtcChainAtDaoFork()
 
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
     peer ! PeerActor.DisconnectPeer(Disconnect.Reasons.TooManyPeers)
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -353,10 +341,9 @@ class PeerActorSpec
     // ETH68+: handshake is complete right after Status exchange. The stashed TooManyPeers
     // disconnect fires immediately — no fork-block exchange step.
 
-    rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.TooManyPeers)))
-  }
+    rlpxConnection.expectMessage(RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.TooManyPeers)))
 
-  it should "stay connected to pre fork peer" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "stay connected to pre fork peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
 
     val remoteStatus: RemoteStatus = RemoteStatus(
       capability = Capability.ETH63,
@@ -364,40 +351,36 @@ class PeerActorSpec
       chainWeight =
         ChainWeight.totalDifficultyOnly(daoForkBlockChainTotalDifficulty - 200000), // remote is before the fork
       bestHash = ByteString("blockhash"),
-      genesisHash = Fixtures.Blocks.Genesis.header.hash
+      genesisHash = Fixtures.Blocks.Genesis.header.hash.value
     )
 
-    val peerActor: TestActorRef[Actor] = TestActorRef(
-      Props(
-        new PeerActor(
-          new InetSocketAddress("127.0.0.1", 0),
-          _ => rlpxConnection.ref,
-          peerConf,
-          peerMessageBus,
-          knownNodesManager.ref,
-          false,
-          None,
-          Mocks.MockHandshakerAlwaysSucceeds(remoteStatus, 0, false)
-        )
+    val peerActor: ActorRef[PeerActor.Command] = testKit.spawn(
+      PeerActor.apply(
+        new InetSocketAddress("127.0.0.1", 0),
+        _ => rlpxConnection.ref,
+        peerConf,
+        peerMessageBus,
+        knownNodesManager.ref,
+        false,
+        Mocks.MockHandshakerAlwaysSucceeds(remoteStatus, 0, false)
       )
     )
 
     peerActor ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peerActor ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
-    rlpxConnection.send(peerActor, RLPxConnectionHandler.MessageReceived(Ping()))
-    rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: PongEnc) => () }
-  }
+    peerActor ! RLPxConnectionHandler.MessageReceived(Ping())
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.SendMessage]
 
-  it should "disconnect gracefully after handshake" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "disconnect gracefully after handshake" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     saveEtcChainAtDaoFork()
 
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -405,58 +388,53 @@ class PeerActorSpec
     )
 
     // Test that the handshake succeeded
-    val sender: TestProbe = TestProbe()(system)
-    sender.send(peer, GetStatus)
-    sender.expectMsg(StatusResponse(Handshaked))
+    val statusProbe: TestProbe[StatusResponse] = testKit.createTestProbe()
+    peer ! GetStatus(statusProbe.ref)
+    statusProbe.expectMessage(StatusResponse(Handshaked))
 
     // Test peer terminated after peerConf.disconnectPoisonPillTimeout
-    val manager: TestProbe = TestProbe()(system)
-    manager.watch(peer)
+    val deathProbe = testKit.createTestProbe[Any]()
 
-    rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(Disconnect(Reasons.Other)))
+    peer ! RLPxConnectionHandler.MessageReceived(Disconnect(Reasons.Other))
 
     // No terminated message instantly
-    manager.expectNoMessage()
+    deathProbe.expectNoMessage()
 
     // terminated only after peerConf.disconnectPoisonPillTimeout
-    testScheduler.timePasses(peerConf.disconnectPoisonPillTimeout)
+    manualTime.timePasses(peerConf.disconnectPoisonPillTimeout)
 
-    manager.expectTerminated(peer)
-  }
+    deathProbe.expectTerminated(peer)
 
-  it should "forward PeerClosedConnection with AlreadyConnected to parent when Disconnect(AlreadyConnected) is received" taggedAs (
+  it should "stop when Disconnect(AlreadyConnected) is received during handshake" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
-    val parentProbe = TestProbe()
+  ) in new TestSetup:
+    // 8k-H removed context.toClassic.parent sends; PeerActor now stops immediately
+    // on pre-handshake Disconnect. Verify via death-watch instead of parent message.
+    val deathProbe = testKit.createTestProbe[Any]()
 
-    val peerWithParent: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new PeerActor(
-          new InetSocketAddress("127.0.0.1", 0),
-          _ => rlpxConnection.ref,
-          peerConf,
-          peerMessageBus,
-          knownNodesManager.ref,
-          false,
-          Some(testScheduler),
-          handshaker
-        )
-      ),
-      parentProbe.ref
+    val peerUnderTest: ActorRef[PeerActor.Command] = testKit.spawn(
+      PeerActor.apply(
+        new InetSocketAddress("127.0.0.1", 0),
+        _ => rlpxConnection.ref,
+        peerConf,
+        peerMessageBus,
+        knownNodesManager.ref,
+        false,
+        handshaker
+      )
     )
 
-    peerWithParent ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
-    rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
-    rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) => () }
+    peerUnderTest ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    peerUnderTest ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
+    rlpxConnection.expectMessageType[RLPxConnectionHandler.SendMessage]
 
-    rlpxConnection.send(peerWithParent, RLPxConnectionHandler.MessageReceived(Disconnect(Reasons.AlreadyConnected)))
+    peerUnderTest ! RLPxConnectionHandler.MessageReceived(Disconnect(Reasons.AlreadyConnected))
 
-    parentProbe.expectMsg(3.seconds, PeerActor.PeerClosedConnection("127.0.0.1", Disconnect.Reasons.AlreadyConnected))
-  }
+    deathProbe.expectTerminated(peerUnderTest)
 
-  trait BlockUtils {
+  trait BlockUtils:
 
     val blockBody = new BlockBody(Seq(), Seq())
 
@@ -464,18 +442,31 @@ class PeerActorSpec
 
     val nonEtcForkBlockHeader: BlockHeader =
       etcForkBlockHeader.copy(
-        parentHash = ByteString("this"),
-        ommersHash = ByteString("is"),
+        parentHash = BlockHash(ByteString("this")),
+        ommersHash = BlockHash(ByteString("is")),
         beneficiary = ByteString("not"),
-        stateRoot = ByteString("an"),
-        transactionsRoot = ByteString("ETC"),
-        receiptsRoot = ByteString("fork"),
-        logsBloom = ByteString("block")
+        stateRoot = TrieRoot(ByteString("an")),
+        transactionsRoot = TrieRoot(ByteString("ETC")),
+        receiptsRoot = TrieRoot(ByteString("fork")),
+        logsBloom = BloomFilter(ByteString("block"))
       )
-  }
 
-  trait NodeStatusSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
-    override lazy val nodeKey: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
+  trait NodeStatusSetup extends SecureRandomBuilder:
+    lazy val nodeKey: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
+
+    private trait LocalPruningConfigBuilder extends PruningConfigBuilder with TestInstanceConfigProvider:
+      override val pruningMode: PruningMode = ArchivePruning
+
+    lazy val storagesInstance: EphemDataSourceComponent & Storages.DefaultStorages =
+      new EphemDataSourceComponent
+        with LocalPruningConfigBuilder
+        with Storages.DefaultStorages
+        with TestInstanceConfigProvider
+
+    lazy val blockchainReader: BlockchainReader = BlockchainReader(storagesInstance.storages)
+    lazy val blockchainWriter: BlockchainWriter = BlockchainWriter(storagesInstance.storages)
+    lazy val blockchain: BlockchainImpl = BlockchainImpl(storagesInstance.storages, blockchainReader)
+    val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
     val nodeStatus: NodeStatus =
       NodeStatus(key = nodeKey, serverStatus = ServerStatus.NotListening, discoveryStatus = ServerStatus.NotListening)
@@ -483,23 +474,21 @@ class PeerActorSpec
     val nodeStatusHolder = new AtomicReference(nodeStatus)
 
     val genesisBlock = Fixtures.Blocks.Genesis.block
-    val genesisWeight: ChainWeight = ChainWeight.totalDifficultyOnly(genesisBlock.header.difficulty)
+    val genesisWeight: ChainWeight = ChainWeight.totalDifficultyOnly(genesisBlock.header.difficulty.value)
 
     blockchainWriter.save(genesisBlock, Nil, genesisWeight, saveAsBestBlock = true)
 
     val daoForkBlockNumber = 1920000
 
-    val peerConf: PeerConfiguration = new PeerConfiguration {
-      override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration {
+    val peerConf: PeerConfiguration = new PeerConfiguration:
+      override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration:
         val maxBlocksHeadersPerMessage: Int = 200
         val maxBlocksBodiesPerMessage: Int = 200
         val maxReceiptsPerMessage: Int = 200
         val maxMptComponentsPerMessage: Int = 200
-      }
-      override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration {
+      override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration:
         override val waitForTcpAckTimeout: FiniteDuration = Timeouts.normalTimeout
         override val waitForHandshakeTimeout: FiniteDuration = Timeouts.normalTimeout
-      }
       override val waitForHelloTimeout: FiniteDuration = 3 seconds
       override val waitForStatusTimeout: FiniteDuration = 30 seconds
       override val waitForChainCheckTimeout: FiniteDuration = 15 seconds
@@ -521,14 +510,12 @@ class PeerActorSpec
       override val longBlacklistDuration: FiniteDuration = 3.minutes
       override val statSlotDuration: FiniteDuration = 1.minute
       override val statSlotCount: Int = 30
-    }
 
-  }
-
-  trait HandshakerSetup extends NodeStatusSetup { self =>
+  trait HandshakerSetup extends NodeStatusSetup:
+    self =>
     def protocol: Capability
 
-    val handshakerConfiguration: NetworkHandshakerConfiguration = new NetworkHandshakerConfiguration {
+    val handshakerConfiguration: NetworkHandshakerConfiguration = new NetworkHandshakerConfiguration:
       override val forkResolverOpt: Option[ForkResolver] = Some(
         new ForkResolver.IrregularStateChangeDaoForkResolver(self.blockchainConfig.daoForkConfig.get)
       )
@@ -538,62 +525,51 @@ class PeerActorSpec
       override val blockchainReader: BlockchainReader = self.blockchainReader
       override val appStateStorage: AppStateStorage = self.storagesInstance.storages.appStateStorage
       override val blockchainConfig: BlockchainConfig = self.blockchainConfig
-    }
 
     val handshaker: NetworkHandshaker = NetworkHandshaker(handshakerConfiguration)
-  }
 
-  trait TestSetup extends NodeStatusSetup with BlockUtils with HandshakerSetup {
+  trait TestSetup extends NodeStatusSetup with BlockUtils with HandshakerSetup:
     override def protocol: Capability = Capability.ETH63
 
-    // Override system to use the explicit scheduler from TestKit
-    implicit override lazy val system: ActorSystem = PeerActorSpec.this.system
-
-    val genesisHash = genesisBlock.hash
+    val genesisHash = genesisBlock.hash.value
 
     val daoForkBlockChainTotalDifficulty: BigInt = BigInt("39490964433395682584")
 
-    val rlpxConnection: TestProbe = TestProbe()
+    val rlpxConnection: TestProbe[RLPxConnectionHandler.Command] =
+      testKit.createTestProbe[RLPxConnectionHandler.Command]()
 
-    def testScheduler: ExplicitlyTriggeredScheduler = system.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
+    val peerMessageBus =
+      testKit.spawn(PeerEventBusActor.behavior(), s"peer-event-bus-${java.util.UUID.randomUUID()}")
 
-    val peerMessageBus: ActorRef = system.actorOf(PeerEventBusActor.props)
+    val knownNodesManager: TestProbe[KnownNodesManager.Command] =
+      testKit.createTestProbe[KnownNodesManager.Command]()
 
-    val knownNodesManager: TestProbe = TestProbe()
-
-    val peer: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new PeerActor(
-          new InetSocketAddress("127.0.0.1", 0),
-          _ => rlpxConnection.ref,
-          peerConf,
-          peerMessageBus,
-          knownNodesManager.ref,
-          false,
-          Some(testScheduler),
-          handshaker
-        )
+    val peer: ActorRef[PeerActor.Command] = testKit.spawn(
+      PeerActor.apply(
+        new InetSocketAddress("127.0.0.1", 0),
+        _ => rlpxConnection.ref,
+        peerConf,
+        peerMessageBus,
+        knownNodesManager.ref,
+        false,
+        handshaker
       )
     )
 
     def expectStatusMessage(): Unit =
-      rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: Status68Enc) =>
-        ()
-      }
+      rlpxConnection.expectMessageType[RLPxConnectionHandler.SendMessage]
 
     /** Advance our chain to the DAO fork block so ForkId validation succeeds for ETC mainnet peers. */
-    def saveEtcChainAtDaoFork(): Unit = {
+    def saveEtcChainAtDaoFork(): Unit =
       val daoForkChainWeight = ChainWeight.totalDifficultyOnly(daoForkBlockChainTotalDifficulty)
       blockchainWriter.save(Fixtures.Blocks.DaoForkBlock.block, Seq.empty, daoForkChainWeight, saveAsBestBlock = true)
-    }
 
     /** Canonical ETH68 handshake with the test's local chain state. */
-    def eth68Handshake(remoteHello: Hello, remoteStatus: Status): Unit = {
-      rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) => () }
-      rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(remoteHello))
+    def eth68Handshake(remoteHello: Hello, remoteStatus: Status): Unit =
+      rlpxConnection.expectMessageType[RLPxConnectionHandler.SendMessage]
+      peer ! RLPxConnectionHandler.MessageReceived(remoteHello)
       expectStatusMessage()
-      rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(remoteStatus))
-    }
+      peer ! RLPxConnectionHandler.MessageReceived(remoteStatus)
 
     /** Build a valid ETC mainnet ETH68 Status for the remote peer. */
     def etcStatus68(networkId: Long = peerConf.networkId, genesisHash: ByteString = this.genesisHash): Status =
@@ -605,6 +581,3 @@ class PeerActorSpec
         genesisHash = genesisHash,
         forkId = ForkId.create(this.genesisHash, handshakerConfiguration.blockchainConfig)(daoForkBlockNumber)
       )
-  }
-
-}

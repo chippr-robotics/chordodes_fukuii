@@ -2,21 +2,20 @@ package com.chipprbots.ethereum.db.storage
 
 import org.apache.pekko.util.ByteString
 
+import boopickle.Default.*
 import org.scalacheck.Gen
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-
-import boopickle.Default._
 
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.db.dataSource.DataSourceUpdate
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.ChainWeightStorage.LegacyChainWeight
 import com.chipprbots.ethereum.domain.ChainWeight
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 
-class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
   test("ChainWeightStorage insert", UnitTest, DatabaseTest) {
     forAll(Gen.listOf(byteStringOfLengthNGen(32))) { blockByteArrayHashes =>
       val blockHashes = blockByteArrayHashes.distinct
@@ -90,12 +89,12 @@ class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks 
     // Legacy checkpoint number is discarded, only totalDifficulty is preserved
     val retrieved = storage.get(blockHash)
     assert(retrieved.isDefined, "Should successfully deserialize legacy format")
-    assert(retrieved.get.totalDifficulty == totalDifficulty)
+    assert(retrieved.get.totalDifficulty.value == totalDifficulty)
   }
 
   test("ChainWeightStorage round-trips current format", UnitTest, DatabaseTest) {
     val blockHash = byteStringOfLengthNGen(32).sample.get
-    val chainWeight = ChainWeight(BigInt(5000))
+    val chainWeight = ChainWeight.totalDifficultyOnly(BigInt(5000))
 
     val storage = new ChainWeightStorage(EphemDataSource())
     storage.put(blockHash, chainWeight).commit()
@@ -103,7 +102,7 @@ class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks 
     val retrieved = storage.get(blockHash)
     assert(retrieved.isDefined)
     assert(retrieved.get == chainWeight)
-    assert(retrieved.get.totalDifficulty == BigInt(5000))
+    assert(retrieved.get.totalDifficulty.value == BigInt(5000))
   }
 
   test("ChainWeightStorage handles corrupted data gracefully", UnitTest, DatabaseTest) {
@@ -132,4 +131,3 @@ class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks 
       s"Error message should indicate deserialization failure. Got: ${exception.getMessage}"
     )
   }
-}

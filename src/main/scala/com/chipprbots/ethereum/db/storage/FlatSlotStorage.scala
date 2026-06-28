@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
   * The MPT-based storage trie is still maintained for Merkle proof generation and state root computation. Flat storage
   * is a read/write optimization layer.
   */
-class FlatSlotStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[ByteString, ByteString] {
+class FlatSlotStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[ByteString, ByteString]:
   val namespace: IndexedSeq[Byte] = Namespaces.FlatSlotNamespace
   def keySerializer: ByteString => IndexedSeq[Byte] = identity
   def keyDeserializer: IndexedSeq[Byte] => ByteString = k => ByteString.fromArrayUnsafe(k.toArray)
@@ -61,7 +61,7 @@ class FlatSlotStorage(val dataSource: DataSource) extends TransactionalKeyValueS
       accountHash: ByteString,
       startSlotHash: ByteString
   ): Stream[IO, Either[IterationError, (ByteString, ByteString)]] =
-    dataSource match {
+    dataSource match
       case rdb: RocksDbDataSource =>
         val seekKey = (accountHash ++ startSlotHash).toArray
         val accountPrefix = accountHash.toArray
@@ -75,14 +75,12 @@ class FlatSlotStorage(val dataSource: DataSource) extends TransactionalKeyValueS
           .map {
             case Right((key, value)) =>
               Right((ByteString.fromArrayUnsafe(key.drop(32)), ByteString.fromArrayUnsafe(value)))
-            case left => left.asInstanceOf[Either[IterationError, (ByteString, ByteString)]]
+            case Left(err) => Left(err)
           }
       case _ =>
         Stream.empty
-    }
 
   override def storageContent: Stream[IO, Either[IterationError, (ByteString, ByteString)]] =
     dataSource.iterate(namespace).map { result =>
       result.map { case (key, value) => (ByteString.fromArrayUnsafe(key), ByteString.fromArrayUnsafe(value)) }
     }
-}

@@ -2,7 +2,7 @@ package com.chipprbots.scalanet.discovery.ethereum
 
 import java.nio.charset.StandardCharsets.UTF_8
 
-import cats.implicits._
+import cats.implicits.*
 
 import scala.util.Failure
 import scala.util.Success

@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** EIP-7702: intrinsic gas is `PER_EMPTY_ACCOUNT_COST` (25,000) per authorization tuple. A
@@ -19,7 +19,7 @@ class EIP7702AuthGasSpec
     extends AnyFlatSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   val olympiaBlock: BigInt = 10
 
@@ -47,10 +47,10 @@ class EIP7702AuthGasSpec
   }
 
   it should "combine with access list and calldata costs" taggedAs (OlympiaTest, VMTest) in {
-    import com.chipprbots.ethereum.domain.{AccessListItem, Address}
+    import com.chipprbots.ethereum.domain.{AccessListItem, Address, StorageKey}
 
     val payload = ByteString(Array.fill(100)(0x01.toByte)) // 100 nonzero bytes
-    val accessList = List(AccessListItem(Address(1), List(BigInt(0), BigInt(1))))
+    val accessList = List(AccessListItem(Address(1), List(StorageKey(BigInt(0)), StorageKey(BigInt(1)))))
 
     val gasBase = evmConfig.calcTransactionIntrinsicGas(emptyPayload, isContractCreation = false, Nil, 0)
     val gasFull = evmConfig.calcTransactionIntrinsicGas(payload, isContractCreation = false, accessList, 2)
@@ -62,4 +62,3 @@ class EIP7702AuthGasSpec
 
     gasFull shouldBe (gasBase + calldataCost + accessListCost + authCost)
   }
-}

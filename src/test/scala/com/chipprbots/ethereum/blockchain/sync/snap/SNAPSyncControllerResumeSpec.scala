@@ -1,17 +1,20 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
+import java.io.File
+import java.nio.file.Files
+
 import org.apache.pekko.util.ByteString
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
-import com.chipprbots.ethereum.db.storage.{Namespaces, SnapSyncProgress, SnapSyncProgressStorage}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
+import com.chipprbots.ethereum.db.storage.Namespaces
+import com.chipprbots.ethereum.db.storage.SnapSyncProgress
+import com.chipprbots.ethereum.db.storage.SnapSyncProgressStorage
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Hex
-
-import java.io.File
-import java.nio.file.Files
 
 /** Tests for the persistence contract that [[SNAPSyncController]] relies on:
   *
@@ -23,17 +26,17 @@ import java.nio.file.Files
   * not re-tested here because the controller's logic is covered by SNAPSyncControllerSpec and the storage round-trip is
   * the only new contract introduced by spec-004.
   */
-class SNAPSyncControllerResumeSpec extends AnyFlatSpec with Matchers {
+class SNAPSyncControllerResumeSpec extends AnyFlatSpec with Matchers:
 
   private val MaxPreservedPivotDistance: BigInt = BigInt(50_000)
 
   private def stateRoot(i: Int): ByteString = ByteString(Array.fill(32)(i.toByte))
   private def hexStr(i: Int): String = "%064x".format(i)
 
-  private def withStorage(test: SnapSyncProgressStorage => Unit): Unit = {
+  private def withStorage(test: SnapSyncProgressStorage => Unit): Unit =
     val dbPath = Files.createTempDirectory("snap-resume-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -43,16 +46,14 @@ class SNAPSyncControllerResumeSpec extends AnyFlatSpec with Matchers {
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     try test(new SnapSyncProgressStorage(dataSource))
-    finally {
+    finally
       dataSource.destroy()
       val dir = new File(dbPath)
-      if (dir.exists()) dir.delete()
-    }
-  }
+      if dir.exists() then dir.delete()
 
   // Test 6: account cursors written by the controller are retrievable on next startup
   "SNAPSyncControllerResume" should "persist account cursors so they survive a crash and restart" taggedAs UnitTest in
@@ -84,10 +85,10 @@ class SNAPSyncControllerResumeSpec extends AnyFlatSpec with Matchers {
       val saved = storage.readProgress(root).get
       val resumeMap: Map[ByteString, ByteString] = saved.accountCursors.flatMap { case (lastHex, nextHex) =>
         import scala.util.Try
-        for {
+        for
           last <- Try(ByteString(Hex.decode(lastHex))).toOption
           next <- Try(ByteString(Hex.decode(nextHex))).toOption
-        } yield last -> next
+        yield last -> next
       }
       resumeMap should have size 1
       resumeMap(lastBs) shouldBe nextBs
@@ -114,4 +115,3 @@ class SNAPSyncControllerResumeSpec extends AnyFlatSpec with Matchers {
       storage.clearProgress(root)
       storage.readProgress(root) shouldBe None // confirmed cleared
     }
-}

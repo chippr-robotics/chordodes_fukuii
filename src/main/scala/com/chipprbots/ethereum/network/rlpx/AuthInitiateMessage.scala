@@ -4,9 +4,9 @@ import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.math.ec.ECPoint
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 
-object AuthInitiateMessage extends AuthInitiateEcdsaCodec {
+object AuthInitiateMessage extends AuthInitiateEcdsaCodec:
   val NonceLength = 32
   val EphemeralHashLength = 32
   val PublicKeyLength = 64
@@ -14,7 +14,7 @@ object AuthInitiateMessage extends AuthInitiateEcdsaCodec {
   val EncodedLength: Int =
     ECDSASignature.EncodedLength + EphemeralHashLength + PublicKeyLength + NonceLength + KnownPeerLength
 
-  def decode(input: Array[Byte]): AuthInitiateMessage = {
+  def decode(input: Array[Byte]): AuthInitiateMessage =
     val publicKeyIndex = ECDSASignature.EncodedLength + EphemeralHashLength
     val nonceIndex = publicKeyIndex + PublicKeyLength
     val knownPeerIndex = nonceIndex + NonceLength
@@ -27,8 +27,6 @@ object AuthInitiateMessage extends AuthInitiateEcdsaCodec {
       nonce = ByteString(input.slice(nonceIndex, knownPeerIndex)),
       knownPeer = input(knownPeerIndex) == 1
     )
-  }
-}
 
 case class AuthInitiateMessage(
     signature: ECDSASignature,
@@ -36,15 +34,13 @@ case class AuthInitiateMessage(
     publicKey: ECPoint,
     nonce: ByteString,
     knownPeer: Boolean
-) extends AuthInitiateEcdsaCodec {
+) extends AuthInitiateEcdsaCodec:
 
-  import com.chipprbots.ethereum.utils.ByteStringUtils._
+  import com.chipprbots.ethereum.utils.ByteStringUtils.*
   lazy val encoded: ByteString = concatByteStrings(
     encodeECDSA(signature),
     ephemeralPublicHash,
     publicKey.getEncoded(false).drop(1),
     nonce,
-    ByteString(if (knownPeer) 1.toByte else 0.toByte)
+    ByteString(if knownPeer then 1.toByte else 0.toByte)
   )
-
-}

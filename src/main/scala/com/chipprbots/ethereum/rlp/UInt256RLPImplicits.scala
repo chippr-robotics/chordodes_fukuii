@@ -3,24 +3,17 @@ package com.chipprbots.ethereum.rlp
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.rlp.RLP._
+import com.chipprbots.ethereum.rlp.RLP.*
 
-object UInt256RLPImplicits {
+object UInt256RLPImplicits:
 
-  implicit class UInt256Enc(obj: UInt256) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable =
-      RLPValue(if (obj.equals(UInt256.Zero)) Array.empty[Byte] else obj.bytes.dropWhile(_ == 0).toArray[Byte])
-  }
+  extension (obj: UInt256)
+    def toRLPEncodable: RLPEncodeable =
+      RLPValue(if obj.equals(UInt256.Zero) then Array.empty[Byte] else obj.bytes.dropWhile(_ == 0).toArray[Byte])
 
-  implicit class UInt256Dec(val bytes: ByteString) extends AnyVal {
-    def toUInt256: UInt256 = UInt256RLPEncodableDec(rawDecode(bytes.toArray)).toUInt256
-  }
+  extension (bytes: ByteString) def toUInt256: UInt256 = rawDecode(bytes.toArray).toUInt256
 
-  implicit class UInt256RLPEncodableDec(val rLPEncodeable: RLPEncodeable) extends AnyVal {
-    def toUInt256: UInt256 = rLPEncodeable match {
+  extension (rLPEncodeable: RLPEncodeable)
+    def toUInt256: UInt256 = rLPEncodeable match
       case RLPValue(b) => UInt256(b)
       case _           => throw RLPException("src is not an RLPValue")
-    }
-  }
-
-}

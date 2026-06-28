@@ -2,7 +2,8 @@ package com.chipprbots.ethereum.jsonrpc
 
 import java.time.Duration
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -11,25 +12,24 @@ import cats.effect.IO
 import scala.util.Try
 
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
-import com.chipprbots.ethereum.jsonrpc.JsonRpcError._
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+import com.chipprbots.ethereum.jsonrpc.JsonRpcError.*
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.keystore.Wallet
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.AddOrOverrideTransaction
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
-import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.TxPoolConfig
 
-object PersonalService {
+object PersonalService:
 
   case class ImportRawKeyRequest(prvKey: ByteString, passphrase: String)
   case class ImportRawKeyResponse(address: Address)
@@ -67,10 +67,9 @@ object PersonalService {
 
   val PrivateKeyLength = 32
   val defaultUnlockTime = 300
-}
 
-trait PersonalServiceAPI {
-  import PersonalService._
+trait PersonalServiceAPI:
+  import PersonalService.*
 
   def importRawKey(req: ImportRawKeyRequest): ServiceResponse[ImportRawKeyResponse]
   def newAccount(req: NewAccountRequest): ServiceResponse[NewAccountResponse]
@@ -83,26 +82,26 @@ trait PersonalServiceAPI {
       request: SendTransactionWithPassphraseRequest
   ): ServiceResponse[SendTransactionWithPassphraseResponse]
   def sendTransaction(request: SendTransactionRequest): ServiceResponse[SendTransactionResponse]
-}
 
 class PersonalService(
     keyStore: KeyStore,
     blockchainReader: BlockchainReader,
-    txPool: ActorRef,
+    txPool: ActorRef[PendingTransactionsManager.Command],
     txPoolConfig: TxPoolConfig,
     configBuilder: BlockchainConfigBuilder,
-    ethTxService: EthTxService
+    ethTxService: EthTxService,
+    scheduler: Scheduler
 ) extends PersonalServiceAPI
-    with Logger {
-  import configBuilder._
+    with Logger:
+  import configBuilder.*
 
   private val unlockedWallets: ExpiringMap[Address, Wallet] = ExpiringMap.empty(Duration.ofSeconds(defaultUnlockTime))
 
   def importRawKey(req: ImportRawKeyRequest): ServiceResponse[ImportRawKeyResponse] = IO {
-    for {
+    for
       prvKey <- Right(req.prvKey).filterOrElse(_.length == PrivateKeyLength, InvalidKey)
       addr <- keyStore.importPrivateKey(prvKey, req.passphrase).left.map(handleError)
-    } yield ImportRawKeyResponse(addr)
+    yield ImportRawKeyResponse(addr)
   }
 
   def newAccount(req: NewAccountRequest): ServiceResponse[NewAccountResponse] = IO {
@@ -114,8 +113,7 @@ class PersonalService(
   }
 
   def listAccounts(request: ListAccountsRequest): ServiceResponse[ListAccountsResponse] = IO {
-    keyStore
-      .listAccounts()
+    keyStore.listAccounts
       .map(ListAccountsResponse.apply)
       .left
       .map(handleError)
@@ -128,10 +126,8 @@ class PersonalService(
       .map(handleError)
       .map { wallet =>
         request.duration.fold(unlockedWallets.add(request.address, wallet))(duration =>
-          if (duration.isZero)
-            unlockedWallets.addForever(request.address, wallet)
-          else
-            unlockedWallets.add(request.address, wallet, duration)
+          if duration.isZero then unlockedWallets.addForever(request.address, wallet)
+          else unlockedWallets.add(request.address, wallet, duration)
         )
 
         UnlockAccountResponse(true)
@@ -144,7 +140,7 @@ class PersonalService(
   }
 
   def sign(request: SignRequest): ServiceResponse[SignResponse] = IO {
-    import request._
+    import request.*
 
     val accountWallet =
       passphrase.fold(unlockedWallets.get(request.address).toRight(AccountLocked)) { pass =>
@@ -158,7 +154,7 @@ class PersonalService(
   }
 
   def ecRecover(req: EcRecoverRequest): ServiceResponse[EcRecoverResponse] = IO {
-    import req._
+    import req.*
     signature
       .publicKey(getMessageToSign(message))
       .map { publicKey =>
@@ -169,7 +165,7 @@ class PersonalService(
 
   def sendTransaction(
       request: SendTransactionWithPassphraseRequest
-  ): ServiceResponse[SendTransactionWithPassphraseResponse] = {
+  ): ServiceResponse[SendTransactionWithPassphraseResponse] =
     val maybeWalletUnlocked = IO {
       keyStore.unlockAccount(request.tx.from, request.passphrase).left.map(handleError)
     }
@@ -182,7 +178,6 @@ class PersonalService(
           .recover { case _: MissingNodeException => Left(JsonRpcError.NodeNotFound) }
       case Left(err) => IO.pure(Left(err))
     }
-  }
 
   def sendTransaction(request: SendTransactionRequest): ServiceResponse[SendTransactionResponse] =
     IO(unlockedWallets.get(request.tx.from)).flatMap {
@@ -195,11 +190,12 @@ class PersonalService(
       case None => IO.pure(Left(AccountLocked))
     }
 
-  private def sendTransaction(request: TransactionRequest, wallet: Wallet): IO[ByteString] = {
-    implicit val timeout: Timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
+  private def sendTransaction(request: TransactionRequest, wallet: Wallet): IO[ByteString] =
+    given timeout: Timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
+    given sc: Scheduler = scheduler
 
     val pendingTxsFuture =
-      txPool.askFor[PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)
+      txPool.askForTyped[PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactionsReq(_))
     val latestPendingTxNonceFuture: IO[Option[BigInt]] = pendingTxsFuture.map { pendingTxs =>
       val senderTxsNonces = pendingTxs.pendingTransactions
         .collect { case ptx if ptx.stx.senderAddress == wallet.address => ptx.stx.tx.tx.nonce }
@@ -213,30 +209,27 @@ class PersonalService(
         request.gasPrice.getOrElse(ethTxService.suggestGasPrice())
       )
 
-      val stx = if (blockchainReader.getBestBlockNumber() >= blockchainConfig.forkBlockNumbers.eip155BlockNumber) {
-        wallet.signTx(tx, Some(blockchainConfig.chainId))
-      } else {
-        wallet.signTx(tx, None)
-      }
+      val stx =
+        if blockchainReader.getBestBlockNumber >= blockchainConfig.forkBlockNumbers.eip155BlockNumber then
+          wallet.signTx(tx, Some(blockchainConfig.chainId))
+        else wallet.signTx(tx, None)
       log.debug("Trying to add personal transaction: {}", stx.tx.hash.toHex)
 
       txPool ! AddOrOverrideTransaction(stx.tx)
 
-      stx.tx.hash
+      stx.tx.hash.value
     }
-  }
 
   private def getCurrentAccount(address: Address): Option[Account] =
-    blockchainReader.getAccount(blockchainReader.getBestBranch(), address, blockchainReader.getBestBlockNumber())
+    blockchainReader.getAccount(blockchainReader.getBestBranch, address, blockchainReader.getBestBlockNumber)
 
-  private def getMessageToSign(message: ByteString) = {
+  private def getMessageToSign(message: ByteString) =
     val prefixed: Array[Byte] =
       0x19.toByte +:
         s"Ethereum Signed Message:\n${message.length}".getBytes ++:
         message.toArray[Byte]
 
     crypto.kec256(prefixed)
-  }
 
   private val handleError: PartialFunction[KeyStore.KeyStoreError, JsonRpcError] = {
     case KeyStore.DecryptionFailed              => InvalidPassphrase
@@ -245,4 +238,3 @@ class PersonalService(
     case KeyStore.IOError(msg)                  => LogicError(msg)
     case KeyStore.DuplicateKeySaved             => LogicError("account already exists")
   }
-}

@@ -6,7 +6,7 @@ import org.scalacheck.Gen
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Property-based range boundary tests for AccountTask and StorageTask.
   *
@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.testing.Tags._
   * for the invariants that must hold across all valid inputs: partition completeness, keyspace clamping, and
   * createContinuation arithmetic at boundary values.
   */
-class SNAPRangeBoundarySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
+class SNAPRangeBoundarySpec extends AnyFunSuite with ScalaCheckPropertyChecks:
 
   private val dummyRoot: ByteString = ByteString(Array.fill(32)(0xab.toByte))
   private val zeroHash: ByteString = ByteString(Array.fill(32)(0x00.toByte))
@@ -111,4 +111,3 @@ class SNAPRangeBoundarySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
     assert(cont.accountHash == acct)
     assert(cont.storageRoot == sroot)
   }
-}

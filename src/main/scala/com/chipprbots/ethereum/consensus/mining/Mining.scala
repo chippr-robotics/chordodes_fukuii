@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.nodebuilder.Node
   * @see
   *   [[Protocol Protocol]]
   */
-trait Mining {
+trait Mining:
 
   /** The type of configuration [[com.chipprbots.ethereum.consensus.mining.FullMiningConfig.specific specific]] to this
     * mining protocol implementation.
@@ -62,7 +62,6 @@ trait Mining {
   /** Sends msg to the internal miner
     */
   def sendMiner(msg: MinerProtocol): Unit
-}
 
 /** Internal API, used for testing.
   *
@@ -70,7 +69,7 @@ trait Mining {
   * behavior but it is the developer's responsibility to maintain consistency (though the particular mining protocols we
   * implement so far do their best in that direction).
   */
-trait TestMining extends Mining {
+trait TestMining extends Mining:
   def blockGenerator: TestBlockGenerator
 
   /** Internal API, used for testing */
@@ -84,4 +83,3 @@ trait TestMining extends Mining {
 
   /** Internal API, used for testing */
   def withBlockGenerator(blockGenerator: TestBlockGenerator): TestMining
-}

@@ -7,11 +7,11 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.ObjectGenerators
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class NodeStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class NodeStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
   test("NodeStorage insert", UnitTest, DatabaseTest) {
     forAll(Gen.listOf(nodeGen)) { unfilteredMptNodes =>
       val mptNodes = unfilteredMptNodes.distinct
@@ -50,4 +50,3 @@ class NodeStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with Ob
       toDelete.foreach(node => assert(nodeStorageAfterDelete.get(ByteString(node.hash)).isEmpty))
     }
   }
-}

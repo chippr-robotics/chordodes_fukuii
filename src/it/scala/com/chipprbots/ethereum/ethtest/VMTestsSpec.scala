@@ -1,11 +1,13 @@
 package com.chipprbots.ethereum.ethtest
 
 import java.io.File
-import io.circe.parser._
+
 import scala.io.Source
 import scala.util.Using
 
-import com.chipprbots.ethereum.testing.Tags._
+import io.circe.parser.*
+
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite for ethereum/tests VMTests category
   *
@@ -26,7 +28,7 @@ import com.chipprbots.ethereum.testing.Tags._
   * See https://github.com/ethereum/tests/tree/develop/GeneralStateTests/VMTests See ADR-015 for implementation details
   * See ADR-017 for test categorization strategy
   */
-class VMTestsSpec extends EthereumTestsSpec {
+class VMTestsSpec extends EthereumTestsSpec:
 
   // Base path for VM tests - configurable via system property or environment variable
   //
@@ -44,7 +46,7 @@ class VMTestsSpec extends EthereumTestsSpec {
     )
 
   // Supported networks (pre-Spiral fork only)
-  val supportedNetworks = Set(
+  val supportedNetworks: Set[String] = Set(
     "Frontier",
     "Homestead",
     "EIP150", // Tangerine Whistle
@@ -63,12 +65,11 @@ class VMTestsSpec extends EthereumTestsSpec {
     * @return
     *   List of test file paths
     */
-  def discoverVMTests(testCategory: String): Seq[String] = {
+  def discoverVMTests(testCategory: String): Seq[String] =
     val categoryPath = new File(s"$vmTestsBasePath/$testCategory")
 
-    if (!categoryPath.exists() || !categoryPath.isDirectory) {
-      Seq.empty
-    } else {
+    if !categoryPath.exists() || !categoryPath.isDirectory then Seq.empty
+    else
       Option(categoryPath.listFiles())
         .fold(Seq.empty[String])(files =>
           files
@@ -76,8 +77,6 @@ class VMTestsSpec extends EthereumTestsSpec {
             .map(f => s"/GeneralStateTests/VMTests/$testCategory/${f.getName}")
             .toSeq
         )
-    }
-  }
 
   /** Load test suite from filesystem path
     *
@@ -86,16 +85,15 @@ class VMTestsSpec extends EthereumTestsSpec {
     * @return
     *   Parsed test suite
     */
-  def loadTestSuiteFromFile(filePath: String): BlockchainTestSuite = {
+  def loadTestSuiteFromFile(filePath: String): BlockchainTestSuite =
     import cats.effect.unsafe.IORuntime
 
     @scala.annotation.unused
     given IORuntime = IORuntime.global
 
     val file = new File(filePath)
-    if (!file.exists()) {
-      BlockchainTestSuite(Map.empty)
-    } else {
+    if !file.exists() then BlockchainTestSuite(Map.empty)
+    else
       Using(Source.fromFile(file)) { source =>
         val jsonString = source.mkString
         parse(jsonString).flatMap(_.as[BlockchainTestSuite])
@@ -106,8 +104,6 @@ class VMTestsSpec extends EthereumTestsSpec {
           suite => suite
         )
       )
-    }
-  }
 
   /** Load and filter test suite to only include supported networks
     *
@@ -116,7 +112,7 @@ class VMTestsSpec extends EthereumTestsSpec {
     * @return
     *   Filtered test suite with only supported networks
     */
-  def loadAndFilterTestSuite(resourcePath: String): BlockchainTestSuite = {
+  def loadAndFilterTestSuite(resourcePath: String): BlockchainTestSuite =
     val fullPath = s"$vmTestsBasePath$resourcePath"
     val suite = loadTestSuiteFromFile(fullPath)
 
@@ -126,72 +122,66 @@ class VMTestsSpec extends EthereumTestsSpec {
     }
 
     BlockchainTestSuite(filteredTests)
-  }
 
   "VMTests" should "discover vmArithmeticTest tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       info("Run 'git submodule init && git submodule update' to initialize")
       pending
-    } else {
+    else
       val tests = discoverVMTests("vmArithmeticTest")
       info(s"Discovered ${tests.size} test files in vmArithmeticTest")
       tests.size should be > 0
-    }
   }
 
   it should "discover vmBitwiseLogicOperation tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverVMTests("vmBitwiseLogicOperation")
       info(s"Discovered ${tests.size} test files in vmBitwiseLogicOperation")
       tests.size should be > 0
-    }
   }
 
   it should "discover vmIOandFlowOperations tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverVMTests("vmIOandFlowOperations")
       info(s"Discovered ${tests.size} test files in vmIOandFlowOperations")
       tests.size should be > 0
-    }
   }
 
   it should "discover vmLogTest tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverVMTests("vmLogTest")
       info(s"Discovered ${tests.size} test files in vmLogTest")
       tests.size should be > 0
-    }
   }
 
   it should "discover vmTests tests" taggedAs (IntegrationTest, EthereumTest, VMTest, SlowTest) in {
     val baseDir = new File(vmTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $vmTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverVMTests("vmTests")
       info(s"Discovered ${tests.size} test files in vmTests")
       tests.size should be > 0
-    }
   }
 
   it should "filter out unsupported networks" taggedAs (IntegrationTest, EthereumTest, VMTest) in {
@@ -228,10 +218,10 @@ class VMTestsSpec extends EthereumTestsSpec {
     val testFile = s"$vmTestsBasePath/vmArithmeticTest/add.json"
     val file = new File(testFile)
 
-    if (!file.exists()) {
+    if !file.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized")
       pending
-    } else {
+    else
       val suite = loadTestSuiteFromFile(testFile)
       info(s"Loaded ${suite.tests.size} test cases from add.json")
 
@@ -247,6 +237,4 @@ class VMTestsSpec extends EthereumTestsSpec {
         // Validate test structure
         test.network should not be empty
       }
-    }
   }
-}

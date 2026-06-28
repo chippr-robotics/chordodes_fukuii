@@ -4,9 +4,9 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.ObjectGenerators
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class HexPrefixSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class HexPrefixSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
 
   test("HexPrefix encoding", UnitTest, MPTTest) {
     forAll(hexPrefixDecodeParametersGen()) { (pair: (Array[Byte], Boolean)) =>
@@ -93,4 +93,3 @@ class HexPrefixSuite extends AnyFunSuite with ScalaCheckPropertyChecks with Obje
     val result: Array[Byte] = Array[Byte](7, 0, 7, 5, 7, 0, 7, 0, 7, 9)
     assert(result.sameElements(HexPrefix.bytesToNibbles(bytes = test)))
   }
-}

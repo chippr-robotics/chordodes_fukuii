@@ -6,8 +6,8 @@ import java.net.InetSocketAddress
 import com.chipprbots.scalanet.peergroup.InetMultiAddress
 import scodec.Codec
 import scodec.DecodeResult
-import scodec.bits._
-import scodec.codecs._
+import scodec.bits.*
+import scodec.codecs.*
 
 /**
   *

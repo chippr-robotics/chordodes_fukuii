@@ -2,21 +2,21 @@ package com.chipprbots.ethereum.cli
 
 import java.security.SecureRandom
 
-import cats.implicits._
+import cats.implicits.*
 
 import com.monovore.decline.Command
 import com.monovore.decline.Opts
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.keystore.EncryptedKey
 import com.chipprbots.ethereum.keystore.EncryptedKeyJsonCodec
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
-object CliCommands extends SecureRandomBuilder {
+object CliCommands extends SecureRandomBuilder:
 
   val generatePrivateKeyCommand = "generate-private-key"
   val generateKeyPairsCommand = "generate-key-pairs"
@@ -100,12 +100,11 @@ object CliCommands extends SecureRandomBuilder {
         .map(address => s"""$address: { "balance": $balance }""")
         .mkString("{", ", ", "}")}"""
 
-  private def privKeyToAddress(privKey: Array[Byte]): String = {
+  private def privKeyToAddress(privKey: Array[Byte]): String =
     val pubKey = pubKeyFromPrvKey(privKey)
     val address = Address(crypto.kec256(pubKey))
 
     address.toUnprefixedString
-  }
 
   val api: Command[String] = Command.apply(name = "cli", header = "Fukuii CLI") {
     Opts.subcommands(
@@ -116,4 +115,3 @@ object CliCommands extends SecureRandomBuilder {
       EncryptKey
     )
   }
-}

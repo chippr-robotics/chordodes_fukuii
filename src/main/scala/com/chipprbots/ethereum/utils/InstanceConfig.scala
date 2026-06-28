@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.utils
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
 import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.network.NetworkProtocolConfig
@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfigurat
   * @param instanceId
   *   optional instance identifier for multi-instance mode (e.g., "etc", "mordor", "sepolia")
   */
-class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "default") extends LazyLogger {
+class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "default") extends LazyLogger:
 
   val testmode: Boolean = config.getBoolean("testmode")
 
@@ -39,7 +39,7 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
   val shutdownTimeout: Duration = config.getDuration("shutdown-timeout").toMillis.millis
 
   val secureRandomAlgo: Option[String] =
-    if (config.hasPath("secure-random-algo")) Some(config.getString("secure-random-algo"))
+    if config.hasPath("secure-random-algo") then Some(config.getString("secure-random-algo"))
     else None
 
   import com.chipprbots.ethereum.network.p2p.messages.Capability
@@ -47,7 +47,7 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
   val networkProtocols: NetworkProtocolConfig =
     NetworkProtocolConfig.fromConfig(config.getConfig("network.protocols"))
 
-  val supportedCapabilities: List[Capability] = {
+  val supportedCapabilities: List[Capability] =
     val p = networkProtocols
     List(
       Option.when(p.eth68)(Capability.ETH68),
@@ -57,27 +57,22 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
       Option.when(p.snap1)(Capability.SNAP1)
       // SNAP2 slot wired here by spec-008
     ).flatten
-  }
 
   // Startup validation — runs at construction; warns on misconfigured combinations but does not abort.
   locally {
     val p = networkProtocols
     val networkName =
-      if (config.hasPath("blockchains.network")) config.getString("blockchains.network") else instanceId
-    if (!p.eth68)
-      log.warn("[InstanceConfig] eth68 disabled; this node cannot communicate with legacy peers")
-    if (p.eth70 && !p.eth69)
-      log.warn("[InstanceConfig] eth70 requires eth69; both should be enabled")
-    if (p.eth71 && !p.eth70)
-      log.warn("[InstanceConfig] eth71 requires eth70; both should be enabled")
-    if (p.snap2 && !p.snap1)
-      log.warn("[InstanceConfig] snap2 requires snap1; both should be enabled")
+      if config.hasPath("blockchains.network") then config.getString("blockchains.network") else instanceId
+    if !p.eth68 then log.warn("[InstanceConfig] eth68 disabled; this node cannot communicate with legacy peers")
+    if p.eth70 && !p.eth69 then log.warn("[InstanceConfig] eth70 requires eth69; both should be enabled")
+    if p.eth71 && !p.eth70 then log.warn("[InstanceConfig] eth71 requires eth70; both should be enabled")
+    if p.snap2 && !p.snap1 then log.warn("[InstanceConfig] snap2 requires snap1; both should be enabled")
     val disabled = List(
       Option.unless(p.eth70)("eth70"),
       Option.unless(p.eth71)("eth71"),
       Option.unless(p.snap2)("snap2")
     ).flatten
-    val disabledNote = if (disabled.nonEmpty) s"; ${disabled.mkString("/")} disabled by config" else ""
+    val disabledNote = if disabled.nonEmpty then s"; ${disabled.mkString("/")} disabled by config" else ""
     log.info(
       s"[InstanceConfig] Protocol capabilities: [${supportedCapabilities.mkString(", ")}]" +
         s" (network=$networkName$disabledNote)"
@@ -86,24 +81,23 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
 
   val blockchains: BlockchainsConfig = BlockchainsConfig(config.getConfig("blockchains"))
 
-  object Network {
+  object Network:
     private val networkConfig = config.getConfig("network")
 
     val automaticPortForwarding: Boolean = networkConfig.getBoolean("automatic-port-forwarding")
 
-    object Server {
+    object Server:
       private val serverConfig = networkConfig.getConfig("server-address")
 
       val interface: String = serverConfig.getString("interface")
       val port: Int = serverConfig.getInt("port")
       val listenAddress = new InetSocketAddress(interface, port)
       val advertisedAddress: Option[String] =
-        if (serverConfig.hasPath("advertised-address") && !serverConfig.getIsNull("advertised-address"))
+        if serverConfig.hasPath("advertised-address") && !serverConfig.getIsNull("advertised-address") then
           Some(serverConfig.getString("advertised-address"))
         else None
-    }
 
-    val peer: PeerConfiguration = new PeerConfiguration {
+    val peer: PeerConfiguration = new PeerConfiguration:
       private val peerConfig = networkConfig.getConfig("peer")
       private val blockchainConfig: BlockchainConfig = blockchains.blockchainConfig
 
@@ -122,20 +116,18 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
       val pruneIncomingPeers: Int = peerConfig.getInt("prune-incoming-peers")
       val minPruneAge: FiniteDuration = peerConfig.getDuration("min-prune-age").toMillis.millis
       val networkId: Long = blockchainConfig.networkId
-      val p2pVersion: Int = if (peerConfig.hasPath("p2p-version")) peerConfig.getInt("p2p-version") else 5
+      val p2pVersion: Int = if peerConfig.hasPath("p2p-version") then peerConfig.getInt("p2p-version") else 5
 
-      val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration {
+      val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration:
         val waitForHandshakeTimeout: FiniteDuration =
           peerConfig.getDuration("wait-for-handshake-timeout").toMillis.millis
         val waitForTcpAckTimeout: FiniteDuration = peerConfig.getDuration("wait-for-tcp-ack-timeout").toMillis.millis
-      }
 
-      val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration {
+      val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration:
         val maxBlocksHeadersPerMessage: Int = peerConfig.getInt("max-blocks-headers-per-message")
         val maxBlocksBodiesPerMessage: Int = peerConfig.getInt("max-blocks-bodies-per-message")
         val maxReceiptsPerMessage: Int = peerConfig.getInt("max-receipts-per-message")
         val maxMptComponentsPerMessage: Int = peerConfig.getInt("max-mpt-components-per-message")
-      }
       override val updateNodesInitialDelay: FiniteDuration =
         peerConfig.getDuration("update-nodes-initial-delay").toMillis.millis
       override val updateNodesInterval: FiniteDuration = peerConfig.getDuration("update-nodes-interval").toMillis.millis
@@ -145,17 +137,15 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
 
       val statSlotDuration: FiniteDuration = peerConfig.getDuration("stat-slot-duration").toMillis.millis
       val statSlotCount: Int = peerConfig.getInt("stat-slot-count")
-    }
-  }
 
-  object Db {
+  object Db:
     private val dbConfig = config.getConfig("db")
     private val rocksDbConfig = dbConfig.getConfig("rocksdb")
 
     val dataSource: String = dbConfig.getString("data-source")
     val periodicConsistencyCheck: Boolean = dbConfig.getBoolean("periodic-consistency-check")
 
-    object RocksDb extends RocksDbConfig {
+    object RocksDb extends RocksDbConfig:
       override val createIfMissing: Boolean = rocksDbConfig.getBoolean("create-if-missing")
       override val paranoidChecks: Boolean = rocksDbConfig.getBoolean("paranoid-checks")
       override val path: String = rocksDbConfig.getString("path")
@@ -166,41 +156,34 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
       override val blockSize: Long = rocksDbConfig.getLong("block-size")
       override val blockCacheSize: Long = rocksDbConfig.getLong("block-cache-size")
       override val dbWriteBufferSize: Long =
-        if (rocksDbConfig.hasPath("db-write-buffer-size")) rocksDbConfig.getLong("db-write-buffer-size")
+        if rocksDbConfig.hasPath("db-write-buffer-size") then rocksDbConfig.getLong("db-write-buffer-size")
         else 512L * 1024 * 1024
       override val maxTotalWalSize: Long =
-        if (rocksDbConfig.hasPath("max-total-wal-size")) rocksDbConfig.getLong("max-total-wal-size")
+        if rocksDbConfig.hasPath("max-total-wal-size") then rocksDbConfig.getLong("max-total-wal-size")
         else 512L * 1024 * 1024
       // spec 002 US2 (FR-005): off by default; enables block-cache hit/miss tickers at ~1-2% read overhead.
       override val enableStatistics: Boolean =
         rocksDbConfig.hasPath("enable-statistics") && rocksDbConfig.getBoolean("enable-statistics")
-    }
-  }
 
-  lazy val nodeCacheConfig: NodeCacheConfig = new NodeCacheConfig {
+  lazy val nodeCacheConfig: NodeCacheConfig = new NodeCacheConfig:
     private val cacheConfig = config.getConfig("node-caching")
     override val maxSize: Long = cacheConfig.getInt("max-size")
     override val maxHoldTime: FiniteDuration = cacheConfig.getDuration("max-hold-time").toMillis.millis
-  }
 
-  lazy val inMemoryPruningNodeCacheConfig: NodeCacheConfig = new NodeCacheConfig {
+  lazy val inMemoryPruningNodeCacheConfig: NodeCacheConfig = new NodeCacheConfig:
     private val cacheConfig = config.getConfig("inmemory-pruning-node-caching")
     override val maxSize: Long = cacheConfig.getInt("max-size")
     override val maxHoldTime: FiniteDuration = cacheConfig.getDuration("max-hold-time").toMillis.millis
-  }
-}
 
 /** Cache configuration used by LruCache, MapCache, StateStorage. Defined at package level so it can be referenced as a
   * type from anywhere.
   */
-trait NodeCacheConfig {
+trait NodeCacheConfig:
   val maxSize: Long
   val maxHoldTime: scala.concurrent.duration.FiniteDuration
-}
 
 /** Trait that provides access to an InstanceConfig. Mix this into cake pattern traits that need per-instance
   * configuration.
   */
-trait InstanceConfigProvider {
+trait InstanceConfigProvider:
   def instanceConfig: InstanceConfig
-}

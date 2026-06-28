@@ -7,11 +7,14 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt.{LeafNode, MerklePatriciaTrie, MptTraversals, byteStringSerializer}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.mpt.LeafNode
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
+import com.chipprbots.ethereum.mpt.MptTraversals
+import com.chipprbots.ethereum.mpt.byteStringSerializer
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
-class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
+class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers:
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -23,20 +26,18 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       trie: MerklePatriciaTrie[K, V],
       firstKey: K,
       lastKey: K
-  ): Seq[ByteString] = {
+  ): Seq[ByteString] =
     val firstProof = trie.getProof(firstKey).getOrElse(Vector.empty)
     val lastProof = trie.getProof(lastKey).getOrElse(Vector.empty)
     (firstProof ++ lastProof)
       .distinctBy(node => ByteString(node.hash))
       .map(node => ByteString(MptTraversals.encodeNode(node)))
-  }
 
   /** Compute the storage root from a set of ordered (k, v) pairs using SnapHashTrie. */
-  private def computeStorageRoot(slots: Seq[(ByteString, ByteString)]): ByteString = {
+  private def computeStorageRoot(slots: Seq[(ByteString, ByteString)]): ByteString =
     val t = new SnapHashTrie(_ => ())
     slots.foreach { case (k, v) => t.update(k.toArray, v.toArray) }
     t.commit()
-  }
 
   // ── Zero-leaf / empty-proof edge cases ──────────────────────────────────────
 
@@ -84,7 +85,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       startHash = ZeroKey,
       endHash = MaxKey
     )
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
   }
 
   it should "accept nil proof for complete storage range when hash matches" taggedAs UnitTest in {
@@ -112,7 +113,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = Seq.empty,
       startHash = ZeroKey,
       endHash = MaxKey
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   // ── Malformed proofs ─────────────────────────────────────────────────────────
@@ -124,7 +125,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = Seq(ByteString("not-a-valid-rlp-node")),
       startHash = ZeroKey,
       endHash = MaxKey
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "reject a malformed proof node for storage range" taggedAs UnitTest in {
@@ -134,7 +135,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = Seq(ByteString("not-valid-rlp-xxxxxxxxxx")),
       startHash = ZeroKey,
       endHash = MaxKey
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "return Left with error for deliberately corrupted proof bytes" taggedAs UnitTest in {
@@ -144,7 +145,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = Seq(ByteString(Array.fill(32)(0xde.toByte)), ByteString(Array[Byte](0x01, 0x02, 0x03))),
       startHash = ZeroKey,
       endHash = MaxKey
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   // ── Empty-proof storage edge cases ──────────────────────────────────────────
@@ -179,7 +180,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = Seq.empty,
       startHash = ZeroKey,
       endHash = MaxKey
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "reject storage range where first and last slot have identical hashes" taggedAs UnitTest in {
@@ -189,7 +190,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = Seq.empty,
       startHash = ZeroKey,
       endHash = MaxKey
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   // ── Valid proof with reconstruction ─────────────────────────────────────────
@@ -250,7 +251,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = proof,
       startHash = key0,
       endHash = key2
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "detect fabricated account value with valid proof structure" taggedAs UnitTest in {
@@ -269,7 +270,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = proof,
       startHash = key0,
       endHash = key1
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   // ── Single-element and edge-proof variants ───────────────────────────────────
@@ -322,7 +323,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = wrongProof,
       startHash = ZeroKey,
       endHash = MaxKey
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   // ── Adversarial / crash-safety ───────────────────────────────────────────────
@@ -341,10 +342,9 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       endHash = MaxKey
     )
     // Must not throw; either outcome acceptable
-    result match {
+    result match
       case Right(_)    => succeed
       case Left(error) => error should not be empty
-    }
   }
 
   it should "accept bloated proof with extra irrelevant nodes without crashing" taggedAs UnitTest in {
@@ -362,10 +362,9 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       startHash = key,
       endHash = key
     )
-    result match {
+    result match
       case Right(_)    => succeed
       case Left(error) => error should not be empty
-    }
   }
 
   // ── Empty-value / zero-account edge cases ────────────────────────────────────
@@ -437,7 +436,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = proof,
       startHash = firstKey,
       endHash = taskLast
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "detect missing account in multi-level trie" taggedAs UnitTest in {
@@ -460,7 +459,7 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       proof = proof,
       startHash = firstKey,
       endHash = lastKey
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "reject nil-proof storage range with empty (zeroed) slot value" taggedAs UnitTest in {
@@ -475,6 +474,5 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       endHash = MaxKey
     )
     // Should fail — either due to hash mismatch or SnapHashTrie rejecting empty value
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
   }
-}

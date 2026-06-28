@@ -7,14 +7,14 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class RestrictedEthashSignerSpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
     with ObjectGenerators
-    with SecureRandomBuilder {
+    with SecureRandomBuilder:
   "RestrictedEthashSigner" should "sign and validate correct header" taggedAs (UnitTest, ConsensusTest) in {
     forAll(blockHeaderGen, genKey(secureRandom)) { (header, key) =>
       val signedHeader = RestrictedPoWSigner.signHeader(header, key)
@@ -30,5 +30,3 @@ class RestrictedEthashSignerSpec
       assert(!RestrictedPoWSigner.validateSignature(signedHeader, Set(wrongKeyAsBytes)))
     }
   }
-
-}

@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.network.p2p.messages
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Regression tests for the Capability.negotiate strict-intersection fix (commit e674303aa).
   *
@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.testing.Tags._
   * The fix: always return a capability from OUR set (the first argument) — we guarantee we have a decoder for
   * everything we advertise.
   */
-class CapabilityNegotiateSpec extends AnyWordSpec with Matchers {
+class CapabilityNegotiateSpec extends AnyWordSpec with Matchers:
 
   "Capability.negotiate" when {
 
@@ -92,4 +92,3 @@ class CapabilityNegotiateSpec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

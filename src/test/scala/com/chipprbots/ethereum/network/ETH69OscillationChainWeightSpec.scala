@@ -4,8 +4,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.consensus.pow.difficulty.OscillationFixtures
-import com.chipprbots.ethereum.consensus.pow.difficulty.OscillationFixtures._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.consensus.pow.difficulty.OscillationFixtures.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
 /** Tests for POW_SCALING chain-weight estimation accuracy across ETH protocol eras.
@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.testing.Tags._
   *     underestimate (gap contribution at 580 TH << actual ~3300 TH avg) → New formula: ~6% underestimate for
   *     rising-difficulty gap; < 0.01% for constant-difficulty
   */
-class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers {
+class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers:
 
   /** Mirrors the Tier 3 POW_SCALING formula in BlockchainReader.resolveETH69ChainWeight. Must stay in sync with:
     * ourBestTD + ourCurrentDiff * gap * 9999 / 10000
@@ -43,10 +43,9 @@ class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers {
       ourCurrentDiff: BigInt,
       latestBlock: BigInt,
       ourBestNum: BigInt
-  ): BigInt = {
+  ): BigInt =
     val gap = (latestBlock - ourBestNum).max(BigInt(0))
     ourBestTD + ourCurrentDiff * gap * 9999 / 10000
-  }
 
   /** Old historical-average formula — kept as a reference baseline for improvement tests. */
   private def historicalAvgEstimate(ourBestTD: BigInt, latestBlock: BigInt, ourBestNum: BigInt): BigInt =
@@ -56,6 +55,23 @@ class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers {
   private def linearRampTD(baseTD: BigInt, startDiff: BigInt, delta: BigInt, count: BigInt): BigInt =
     // sum_{i=0}^{count-1} (startDiff + i*delta) = count*startDiff + delta*count*(count-1)/2
     baseTD + startDiff * count + delta * count * (count - 1) / 2
+
+  /** Tier-3 estimate using a rolling median over a 1,000-block difficulty history.
+    *
+    * Mirrors BlockchainReader.rollingMedianDifficulty + resolveETH69ChainWeight (POW_SCALING tier). The two middle
+    * elements are averaged for even-length arrays so that a symmetric bimodal oscillation resolves to its true mean.
+    */
+  private def rollingMedianEstimate(
+      ourBestTD: BigInt,
+      difficultyHistory: Seq[BigInt],
+      latestBlock: BigInt,
+      ourBestNum: BigInt
+  ): BigInt =
+    val sorted = difficultyHistory.sorted
+    val mid = sorted.length / 2
+    val median = (sorted(mid - 1) + sorted(mid)) / 2
+    val gap = (latestBlock - ourBestNum).max(BigInt(0))
+    ourBestTD + median * gap
 
   // -------------------------------------------------------------------------
   // ETH/68 era — wire provides totalDifficulty directly
@@ -307,5 +323,60 @@ class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers {
     overestimateFrac should be > 0.0 // measurable overestimate during falling-diff phase
     overestimateFrac should be < 0.20 // but not catastrophically wrong for 500 blocks
   }
-}
+
+  // -------------------------------------------------------------------------
+  // Rolling-median Tier-3 (BlockchainReader.rollingMedianDifficulty)
+  // -------------------------------------------------------------------------
+
+  "ETH69-only era rolling median" should "reduce Tier3 estimate variance to < ±20% under ±50% oscillation" taggedAs (
+    UnitTest,
+    NetworkTest
+  ) in {
+    // Symmetric ±50% oscillation: 500 blocks at lowD (1500 TH) + 500 blocks at highD (4500 TH)
+    // True cycle-average difficulty = (1500 + 4500) / 2 = 3000 TH
+    val trueAvg = BigInt("3000000000000000")
+    val highD = BigInt("4500000000000000") // +50% from average
+    val lowD = BigInt("1500000000000000") // −50% from average
+
+    val history = (0 until 1000).map(i => if i % 2 == 0 then lowD else highD)
+
+    // anchorNum = 100 so the gap (10,000 blocks) dominates: error in gap rate shows as > 20% total error.
+    // If anchorNum were 1M the base TD (accumulated) would swamp the gap contribution and mask the error.
+    val anchorNum = BigInt(100)
+    val anchorTD = trueAvg * anchorNum
+    val gap = BigInt(10_000)
+    val peerNum = anchorNum + gap
+    // Actual TD: the peer's gap blocks average trueAvg difficulty (constant-average scenario)
+    val actualTD = anchorTD + trueAvg * gap
+
+    // Old formula: head difficulty at flex-on peak (4500 TH) → ~49% overestimate of gap contribution
+    val oldEstimate = powScalingEstimate(anchorTD, highD, peerNum, anchorNum)
+    val oldErr = (oldEstimate - actualTD).abs.toDouble / actualTD.toDouble
+
+    // New formula: median of {500×1500, 500×4500} = (1500 + 4500) / 2 = 3000 TH → ~0% error
+    val newEstimate = rollingMedianEstimate(anchorTD, history, peerNum, anchorNum)
+    val newErr = (newEstimate - actualTD).abs.toDouble / actualTD.toDouble
+
+    oldErr should be > 0.20 // point-in-time formula at oscillation peak: ~49% overestimate
+    newErr should be < 0.20 // rolling-median formula: near-zero error
+  }
+
+  "ETH69-only era rolling median" should "average out alternating high/low difficulty to the true midpoint" taggedAs (
+    UnitTest,
+    NetworkTest
+  ) in {
+    val highD = BigInt("4000000000000000") // 4000 TH
+    val lowD = BigInt("2000000000000000") // 2000 TH
+    val expected = (highD + lowD) / 2 // 3000 TH — true midpoint
+
+    // 500 low blocks + 500 high blocks interleaved
+    val history = (0 until 1000).map(i => if i % 2 == 0 then lowD else highD)
+    val sorted = history.sorted
+    val mid = sorted.length / 2
+    val median = (sorted(mid - 1) + sorted(mid)) / 2
+
+    median shouldBe expected
+    median should be > lowD
+    median should be < highD
+  }
 // scalastyle:on magic.number

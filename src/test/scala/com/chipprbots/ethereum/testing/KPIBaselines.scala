@@ -20,7 +20,7 @@ import scala.concurrent.duration.*
   * @author
   *   Chippr Robotics Engineering Team
   */
-object KPIBaselines {
+object KPIBaselines:
 
   /** Baseline established date
     */
@@ -28,39 +28,35 @@ object KPIBaselines {
 
   /** Test execution time baselines
     */
-  object TestExecutionTime {
+  object TestExecutionTime:
 
     /** Tier 1: Essential Tests
       */
-    object Essential {
+    object Essential:
       val target: FiniteDuration = 5.minutes
       val warningThreshold: FiniteDuration = 7.minutes
       val failureThreshold: FiniteDuration = 10.minutes
       val baseline: FiniteDuration = 4.minutes // Typical execution time
-    }
 
     /** Tier 2: Standard Tests
       */
-    object Standard {
+    object Standard:
       val target: FiniteDuration = 30.minutes
       val warningThreshold: FiniteDuration = 40.minutes
       val failureThreshold: FiniteDuration = 60.minutes
       val baseline: FiniteDuration = 22.minutes // Typical execution time
-    }
 
     /** Tier 3: Comprehensive Tests
       */
-    object Comprehensive {
+    object Comprehensive:
       val target: FiniteDuration = 3.hours
       val warningThreshold: FiniteDuration = 4.hours
       val failureThreshold: FiniteDuration = 5.hours
       val baseline: FiniteDuration = 90.minutes // Typical execution time (Phase 2)
-    }
-  }
 
   /** Test health KPI baselines
     */
-  object TestHealth {
+  object TestHealth:
 
     /** Test success rate baseline (percentage)
       */
@@ -74,60 +70,53 @@ object KPIBaselines {
 
     /** Test coverage baselines (percentage)
       */
-    object Coverage {
+    object Coverage:
       val lineTarget: Double = 80.0
       val lineBaseline: Double = 75.0
 
       val branchTarget: Double = 70.0
       val branchBaseline: Double = 65.0
-    }
 
     /** Actor cleanup success rate (percentage)
       */
     val actorCleanupTarget: Double = 100.0
     val actorCleanupBaseline: Double = 100.0
-  }
 
   /** Ethereum/Tests compliance KPI baselines
     */
-  object EthereumTestsCompliance {
+  object EthereumTestsCompliance:
 
     /** GeneralStateTests pass rate (percentage)
       */
-    object GeneralStateTests {
+    object GeneralStateTests:
       val target: Double = 95.0
       val baseline: Double = 100.0 // SimpleTx tests (Phase 2)
-    }
 
     /** BlockchainTests pass rate (percentage)
       */
-    object BlockchainTests {
+    object BlockchainTests:
       val target: Double = 90.0
       val baseline: Double = 100.0 // SimpleTx tests (Phase 2)
-    }
 
     /** TransactionTests pass rate (percentage)
       */
-    object TransactionTests {
+    object TransactionTests:
       val target: Double = 95.0
       val baseline: Option[Double] = None // Pending Phase 3
-    }
 
     /** VMTests pass rate (percentage)
       */
-    object VMTests {
+    object VMTests:
       val target: Double = 95.0
       val baseline: Option[Double] = None // Pending Phase 3
-    }
-  }
 
   /** Performance benchmark baselines (in milliseconds)
     */
-  object PerformanceBenchmarks {
+  object PerformanceBenchmarks:
 
     /** Block validation timing baseline
       */
-    object BlockValidation {
+    object BlockValidation:
       val target: FiniteDuration = 100.millis
       val regressionThreshold: FiniteDuration = 120.millis
 
@@ -137,11 +126,10 @@ object KPIBaselines {
       val simpleTxBlock: Percentiles = Percentiles(60.millis, 90.millis, 120.millis)
       val complexTxBlock: Percentiles = Percentiles(80.millis, 130.millis, 180.millis)
       val fullBlock: Percentiles = Percentiles(95.millis, 160.millis, 220.millis)
-    }
 
     /** Transaction execution timing baseline
       */
-    object TransactionExecution {
+    object TransactionExecution:
       val simpleTransferTarget: FiniteDuration = 1.millis
       val contractCallTarget: FiniteDuration = 10.millis
       val regressionThreshold: FiniteDuration = 1.2.millis
@@ -152,11 +140,10 @@ object KPIBaselines {
       val contractCallSimple: Percentiles = Percentiles(2.millis, 4.millis, 6.millis)
       val contractCallComplex: Percentiles = Percentiles(8.millis, 15.millis, 25.millis)
       val contractCreation: Percentiles = Percentiles(12.millis, 20.millis, 30.millis)
-    }
 
     /** State root calculation timing baseline
       */
-    object StateRootCalculation {
+    object StateRootCalculation:
       val target: FiniteDuration = 50.millis
       val regressionThreshold: FiniteDuration = 60.millis
 
@@ -165,11 +152,10 @@ object KPIBaselines {
       val smallState: Percentiles = Percentiles(15.millis, 20.millis, 25.millis) // < 100 accounts
       val mediumState: Percentiles = Percentiles(40.millis, 50.millis, 60.millis) // 100-1000 accounts
       val largeState: Percentiles = Percentiles(100.millis, 150.millis, 200.millis) // 1000-10000 accounts
-    }
 
     /** RLP encoding/decoding timing baseline
       */
-    object RLPOperations {
+    object RLPOperations:
       val target: FiniteDuration = 100.micros
       val regressionThreshold: FiniteDuration = 120.micros
 
@@ -178,11 +164,10 @@ object KPIBaselines {
       val tinyPayload: Percentiles = Percentiles(10.micros, 20.micros) // < 100 bytes
       val smallPayload: Percentiles = Percentiles(30.micros, 50.micros) // < 1 KB
       val mediumPayload: Percentiles = Percentiles(100.micros, 150.micros) // 1-10 KB
-    }
 
     /** Cryptographic operations timing baseline
       */
-    object CryptoOperations {
+    object CryptoOperations:
       val target: FiniteDuration = 1.millis
       val regressionThreshold: FiniteDuration = 1.2.millis
 
@@ -192,11 +177,10 @@ object KPIBaselines {
       val ecdsaVerify: Percentiles = Percentiles(0.8.millis, 1.2.millis)
       val ecdsaRecover: Percentiles = Percentiles(1.0.millis, 1.5.millis)
       val keccak256Small: Percentiles = Percentiles(10.micros, 20.micros)
-    }
 
     /** Network operations timing baseline
       */
-    object NetworkOperations {
+    object NetworkOperations:
       val handshakeTarget: FiniteDuration = 500.millis
       val regressionThreshold: FiniteDuration = 600.millis
 
@@ -206,11 +190,10 @@ object KPIBaselines {
       val peerHandshakeRemote: Percentiles = Percentiles(300.millis, 500.millis)
       val messageEncode: Percentiles = Percentiles(200.micros, 500.micros)
       val messageDecode: Percentiles = Percentiles(300.micros, 600.micros)
-    }
 
     /** Database operations timing baseline
       */
-    object DatabaseOperations {
+    object DatabaseOperations:
       val target: FiniteDuration = 1.millis
       val regressionThreshold: FiniteDuration = 1.2.millis
 
@@ -220,12 +203,10 @@ object KPIBaselines {
       val singlePut: Percentiles = Percentiles(200.micros, 500.micros)
       val batchGet10: Percentiles = Percentiles(500.micros, 1.millis)
       val batchPut10: Percentiles = Percentiles(1.millis, 2.millis)
-    }
-  }
 
   /** Memory usage baselines (in megabytes)
     */
-  object MemoryBaselines {
+  object MemoryBaselines:
     val heapTarget: Int = 2048 // MB
     val regressionThreshold: Int = 2400 // MB (20% over target)
 
@@ -242,11 +223,10 @@ object KPIBaselines {
     val gcOverheadTarget: Double = 5.0
     val gcOverheadBaseline: Double = 2.5
     val gcOverheadThreshold: Double = 6.0
-  }
 
   /** Helper methods for baseline validation
     */
-  object Validation {
+  object Validation:
 
     /** Check if a duration is within baseline target
       */
@@ -267,7 +247,6 @@ object KPIBaselines {
       */
     def isPercentageWithinTarget(actual: Double, target: Double, tolerance: Double = 5.0): Boolean =
       Math.abs(actual - target) <= tolerance
-  }
 
   /** Formatted baseline summary for reporting
     */
@@ -300,4 +279,3 @@ object KPIBaselines {
        |  Heap Target:         ${MemoryBaselines.heapTarget} MB
        |  GC Overhead:         ${MemoryBaselines.gcOverheadBaseline}% (target: ${MemoryBaselines.gcOverheadTarget}%)
        |""".stripMargin
-}

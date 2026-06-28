@@ -5,8 +5,8 @@ import java.util.Base64
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for ENR parsing in DnsDiscovery.
   *
@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.testing.Tags._
   *
   * ENR structure: RLP([signature(64), seq, k1, v1, k2, v2, ...]) URL-safe base64 (no padding) after "enr:" prefix.
   */
-class DnsDiscoveryEnrSpec extends AnyFlatSpec with Matchers {
+class DnsDiscoveryEnrSpec extends AnyFlatSpec with Matchers:
 
   // secp256k1 generator point G in compressed form (33 bytes: 0x02 + x-coordinate).
   // Using G makes every test independent of key generation — it's a canonical valid point.
@@ -61,7 +61,7 @@ class DnsDiscoveryEnrSpec extends AnyFlatSpec with Matchers {
       udp: Option[Array[Byte]] = None,
       pubkey: Array[Byte] = validCompressedKey,
       extraFields: Seq[RLPEncodeable] = Nil
-  ): String = {
+  ): String =
     val base: Seq[RLPEncodeable] = Seq(
       RLPValue(Array.fill(64)(0.toByte)), // signature placeholder
       RLPValue(Array(0.toByte)), // seq = 0
@@ -75,9 +75,8 @@ class DnsDiscoveryEnrSpec extends AnyFlatSpec with Matchers {
       Seq(RLPValue("udp".getBytes("UTF-8")), RLPValue(u))
     } ++ extraFields
 
-    val bytes = encode(RLPList(base: _*))
+    val bytes = encode(RLPList(base*))
     "enr:" + Base64.getUrlEncoder.withoutPadding.encodeToString(bytes)
-  }
 
   "parseEnrToEnode" should "parse a minimal valid IPv4 ENR" taggedAs UnitTest in {
     val enr = buildEnr()
@@ -275,4 +274,3 @@ class DnsDiscoveryEnrSpec extends AnyFlatSpec with Matchers {
     (nodeId should have).length(128)
     all(nodeId.toCharArray) should ((be >= '0').and(be <= 'f')) // hex chars
   }
-}

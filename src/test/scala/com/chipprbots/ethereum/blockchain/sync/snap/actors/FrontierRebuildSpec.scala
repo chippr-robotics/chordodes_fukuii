@@ -1,13 +1,13 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
+import java.nio.ByteBuffer
+
 import org.apache.pekko.util.ByteString
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
-
-import java.nio.ByteBuffer
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for the heap-bounded `visited` set used by the post-SNAP frontier-rebuild DFS
   * (`TrieNodeHealingCoordinator.boundedVisitedSet`).
@@ -17,7 +17,7 @@ import java.nio.ByteBuffer
   * earliest-completed subtries dropped first). Completeness of the rebuilt frontier (INV-1) is provided independently
   * by `pendingHashSet` de-duplication and is exercised by the coordinator-level healing tests.
   */
-class FrontierRebuildSpec extends AnyFlatSpec with Matchers {
+class FrontierRebuildSpec extends AnyFlatSpec with Matchers:
 
   private def hash(i: Int): ByteString =
     ByteString(ByteBuffer.allocate(4).putInt(i).array())
@@ -65,4 +65,3 @@ class FrontierRebuildSpec extends AnyFlatSpec with Matchers {
   }
 
   private def forCaps(caps: Seq[Int])(check: Int => Unit): Unit = caps.foreach(check)
-}

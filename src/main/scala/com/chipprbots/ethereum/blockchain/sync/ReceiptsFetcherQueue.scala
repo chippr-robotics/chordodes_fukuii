@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import scala.collection.mutable
-
 import org.apache.pekko.util.ByteString
+
+import scala.collection.mutable
 
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.network.PeerId
@@ -21,9 +21,9 @@ import com.chipprbots.ethereum.utils.Logger
   *
   * Reference: go-ethereum/eth/downloader/queue.go — receiptTaskQueue
   */
-class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetReceipts, Receipts68] with Logger {
+class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetReceipts, Receipts68] with Logger:
 
-  import ReceiptsFetcherQueue._
+  import ReceiptsFetcherQueue.*
 
   private val pendingQueue = mutable.Queue[ByteString]()
   private val inFlightMap = mutable.Map[PeerId, InFlightEntry]()
@@ -53,7 +53,7 @@ class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[Get
       .max(1)
 
   def reserve(peer: PeerWithInfo, items: Int): Option[GetReceipts] = synchronized {
-    if (pendingQueue.isEmpty) return None
+    if pendingQueue.isEmpty then return None
 
     val count = items.min(MaxReceiptsPerRequest).min(pendingQueue.size)
     val taken = (0 until count).map(_ => pendingQueue.dequeue()).toVector
@@ -82,7 +82,7 @@ class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[Get
   }
 
   def deliver(peer: PeerWithInfo, resp: Receipts68, elapsedMs: Long): DeliveryResult = synchronized {
-    inFlightMap.get(peer.peer.id) match {
+    inFlightMap.get(peer.peer.id) match
       case None =>
         DeliveryResult.Duplicate
 
@@ -101,7 +101,6 @@ class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[Get
             s"elapsed=${elapsedMs}ms, pending=${pendingQueue.size}"
         )
         DeliveryResult.Delivered(blockCount)
-    }
   }
 
   def expireStale(nowMs: Long): Seq[(PeerId, GetReceipts)] = synchronized {
@@ -124,14 +123,11 @@ class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[Get
       taken: Vector[ByteString],
       sentMs: Long,
       deadlineMs: Long
-  ) {
+  ):
     def snapshot: InFlightRequest[GetReceipts] =
       InFlightRequest(req, peer, sentMs, deadlineMs)
-  }
-}
 
-object ReceiptsFetcherQueue {
+object ReceiptsFetcherQueue:
 
   /** ETH protocol maximum receipt batches per request (matches go-ethereum/eth/handler.go maxReceiptsServe). */
   val MaxReceiptsPerRequest: Int = 256
-}

@@ -3,7 +3,7 @@ package com.chipprbots.scalanet.peergroup
 import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.std.Queue
-import cats.implicits._
+import cats.implicits.*
 
 import scala.util.Left
 import scala.util.Right

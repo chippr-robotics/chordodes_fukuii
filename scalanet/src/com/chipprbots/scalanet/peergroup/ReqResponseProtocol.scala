@@ -9,19 +9,19 @@ import cats.effect.IO
 import cats.effect.Ref
 import cats.effect.Resource
 import cats.effect.std.Semaphore
-import cats.implicits._
+import cats.implicits.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.scalanet.crypto.CryptoUtils
 import com.chipprbots.scalanet.peergroup.Channel.ChannelEvent
 import com.chipprbots.scalanet.peergroup.Channel.MessageReceived
-import com.chipprbots.scalanet.peergroup.ReqResponseProtocol._
+import com.chipprbots.scalanet.peergroup.ReqResponseProtocol.*
 import com.chipprbots.scalanet.peergroup.dynamictls.DynamicTLSPeerGroup
 import com.chipprbots.scalanet.peergroup.dynamictls.DynamicTLSPeerGroup.FramingConfig
 import com.chipprbots.scalanet.peergroup.dynamictls.DynamicTLSPeerGroup.PeerInfo
 import com.chipprbots.scalanet.peergroup.dynamictls.Secp256k1
-import com.chipprbots.scalanet.peergroup.implicits._
+import com.chipprbots.scalanet.peergroup.implicits.*
 import com.chipprbots.scalanet.peergroup.udp.DynamicUDPPeerGroup
 import scodec.Codec
 

@@ -1,103 +1,103 @@
 package com.chipprbots.ethereum.faucet
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
-import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.faucet.FaucetHandler.WalletException
 import com.chipprbots.ethereum.faucet.FaucetStatus.WalletAvailable
 import com.chipprbots.ethereum.faucet.jsonrpc.WalletService
 import com.chipprbots.ethereum.keystore.KeyStore.KeyStoreError
 import com.chipprbots.ethereum.keystore.Wallet
 
-class FaucetHandler(walletService: WalletService, config: FaucetConfig)(using runtime: IORuntime)
-    extends Actor
-    with ActorLogging {
+object FaucetHandler:
 
-  import FaucetHandler.FaucetHandlerMsg._
-  import FaucetHandler.FaucetHandlerResponse._
+  sealed trait Command
+  object Command:
+    case class Status(replyTo: ActorRef[FaucetHandlerResponse]) extends Command
+    private[faucet] case object Initialize extends Command
+    case class SendFunds(address: Address, replyTo: ActorRef[FaucetHandlerResponse]) extends Command
 
-  override def preStart(): Unit =
-    self ! Initialization
-
-  override def receive: Receive = unavailable()
-
-  private def unavailable(): Receive = {
-    case Status =>
-      sender() ! StatusResponse(FaucetStatus.FaucetUnavailable)
-
-    case Initialization =>
-      log.info("Initialization called (faucet unavailable)")
-      walletService.getWallet.unsafeRunSync() match {
-        case Left(error) =>
-          log.debug(s"Couldn't initialize wallet - error: $error")
-          throw new WalletException(error)
-        case Right(wallet) =>
-          log.info("Faucet initialization succeeded")
-          context.become(available(wallet))
-      }
-    case SendFunds(addressTo: Address) =>
-      log.info(
-        s"SendFunds called, to: $addressTo, value: ${config.txValue}, gas price: ${config.txGasPrice}," +
-          s" gas limit: ${config.txGasLimit} (faucet unavailable)"
-      )
-      sender() ! FaucetIsUnavailable
-  }
-
-  private def available(wallet: Wallet): Receive = {
-    case Status =>
-      val respondTo = sender()
-      respondTo ! StatusResponse(WalletAvailable)
-
-    case Initialization =>
-      log.debug("Initialization called (faucet available)")
-      sender() ! FaucetIsAlreadyAvailable
-
-    case SendFunds(addressTo: Address) =>
-      log.info(
-        s"SendFunds called, to: $addressTo, value: ${config.txValue}, gas price: ${config.txGasPrice}, gas limit: ${config.txGasLimit} (faucet available)"
-      )
-      val respondTo = sender()
-      // We Only consider the request fail if we found out
-      // wallet is not properly initialized
-      walletService
-        .sendFunds(wallet, addressTo)
-        .map {
-          case Right(txHash) =>
-            respondTo ! TransactionSent(txHash)
-          case Left(error) =>
-            respondTo ! WalletRpcClientError(error.msg)
-        }
-        .unsafeRunAndForget()
-  }
-}
-
-object FaucetHandler {
-
-  sealed abstract class FaucetHandlerMsg
-  object FaucetHandlerMsg {
-    case object Status extends FaucetHandlerMsg
-    case object Initialization extends FaucetHandlerMsg
-    case class SendFunds(address: Address) extends FaucetHandlerMsg
-  }
   sealed trait FaucetHandlerResponse
-  object FaucetHandlerResponse {
+  object FaucetHandlerResponse:
     case class StatusResponse(status: FaucetStatus) extends FaucetHandlerResponse
     case object FaucetIsUnavailable extends FaucetHandlerResponse
-    case object FaucetIsAlreadyAvailable extends FaucetHandlerResponse
     case class WalletRpcClientError(error: String) extends FaucetHandlerResponse
     case class TransactionSent(txHash: ByteString) extends FaucetHandlerResponse
-  }
 
   class WalletException(keyStoreError: KeyStoreError) extends RuntimeException(keyStoreError.toString)
 
-  def props(walletRpcClient: WalletService, config: FaucetConfig)(using runtime: IORuntime): Props = Props(
-    new FaucetHandler(walletRpcClient, config)
-  )
-
   val name: String = "FaucetHandler"
-}
+
+  def apply(walletService: WalletService, config: FaucetConfig, shutdown: () => Unit)(using
+      runtime: IORuntime
+  ): Behavior[Command] =
+    Behaviors.setup { ctx =>
+      ctx.self ! Command.Initialize
+      unavailable(walletService, config, shutdown)
+    }
+
+  private[faucet] def testBehavior(walletService: WalletService, config: FaucetConfig, shutdown: () => Unit)(using
+      runtime: IORuntime
+  ): Behavior[Command] =
+    unavailable(walletService, config, shutdown)
+
+  private def unavailable(walletService: WalletService, config: FaucetConfig, shutdown: () => Unit)(using
+      runtime: IORuntime
+  ): Behavior[Command] =
+    Behaviors.receive { (ctx, msg) =>
+      msg match
+        case Command.Status(replyTo) =>
+          replyTo ! FaucetHandlerResponse.StatusResponse(FaucetStatus.FaucetUnavailable)
+          Behaviors.same
+
+        case Command.Initialize =>
+          ctx.log.info("Initialization called (faucet unavailable)")
+          walletService.getWallet.unsafeRunSync() match
+            case Left(error) =>
+              ctx.log.debug(s"Couldn't initialize wallet - error: $error")
+              shutdown()
+              throw new WalletException(error)
+            case Right(wallet) =>
+              ctx.log.info("Faucet initialization succeeded")
+              available(walletService, wallet, config)
+
+        case Command.SendFunds(addressTo, replyTo) =>
+          ctx.log.info(
+            s"SendFunds called, to: $addressTo, value: ${config.txValue}, gas price: ${config.txGasPrice}," +
+              s" gas limit: ${config.txGasLimit} (faucet unavailable)"
+          )
+          replyTo ! FaucetHandlerResponse.FaucetIsUnavailable
+          Behaviors.same
+    }
+
+  private def available(walletService: WalletService, wallet: Wallet, config: FaucetConfig)(using
+      runtime: IORuntime
+  ): Behavior[Command] =
+    Behaviors.receive { (ctx, msg) =>
+      msg match
+        case Command.Status(replyTo) =>
+          replyTo ! FaucetHandlerResponse.StatusResponse(WalletAvailable)
+          Behaviors.same
+
+        case Command.Initialize =>
+          ctx.log.debug("Initialization called (faucet available)")
+          Behaviors.same
+
+        case Command.SendFunds(addressTo, replyTo) =>
+          ctx.log.info(
+            s"SendFunds called, to: $addressTo, value: ${config.txValue}, gas price: ${config.txGasPrice}," +
+              s" gas limit: ${config.txGasLimit} (faucet available)"
+          )
+          walletService
+            .sendFunds(wallet, addressTo)
+            .map {
+              case Right(txHash) => replyTo ! FaucetHandlerResponse.TransactionSent(txHash)
+              case Left(error)   => replyTo ! FaucetHandlerResponse.WalletRpcClientError(error.msg)
+            }
+            .unsafeRunAndForget()
+          Behaviors.same
+    }

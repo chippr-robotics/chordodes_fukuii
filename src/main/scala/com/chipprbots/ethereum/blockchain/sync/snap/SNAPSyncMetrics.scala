@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.metrics.MetricsContainer
   *
   * Metrics are exposed via Prometheus endpoint and can be visualized in Grafana.
   */
-object SNAPSyncMetrics extends MetricsContainer {
+object SNAPSyncMetrics extends MetricsContainer:
 
   // ===== Sync Phase Metrics =====
 
@@ -385,18 +385,18 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setPhaseTime(seconds: Double): Unit = PhaseTimeSecondsGauge.set(seconds)
 
   /** Record full sync progress from SyncProgress object */
-  def measure(progress: SyncProgress): Unit = {
+  def measure(progress: SyncProgress): Unit =
     // Phase
-    val phaseValue = progress.phase match {
-      case SNAPSyncController.Idle                    => 0
-      case SNAPSyncController.AccountRangeSync        => 1
-      case SNAPSyncController.ByteCodeAndStorageSync  => 3
-      case SNAPSyncController.StateHealing            => 5
-      case SNAPSyncController.StateValidation         => 6
-      case SNAPSyncController.ChainDownloadCompletion => 7
-      case SNAPSyncController.Completed               => 8
-      case SNAPSyncController.Dormant                 => 9
-    }
+    import SNAPSyncController.SyncPhase.*
+    val phaseValue = progress.phase match
+      case Idle                    => 0
+      case AccountRangeSync        => 1
+      case ByteCodeAndStorageSync  => 3
+      case StateHealing            => 5
+      case StateValidation         => 6
+      case ChainDownloadCompletion => 7
+      case Completed               => 8
+      case Dormant                 => 9
     setCurrentPhase(phaseValue)
 
     // Accounts
@@ -428,7 +428,6 @@ object SNAPSyncMetrics extends MetricsContainer {
 
     val phaseSeconds = (System.currentTimeMillis() - progress.phaseStartTime) / 1000.0
     setPhaseTime(phaseSeconds)
-  }
 
   // ===== Timers for Download Operations =====
 
@@ -473,7 +472,7 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setHealingPrunedDurationMs(ms: Long): Unit = HealingPrunedDurationMsGauge.set(ms)
 
   // spec 004 C9/T019 — decoupled heal serve-root (observation-only)
-  def setHealingDecoupledEngaged(engaged: Boolean): Unit = HealingDecoupledEngagedGauge.set(if (engaged) 1L else 0L)
+  def setHealingDecoupledEngaged(engaged: Boolean): Unit = HealingDecoupledEngagedGauge.set(if engaged then 1L else 0L)
   def setHealingWalkRoot(shortLabel: Long): Unit = HealingWalkRootGauge.set(shortLabel)
   def setHealingServeRoot(shortLabel: Long): Unit = HealingServeRootGauge.set(shortLabel)
   def setHealingCrossRootHeals(count: Long): Unit = HealingCrossRootHealsGauge.set(count)
@@ -497,11 +496,11 @@ object SNAPSyncMetrics extends MetricsContainer {
   // ===== Backpressure / Pivot / Peer-Pool Metrics (PR #1233, #1237, #1239, #1241, #1242) =====
 
   def setStorageQueueDepth(depth: Long): Unit = StorageQueueDepthGauge.set(depth)
-  def setStorageBackpressure(engaged: Boolean): Unit = StorageBackpressureGauge.set(if (engaged) 1L else 0L)
+  def setStorageBackpressure(engaged: Boolean): Unit = StorageBackpressureGauge.set(if engaged then 1L else 0L)
   def setStoragePendingTries(count: Long): Unit = StoragePendingTriesGauge.set(count)
 
   def setByteCodeQueueDepth(depth: Long): Unit = ByteCodeQueueDepthGauge.set(depth)
-  def setByteCodeBackpressure(engaged: Boolean): Unit = ByteCodeBackpressureGauge.set(if (engaged) 1L else 0L)
+  def setByteCodeBackpressure(engaged: Boolean): Unit = ByteCodeBackpressureGauge.set(if engaged then 1L else 0L)
 
   def incrementPivotRefreshed(): Unit = PivotRefreshedCounter.increment()
   def incrementLaggingPeerEvicted(): Unit = LaggingPeerEvictedCounter.increment()
@@ -511,4 +510,3 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setAccountActivePeers(count: Int): Unit = AccountActivePeersGauge.set(count.toLong)
   def setStorageActivePeers(count: Int): Unit = StorageActivePeersGauge.set(count.toLong)
   def setByteCodeActivePeers(count: Int): Unit = ByteCodeActivePeersGauge.set(count.toLong)
-}

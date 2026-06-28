@@ -2,21 +2,21 @@ package com.chipprbots.ethereum.mpt
 
 import java.util.concurrent.Executors
 
+import org.apache.pekko.util.ByteString
+
 import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
-
-import org.apache.pekko.util.ByteString
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
-import com.chipprbots.ethereum.testing.Tags._
 
 /** Tests for [[StackTrie]].
   *
@@ -24,36 +24,33 @@ import com.chipprbots.ethereum.testing.Tags._
   * `StackTrie.hash()` must produce the same 32-byte root hash as inserting the same pairs into a [[MerklePatriciaTrie]]
   * backed by an arbitrary `MptStorage`. The MerklePatriciaTrie is the reference oracle.
   */
-class StackTrieSpec extends AnyFlatSpec with Matchers {
+class StackTrieSpec extends AnyFlatSpec with Matchers:
 
   // ---- helpers ----
 
   /** Implicit serializer used by the reference MerklePatriciaTrie tests below. */
   implicit private val byteArraySerializer: com.chipprbots.ethereum.mpt.ByteArraySerializable[Array[Byte]] =
-    new com.chipprbots.ethereum.mpt.ByteArraySerializable[Array[Byte]] {
+    new com.chipprbots.ethereum.mpt.ByteArraySerializable[Array[Byte]]:
       def toBytes(input: Array[Byte]): Array[Byte] = input
       def fromBytes(bytes: Array[Byte]): Array[Byte] = bytes
-    }
 
   /** Build a reference MPT root for the given (key, value) pairs. */
-  private def referenceRoot(pairs: Seq[(Array[Byte], Array[Byte])]): Array[Byte] = {
+  private def referenceRoot(pairs: Seq[(Array[Byte], Array[Byte])]): Array[Byte] =
     var trie: MerklePatriciaTrie[Array[Byte], Array[Byte]] =
       MerklePatriciaTrie[Array[Byte], Array[Byte]](new TestMptStorage())
     pairs.foreach { case (k, v) => trie = trie.put(k, v) }
     trie.getRootHash
-  }
 
   /** Build a StackTrie root for the same pairs, discarding emitted nodes. */
-  private def stackTrieRoot(pairs: Seq[(Array[Byte], Array[Byte])]): Array[Byte] = {
+  private def stackTrieRoot(pairs: Seq[(Array[Byte], Array[Byte])]): Array[Byte] =
     val st = new StackTrie((_, _, _) => ())
     pairs.foreach { case (k, v) => st.update(k, v) }
     st.hash().toArray
-  }
 
   /** Build a StackTrie and collect every emitted node into a hash → blob map. */
   private def stackTrieWithEmissions(
       pairs: Seq[(Array[Byte], Array[Byte])]
-  ): (Array[Byte], Map[ByteString, Array[Byte]]) = {
+  ): (Array[Byte], Map[ByteString, Array[Byte]]) =
     val collected = mutable.LinkedHashMap.empty[ByteString, Array[Byte]]
     val st = new StackTrie((_, hash, blob) =>
       // Defensive: callers must deep-copy if they want to retain the blob.
@@ -62,14 +59,13 @@ class StackTrieSpec extends AnyFlatSpec with Matchers {
     pairs.foreach { case (k, v) => st.update(k, v) }
     val root = st.hash().toArray
     (root, collected.toMap)
-  }
 
   /** Sort a sequence of (key, value) pairs by big-endian unsigned key. */
   private def sortByKey(pairs: Seq[(Array[Byte], Array[Byte])]): Seq[(Array[Byte], Array[Byte])] =
     pairs.sortWith { case ((a, _), (b, _)) => StackTrie.byteCompare(a, b) < 0 }
 
   /** Generate `n` (32-byte hash, value-bytes) pairs with the given seed. */
-  private def generatedPairs(n: Int, seed: Long): Seq[(Array[Byte], Array[Byte])] = {
+  private def generatedPairs(n: Int, seed: Long): Seq[(Array[Byte], Array[Byte])] =
     val rng = new Random(seed)
     val raw = (0 until n).map { _ =>
       val k = new Array[Byte](32); rng.nextBytes(k)
@@ -77,22 +73,19 @@ class StackTrieSpec extends AnyFlatSpec with Matchers {
       (k, v)
     }
     sortByKey(raw)
-  }
 
   /** Expand a key's bytes to hex nibbles (0–15 per byte), matching `HexPrefix.bytesToNibbles`. Used to drive the
     * [[ProofTrieInserter]] insert/hash path, which consumes nibble-arrays directly.
     */
-  private def toNibbles(key: Array[Byte]): Array[Byte] = {
+  private def toNibbles(key: Array[Byte]): Array[Byte] =
     val out = new Array[Byte](key.length * 2)
     var i = 0
-    while (i < key.length) {
+    while i < key.length do
       val b = key(i) & 0xff
       out(2 * i) = ((b >>> 4) & 0x0f).toByte
       out(2 * i + 1) = (b & 0x0f).toByte
       i += 1
-    }
     out
-  }
 
   // ---- empty trie ----
 
@@ -307,7 +300,7 @@ class StackTrieSpec extends AnyFlatSpec with Matchers {
   // diverge from the MerklePatriciaTrie oracle and/or some emitted `kec256(blob) != hash`.
 
   /** Assert StackTrie root == MPT oracle AND every emitted (hash, blob) satisfies kec256(blob) == hash. */
-  private def assertRootAndEmissions(pairs: Seq[(Array[Byte], Array[Byte])]): Unit = {
+  private def assertRootAndEmissions(pairs: Seq[(Array[Byte], Array[Byte])]): Unit =
     val (root, emissions) = stackTrieWithEmissions(pairs)
     root shouldEqual referenceRoot(pairs)
     emissions.foreach { case (hash, blob) =>
@@ -315,7 +308,6 @@ class StackTrieSpec extends AnyFlatSpec with Matchers {
     }
     // Distinct hashes (content-addressed nodes never collide on distinct content).
     emissions.keys.toSeq.distinct.size shouldEqual emissions.size
-  }
 
   it should "match MerklePatriciaTrie for a smaller meaningful sorted-key set with per-node hash equality" taggedAs UnitTest in {
     // 2 000 sequential 32-byte keys (high prefix collision → deep branch/ext structure), pinned seed.
@@ -395,7 +387,7 @@ class StackTrieSpec extends AnyFlatSpec with Matchers {
 
     val pool = Executors.newFixedThreadPool(4)
     implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(pool)
-    try {
+    try
       val futures: Seq[Future[(Long, Seq[Byte])]] = corpora.map { case (s, pairs) =>
         Future {
           // A fresh StackTrie per task — this is the thread-confined contract.
@@ -409,6 +401,5 @@ class StackTrieSpec extends AnyFlatSpec with Matchers {
       results.foreach { case (s, root) =>
         root shouldEqual oracleRoots(s)
       }
-    } finally pool.shutdownNow()
+    finally pool.shutdownNow()
   }
-}

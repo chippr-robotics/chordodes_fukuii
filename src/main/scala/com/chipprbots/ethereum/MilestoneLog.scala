@@ -8,16 +8,15 @@ import com.chipprbots.ethereum.utils.Logger
   * Besu reference: ProtocolScheduleBuilder.java — `LOG.info("Protocol schedule created with milestones: {}", ...)` Only
   * activated forks (block number != Long.MaxValue) are included in the output.
   */
-object MilestoneLog extends Logger {
+object MilestoneLog extends Logger:
 
   def logMilestones(forkBlockNumbers: ForkBlockNumbers): Unit =
     log.info("Protocol schedule milestones: {}", formatMilestones(forkBlockNumbers))
 
-  private[ethereum] def formatMilestones(forkBlockNumbers: ForkBlockNumbers): String = {
+  private[ethereum] def formatMilestones(forkBlockNumbers: ForkBlockNumbers): String =
     val active = namedMilestones(forkBlockNumbers).filter { case (_, block) => block != Long.MaxValue }
-    if (active.isEmpty) "[]"
+    if active.isEmpty then "[]"
     else active.map { case (name, block) => s"$name:$block" }.mkString("[", ", ", "]")
-  }
 
   private def namedMilestones(f: ForkBlockNumbers): Seq[(String, BigInt)] = Seq(
     "Frontier" -> f.frontierBlockNumber,
@@ -45,4 +44,3 @@ object MilestoneLog extends Logger {
     "Spiral" -> f.spiralBlockNumber,
     "Olympia" -> f.olympiaBlockNumber
   )
-}

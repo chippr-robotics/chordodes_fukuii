@@ -11,33 +11,29 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.utils.ByteStringUtils.hash2string
 import com.chipprbots.ethereum.utils.Logger
 
-class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
+class BranchResolution(blockchainReader: BlockchainReader) extends Logger:
 
   /** Optional MESS config for anti-reorg protection. Set by SyncController when configured. */
   private[ethereum] var messConfig: Option[MESSConfig] = None
 
   def resolveBranch(headers: NonEmptyList[BlockHeader]): BranchResolutionResult =
-    if (!doHeadersFormChain(headers)) {
-      InvalidBranch
-    } else {
+    if !doHeadersFormChain(headers) then InvalidBranch
+    else
       val knownParentOrGenesis = blockchainReader
         .isInChain(
-          blockchainReader.getBestBranch(),
+          blockchainReader.getBestBranch,
           headers.head.parentHash
         ) || headers.head.hash == blockchainReader.genesisHeader.hash
 
-      if (!knownParentOrGenesis)
-        UnknownBranch
-      else
-        compareBranch(headers)
-    }
+      if !knownParentOrGenesis then UnknownBranch
+      else compareBranch(headers)
 
   private[ledger] def doHeadersFormChain(headers: NonEmptyList[BlockHeader]): Boolean =
     headers.toList.zip(headers.tail).forall { case (parent, child) =>
       parent.hash == child.parentHash && parent.number + 1 == child.number
     }
 
-  private[ledger] def compareBranch(headers: NonEmptyList[BlockHeader]): BranchResolutionResult = {
+  private[ledger] def compareBranch(headers: NonEmptyList[BlockHeader]): BranchResolutionResult =
     val headersList = headers.toList
     val oldBlocksWithCommonPrefix = getTopBlocksFromNumber(headers.head.number)
 
@@ -59,7 +55,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
             .toRight(s"ChainWeight for ${header.idTag} not found when resolving branch: $newHeaders")
         }
 
-    maybeParentWeight match {
+    maybeParentWeight match
       case Some(Right(parentWeight)) =>
         val oldWeight = oldBlocks.foldLeft(parentWeight) { (w, b) =>
           w.increase(b.header)
@@ -68,21 +64,16 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
           w.increase(h)
         }
 
-        if (newWeight > oldWeight) {
+        if newWeight > oldWeight then
           // New branch has higher TD — check MESS anti-reorg protection
-          if (shouldMessReject(oldBlocks, newHeaders)) {
-            NoChainSwitch
-          } else {
-            NewBetterBranch(oldBlocks)
-          }
-        } else if (newWeight == oldWeight && newHeaders.nonEmpty && oldBlocks.isEmpty) {
+          if shouldMessReject(oldBlocks, newHeaders) then NoChainSwitch
+          else NewBetterBranch(oldBlocks)
+        else if newWeight == oldWeight && newHeaders.nonEmpty && oldBlocks.isEmpty then
           // Post-merge: all blocks have difficulty=0, so weight never increases.
           // If the new branch extends the chain without conflicting (no old blocks to replace),
           // accept it. This is the normal case for regular sync importing new blocks.
           NewBetterBranch(Nil)
-        } else {
-          NoChainSwitch
-        }
+        else NoChainSwitch
 
       case Some(Left(err)) =>
         log.error(err)
@@ -92,8 +83,6 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
         // after removing common prefix both 'new' and 'old` were empty
         log.warn("Attempted to compare identical branches")
         NoChainSwitch
-    }
-  }
 
   /** Check if MESS should reject the proposed reorg.
     *
@@ -104,10 +93,10 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
       oldBlocks: List[Block],
       newHeaders: List[BlockHeader]
   ): Boolean =
-    messConfig match {
+    messConfig match
       case Some(config) if oldBlocks.nonEmpty =>
         val currentHeadNumber = oldBlocks.last.header.number
-        if (!config.isActiveAtBlock(currentHeadNumber)) return false
+        if !config.isActiveAtBlock(currentHeadNumber) then return false
 
         val commonAncestorTimestamp = blockchainReader
           .getBlockHeaderByHash(oldBlocks.head.header.parentHash)
@@ -117,8 +106,8 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
         val currentHeadTimestamp = oldBlocks.last.header.unixTimestamp
         val timeDeltaSeconds = math.max(0L, currentHeadTimestamp - commonAncestorTimestamp)
 
-        val localSubchainTD = oldBlocks.map(_.header.difficulty).foldLeft(BigInt(0))(_ + _)
-        val proposedSubchainTD = newHeaders.map(_.difficulty).foldLeft(BigInt(0))(_ + _)
+        val localSubchainTD = oldBlocks.map(_.header.difficulty.value).foldLeft(BigInt(0))(_ + _)
+        val proposedSubchainTD = newHeaders.map(_.difficulty.value).foldLeft(BigInt(0))(_ + _)
 
         val shouldReject = ArtificialFinality.shouldRejectReorg(timeDeltaSeconds, localSubchainTD, proposedSubchainTD)
 
@@ -126,7 +115,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
         val polyVal = ArtificialFinality.polynomialV(BigInt(timeDeltaSeconds))
         val want = polyVal * localSubchainTD
         val got = proposedSubchainTD * BigInt(128)
-        val tdrRatio = if (want > 0) got.toDouble / want.toDouble else 0.0
+        val tdrRatio = if want > 0 then got.toDouble / want.toDouble else 0.0
 
         val commonAncestorNumber = oldBlocks.head.header.number - 1
         val commonAncestorHash = oldBlocks.head.header.parentHash
@@ -135,41 +124,36 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
         val proposedSpanSeconds = math.max(0L, proposedTip.unixTimestamp - commonAncestorTimestamp)
 
         BlockMetrics.setMessGravity(tdrRatio)
-        if (shouldReject) {
+        if shouldReject then
           BlockMetrics.incrementMessRejected()
           log.warn(
             s"ECBP1100-MESS status=rejected age=${timeDeltaSeconds}s span.proposed=${proposedSpanSeconds}s " +
               s"tdr/gravity=${f"$tdrRatio%.4f"} " +
-              s"common.bno=$commonAncestorNumber common.hash=${hash2string(commonAncestorHash).take(8)} " +
-              s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash).take(8)} " +
-              s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash).take(8)}"
+              s"common.bno=$commonAncestorNumber common.hash=${hash2string(commonAncestorHash.value).take(8)} " +
+              s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash.value).take(8)} " +
+              s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash.value).take(8)}"
           )
-        } else if (currentHead.number - commonAncestorNumber > 2) {
+        else if currentHead.number - commonAncestorNumber > 2 then
           // Log MESS acceptance only for non-trivial reorgs (> 2 blocks), matching core-geth forkchoice.go:177
           BlockMetrics.incrementMessAccepted()
           log.info(
             s"ECBP1100-MESS status=accepted age=${timeDeltaSeconds}s span.proposed=${proposedSpanSeconds}s " +
               s"tdr/gravity=${f"$tdrRatio%.4f"} " +
-              s"common.bno=$commonAncestorNumber common.hash=${hash2string(commonAncestorHash).take(8)} " +
-              s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash).take(8)} " +
-              s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash).take(8)}"
+              s"common.bno=$commonAncestorNumber common.hash=${hash2string(commonAncestorHash.value).take(8)} " +
+              s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash.value).take(8)} " +
+              s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash.value).take(8)}"
           )
-        } else {
-          BlockMetrics.incrementMessAccepted()
-        }
+        else BlockMetrics.incrementMessAccepted()
 
         shouldReject
 
       case _ => false
-    }
 
-  private def getTopBlocksFromNumber(from: BigInt): List[Block] = {
-    val bestBranch = blockchainReader.getBestBranch()
-    (from to blockchainReader.getBestBlockNumber())
+  private def getTopBlocksFromNumber(from: BigInt): List[Block] =
+    val bestBranch = blockchainReader.getBestBranch
+    (from to blockchainReader.getBestBlockNumber)
       .flatMap(nb => blockchainReader.getBlockByNumber(bestBranch, nb))
       .toList
-  }
-}
 
 sealed trait BranchResolutionResult
 

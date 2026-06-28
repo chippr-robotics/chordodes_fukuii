@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.event.Logging._
+import org.apache.pekko.event.Logging.*
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -9,13 +9,13 @@ import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for NewBlockImportMessages log format.
   *
   * Verifies: reorg log levels (core-geth vocabulary), field presence, large-reorg threshold, importedToTheTop fields.
   */
-class ImportMessagesSpec extends AnyWordSpec with Matchers {
+class ImportMessagesSpec extends AnyWordSpec with Matchers:
 
   private val testPeer: PeerId = PeerId("test-peer")
 
@@ -119,4 +119,3 @@ class ImportMessagesSpec extends AnyWordSpec with Matchers {
       level shouldBe WarningLevel
     }
   }
-}

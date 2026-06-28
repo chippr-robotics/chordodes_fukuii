@@ -2,24 +2,23 @@ package com.chipprbots.ethereum.db.components
 
 import com.chipprbots.ethereum.db.cache.AppCaches
 import com.chipprbots.ethereum.db.cache.LruCache
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
-import com.chipprbots.ethereum.db.storage._
 import com.chipprbots.ethereum.db.storage.pruning.PruningMode
 import com.chipprbots.ethereum.utils.Config
 
-object Storages {
+object Storages:
 
-  trait PruningModeComponent {
+  trait PruningModeComponent:
     val pruningMode: PruningMode
-  }
 
-  trait DefaultStorages extends StoragesComponent {
+  trait DefaultStorages extends StoragesComponent:
 
-    dataSourcesComp: DataSourceComponent with PruningModeComponent =>
+    dataSourcesComp: DataSourceComponent & PruningModeComponent =>
 
     override val storages: Storages = new DefaultStorages(pruningMode)
 
-    class DefaultStorages(override val pruningMode: PruningMode) extends Storages with AppCaches {
+    class DefaultStorages(override val pruningMode: PruningMode) extends Storages with AppCaches:
 
       override val blockHeadersStorage: BlockHeadersStorage = new BlockHeadersStorage(dataSource)
 
@@ -60,7 +59,3 @@ object Storages {
             Some(CachedReferenceCountedStorage.saveOnlyNotificationHandler(nodeStorage))
           )
         )
-
-    }
-  }
-}

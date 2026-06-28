@@ -1,15 +1,16 @@
 package com.chipprbots.ethereum.db.storage
 
+import java.io.File
+import java.nio.file.Files
+
 import org.apache.pekko.util.ByteString
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
-import com.chipprbots.ethereum.testing.Tags._
-
-import java.io.File
-import java.nio.file.Files
+import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for [[HealingFrontierStorage]] — the Layer-2 persisted healing frontier (node hash -> pathset).
   *
@@ -18,16 +19,16 @@ import java.nio.file.Files
   * keys, which would corrupt the hash; RocksDB column families return bare keys, matching production. See
   * docs/design/healing-frontier-scale.md (Layer 2).
   */
-class HealingFrontierStorageSpec extends AnyFlatSpec with Matchers {
+class HealingFrontierStorageSpec extends AnyFlatSpec with Matchers:
 
   private def hash(i: Int): ByteString = ByteString(Array.fill(32)(i.toByte))
   private def pathset(parts: Int): Seq[ByteString] =
     (0 until parts).map(p => ByteString(Array.fill(p + 1)((p + 1).toByte)))
 
-  private def withStorage(test: HealingFrontierStorage => Unit): Unit = {
+  private def withStorage(test: HealingFrontierStorage => Unit): Unit =
     val dbPath = Files.createTempDirectory("healing-frontier-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -37,16 +38,14 @@ class HealingFrontierStorageSpec extends AnyFlatSpec with Matchers {
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     try test(new HealingFrontierStorage(dataSource))
-    finally {
+    finally
       dataSource.destroy()
       val dir = new File(dbPath)
       !dir.exists() || dir.delete()
-    }
-  }
 
   "HealingFrontierStorage" should "round-trip a (hash -> pathset) entry through put/get" taggedAs UnitTest in
     withStorage { storage =>
@@ -117,4 +116,3 @@ class HealingFrontierStorageSpec extends AnyFlatSpec with Matchers {
     loaded.keySet shouldBe Set(hash(1), hash(3), hash(4))
     loaded(hash(4)) shouldBe pathset(2)
   }
-}

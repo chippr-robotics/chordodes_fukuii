@@ -5,14 +5,14 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.{Fixtures => CommonFixtures}
+import com.chipprbots.ethereum.Fixtures as CommonFixtures
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.SignedTransaction
-import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Regression for `ProgramContext.apply` setting `gasPrice` to the EIP-1559 effective gas price (min(maxFeePerGas,
   * baseFee + maxPriorityFeePerGas)) rather than the raw `tx.gasPrice` (which for Type-2 returns maxFeePerGas).
@@ -22,13 +22,13 @@ import com.chipprbots.ethereum.testing.Tags._
   * When `GASPRICE` was leaking out as `maxFeePerGas` (1000) instead of the effective price (875 = baseFee), Fukuii
   * treated it as a fresh-slot reset (2900 gas), yielding the observed +2800 gas delta.
   */
-class ProgramContextEffectiveGasPriceSpec extends AnyFlatSpec with Matchers {
+class ProgramContextEffectiveGasPriceSpec extends AnyFlatSpec with Matchers:
 
   private val senderAddr: Address = Address(ByteString(Array.fill[Byte](20)(0x11.toByte)))
 
   // Only the EIP-1559 fields matter for `effectiveGasPrice`. Other fields use
   // arbitrary fixture values.
-  private def newDynamicFeeTx(maxFeePerGas: BigInt, maxPriorityFeePerGas: BigInt): SignedTransaction = {
+  private def newDynamicFeeTx(maxFeePerGas: BigInt, maxPriorityFeePerGas: BigInt): SignedTransaction =
     val raw = TransactionWithDynamicFee(
       nonce = 0,
       maxPriorityFeePerGas = maxPriorityFeePerGas,
@@ -41,7 +41,6 @@ class ProgramContextEffectiveGasPriceSpec extends AnyFlatSpec with Matchers {
       chainId = 1
     )
     SignedTransaction(raw, ECDSASignature(BigInt(0), BigInt(0), BigInt(0)))
-  }
 
   // HefPostOlympia carries just the baseFee, which is all `Transaction.effectiveGasPrice`
   // looks at. For Cancun-era txs the same baseFee plumbing applies through HefPostShanghai/
@@ -79,4 +78,3 @@ class ProgramContextEffectiveGasPriceSpec extends AnyFlatSpec with Matchers {
     // effective = min(maxFee=2000, baseFee+priority = 875+100 = 975) = 975
     ctx.gasPrice shouldBe UInt256(975)
   }
-}

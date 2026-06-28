@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import scala.collection.mutable
-
 import org.apache.pekko.util.ByteString
+
+import scala.collection.mutable
 
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.network.PeerId
@@ -21,9 +21,9 @@ import com.chipprbots.ethereum.utils.Logger
   *
   * Reference: go-ethereum/eth/downloader/queue.go — blockTaskQueue
   */
-class BodiesFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBlockBodies, BlockBodies] with Logger {
+class BodiesFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBlockBodies, BlockBodies] with Logger:
 
-  import BodiesFetcherQueue._
+  import BodiesFetcherQueue.*
 
   private val pendingQueue = mutable.Queue[ByteString]()
   private val inFlightMap = mutable.Map[PeerId, InFlightEntry]()
@@ -53,7 +53,7 @@ class BodiesFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBl
       .max(1)
 
   def reserve(peer: PeerWithInfo, items: Int): Option[GetBlockBodies] = synchronized {
-    if (pendingQueue.isEmpty) return None
+    if pendingQueue.isEmpty then return None
 
     val count = items.min(MaxBodiesPerRequest).min(pendingQueue.size)
     val taken = (0 until count).map(_ => pendingQueue.dequeue()).toVector
@@ -82,7 +82,7 @@ class BodiesFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBl
   }
 
   def deliver(peer: PeerWithInfo, resp: BlockBodies, elapsedMs: Long): DeliveryResult = synchronized {
-    inFlightMap.get(peer.peer.id) match {
+    inFlightMap.get(peer.peer.id) match
       case None =>
         DeliveryResult.Duplicate
 
@@ -99,7 +99,6 @@ class BodiesFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBl
             s"elapsed=${elapsedMs}ms, pending=${pendingQueue.size}"
         )
         DeliveryResult.Delivered(resp.bodies.size)
-    }
   }
 
   def expireStale(nowMs: Long): Seq[(PeerId, GetBlockBodies)] = synchronized {
@@ -122,14 +121,11 @@ class BodiesFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBl
       taken: Vector[ByteString],
       sentMs: Long,
       deadlineMs: Long
-  ) {
+  ):
     def snapshot: InFlightRequest[GetBlockBodies] =
       InFlightRequest(req, peer, sentMs, deadlineMs)
-  }
-}
 
-object BodiesFetcherQueue {
+object BodiesFetcherQueue:
 
   /** ETH protocol maximum bodies per request (matches go-ethereum/eth/handler.go maxBodiesServe). */
   val MaxBodiesPerRequest: Int = 128
-}

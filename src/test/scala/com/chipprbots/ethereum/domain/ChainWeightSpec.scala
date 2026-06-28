@@ -5,43 +5,44 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.domain.BlockHash
 
-class ChainWeightSpec extends AnyFlatSpec with Matchers {
+class ChainWeightSpec extends AnyFlatSpec with Matchers:
 
   def createHeader(
       number: BigInt,
       difficulty: BigInt
   ): BlockHeader =
     BlockHeader(
-      parentHash = ByteString.empty,
-      ommersHash = ByteString.empty,
+      parentHash = BlockHash(ByteString.empty),
+      ommersHash = BlockHash(ByteString.empty),
       beneficiary = ByteString.empty,
-      stateRoot = ByteString.empty,
-      transactionsRoot = ByteString.empty,
-      receiptsRoot = ByteString.empty,
-      logsBloom = ByteString.empty,
-      difficulty = difficulty,
+      stateRoot = TrieRoot(ByteString.empty),
+      transactionsRoot = TrieRoot(ByteString.empty),
+      receiptsRoot = TrieRoot(ByteString.empty),
+      logsBloom = BloomFilter(ByteString.empty),
+      difficulty = Difficulty(difficulty),
       number = number,
       gasLimit = 0,
       gasUsed = 0,
       unixTimestamp = 0,
       extraData = ByteString.empty,
-      mixHash = ByteString.empty,
+      mixHash = BlockHash(ByteString.empty),
       nonce = ByteString.empty
     )
 
   "ChainWeight" should "compare based on total difficulty" taggedAs (UnitTest) in {
-    val weight1 = ChainWeight(totalDifficulty = 1000)
-    val weight2 = ChainWeight(totalDifficulty = 2000)
+    val weight1 = ChainWeight.totalDifficultyOnly(1000)
+    val weight2 = ChainWeight.totalDifficultyOnly(2000)
 
     weight1 should be < weight2
     weight2 should be > weight1
   }
 
   it should "be equal when total difficulty is the same" taggedAs (UnitTest) in {
-    val weight1 = ChainWeight(totalDifficulty = 1000)
-    val weight2 = ChainWeight(totalDifficulty = 1000)
+    val weight1 = ChainWeight.totalDifficultyOnly(1000)
+    val weight2 = ChainWeight.totalDifficultyOnly(1000)
 
     weight1.compare(weight2) shouldBe 0
   }
@@ -52,7 +53,7 @@ class ChainWeightSpec extends AnyFlatSpec with Matchers {
 
     val newWeight = initialWeight.increase(header)
 
-    newWeight.totalDifficulty shouldBe BigInt(100)
+    newWeight.totalDifficulty.value shouldBe BigInt(100)
   }
 
   it should "accumulate difficulty across multiple blocks" taggedAs (UnitTest) in {
@@ -65,22 +66,21 @@ class ChainWeightSpec extends AnyFlatSpec with Matchers {
       .increase(header2)
       .increase(header3)
 
-    weight.totalDifficulty shouldBe BigInt(600)
+    weight.totalDifficulty.value shouldBe BigInt(600)
   }
 
   "ChainWeight.zero" should "have zero total difficulty" in {
-    ChainWeight.zero.totalDifficulty shouldBe BigInt(0)
+    ChainWeight.zero.totalDifficulty.value shouldBe BigInt(0)
   }
 
   "ChainWeight.totalDifficultyOnly" should "create weight with specified difficulty" in {
     val weight = ChainWeight.totalDifficultyOnly(500)
-    weight.totalDifficulty shouldBe BigInt(500)
+    weight.totalDifficulty.value shouldBe BigInt(500)
   }
 
   "ChainWeight test API" should "allow increasing total difficulty" in {
     val weight = ChainWeight.zero
     val increased = weight.increaseTotalDifficulty(100)
 
-    increased.totalDifficulty shouldBe BigInt(100)
+    increased.totalDifficulty.value shouldBe BigInt(100)
   }
-}

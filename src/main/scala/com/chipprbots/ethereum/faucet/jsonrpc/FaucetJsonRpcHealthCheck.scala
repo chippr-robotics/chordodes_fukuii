@@ -7,21 +7,19 @@ import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
 import com.chipprbots.ethereum.jsonrpc.JsonRpcHealthChecker
 import com.chipprbots.ethereum.jsonrpc.JsonRpcHealthcheck
 
-class FaucetJsonRpcHealthCheck(faucetRpcService: FaucetRpcService) extends JsonRpcHealthChecker {
+class FaucetJsonRpcHealthCheck(faucetRpcService: FaucetRpcService) extends JsonRpcHealthChecker:
 
   protected def mainService: String = "faucet health"
 
   final val statusHC: IO[JsonRpcHealthcheck[FaucetDomain.StatusResponse]] =
     JsonRpcHealthcheck.fromServiceResponse("status", faucetRpcService.status(StatusRequest()))
 
-  override def healthCheck(): IO[HealthcheckResponse] = {
+  override def healthCheck: IO[HealthcheckResponse] =
     val statusF = statusHC.map(_.toResult)
     val responseF = statusF.map(check => HealthcheckResponse(List(check)))
 
     handleResponse(responseF)
-  }
 
   override def readinessCheck(): IO[HealthcheckResponse] =
     // For faucet, readiness is the same as health
-    healthCheck()
-}
+    healthCheck

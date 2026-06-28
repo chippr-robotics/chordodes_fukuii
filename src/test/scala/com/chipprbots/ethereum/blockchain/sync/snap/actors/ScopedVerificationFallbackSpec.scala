@@ -1,29 +1,37 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem}
-import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
+import java.io.File
+import java.nio.file.Files
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
+import org.apache.pekko.actor.testkit.typed.scaladsl.FishingOutcomes
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
-import com.chipprbots.ethereum.db.storage.{HealingFrontierStorage, Namespaces}
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
+import com.chipprbots.ethereum.db.storage.HealingFrontierStorage
+import com.chipprbots.ethereum.db.storage.Namespaces
 import com.chipprbots.ethereum.metrics.Metrics
-import com.chipprbots.ethereum.mpt.{LeafNode, MptTraversals}
+import com.chipprbots.ethereum.mpt.LeafNode
+import com.chipprbots.ethereum.mpt.MptTraversals
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.testing.{PeerTestHelpers, TestMptStorage}
-
-import java.io.File
-import java.nio.file.Files
-import java.util.concurrent.{Executors, TimeUnit}
+import com.chipprbots.ethereum.testing.PeerTestHelpers
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** T015 (US2, V5 / SC-003): the completion gate falls back to full-root verification for every unsafe condition.
   *
@@ -42,44 +50,42 @@ import java.util.concurrent.{Executors, TimeUnit}
   * set empty); a true restart-lost set is covered by the resume/restart path and the data-model lifecycle.
   */
 class ScopedVerificationFallbackSpec
-    extends TestKit(ActorSystem("ScopedVerificationFallbackSpec"))
-    with ImplicitSender
+    extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfterAll {
+    with Eventually:
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
-  }
+    if gauge == null then Double.NaN else gauge.value()
 
-  private def storedRoot(storage: TestMptStorage): ByteString = {
+  private def storedRoot(storage: TestMptStorage): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(Array[Byte](0x02)))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
-  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(s"fallback-leaf-$seed")).toArray))
     val encoded = MptTraversals.encodeNode(leaf)
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"fallback-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded))
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
-  private def awaitStateHealingComplete(controller: TestProbe): Unit =
+  private def awaitStateHealingComplete(
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ): Unit =
     controller.fishForMessage(10.seconds) {
-      case SNAPSyncController.StateHealingComplete   => true
-      case _: SNAPSyncController.ProgressNodesHealed => false
-      case _                                         => false
+      case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+      case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+      case _                                         => FishingOutcomes.continueAndIgnore
     }
 
   /** Build a marker-backed fixture with a present complete root and configurable scoped settings. */
@@ -87,12 +93,19 @@ class ScopedVerificationFallbackSpec
       scoped: Boolean,
       maxPaths: Int,
       markComplete: Boolean
-  )(body: (ActorRef, HealingFrontierStorage, TestProbe, ByteString) => Unit): Unit = {
+  )(
+      body: (
+          ActorRef[TrieNodeHealingCoordinator.Command],
+          HealingFrontierStorage,
+          org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command],
+          ByteString
+      ) => Unit
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scoped-fallback-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -102,56 +115,50 @@ class ScopedVerificationFallbackSpec
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
-    if (markComplete) store.markComplete()
+    if markComplete then store.markComplete()
 
     val storage = new TestMptStorage()
     val root = storedRoot(storage)
-    val controller = TestProbe()
-    val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
-        stateRoot = root,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controller.ref,
-        healingFrontierStorage = Some(store),
-        frontierPersistenceEnabled = true,
-        healingWriterEcOverride = Some(ec),
-        scopedHealVerification = scoped,
-        scopedHealMaxPaths = maxPaths
-      )
+    val controller = testKit.createTestProbe[SNAPSyncController.Command]()
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = root,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controller.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec),
+      scopedHealVerification = scoped,
+      scopedHealMaxPaths = maxPaths
     )
-    val death = TestProbe()
-    death.watch(coordinator)
     try body(coordinator, store, controller, root)
-    finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+    finally
+      testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   /** Heal one clean storage leaf, then assert the round completes via the FULL-ROOT path (gauge == 0). */
-  private def healOneAndAssertFullRoot(coordinator: ActorRef, controller: TestProbe): Unit = {
+  private def healOneAndAssertFullRoot(
+      coordinator: ActorRef[TrieNodeHealingCoordinator.Command],
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ): Unit =
     // Seed the mode gauge to a sentinel so "0" can only come from the full-root path actually running.
     SNAPSyncMetrics.setHealingScopedVerification(-1L)
     val node = cleanLeaf(0)
-    val peer = PeerTestHelpers.createTestPeer("fallback-peer", TestProbe().ref)
-    coordinator ! Messages.QueueMissingNodes(Seq((node._1, node._2)))
-    coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-    coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(node._3)))
+    val peer = PeerTestHelpers.createTestPeer("fallback-peer", testKit.createTestProbe[Any]().ref.toClassic)
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((node._1, node._2)))
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+    coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(node._3)))
     awaitStateHealingComplete(controller)
     // Full-root verification sets the mode gauge to 0; scoped would have set 1.
     gaugeValue("snapsync.healing.scoped_verification.gauge") shouldBe 0.0 +- 1e-9
-  }
 
   "Completion gate fallback" should
     "take the full-root path when scoping is DISABLED by config (F1)" taggedAs UnitTest in {
@@ -181,8 +188,7 @@ class ScopedVerificationFallbackSpec
     // and an empty set, the next gate can only take the full-root path.
     withFixture(scoped = true, maxPaths = 200000, markComplete = true) { (coordinator, store, _, _) =>
       store.isComplete shouldBe true
-      coordinator ! Messages.HealingPivotRefreshed(kec256(ByteString("fallback-different-root")))
-      awaitAssert(store.isComplete shouldBe false, 3.seconds, 100.millis)
+      coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(kec256(ByteString("fallback-different-root")))
+      eventually(timeout(3.seconds), interval(100.millis))(store.isComplete shouldBe false)
     }
   }
-}

@@ -4,6 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -18,7 +19,7 @@ import com.chipprbots.ethereum.jsonrpc.ServiceResponse
 import com.chipprbots.ethereum.jsonrpc.TransactionData
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.utils.ByteStringUtils._
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Logger
 
@@ -28,7 +29,7 @@ class TestEthBlockServiceWrapper(
     mining: Mining,
     blockQueue: BlockQueue
 ) extends EthBlocksService(blockchain, blockchainReader, mining, blockQueue)
-    with Logger {
+    with Logger:
 
   /** Implements the eth_getBlockByHash method that fetches a requested block.
     *
@@ -51,12 +52,14 @@ class TestEthBlockServiceWrapper(
           Left(JsonRpcError.LogicError(s"missing hash for block $baseBlockResponse"))
 
         case BlockByBlockHashResponse(Some(baseBlockResponse)) =>
-          val ethResponseOpt = for {
+          val ethResponseOpt = for
             hash <- baseBlockResponse.hash
-            fullBlock <- blockchainReader.getBlockByHash(hash).orElse(blockQueue.getBlockByHash(hash))
-          } yield toEthResponse(fullBlock, baseBlockResponse)
+            fullBlock <- blockchainReader
+              .getBlockByHash(BlockHash(hash))
+              .orElse(blockQueue.getBlockByHash(BlockHash(hash)))
+          yield toEthResponse(fullBlock, baseBlockResponse)
 
-          ethResponseOpt match {
+          ethResponseOpt match
             case None =>
               val hashHex = baseBlockResponse.hash.map(_.toHex).getOrElse("unknown")
               Left(
@@ -64,7 +67,6 @@ class TestEthBlockServiceWrapper(
               )
             case Some(_) =>
               Right(BlockByBlockHashResponse(ethResponseOpt))
-          }
       }
     )
 
@@ -81,11 +83,11 @@ class TestEthBlockServiceWrapper(
     .getBlockByNumber(request)
     .map(
       _.map { blockByBlockResponse =>
-        val bestBranch = blockchainReader.getBestBranch()
-        val response = for {
+        val bestBranch = blockchainReader.getBestBranch
+        val response = for
           blockResp <- blockByBlockResponse.blockResponse
           fullBlock <- blockchainReader.getBlockByNumber(bestBranch, blockResp.number)
-        } yield toEthResponse(fullBlock, blockResp)
+        yield toEthResponse(fullBlock, blockResp)
         BlockByNumberResponse(response)
       }
     )
@@ -94,7 +96,7 @@ class TestEthBlockServiceWrapper(
     response.number,
     response.hash,
     response.parentHash,
-    if (block.header.nonce.isEmpty) None else Some(block.header.nonce),
+    if block.header.nonce.isEmpty then None else Some(block.header.nonce),
     response.sha3Uncles,
     response.logsBloom,
     response.transactionsRoot,
@@ -121,7 +123,6 @@ class TestEthBlockServiceWrapper(
       EthTransactionResponse(tx = TransactionData(stx, Some(block.header), Some(transactionIndex)))
     }
   }
-}
 
 case class EthBlockResponse(
     number: BigInt,
@@ -163,9 +164,9 @@ final case class EthTransactionResponse(
     v: BigInt
 ) extends BaseTransactionResponse
 
-object EthTransactionResponse {
+object EthTransactionResponse:
 
-  implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+  given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
   def apply(tx: TransactionData): EthTransactionResponse =
     EthTransactionResponse(tx.stx, tx.blockHeader, tx.transactionIndex)
@@ -176,9 +177,9 @@ object EthTransactionResponse {
       transactionIndex: Option[Int] = None
   ): EthTransactionResponse =
     EthTransactionResponse(
-      hash = stx.hash,
+      hash = stx.hash.value,
       nonce = stx.tx.nonce,
-      blockHash = blockHeader.map(_.hash),
+      blockHash = blockHeader.map(_.hash.value),
       blockNumber = blockHeader.map(_.number),
       transactionIndex = transactionIndex.map(txIndex => BigInt(txIndex)),
       from = SignedTransaction.getSender(stx).map(_.bytes),
@@ -191,4 +192,3 @@ object EthTransactionResponse {
       s = stx.signature.s,
       v = stx.signature.v
     )
-}

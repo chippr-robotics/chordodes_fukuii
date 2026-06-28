@@ -7,7 +7,7 @@ import scala.language.implicitConversions
 import com.chipprbots.ethereum.utils.ByteUtils
 
 // scalastyle:off number.of.methods
-object UInt256 {
+object UInt256:
 
   /** Size of UInt256 byte representation */
   val Size: Int = 32
@@ -22,10 +22,9 @@ object UInt256 {
 
   val Two: UInt256 = new UInt256(2)
 
-  def apply(bytes: ByteString): UInt256 = {
+  def apply(bytes: ByteString): UInt256 =
     require(bytes.length <= Size, s"Input byte array cannot be longer than $Size: ${bytes.length}")
     UInt256(ByteUtils.toBigInt(bytes))
-  }
 
   def apply(array: Array[Byte]): UInt256 =
     UInt256(ByteString(array))
@@ -34,14 +33,13 @@ object UInt256 {
     new UInt256(boundBigInt(n))
 
   def apply(b: Boolean): UInt256 =
-    if (b) One else Zero
+    if b then One else Zero
 
   def apply(n: Long): UInt256 =
     apply(BigInt(n))
 
-  implicit class BigIntAsUInt256(val bigInt: BigInt) extends AnyVal {
+  implicit class BigIntAsUInt256(val bigInt: BigInt) extends AnyVal:
     def toUInt256: UInt256 = UInt256(bigInt)
-  }
 
   implicit def uint256ToBigInt(uint: UInt256): BigInt = uint.toBigInt
 
@@ -58,12 +56,11 @@ object UInt256 {
   private def boundBigInt(n: BigInt): BigInt = (n % Modulus + Modulus) % Modulus
 
   private val MaxSignedValue: BigInt = BigInt(2).pow(Size * 8 - 1) - 1
-}
 
 /** Represents 256 bit unsigned integers with standard arithmetic, byte-wise operation and EVM-specific extensions */
-class UInt256 private (private val n: BigInt) extends Ordered[UInt256] {
+class UInt256 private (private val n: BigInt) extends Ordered[UInt256]:
 
-  import UInt256._
+  import UInt256.*
   require(n >= 0 && n < Modulus, s"Invalid UInt256 value: $n")
 
   // byte-wise operations
@@ -71,14 +68,11 @@ class UInt256 private (private val n: BigInt) extends Ordered[UInt256] {
   /** Converts a BigInt to a ByteString. Output ByteString is padded with 0's from the left side up to UInt256.Size
     * bytes.
     */
-  lazy val bytes: ByteString = {
+  lazy val bytes: ByteString =
     val bs: ByteString = ByteString(n.toByteArray).takeRight(Size)
     val padLength: Int = Size - bs.length
-    if (padLength > 0)
-      Zeros.take(padLength) ++ bs
-    else
-      bs
-  }
+    if padLength > 0 then Zeros.take(padLength) ++ bs
+    else bs
 
   /** Used for gas calculation for EXP opcode. See YP Appendix H.1 (220) For n > 0: (n.bitLength - 1) / 8 + 1 == 1 +
     * floor(log_256(n))
@@ -86,10 +80,10 @@ class UInt256 private (private val n: BigInt) extends Ordered[UInt256] {
     * @return
     *   Size in bytes excluding the leading 0 bytes
     */
-  def byteSize: Int = if (isZero) 0 else (n.bitLength - 1) / 8 + 1
+  def byteSize: Int = if isZero then 0 else (n.bitLength - 1) / 8 + 1
 
   def getByte(that: UInt256): UInt256 =
-    if (that.n > 31) Zero else UInt256(bytes(that.n.toInt).toInt & 0xff)
+    if that.n > 31 then Zero else UInt256(bytes(that.n.toInt).toInt & 0xff)
 
   // standard arithmetic (note the use of new instead of apply where result is guaranteed to be within bounds)
   def &(that: UInt256): UInt256 = new UInt256(this.n & that.n)
@@ -114,9 +108,9 @@ class UInt256 private (private val n: BigInt) extends Ordered[UInt256] {
 
   def compare(that: UInt256): Int = this.n.compare(that.n)
 
-  def min(that: UInt256): UInt256 = if (compare(that) < 0) this else that
+  def min(that: UInt256): UInt256 = if compare(that) < 0 then this else that
 
-  def max(that: UInt256): UInt256 = if (compare(that) > 0) this else that
+  def max(that: UInt256): UInt256 = if compare(that) > 0 then this else that
 
   def isZero: Boolean = n == 0
 
@@ -125,10 +119,10 @@ class UInt256 private (private val n: BigInt) extends Ordered[UInt256] {
   def >>(that: UInt256): UInt256 = UInt256(this.n.>>(that.toInt))
 
   // EVM-specific arithmetic
-  private lazy val signedN: BigInt = if (n > MaxSignedValue) n - Modulus else n
+  private lazy val signedN: BigInt = if n > MaxSignedValue then n - Modulus else n
 
   private def zeroCheck(x: UInt256)(result: => BigInt): UInt256 =
-    if (x.isZero) Zero else UInt256(result)
+    if x.isZero then Zero else UInt256(result)
 
   def div(that: UInt256): UInt256 = zeroCheck(that)(new UInt256(this.n / that.n))
 
@@ -153,30 +147,24 @@ class UInt256 private (private val n: BigInt) extends Ordered[UInt256] {
   def sshift(that: UInt256): UInt256 = UInt256(this.signedN >> that.signedN.toInt)
 
   def signExtend(that: UInt256): UInt256 =
-    if (that.n < 0 || that.n > 31) {
-      this
-    } else {
+    if that.n < 0 || that.n > 31 then this
+    else
       val idx = that.n.toByte
       val negative = n.testBit(idx * 8 + 7)
       val mask = (BigInt(1) << ((idx + 1) * 8)) - 1
-      val newN = if (negative) n | (MaxValue ^ mask) else n & mask
+      val newN = if negative then n | (MaxValue ^ mask) else n & mask
       new UInt256(newN)
-    }
 
-  def fillingAdd(that: UInt256): UInt256 = {
+  def fillingAdd(that: UInt256): UInt256 =
     val result = this.n + that.n
-    if (result > MaxValue)
-      MaxValue
-    else
-      new UInt256(result)
-  }
+    if result > MaxValue then MaxValue
+    else new UInt256(result)
 
   // standard methods
-  override def equals(that: Any): Boolean =
-    that match {
+  override def equals(that: Any): Boolean = // §3h: FORGE-confirmed — java.lang.Object.equals signature is fixed by JVM
+    that match
       case that: UInt256 => this.n.equals(that.n)
       case other         => other == n
-    }
 
   override def hashCode: Int = n.hashCode()
 
@@ -188,12 +176,11 @@ class UInt256 private (private val n: BigInt) extends Ordered[UInt256] {
   def toSignedDecString: String =
     signedN.toString
 
-  def toHexString: String = {
+  def toHexString: String =
     val hex = f"$n%x"
     // add zero if odd number of digits
-    val extraZero = if (hex.length % 2 == 0) "" else "0"
+    val extraZero = if hex.length % 2 == 0 then "" else "0"
     s"0x$extraZero$hex"
-  }
 
   def toSign: BigInt = signedN
 
@@ -209,4 +196,3 @@ class UInt256 private (private val n: BigInt) extends Ordered[UInt256] {
     *   a Long with MSB=0, thus a value in range [0, Long.MaxValue]
     */
   def toLong: Long = n.longValue & Long.MaxValue
-}

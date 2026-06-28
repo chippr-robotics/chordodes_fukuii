@@ -10,13 +10,13 @@ import com.chipprbots.ethereum.db.storage.BlockHeadersStorage.BlockHeaderHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.ByteUtils.byteSequenceToBuffer
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
-import com.chipprbots.ethereum.utils.Picklers._
+import com.chipprbots.ethereum.utils.Picklers.given
 
 /** This class is used to store the BlockHeader, by using: Key: hash of the block to which the BlockHeader belong Value:
   * the block header
   */
 class BlockHeadersStorage(val dataSource: DataSource)
-    extends TransactionalKeyValueStorage[BlockHeaderHash, BlockHeader] {
+    extends TransactionalKeyValueStorage[BlockHeaderHash, BlockHeader]:
 
   override val namespace: IndexedSeq[Byte] = Namespaces.HeaderNamespace
 
@@ -28,9 +28,7 @@ class BlockHeadersStorage(val dataSource: DataSource)
     blockHeader => compactPickledBytes(Pickle.intoBytes(blockHeader))
 
   override def valueDeserializer: IndexedSeq[Byte] => BlockHeader =
-    (byteSequenceToBuffer _).andThen(Unpickle[BlockHeader].fromBytes)
-}
+    byteSequenceToBuffer.andThen(Unpickle[BlockHeader].fromBytes)
 
-object BlockHeadersStorage {
+object BlockHeadersStorage:
   type BlockHeaderHash = ByteString
-}

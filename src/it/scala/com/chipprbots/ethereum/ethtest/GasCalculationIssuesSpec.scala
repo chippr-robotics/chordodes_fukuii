@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.ethtest
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite to identify and flag gas calculation discrepancies
   *
@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.testing.Tags._
   * CRITICAL: All tests in this spec are expected to fail with gas calculation errors. These failures indicate potential
   * bugs or missing EIP implementations that need to be fixed.
   */
-class GasCalculationIssuesSpec extends EthereumTestsSpec {
+class GasCalculationIssuesSpec extends EthereumTestsSpec:
 
   /** Execute test and capture detailed gas calculation error information
     *
@@ -21,7 +21,7 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
     *   Either error message with gas details, or success
     */
   def executeAndAnalyzeGasError(test: BlockchainTest): Either[String, TestExecutionResult] =
-    executeTest(test) match {
+    executeTest(test) match
       case Left(error) if error.contains("invalid gas used") =>
         // Extract expected vs actual gas from error message
         val expectedGasRegex = """expected (\d+)""".r
@@ -30,15 +30,13 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
         val expectedGas = expectedGasRegex.findFirstMatchIn(error).map(_.group(1).toLong)
         val actualGas = actualGasRegex.findFirstMatchIn(error).map(_.group(1).toLong)
 
-        val diff = (expectedGas, actualGas) match {
+        val diff = (expectedGas, actualGas) match
           case (Some(exp), Some(act)) => s" (difference: ${exp - act})"
           case _                      => ""
-        }
 
         Left(s"Gas calculation error$diff: $error")
 
       case result => result
-    }
 
   "GasCalculationIssues" should "flag add11 test gas calculation discrepancy" taggedAs (
     IntegrationTest,
@@ -52,7 +50,7 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
       info(s"Test: $testName, Network: ${test.network}")
 
       val result = executeAndAnalyzeGasError(test)
-      result match {
+      result match
         case Left(error) =>
           info(s"  ✗ FLAGGED: $error")
           info(s"  ACTION REQUIRED: Review gas calculation for ADD opcode in ${test.network}")
@@ -61,7 +59,6 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
         case Right(executionResult) =>
           info(s"  ✓ Test passed unexpectedly - gas calculation may have been fixed")
           info(s"  Gas used: ${executionResult.blocksExecuted} blocks executed successfully")
-      }
     }
   }
 
@@ -73,7 +70,7 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
       info(s"Test: $testName, Network: ${test.network}")
 
       val result = executeAndAnalyzeGasError(test)
-      result match {
+      result match
         case Left(error) =>
           info(s"  ✗ FLAGGED: $error")
           info(s"  ACTION REQUIRED: Review gas calculation for PUSH and ADD opcodes in ${test.network}")
@@ -81,7 +78,6 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
 
         case Right(_) =>
           info(s"  ✓ Test passed unexpectedly - gas calculation may have been fixed")
-      }
     }
   }
 
@@ -105,17 +101,16 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
       val suite = loadTestSuite(testPath)
 
       suite.tests.foreach { case (testName, test) =>
-        executeAndAnalyzeGasError(test) match {
+        executeAndAnalyzeGasError(test) match
           case Left(error) if error.contains("difference:") =>
             totalGasDiscrepancies += 1
             discrepancyDetails += s"  - $testName: $error"
 
           case _ => // Test passed or different error
-        }
       }
     }
 
-    if (totalGasDiscrepancies > 0) {
+    if totalGasDiscrepancies > 0 then
       info(s"Found $totalGasDiscrepancies gas calculation discrepancies:")
       discrepancyDetails.foreach(d => info(d))
 
@@ -128,9 +123,7 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
       info("")
 
       fail(s"$totalGasDiscrepancies gas calculation discrepancies detected - code review required")
-    } else {
-      info("✓ No gas calculation discrepancies detected")
-    }
+    else info("✓ No gas calculation discrepancies detected")
   }
 
   it should "document known gas calculation issues for follow-up" taggedAs (
@@ -161,4 +154,3 @@ class GasCalculationIssuesSpec extends EthereumTestsSpec {
     // This test documents the issues but doesn't fail - it's for information
     succeed
   }
-}

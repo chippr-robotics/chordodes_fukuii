@@ -3,11 +3,11 @@ package com.chipprbots.scalanet.kademlia
 import java.security.SecureRandom
 import java.time.Clock
 
-import com.chipprbots.scalanet.kademlia.Generators._
-import com.chipprbots.scalanet.kademlia.KBucketsSpec._
+import com.chipprbots.scalanet.kademlia.Generators.*
+import com.chipprbots.scalanet.kademlia.KBucketsSpec.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks._
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks.*
 import scodec.bits.BitVector
 
 import scala.util.Random

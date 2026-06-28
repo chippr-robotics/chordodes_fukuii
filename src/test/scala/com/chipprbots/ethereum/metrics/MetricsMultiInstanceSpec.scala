@@ -14,7 +14,7 @@ import org.scalatest.matchers.should.Matchers
   * Prometheus HTTP server. Port-binding tests belong in an integration suite with explicit lifecycle control; the Bug
   * 29 *semantic* we want to lock is the lookup fallback, which doesn't require binding.
   */
-class MetricsMultiInstanceSpec extends AnyFlatSpec with Matchers {
+class MetricsMultiInstanceSpec extends AnyFlatSpec with Matchers:
 
   "Metrics.forInstance" should "fall back to Metrics.get() for unknown instance ids" in {
     val any = Metrics.forInstance("definitely-not-registered-12345")
@@ -34,4 +34,3 @@ class MetricsMultiInstanceSpec extends AnyFlatSpec with Matchers {
     object Probe extends MetricsContainer
     Probe.metrics shouldBe Metrics.get()
   }
-}

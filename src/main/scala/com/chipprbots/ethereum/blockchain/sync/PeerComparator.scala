@@ -2,8 +2,7 @@ package com.chipprbots.ethereum.blockchain
 
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 
-object PeerComparator {
+object PeerComparator:
 
   def doPeersHaveSameBestBlock(peerInfo1: PeerInfo, peerInfo2: PeerInfo): Boolean =
     peerInfo1.bestBlockHash == peerInfo2.bestBlockHash
-}

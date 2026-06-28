@@ -8,7 +8,7 @@ import com.chipprbots.scalanet.discovery.crypto.PublicKey
 import com.chipprbots.scalanet.discovery.hash.Hash
 import com.chipprbots.scalanet.discovery.hash.Keccak256
 import com.chipprbots.scalanet.peergroup.Addressable
-import com.chipprbots.scalanet.peergroup.InetAddressOps._
+import com.chipprbots.scalanet.peergroup.InetAddressOps.*
 import scodec.bits.ByteVector
 
 case class Node(id: Node.Id, address: Node.Address) {

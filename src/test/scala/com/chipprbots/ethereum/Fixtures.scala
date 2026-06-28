@@ -4,13 +4,13 @@ import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 
-object Fixtures {
+object Fixtures:
 
-  object Blocks {
+  object Blocks:
 
-    trait FixtureBlock {
+    trait FixtureBlock:
       val header: BlockHeader
       val body: BlockBody
       val transactionHashes: Seq[ByteString]
@@ -18,32 +18,35 @@ object Fixtures {
 
       def number: BigInt = header.number
       def block: Block = Block(header, body)
-    }
 
-    object ValidBlock extends FixtureBlock {
+    object ValidBlock extends FixtureBlock:
       // Arbitrary taken Block 3125369
       override val header: BlockHeader = Block3125369.header
       override val body: BlockBody = Block3125369.body
       override val transactionHashes: Seq[ByteString] = Block3125369.transactionHashes
       override val size: Long = Block3125369.size
-    }
 
-    object Block3125369 extends FixtureBlock {
+    object Block3125369 extends FixtureBlock:
       val header: BlockHeader = BlockHeader(
-        parentHash = ByteString(Hex.decode("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71")),
-        ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("df7d7e053933b5cc24372f878c90e62dadad5d42")),
-        stateRoot = ByteString(Hex.decode("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67")),
-        transactionsRoot = ByteString(Hex.decode("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac")),
-        receiptsRoot = ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d")),
-        logsBloom = ByteString(Hex.decode("0" * 512)),
-        difficulty = BigInt("14005986920576"),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d"))),
+        logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
+        difficulty = Difficulty(BigInt("14005986920576")),
         number = 3125369,
         gasLimit = 4699996,
         gasUsed = 84000,
         unixTimestamp = 1486131165,
         extraData = ByteString(Hex.decode("d5830104098650617269747986312e31332e30826c69")),
-        mixHash = ByteString(Hex.decode("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a")),
+        mixHash = BlockHash(ByteString(Hex.decode("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a"))),
         nonce = ByteString(Hex.decode("2b0fb0c002946392"))
       )
 
@@ -117,24 +120,28 @@ object Fixtures {
       )
 
       val size = 1000L
-    }
 
-    object Genesis extends FixtureBlock {
+    object Genesis extends FixtureBlock:
       val header: BlockHeader = BlockHeader(
-        parentHash = ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000")),
-        ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("0000000000000000000000000000000000000000")),
-        stateRoot = ByteString(Hex.decode("d7f8974fb5ac78d9ac099b9ad5018bedc2ce0a72dad1827a1709da30580f0544")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        logsBloom = ByteString(Hex.decode("0" * 512)),
-        difficulty = BigInt("17179869184"),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("d7f8974fb5ac78d9ac099b9ad5018bedc2ce0a72dad1827a1709da30580f0544"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
+        difficulty = Difficulty(BigInt("17179869184")),
         number = 0,
         gasLimit = 5000,
         gasUsed = 0,
         unixTimestamp = 0,
         extraData = ByteString(Hex.decode("11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa")),
-        mixHash = ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000")),
+        mixHash = BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
         nonce = ByteString(Hex.decode("0000000000000042"))
       )
       override val body: BlockBody = BlockBody(
@@ -145,24 +152,28 @@ object Fixtures {
       )
       override val transactionHashes: Seq[ByteString] = Seq()
       override val size: Long = 540
-    }
 
-    object DaoForkBlock extends FixtureBlock {
+    object DaoForkBlock extends FixtureBlock:
       override val header: BlockHeader = BlockHeader(
-        parentHash = ByteString(Hex.decode("a218e2c611f21232d857e3c8cecdcdf1f65f25a4477f98f6f47e4063807f2308")),
-        ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("a218e2c611f21232d857e3c8cecdcdf1f65f25a4477f98f6f47e4063807f2308"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("61c808d82a3ac53231750dadc13c777b59310bd9")),
-        stateRoot = ByteString(Hex.decode("614d7d358b03cbdaf0343529673be20ad45809d02487f023e047efdce9da8aff")),
-        transactionsRoot = ByteString(Hex.decode("d33068a7f21bff5018a00ca08a3566a06be4196dfe9e39f96e431565a619d455")),
-        receiptsRoot = ByteString(Hex.decode("7bda9aa65977800376129148cbfe89d35a016dd51c95d6e6dc1e76307d315468")),
-        logsBloom = ByteString(Hex.decode("0" * 512)),
-        difficulty = BigInt("62413376722602"),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("614d7d358b03cbdaf0343529673be20ad45809d02487f023e047efdce9da8aff"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("d33068a7f21bff5018a00ca08a3566a06be4196dfe9e39f96e431565a619d455"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("7bda9aa65977800376129148cbfe89d35a016dd51c95d6e6dc1e76307d315468"))),
+        logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
+        difficulty = Difficulty(BigInt("62413376722602")),
         number = 1920000,
         gasLimit = 4712384,
         gasUsed = 84000,
         unixTimestamp = 1469020839,
         extraData = ByteString(Hex.decode("e4b883e5bda9e7a59ee4bb99e9b1bc")),
-        mixHash = ByteString(Hex.decode("c52daa7054babe515b17ee98540c0889cf5e1595c5dd77496997ca84a68c8da1")),
+        mixHash = BlockHash(ByteString(Hex.decode("c52daa7054babe515b17ee98540c0889cf5e1595c5dd77496997ca84a68c8da1"))),
         nonce = ByteString(Hex.decode("05276a600980199d"))
       )
       override val body: BlockBody = BlockBody(
@@ -235,24 +246,28 @@ object Fixtures {
         ByteString(Hex.decode("2a5177e6d6cea40594c7d4b0115dcd087443be3ec2fa81db3c21946a5e51cea9"))
       )
       override val size: Long = 978L
-    }
 
-    object ProDaoForkBlock extends FixtureBlock {
+    object ProDaoForkBlock extends FixtureBlock:
       override val header: BlockHeader = BlockHeader(
-        parentHash = ByteString(Hex.decode("a218e2c611f21232d857e3c8cecdcdf1f65f25a4477f98f6f47e4063807f2308")),
-        ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("a218e2c611f21232d857e3c8cecdcdf1f65f25a4477f98f6f47e4063807f2308"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("bcdfc35b86bedf72f0cda046a3c16829a2ef41d1 ")),
-        stateRoot = ByteString(Hex.decode("c5e389416116e3696cce82ec4533cce33efccb24ce245ae9546a4b8f0d5e9a75")),
-        transactionsRoot = ByteString(Hex.decode("7701df8e07169452554d14aadd7bfa256d4a1d0355c1d174ab373e3e2d0a3743")),
-        receiptsRoot = ByteString(Hex.decode("26cf9d9422e9dd95aedc7914db690b92bab6902f5221d62694a2fa5d065f534b")),
-        logsBloom = ByteString(Hex.decode("0" * 512)),
-        difficulty = BigInt("62413376722602"),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("c5e389416116e3696cce82ec4533cce33efccb24ce245ae9546a4b8f0d5e9a75"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("7701df8e07169452554d14aadd7bfa256d4a1d0355c1d174ab373e3e2d0a3743"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("26cf9d9422e9dd95aedc7914db690b92bab6902f5221d62694a2fa5d065f534b"))),
+        logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
+        difficulty = Difficulty(BigInt("62413376722602")),
         number = 1920000,
         gasLimit = 4712384,
         gasUsed = 84000,
         unixTimestamp = 1469020840,
         extraData = ByteString(Hex.decode("64616f2d686172642d666f726b")),
-        mixHash = ByteString(Hex.decode("5b5acbf4bf305f948bd7be176047b20623e1417f75597341a059729165b92397")),
+        mixHash = BlockHash(ByteString(Hex.decode("5b5acbf4bf305f948bd7be176047b20623e1417f75597341a059729165b92397"))),
         nonce = ByteString(Hex.decode("bede87201de42426"))
       )
       override val body: BlockBody = BlockBody(
@@ -324,31 +339,30 @@ object Fixtures {
         ByteString(Hex.decode("2a5177e6d6cea40594c7d4b0115dcd087443be3ec2fa81db3c21946a5e51cea9"))
       )
       override val size: Long = 976
-    }
 
-    object DaoParentBlock extends FixtureBlock {
+    object DaoParentBlock extends FixtureBlock:
       override val header: BlockHeader = BlockHeader(
-        parentHash = ByteString(Hex.decode("505ffd21f4cbf2c5c34fa84cd8c92525f3a719b7ad18852bffddad601035f5f4")),
-        ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("505ffd21f4cbf2c5c34fa84cd8c92525f3a719b7ad18852bffddad601035f5f4"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("2a65aca4d5fc5b5c859090a6c34d164135398226")),
-        stateRoot = ByteString(Hex.decode("fdf2fc04580b95ca15defc639080b902e93892dcce288be0c1f7a7bbc778248b")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        logsBloom = ByteString(Hex.decode("00" * 256)),
-        difficulty = BigInt("62382916183238"),
+        stateRoot =
+          TrieRoot(ByteString(Hex.decode("fdf2fc04580b95ca15defc639080b902e93892dcce288be0c1f7a7bbc778248b"))),
+        transactionsRoot =
+          TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot =
+          TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
+        difficulty = Difficulty(BigInt("62382916183238")),
         number = 1919999,
         gasLimit = 4707788,
         gasUsed = 0,
         unixTimestamp = 1469020838,
         extraData = ByteString(Hex.decode("4477617266506f6f6c")),
-        mixHash = ByteString(Hex.decode("7f9ac1ddeafff0f926ed9887b8cf7d50c3f919d902e618b957022c46c8b404a6")),
+        mixHash = BlockHash(ByteString(Hex.decode("7f9ac1ddeafff0f926ed9887b8cf7d50c3f919d902e618b957022c46c8b404a6"))),
         nonce = ByteString(Hex.decode("60832709c8979daa"))
       )
       override val body: BlockBody = BlockBody.empty
       override val transactionHashes: Seq[ByteString] = Seq.empty
       override val size: Long = 540 // Approximate size of an empty block with the above header
-    }
-
-  }
-
-}

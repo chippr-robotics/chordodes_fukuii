@@ -23,7 +23,7 @@ case class MESSConfig(
     activationBlock: Option[BigInt] = None,
     deactivationBlock: Option[BigInt] = None,
     reactivationBlock: Option[BigInt] = None
-) {
+):
 
   /** True when MESS is active at `blockNumber`.
     *
@@ -35,4 +35,3 @@ case class MESSConfig(
 
   private def firstWindowActive(blockNumber: BigInt): Boolean =
     activationBlock.forall(blockNumber >= _) && deactivationBlock.forall(blockNumber < _)
-}

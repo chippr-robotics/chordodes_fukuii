@@ -92,7 +92,7 @@ class EthereumIESEngine(
           (plainText(inOff + idx) ^ value).toByte
         }
 
-        (secondPart, ByteString(encrypted: _*))
+        (secondPart, ByteString(encrypted*))
     }
 
     // calculate mac
@@ -157,7 +157,7 @@ class EthereumIESEngine(
           (cryptogram(inOff + encodedPublicKey.length + idx) ^ value).toByte
         }
 
-        (secondPart, ByteString(decrypted: _*))
+        (secondPart, ByteString(decrypted*))
     }
 
     val end = inOff + inLen

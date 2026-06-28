@@ -1,3 +1,4 @@
+# loop: invoked_by=[discover] applicable_recipes=[test-greening, ref-parity-audit]
 ---
 name: fukuii-sync-troubleshooting
 description: >-

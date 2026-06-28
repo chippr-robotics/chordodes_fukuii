@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofRequest
@@ -9,11 +9,11 @@ import com.chipprbots.ethereum.jsonrpc.ProofService.StorageProofKey
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 
-object EthProofJsonMethodsImplicits extends JsonMethodsImplicits {
-  def extractStorageKeys(input: JValue): Either[JsonRpcError, Seq[StorageProofKey]] = {
-    import cats.syntax.traverse._
-    import cats.syntax.either._
-    input match {
+object EthProofJsonMethodsImplicits extends JsonMethodsImplicits:
+  def extractStorageKeys(input: JValue): Either[JsonRpcError, Seq[StorageProofKey]] =
+    import cats.syntax.traverse.*
+    import cats.syntax.either.*
+    input match
       case JArray(elems) =>
         elems.traverse { x =>
           extractQuantity(x)
@@ -21,21 +21,18 @@ object EthProofJsonMethodsImplicits extends JsonMethodsImplicits {
             .leftMap(_ => InvalidParams(s"Invalid param storage proof key: $x"))
         }
       case _ => Left(InvalidParams())
-    }
-  }
 
-  implicit val eth_getProof: JsonMethodDecoder[GetProofRequest] with JsonEncoder[GetProofResponse] =
-    new JsonMethodDecoder[GetProofRequest] with JsonEncoder[GetProofResponse] {
+  given eth_getProof: (JsonMethodDecoder[GetProofRequest] & JsonEncoder[GetProofResponse]) =
+    new JsonMethodDecoder[GetProofRequest] with JsonEncoder[GetProofResponse]:
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetProofRequest] =
-        params match {
+        params match
           case Some(JArray((address: JString) :: storageKeys :: (blockNumber: JValue) :: Nil)) =>
-            for {
+            for
               addressParsed <- extractAddress(address)
               storageKeysParsed <- extractStorageKeys(storageKeys)
               blockNumberParsed <- extractBlockParam(blockNumber)
-            } yield GetProofRequest(addressParsed, storageKeysParsed, blockNumberParsed)
+            yield GetProofRequest(addressParsed, storageKeysParsed, blockNumberParsed)
           case _ => Left(InvalidParams())
-        }
 
       override def encodeJson(t: GetProofResponse): JValue =
         JObject(
@@ -53,6 +50,3 @@ object EthProofJsonMethodsImplicits extends JsonMethodsImplicits {
             )
           })
         )
-    }
-
-}

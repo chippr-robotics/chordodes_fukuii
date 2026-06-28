@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.consensus.mess
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // ── L6: MESS blockchain-level reorg boundary (ECBP-1100 + Spiral deactivation + Olympia re-activation) ─────
 //
@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.testing.Tags._
 // These tests lock that guard so a refactor to MESSConfig cannot silently extend/shrink the
 // active window and accidentally reject valid reorgs (or accept invalid ones) outside the window.
 
-class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
+class MESSIntegrationSpec extends AnyFlatSpec with Matchers:
 
   // ETC mainnet ECBP-1100 canonical block numbers
   private val MessActivation = BigInt(11_380_000)
@@ -44,10 +44,9 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
       localSubchainTD: BigInt,
       proposedSubchainTD: BigInt
   ): Boolean =
-    if (etcMainnetConfig.isActiveAtBlock(localHeadBlock))
+    if etcMainnetConfig.isActiveAtBlock(localHeadBlock) then
       ArtificialFinality.shouldRejectReorg(timeDeltaSeconds, localSubchainTD, proposedSubchainTD)
-    else
-      false
+    else false
 
   // ── Pre-activation: any reorg accepted ───────────────────────────────────
 
@@ -274,4 +273,3 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
     rejectsWith1xReorg(OlympiaBlock) shouldBe true
     rejectsWith1xReorg(OlympiaBlock + BigInt(5_000_000)) shouldBe true
   }
-}

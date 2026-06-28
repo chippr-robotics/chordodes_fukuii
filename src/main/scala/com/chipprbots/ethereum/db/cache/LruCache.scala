@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.utils.NodeCacheConfig
 class LruCache[K <: AnyRef, V <: AnyRef](
     config: NodeCacheConfig,
     notificationHandler: Option[RemovalNotification[K, V] => Unit] = None
-) extends Cache[K, V] {
+) extends Cache[K, V]:
 
   private val lastClear = new AtomicLong(System.nanoTime())
 
@@ -22,37 +22,32 @@ class LruCache[K <: AnyRef, V <: AnyRef](
     CacheBuilder
       .newBuilder()
       .maximumSize(config.maxSize)
-      .removalListener(new cache.RemovalListener[K, V] {
-        def onRemoval(notification: RemovalNotification[K, V]): Unit =
-          if (notification.wasEvicted()) {
-            notificationHandler.foreach(handler => handler(notification))
-          }
-      })
+      .removalListener(
+        new cache.RemovalListener[K, V]:
+          def onRemoval(notification: RemovalNotification[K, V]): Unit =
+            if notification.wasEvicted() then notificationHandler.foreach(handler => handler(notification))
+      )
       .build()
 
-  override def clear(): Unit = {
+  override def clear(): Unit =
     lastClear.getAndSet(System.nanoTime())
     lruCache.invalidateAll()
-  }
 
-  override def getValues: Seq[(K, V)] = {
-    import scala.jdk.CollectionConverters._
+  override def getValues: Seq[(K, V)] =
+    import scala.jdk.CollectionConverters.*
     lruCache.asMap().asScala.toSeq
-  }
 
   override def shouldPersist: Boolean = isTimeToClear
 
   override def get(key: K): Option[V] = Option(lruCache.getIfPresent(key))
 
-  override def update(toRemove: Seq[K], toUpsert: Seq[(K, V)]): Cache[K, V] = {
+  override def update(toRemove: Seq[K], toUpsert: Seq[(K, V)]): Cache[K, V] =
     toRemove.foreach(key => lruCache.invalidate(key))
     toUpsert.foreach(keyValue => lruCache.put(keyValue._1, keyValue._2))
     this
-  }
 
   private def isTimeToClear: Boolean =
     FiniteDuration(System.nanoTime(), TimeUnit.NANOSECONDS) - FiniteDuration(
       lastClear.get(),
       TimeUnit.NANOSECONDS
     ) >= config.maxHoldTime
-}

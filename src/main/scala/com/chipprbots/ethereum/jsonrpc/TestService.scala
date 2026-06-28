@@ -1,13 +1,14 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -21,7 +22,7 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockEnqueued
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportResult
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportedToTop
 import com.chipprbots.ethereum.blockchain.sync.regular.ChainReorganised
-import com.chipprbots.ethereum.consensus.blocks._
+import com.chipprbots.ethereum.consensus.blocks.*
 import com.chipprbots.ethereum.consensus.mining.MiningConfig
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.kec256
@@ -30,26 +31,28 @@ import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
-import com.chipprbots.ethereum.domain.Block._
+import com.chipprbots.ethereum.domain.Block.*
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.jsonrpc.JsonMethodsImplicits._
+import com.chipprbots.ethereum.jsonrpc.JsonMethodsImplicits.*
 import com.chipprbots.ethereum.nodebuilder.TestNode
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.testmode.SealEngineType
 import com.chipprbots.ethereum.testmode.TestModeComponentsProvider
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager.GetPendingTransactionsReq
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.Logger
 
-object TestService {
+object TestService:
   case class GenesisParams(
       author: ByteString,
       difficulty: String,
@@ -133,7 +136,6 @@ object TestService {
 
   case class GetLogHashRequest(transactionHash: ByteString)
   case class GetLogHashResponse(logHash: ByteString)
-}
 
 class TestService(
     blockchain: BlockchainImpl,
@@ -141,17 +143,18 @@ class TestService(
     blockchainWriter: BlockchainWriter,
     stateStorage: StateStorage,
     evmCodeStorage: EvmCodeStorage,
-    pendingTransactionsManager: ActorRef,
+    pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
     miningConfig: MiningConfig,
     testModeComponentsProvider: TestModeComponentsProvider,
     transactionMappingStorage: TransactionMappingStorage,
-    node: TestNode
+    node: TestNode,
+    scheduler: Scheduler
 )(implicit ioRuntime: IORuntime)
-    extends Logger {
-  import node._
+    extends Logger:
+  import node.*
 
-  import TestService._
-  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+  import TestService.*
+  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 
   private var etherbase: Address = miningConfig.coinbase
   private var accountHashWithAdresses: List[(ByteString, Address)] = List()
@@ -160,7 +163,7 @@ class TestService(
   private val preimageCache: collection.concurrent.Map[ByteString, UInt256] =
     new collection.concurrent.TrieMap[ByteString, UInt256]()
 
-  def setChainParams(request: SetChainParamsRequest): ServiceResponse[SetChainParamsResponse] = {
+  def setChainParams(request: SetChainParamsRequest): ServiceResponse[SetChainParamsResponse] =
     node.currentBlockchainConfig.set(buildNewConfig(request.chainParams.blockchainParams))
 
     // clear ledger's cache on test start
@@ -206,11 +209,10 @@ class TestService(
       .sortBy(v => UInt256(v._1))
 
     SetChainParamsResponse().rightNow
-  }
 
   val neverOccurringBlock: Int = Int.MaxValue
 
-  private def buildNewConfig(blockchainParams: BlockchainParams) = {
+  private def buildNewConfig(blockchainParams: BlockchainParams) =
     val byzantiumBlockNumber: BigInt = blockchainParams.byzantiumForkBlock.getOrElse(neverOccurringBlock)
     val istanbulForkBlockNumber: BigInt = blockchainParams.istanbulForkBlock.getOrElse(neverOccurringBlock)
     val berlinForkBlockNumber: BigInt = blockchainParams.berlinForkBlock.getOrElse(neverOccurringBlock)
@@ -236,16 +238,15 @@ class TestService(
       networkId = 1,
       bootstrapNodes = Set()
     )
-  }
 
   private def storeGenesisAccountCodes(accounts: Map[String, GenesisAccount]): Unit =
     accounts
       .collect { case (_, GenesisAccount(_, _, Some(code), _, _)) => code }
       .foreach(code => evmCodeStorage.put(kec256(code), code).commit())
 
-  private def storeGenesisAccountStorageData(accounts: Map[String, GenesisAccount]): Unit = {
+  private def storeGenesisAccountStorageData(accounts: Map[String, GenesisAccount]): Unit =
     val emptyStorage = domain.EthereumUInt256Mpt.storageMpt(
-      Account.EmptyStorageRootHash,
+      Account.EmptyStorageRootHash.value,
       stateStorage.getBackingStorage(0)
     )
     val storagesToPersist = accounts
@@ -255,14 +256,13 @@ class TestService(
 
     val toBigInts: ((UInt256, UInt256)) => (BigInt, BigInt) = { case (a, b) => (a, b) }
     storagesToPersist.foreach(storage => emptyStorage.update(Nil, storage.toSeq.map(toBigInts)))
-  }
 
   def mineBlocks(
       request: MineBlocksRequest
-  ): ServiceResponse[MineBlocksResponse] = {
+  ): ServiceResponse[MineBlocksResponse] =
     def mineBlock(): IO[Unit] =
       getBlockForMining(
-        blockchainReader.getBestBlock().getOrElse(throw new IllegalStateException("No best block found"))
+        blockchainReader.getBestBlock.getOrElse(throw new IllegalStateException("No best block found"))
       )
         .flatMap { blockForMining =>
           testModeComponentsProvider
@@ -276,34 +276,31 @@ class TestService(
         }
 
     def doNTimesF(n: Int)(fn: IO[Unit]): IO[Unit] = fn.flatMap { _ =>
-      if (n <= 1) IO.unit
+      if n <= 1 then IO.unit
       else doNTimesF(n - 1)(fn)
     }
 
     doNTimesF(request.num)(mineBlock()).as(Right(MineBlocksResponse()))
-  }
 
   def modifyTimestamp(
       request: ModifyTimestampRequest
-  ): ServiceResponse[ModifyTimestampResponse] = {
+  ): ServiceResponse[ModifyTimestampResponse] =
     blockTimestamp = request.timestamp
     ModifyTimestampResponse().rightNow
-  }
 
-  def rewindToBlock(request: RewindToBlockRequest): ServiceResponse[RewindToBlockResponse] = {
+  def rewindToBlock(request: RewindToBlockRequest): ServiceResponse[RewindToBlockResponse] =
     pendingTransactionsManager ! PendingTransactionsManager.ClearPendingTransactions
-    (blockchainReader.getBestBlockNumber() until request.blockNum by -1).foreach { n =>
+    (blockchainReader.getBestBlockNumber until request.blockNum by -1).foreach { n =>
       blockchainReader.getBlockHeaderByNumber(n).foreach { header =>
         blockchain.removeBlock(header.hash)
       }
     }
     RewindToBlockResponse().rightNow
-  }
 
   def importRawBlock(
       request: ImportRawBlockRequest
   ): ServiceResponse[ImportRawBlockResponse] =
-    Try(decode(request.blockRlp).toBlock) match {
+    Try(decode(request.blockRlp).toBlock) match
       case Failure(_) =>
         IO.pure(Left(JsonRpcError(-1, "block validation failed!", None)))
       case Success(value) =>
@@ -311,41 +308,38 @@ class TestService(
           .getConsensus(preimageCache)
           .evaluateBranchBlock(value)
           .flatMap(handleResult(value))
-    }
 
   private def handleResult(
       block: Block
   )(blockImportResult: BlockImportResult): ServiceResponse[ImportRawBlockResponse] =
-    blockImportResult match {
+    blockImportResult match
       case BlockImportedToTop(blockImportData) =>
-        val blockHash = s"0x${ByteStringUtils.hash2string(blockImportData.head.block.header.hash)}"
+        val blockHash = s"0x${ByteStringUtils.hash2string(blockImportData.head.block.header.hash.value)}"
         ImportRawBlockResponse(blockHash).rightNow
       case BlockEnqueued | ChainReorganised(_, _, _) =>
-        val blockHash = s"0x${ByteStringUtils.hash2string(block.hash)}"
+        val blockHash = s"0x${ByteStringUtils.hash2string(block.hash.value)}"
         ImportRawBlockResponse(blockHash).rightNow
       case e =>
         log.warn("Block import failed with {}", e)
         IO.pure(Left(JsonRpcError(-1, "block validation failed!", None)))
-    }
 
-  def setEtherbase(req: SetEtherbaseRequest): ServiceResponse[SetEtherbaseResponse] = {
+  def setEtherbase(req: SetEtherbaseRequest): ServiceResponse[SetEtherbaseResponse] =
     etherbase = req.etherbase
     SetEtherbaseResponse().rightNow
-  }
 
-  private def resetPreimages(genesisData: GenesisData): Unit = {
+  private def resetPreimages(genesisData: GenesisData): Unit =
     preimageCache.clear()
-    for {
+    for
       (_, account) <- genesisData.alloc
       storage <- account.storage
       storageKey <- storage.keys
-    } preimageCache.put(crypto.kec256(storageKey.bytes), storageKey)
-  }
+    do preimageCache.put(crypto.kec256(storageKey.bytes), storageKey)
 
-  private def getBlockForMining(parentBlock: Block): IO[PendingBlock] = {
-    implicit val timeout: Timeout = Timeout(20.seconds)
+  private def getBlockForMining(parentBlock: Block): IO[PendingBlock] =
+    given timeout: Timeout = Timeout(20.seconds)
+    given sc: Scheduler = scheduler
     pendingTransactionsManager
-      .askFor[PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)
+      .askForTyped[PendingTransactionsResponse](GetPendingTransactionsReq(_))
       .timeout(timeout.duration)
       .recover { case ex =>
         log.error("Error getting transactions", ex)
@@ -365,7 +359,6 @@ class TestService(
           .pendingBlock
       }
       .timeout(timeout.duration)
-  }
 
   /** Get the list of accounts of size _maxResults in the given _blockHashOrNumber after given _txIndex. In response
     * AddressMap contains addressHash - > address starting from given _addressHash. nexKey field is the next addressHash
@@ -373,25 +366,24 @@ class TestService(
     * @see
     *   https://github.com/ethereum/retesteth/wiki/RPC-Methods#debug_accountrange
     */
-  def getAccountsInRange(request: AccountsInRangeRequest): ServiceResponse[AccountsInRangeResponse] = {
+  def getAccountsInRange(request: AccountsInRangeRequest): ServiceResponse[AccountsInRangeResponse] =
     // This implementation works by keeping a list of know account from the genesis state
     // It might not cover all the cases as an account created inside a transaction won't be there.
 
     val blockOpt = request.parameters.blockHashOrNumber
       .fold(
-        number => blockchainReader.getBlockByNumber(blockchainReader.getBestBranch(), number),
-        blockHash => blockchainReader.getBlockByHash(blockHash)
+        number => blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, number),
+        blockHash => blockchainReader.getBlockByHash(BlockHash(blockHash))
       )
 
-    if (blockOpt.isEmpty) {
-      AccountsInRangeResponse(Map(), ByteString(0)).rightNow
-    } else {
+    if blockOpt.isEmpty then AccountsInRangeResponse(Map(), ByteString(0)).rightNow
+    else
       val blockNumber: BigInt = blockOpt.map(_.header.number).getOrElse(BigInt(0))
       val accountBatch: Seq[(ByteString, Address)] = accountHashWithAdresses.view
         .dropWhile { case (hash, _) => UInt256(hash) < UInt256(request.parameters.addressHash) }
         .filter { case (_, address) =>
           blockchainReader
-            .getAccount(blockchainReader.getBestBranch(), address, blockNumber)
+            .getAccount(blockchainReader.getBestBranch, address, blockNumber)
             .isDefined
         }
         .take(request.parameters.maxResults + 1)
@@ -405,12 +397,9 @@ class TestService(
       AccountsInRangeResponse(
         addressMap = addressMap,
         nextKey =
-          if (accountBatch.size > request.parameters.maxResults)
-            accountBatch.last._1
+          if accountBatch.size > request.parameters.maxResults then accountBatch.last._1
           else UInt256(0).bytes
       ).rightNow
-    }
-  }
 
   /** Get the list of storage values starting from _begin and up to _begin + _maxResults at given block. nexKey field is
     * the next key hash if any key left in the state, or 0x00 otherwise.
@@ -420,24 +409,23 @@ class TestService(
     * @see
     *   https://github.com/ethereum/retesteth/wiki/RPC-Methods#debug_storagerangeat
     */
-  def storageRangeAt(request: StorageRangeRequest): ServiceResponse[StorageRangeResponse] = {
+  def storageRangeAt(request: StorageRangeRequest): ServiceResponse[StorageRangeResponse] =
 
     val blockOpt = request.parameters.blockHashOrNumber
       .fold(
-        number => blockchainReader.getBlockByNumber(blockchainReader.getBestBranch(), number),
-        hash => blockchainReader.getBlockByHash(hash)
+        number => blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, number),
+        hash => blockchainReader.getBlockByHash(BlockHash(hash))
       )
 
-    (for {
+    (for
       block <- blockOpt.toRight(StorageRangeResponse(complete = false, Map.empty, None))
       accountOpt = blockchainReader.getAccount(
-        blockchainReader.getBestBranch(),
+        blockchainReader.getBestBranch,
         Address(request.parameters.address),
         block.header.number
       )
       account <- accountOpt.toRight(StorageRangeResponse(complete = false, Map.empty, None))
-
-    } yield {
+    yield
       // This implementation might be improved. It is working for most tests in ETS but might be
       // not really efficient and would not work outside of a test context. We simply iterate over
       // every key known by the preimage cache.
@@ -446,7 +434,7 @@ class TestService(
         .view
         .dropWhile { case (hash, _) => UInt256(hash) < request.parameters.begin }
         .map { case (keyHash, keyValue) =>
-          (keyHash.toArray, keyValue, blockchain.getAccountStorageAt(account.storageRoot, keyValue, true))
+          (keyHash.toArray, keyValue, blockchain.getAccountStorageAt(account.storageRoot.value, keyValue, true))
         }
         .filterNot { case (_, _, storageValue) => storageValue == ByteString(0) }
         .take(request.parameters.maxResults + 1)
@@ -463,27 +451,23 @@ class TestService(
         storage = storage,
         nextKey = next.headOption.map { case (hash, _, _) => UInt256(hash).toHexString }
       )
-    }).fold(identity, identity).rightNow
-  }
+    ).fold(identity, identity).rightNow
 
-  def getLogHash(request: GetLogHashRequest): ServiceResponse[GetLogHashResponse] = {
-    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.TxLogEntryEnc
+  def getLogHash(request: GetLogHashRequest): ServiceResponse[GetLogHashResponse] =
+    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 
-    val result = for {
+    val result = for
       transactionLocation <- transactionMappingStorage.get(request.transactionHash)
-      block <- blockchainReader.getBlockByHash(transactionLocation.blockHash)
+      block <- blockchainReader.getBlockByHash(BlockHash(transactionLocation.blockHash))
       _ <- block.body.transactionList.lift(transactionLocation.txIndex)
       receipts <- blockchainReader.getReceiptsByHash(block.header.hash)
       logs = receipts.flatMap(receipt => receipt.logs)
-      rlpList: RLPList = RLPList(logs.map(_.toRLPEncodable).toList: _*)
-    } yield ByteString(crypto.kec256(rlp.encode(rlpList)))
+      rlpList: RLPList = RLPList(logs.map(_.toRLPEncodable).toList*)
+    yield ByteString(crypto.kec256(rlp.encode(rlpList)))
 
     result.fold(GetLogHashResponse(emptyLogRlpHash))(rlpHash => GetLogHashResponse(rlpHash)).rightNow
-  }
 
   private val emptyLogRlpHash: ByteString = ByteString(crypto.kec256(rlp.encode(RLPList())))
 
-  implicit private class RichResponse[A](response: A) {
+  implicit private class RichResponse[A](response: A):
     def rightNow: IO[Either[JsonRpcError, A]] = IO.pure(Right(response))
-  }
-}

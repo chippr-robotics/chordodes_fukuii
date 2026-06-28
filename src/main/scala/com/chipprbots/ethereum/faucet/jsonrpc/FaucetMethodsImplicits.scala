@@ -14,19 +14,18 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsMethodDecoder
 
-object FaucetMethodsImplicits extends JsonMethodsImplicits {
+object FaucetMethodsImplicits extends JsonMethodsImplicits:
 
-  implicit val sendFundsRequestDecoder: JsonMethodDecoder[SendFundsRequest] = {
+  given sendFundsRequestDecoder: JsonMethodDecoder[SendFundsRequest] = {
     case Some(JArray((input: JString) :: Nil)) => extractAddress(input).map(SendFundsRequest.apply)
     case _                                     => Left(InvalidParams())
   }
 
-  implicit val sendFundsResponseEncoder: JsonEncoder[SendFundsResponse] = (t: SendFundsResponse) => encodeAsHex(t.txId)
+  given sendFundsResponseEncoder: JsonEncoder[SendFundsResponse] = (t: SendFundsResponse) => encodeAsHex(t.txId)
 
-  implicit val statusRequestDecoder: JsonMethodDecoder[StatusRequest] = new NoParamsMethodDecoder(StatusRequest())
+  given statusRequestDecoder: JsonMethodDecoder[StatusRequest] = new NoParamsMethodDecoder(StatusRequest())
 
-  implicit val statusEncoder: JsonEncoder[StatusResponse] = (t: StatusResponse) =>
+  given statusEncoder: JsonEncoder[StatusResponse] = (t: StatusResponse) =>
     JObject(
       "status" -> JString(t.status.toString)
     )
-}

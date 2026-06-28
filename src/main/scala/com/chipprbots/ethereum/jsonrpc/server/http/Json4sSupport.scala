@@ -14,7 +14,7 @@ import org.json4s.Serialization
 /** Pekko HTTP support for json4s serialization Compatibility layer replacing
   * de.heikoseeberger.akkahttpjson4s.Json4sSupport
   */
-trait Json4sSupport {
+trait Json4sSupport:
   implicit def serialization: Serialization
 
   implicit def formats: Formats
@@ -32,9 +32,7 @@ trait Json4sSupport {
         HttpEntity(MediaTypes.`application/json`, serialization.write(value: AnyRef))
       }
     )
-}
 
-object Json4sSupport extends Json4sSupport {
+object Json4sSupport extends Json4sSupport:
   implicit override val serialization: Serialization = org.json4s.native.Serialization
   implicit override val formats: Formats = org.json4s.DefaultFormats
-}

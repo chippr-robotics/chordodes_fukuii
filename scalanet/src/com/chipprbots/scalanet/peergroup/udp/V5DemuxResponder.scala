@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 
 import scala.util.control.NonFatal
 
-import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import com.chipprbots.scalanet.peergroup.CloseableQueue
 import com.typesafe.scalalogging.LazyLogging

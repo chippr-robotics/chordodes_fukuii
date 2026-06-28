@@ -24,6 +24,9 @@ inThisBuild(
     ),
     licenses := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
     developers := List(),
+    scalaVersion := `scala-3`,                            // must be in inThisBuild for scalafixSemanticdb.revision
+    semanticdbEnabled := true,                            // required for scalafix semantic rules
+    semanticdbVersion := scalafixSemanticdb.revision,
     // Add reliable resolvers to avoid transient HTTP 503 errors
     resolvers ++= Seq(
       Resolver.mavenCentral,
@@ -58,8 +61,12 @@ val baseScalacOptions = Seq(
 
 // Scala 3 warning and feature options
 val scala3Options = Seq(
+  "-source:future",  // Enforce Scala 3 future syntax (import x.* required, not import x._)
+  "-language:adhocExtensions", // Allow extending non-open classes (TestKit, Pekko test patterns)
   "-Wunused:all", // Enable unused warnings for Scala 3 (required for scalafix)
-  "-Wconf:msg=Compiler synthesis of Manifest:s,cat=deprecation:s", // Suppress Manifest deprecation warnings
+  "-Wconf:id=E198:error", // Ratchet step 4/4: unused symbols are build errors (Scala 3: id=E198, cat=unused is not valid)
+  "-Wconf:cat=feature:s", // Suppress adhocExtensions feature warnings (extending non-open Pekko/library classes)
+  "-Wconf:cat=unchecked:error", // Ratchet step 4/4: unchecked patterns are build errors
   "-Ykind-projector", // Scala 3 replacement for kind-projector plugin
   "-Xmax-inlines:64" // Increase inline depth limit for complex boopickle/circe derivations
 )
@@ -74,10 +81,6 @@ def commonSettings(projectName: String): Seq[sbt.Def.Setting[_]] = Seq(
   // Scalanet snapshots are published to Sonatype after each build (now defined in inThisBuild resolvers).
   (Test / testOptions) += Tests
     .Argument(TestFrameworks.ScalaTest, "-l", "EthashMinerSpec"), // miner tests disabled by default
-  (Test / testOptions) += Tests
-    .Argument(TestFrameworks.ScalaTest, "-l", "FlakyTest"), // timing-sensitive tests excluded by default
-  (Test / testOptions) += Tests
-    .Argument(TestFrameworks.ScalaTest, "-l", "DisabledTest"), // known-broken tests excluded by default
   (Test / testOptions) += Tests
     .Argument(TestFrameworks.ScalaTest, "-l", "IntegrationTest"), // network-dependent tests excluded by default
   // Configure scalacOptions for Scala 3
@@ -341,12 +344,6 @@ lazy val node = {
     .settings(inConfig(Evm)(Defaults.testSettings :+ (Test / parallelExecution := true)): _*)
     .settings(inConfig(Rpc)(Defaults.testSettings :+ (Test / parallelExecution := true)): _*)
     .settings(
-      // protobuf compilation
-      // Into a subdirectory of src_managed to avoid it deleting other generated files; see https://github.com/sbt/sbt-buildinfo/issues/149
-      (Compile / PB.targets) := Seq(
-        scalapb.gen() -> (Compile / sourceManaged).value / "protobuf"
-      ),
-      // protobuf API version file is now provided in src/main/resources/extvm/VERSION
       // Packaging
       maintainer := "chippr-robotics@github.com",
       (Compile / mainClass) := Some("com.chipprbots.ethereum.App"),
@@ -391,10 +388,7 @@ lazy val node = {
       }
     )
 
-  if (!nixBuild)
-    node
-  else
-    node.settings((Compile / PB.protocExecutable) := file("protoc"))
+  node
 
 }
 
@@ -404,9 +398,7 @@ coverageMinimumStmtTotal := 70
 coverageFailOnMinimum := true
 coverageHighlighting := true
 coverageExcludedPackages := Seq(
-  "com\\.chipprbots\\.ethereum\\.extvm\\.msg.*", // Protobuf generated code
-  "com\\.chipprbots\\.ethereum\\.utils\\.BuildInfo", // BuildInfo generated code
-  ".*\\.protobuf\\..*" // All protobuf packages
+  "com\\.chipprbots\\.ethereum\\.utils\\.BuildInfo" // BuildInfo generated code
 ).mkString(";")
 coverageExcludedFiles := Seq(
   ".*/src_managed/.*", // All managed sources
@@ -520,13 +512,13 @@ addCommandAlias(
 // These commands enable selective test execution based on ScalaTest tags
 
 // testEssential - Tier 1: Essential tests (< 5 minutes)
-// Runs fast unit tests, excludes integration, slow, sync, and disabled tests
-// Sync tests are excluded because they involve complex actor choreography (ADR-017)
-// DisabledTest is excluded because these tests are known to be broken or flaky
+// Runs fast unit tests, excludes integration and slow tests.
+// SlowTest: legitimately too slow for the daily commit gate (runs in testStandard).
+// IntegrationTest: network-dependent or actor-choreography tests that belong in Tier 2+.
 addCommandAlias(
   "testEssential",
   """; compile-all
-    |; testOnly -- -l SlowTest -l IntegrationTest -l SyncTest -l DisabledTest -l FlakyTest
+    |; testOnly -- -l SlowTest -l IntegrationTest
     |; rlp / test
     |; bytes / test
     |; crypto / test
@@ -534,32 +526,37 @@ addCommandAlias(
 )
 
 // testStandard - Tier 2: Standard tests (< 30 minutes)
-// Runs unit and integration tests, excludes benchmarks, comprehensive ethereum tests, and disabled tests
-// DisabledTest is excluded because these tests are known to be broken or flaky
-// SyncTest is excluded because these tests involve complex actor choreography (ADR-017)
-//   that times out under load — same reason testEssential excludes them
+// Runs unit and integration tests. Excludes only Tier 3 tests:
+// BenchmarkTest/EthereumTest: the 3-hour compliance suite — belongs in testComprehensive only.
 addCommandAlias(
   "testStandard",
   """; compile-all
-    |; testOnly -- -l BenchmarkTest -l EthereumTest -l SyncTest -l DisabledTest -l FlakyTest
+    |; testOnly -- -l BenchmarkTest -l EthereumTest
     |""".stripMargin
 )
 
 // testComprehensive - Tier 3: Comprehensive tests (< 3 hours)
-// Runs all tests including ethereum/tests compliance suite
-// Excludes FlakyTest and DisabledTest to ensure reliable nightly builds
-// SyncTest is excluded for the same reason testEssential and testStandard exclude it:
-//   complex actor choreography (ADR-017) times out under CI load
-//   (RegularSyncSpec, SyncControllerSpec, BlockchainHostActorSpec, FastSyncSpec,
-//   SyncStateDownloaderStateSpec — all "timeout during fishForSpecificMessage").
+// Runs all tests including the ethereum/tests compliance suite. No exclusions.
 addCommandAlias(
   "testComprehensive",
   """; compile-all
     |; rlp / test
     |; bytes / test
     |; crypto / test
-    |; testOnly -- -l SyncTest -l FlakyTest -l DisabledTest
-    |; IntegrationTest / testOnly -- -l SyncTest -l FlakyTest -l DisabledTest
+    |; testOnly
+    |; IntegrationTest / testOnly
+    |""".stripMargin
+)
+
+// testEthSmoke - Fast ETH-path smoke target (< 60s)
+// Runs only EthSmoke-tagged vectors in the IntegrationTest config to exercise the ETH
+// execution path (chainId=1, forTimestamp dispatch) below testComprehensive.
+// Mirrors the testEssential pattern (compile-all + filtered testOnly), but scoped to
+// IntegrationTest and using an inclusion filter (-n EthSmoke) instead of exclusions.
+addCommandAlias(
+  "testEthSmoke",
+  """; compile-all
+    |; IntegrationTest / testOnly -- -n EthSmoke
     |""".stripMargin
 )
 
@@ -571,6 +568,13 @@ addCommandAlias("testDatabase", "testOnly -- -n DatabaseTest")
 addCommandAlias("testRLP", "testOnly -- -n RLPTest")
 addCommandAlias("testMPT", "testOnly -- -n MPTTest")
 addCommandAlias("testEthereum", "testOnly -- -n EthereumTest")
+// Domain test commands — added in P12 (tag taxonomy audit)
+// ConsensusTest (284), RPCTest (219), OlympiaTest (201), StateTest (63), SyncTest (84)
+addCommandAlias("testConsensus", "testOnly -- -n ConsensusTest")
+addCommandAlias("testRPC", "testOnly -- -n RPCTest")
+addCommandAlias("testState", "testOnly -- -n StateTest")
+addCommandAlias("testOlympia", "testOnly -- -n OlympiaTest")
+addCommandAlias("testSync", "testOnly -- -n SyncTest")
 
 // Scapegoat configuration for Scala 3
 (ThisBuild / scapegoatVersion) := "3.3.6" // first cross-build for Scala 3.3.8
@@ -579,6 +583,5 @@ scapegoatConsoleOutput := false
 scapegoatDisabledInspections := Seq("UnsafeTraversableMethods")
 scapegoatIgnoredFiles := Seq(
   ".*/src_managed/.*",
-  ".*/target/.*protobuf/.*",
   ".*/BuildInfo\\.scala"
 )

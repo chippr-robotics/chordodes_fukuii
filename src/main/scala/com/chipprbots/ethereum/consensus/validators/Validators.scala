@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.ledger.BlockExecutionError.ValidationBeforeExecEr
 import com.chipprbots.ethereum.ledger.BlockExecutionSuccess
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-trait Validators {
+trait Validators:
   def blockValidator: BlockValidator
   def blockHeaderValidator: BlockHeaderValidator
   def signedTransactionValidator: SignedTransactionValidator
@@ -45,4 +45,3 @@ trait Validators {
       receipts: Seq[Receipt],
       gasUsed: BigInt
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockExecutionSuccess]
-}

@@ -5,13 +5,11 @@ import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.spec.{GCMParameterSpec, SecretKeySpec}
 
-import cats.effect.{IO, Ref}
-import cats.implicits._
+import cats.effect.IO
 import org.bouncycastle.asn1.sec.SECNamedCurves
-import org.bouncycastle.crypto.agreement.ECDHBasicAgreement
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.generators.HKDFBytesGenerator
-import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters, HKDFParameters}
+import org.bouncycastle.crypto.params.{ECDomainParameters, HKDFParameters}
 import org.bouncycastle.jcajce.provider.digest.SHA256
 import scodec.bits.ByteVector
 

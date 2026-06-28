@@ -9,11 +9,10 @@ import scala.concurrent.duration.DurationInt
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.BlockHeadersStorage
 import com.chipprbots.ethereum.db.storage.BlockNumberMappingStorage
-
 import com.chipprbots.ethereum.nodebuilder.tooling.PeriodicConsistencyCheck.ConsistencyCheck
 import com.chipprbots.ethereum.utils.Logger
 
-object PeriodicConsistencyCheck {
+object PeriodicConsistencyCheck:
   def start(
       appStateStorage: AppStateStorage,
       blockNumberMappingStorage: BlockNumberMappingStorage,
@@ -39,7 +38,6 @@ object PeriodicConsistencyCheck {
 
   def tick(timers: TimerScheduler[ConsistencyCheck]): Unit =
     timers.startSingleTimer(Tick, 10.minutes)
-}
 
 case class PeriodicConsistencyCheck(
     timers: TimerScheduler[ConsistencyCheck],
@@ -48,21 +46,21 @@ case class PeriodicConsistencyCheck(
     blockHeadersStorage: BlockHeadersStorage,
     shutdown: () => Unit,
     engineApiEnabled: Boolean = false
-) extends Logger {
-  import PeriodicConsistencyCheck._
+) extends Logger:
+  import PeriodicConsistencyCheck.*
 
   def check(): Behavior[ConsistencyCheck] = Behaviors.receiveMessage { case Tick =>
     // Match the skip conditions in StdNode.runDBConsistencyCheck: the post-SNAP best block
     // points to a pivot header without the full 0..pivot chain, the mid-SNAP state is even
     // more partial (Bug 28), and Engine API mode uses optimistic imports that don't fill in
     // the chain from genesis. All three would misfire the shutdown.
-    if (appStateStorage.isSnapSyncDone()) {
+    if appStateStorage.isSnapSyncDone() then
       log.debug("Skipping periodic consistency check: SNAP sync stores only pivot block header")
-    } else if (appStateStorage.isSnapSyncInProgress()) {
+    else if appStateStorage.isSnapSyncInProgress() then
       log.debug("Skipping periodic consistency check: SNAP sync in progress")
-    } else if (engineApiEnabled) {
+    else if engineApiEnabled then
       log.debug("Skipping periodic consistency check: Engine API mode uses optimistic block import")
-    } else {
+    else
       log.debug("Running a storage consistency check")
       StorageConsistencyChecker.checkStorageConsistency(
         appStateStorage.getBestBlockNumber(),
@@ -70,8 +68,6 @@ case class PeriodicConsistencyCheck(
         blockHeadersStorage,
         shutdown
       )(log)
-    }
     tick(timers)
     Behaviors.same
   }
-}

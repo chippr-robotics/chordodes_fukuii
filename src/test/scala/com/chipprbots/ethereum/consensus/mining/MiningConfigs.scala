@@ -2,14 +2,14 @@ package com.chipprbots.ethereum.consensus.mining
 
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.consensus.pow.EthashConfig
 import com.chipprbots.ethereum.domain.Address
 
 /** Provides utility values used throughout tests */
-object MiningConfigs {
+object MiningConfigs:
   final val blockCacheSize = 30
   final val coinbaseAddressNum = 42
   final val coinbase: Address = Address(coinbaseAddressNum)
@@ -35,4 +35,3 @@ object MiningConfigs {
   )
 
   final val fullMiningConfig: FullMiningConfig[EthashConfig] = FullMiningConfig(miningConfig, ethashConfig)
-}

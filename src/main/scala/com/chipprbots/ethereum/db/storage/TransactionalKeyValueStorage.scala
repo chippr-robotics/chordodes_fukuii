@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
   * perform updates return [[com.chipprbots.ethereum.db.dataSource.DataSourceBatchUpdate]] meaning no updates are
   * actually saved in the underlying DataSource until `.commit()` is called.
   */
-trait TransactionalKeyValueStorage[K, V] {
+trait TransactionalKeyValueStorage[K, V]:
 
   val dataSource: DataSource
   val namespace: IndexedSeq[Byte]
@@ -66,4 +66,3 @@ trait TransactionalKeyValueStorage[K, V] {
         (kseq, vseq)
       }
     }
-}

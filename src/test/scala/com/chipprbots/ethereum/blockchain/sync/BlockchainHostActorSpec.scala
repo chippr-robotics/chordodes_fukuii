@@ -1,12 +1,11 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.Props
-import org.apache.pekko.testkit.TestActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.language.postfixOps
 
 import org.bouncycastle.util.encoders.Hex
@@ -15,11 +14,13 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Timeouts
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
+import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.Receipt
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.mpt.ExtensionNode
 import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.HexPrefix
@@ -27,39 +28,34 @@ import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguration
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
-import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
-class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
+class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
 
-  it should "return Receipts for block hashes" taggedAs (UnitTest, SyncTest) in new TestSetup {
-    peerEventBus.expectMsg(
-      Subscribe(
-        MessageClassifier(
-          Set(
-            Codes.GetPooledTransactionsCode,
-            Codes.GetNodeDataCode,
-            Codes.GetReceiptsCode,
-            Codes.GetBlockBodiesCode,
-            Codes.GetBlockHeadersCode
-          ),
-          PeerSelector.AllPeers
-        )
-      )
+  it should "return Receipts for block hashes" taggedAs (UnitTest) in new TestSetup:
+    peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
+      Set(
+        Codes.GetPooledTransactionsCode,
+        Codes.GetNodeDataCode,
+        Codes.GetReceiptsCode,
+        Codes.GetBlockBodiesCode,
+        Codes.GetBlockHeadersCode
+      ),
+      PeerSelector.AllPeers
     )
 
     // given
@@ -71,27 +67,28 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     val receipts: Seq[Seq[Receipt]] = Seq(Seq(), Seq())
 
     blockchainWriter
-      .storeReceipts(receiptsHashes.head, receipts.head)
-      .and(blockchainWriter.storeReceipts(receiptsHashes(1), receipts(1)))
+      .storeReceipts(BlockHash(receiptsHashes.head), receipts.head)
+      .and(blockchainWriter.storeReceipts(BlockHash(receiptsHashes(1)), receipts(1)))
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(ETHPackets.GetReceipts(BigInt(0), receiptsHashes), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(ETHPackets.GetReceipts(BigInt(0), receiptsHashes), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         ETHPackets.Receipts68(
           BigInt(0),
           com.chipprbots.ethereum.rlp
-            .RLPList(receipts.map(rs => com.chipprbots.ethereum.rlp.RLPList(rs.map(_.toRLPEncodable): _*)): _*)
+            .RLPList(receipts.map(rs => com.chipprbots.ethereum.rlp.RLPList(rs.map(_.toRLPEncodable)*))*)
         ),
         peerId
       )
     )
-  }
 
-  it should "return BlockBodies for block hashes" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "return BlockBodies for block hashes" taggedAs (UnitTest) in new TestSetup:
     // given
     val blockBodiesHashes: Seq[ByteString] = Seq(
       ByteString(Hex.decode("a218e2c611f21232d857e3c8cecdcdf1f65f25a4477f98f6f47e4063807f2308")),
@@ -101,20 +98,21 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     val blockBodies: Seq[BlockBody] = Seq(baseBlockBody, baseBlockBody)
 
     blockchainWriter
-      .storeBlockBody(blockBodiesHashes(0), blockBodies(0))
-      .and(blockchainWriter.storeBlockBody(blockBodiesHashes(1), blockBodies(1)))
+      .storeBlockBody(BlockHash(blockBodiesHashes(0)), blockBodies(0))
+      .and(blockchainWriter.storeBlockBody(BlockHash(blockBodiesHashes(1)), blockBodies(1)))
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(ETHPackets.GetBlockBodies(BigInt(0), blockBodiesHashes), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(ETHPackets.GetBlockBodies(BigInt(0), blockBodiesHashes), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(ETHPackets.BlockBodies(BigInt(0), blockBodies), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(ETHPackets.BlockBodies(BigInt(0), blockBodies), peerId)
     )
-  }
 
-  it should "return block headers by block number" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "return block headers by block number" taggedAs (UnitTest) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 4)
@@ -127,18 +125,18 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 2, 0, reverse = false), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 2, 0, reverse = false), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
   it should "return block headers by block number when response is shorter then what was requested" taggedAs (
-    UnitTest,
-    SyncTest
-  ) in new TestSetup {
+    UnitTest
+  ) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 4)
@@ -149,15 +147,16 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 3, 0, reverse = false), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 3, 0, reverse = false), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
-  it should "return block headers by block number in reverse order" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "return block headers by block number in reverse order" taggedAs (UnitTest) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 2)
@@ -169,15 +168,16 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 2, 0, reverse = true), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 2, 0, reverse = true), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
-  it should "return block headers by block hash" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "return block headers by block hash" taggedAs (UnitTest) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 4)
@@ -190,15 +190,16 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 2, 0, reverse = false), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), 2, 0, reverse = false), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
-  it should "return block headers by block hash when skipping headers" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "return block headers by block hash when skipping headers" taggedAs (UnitTest) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 5)
@@ -212,21 +213,21 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(
-      ETHPackets.GetBlockHeaders(BigInt(0), Right(firstHeader.hash), maxHeaders = 2, skip = 1, reverse = false),
-      peerId
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(
+        ETHPackets.GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), maxHeaders = 2, skip = 1, reverse = false),
+        peerId
+      )
     )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
   it should "return block headers in reverse when there are skipped blocks" taggedAs (
-    UnitTest,
-    SyncTest
-  ) in new TestSetup {
+    UnitTest
+  ) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 1)
@@ -237,18 +238,18 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 2, 1, reverse = true), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), 2, 1, reverse = true), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
   it should "return block headers in reverse when there are skipped blocks and we are asking for blocks before genesis" taggedAs (
-    UnitTest,
-    SyncTest
-  ) in new TestSetup {
+    UnitTest
+  ) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 1)
@@ -259,18 +260,18 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 3, 1, reverse = true), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), 3, 1, reverse = true), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
   it should "return block headers in reverse when there are skipped blocks ending at genesis" taggedAs (
-    UnitTest,
-    SyncTest
-  ) in new TestSetup {
+    UnitTest
+  ) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 4)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 2)
@@ -281,18 +282,19 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 4, 1, reverse = true), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), 4, 1, reverse = true), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader, blockchainReader.genesisHeader)),
         peerId
       )
     )
-  }
 
-  it should "return evm code for hash" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "return evm code for hash" taggedAs (UnitTest) in new TestSetup:
     // given
     val fakeEvmCode: ByteString = ByteString(Hex.decode("ffddaaffddaaffddaaffddaaffddaa"))
     val evmCodeHash: ByteString = ByteString(crypto.kec256(fakeEvmCode.toArray[Byte]))
@@ -300,13 +302,12 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     storagesInstance.storages.evmCodeStorage.put(evmCodeHash, fakeEvmCode).commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetNodeData(Seq(evmCodeHash)), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(MessageFromPeer(GetNodeData(Seq(evmCodeHash)), peerId))
 
     // then
-    networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessage(NodeData(Seq(fakeEvmCode)), peerId))
-  }
+    networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessageCmd(NodeData(Seq(fakeEvmCode)), peerId))
 
-  it should "return mptNode for hash" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "return mptNode for hash" taggedAs (UnitTest) in new TestSetup:
     // given
     val exampleNibbles: ByteString = ByteString(HexPrefix.bytesToNibbles(Hex.decode("ffddaa")))
     val exampleHash: ByteString = ByteString(Hex.decode("ab" * 32))
@@ -319,28 +320,27 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     )
 
     // when
-    blockchainHost ! MessageFromPeer(GetNodeData(Seq(ByteString(extensionNode.hash))), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetNodeData(Seq(ByteString(extensionNode.hash))), peerId)
+    )
 
     // then
-    networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessage(NodeData(Seq(extensionNode.toBytes)), peerId))
-  }
+    networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessageCmd(NodeData(Seq(extensionNode.toBytes)), peerId))
 
-  trait TestSetup extends EphemBlockchainTestSetup {
-    implicit override lazy val system: ActorSystem = ActorSystem("BlockchainHostActor_System")
+  trait TestSetup extends EphemBlockchainTestSetup:
+    implicit override lazy val classicSystem: ActorSystem = ActorSystem("BlockchainHostActor_System")
 
     blockchainWriter.storeBlockHeader(Fixtures.Blocks.Genesis.header).commit()
 
-    val peerConf: PeerConfiguration = new PeerConfiguration {
-      override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration {
+    val peerConf: PeerConfiguration = new PeerConfiguration:
+      override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration:
         val maxBlocksHeadersPerMessage: Int = 200
         val maxBlocksBodiesPerMessage: Int = 200
         val maxReceiptsPerMessage: Int = 200
         val maxMptComponentsPerMessage: Int = 200
-      }
-      override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration {
+      override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration:
         override val waitForTcpAckTimeout: FiniteDuration = Timeouts.normalTimeout
         override val waitForHandshakeTimeout: FiniteDuration = Timeouts.normalTimeout
-      }
       override val waitForHelloTimeout: FiniteDuration = 30 seconds
       override val waitForStatusTimeout: FiniteDuration = 30 seconds
       override val waitForChainCheckTimeout: FiniteDuration = 15 seconds
@@ -362,7 +362,6 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       override val longBlacklistDuration: FiniteDuration = 3.minutes
       override val statSlotDuration: FiniteDuration = 1.minute
       override val statSlotCount: Int = 30
-    }
 
     val baseBlockHeader = Fixtures.Blocks.Block3125369.header
     val baseBlockBody: BlockBody = BlockBody(Nil, Nil)
@@ -373,18 +372,15 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     val networkPeerManager: TestProbe = TestProbe()
     val pendingTxManager: TestProbe = TestProbe()
 
-    val blockchainHost: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new BlockchainHostActor(
+    val blockchainHost: org.apache.pekko.actor.typed.ActorRef[BlockchainHostActor.Command] =
+      classicSystem.spawn(
+        BlockchainHostActor(
           blockchainReader,
           storagesInstance.storages.evmCodeStorage,
           peerConf,
           peerEventBus.ref,
           networkPeerManager.ref,
-          pendingTxManager.ref
-        )
+          pendingTxManager.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command]
+        ),
+        s"blockchain-host-${System.nanoTime()}"
       )
-    )
-  }
-
-}

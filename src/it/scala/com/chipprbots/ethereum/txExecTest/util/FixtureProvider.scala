@@ -9,28 +9,28 @@ import scala.util.Try
 
 import org.bouncycastle.util.encoders.Hex
 
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
+import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 import com.chipprbots.ethereum.db.cache.AppCaches
 import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.components.EphemDataSourceComponent
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
-import com.chipprbots.ethereum.db.storage._
 import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
 import com.chipprbots.ethereum.db.storage.pruning.PruningMode
-import com.chipprbots.ethereum.domain.Account._
-import com.chipprbots.ethereum.domain.BlockBody._
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.Account.*
+import com.chipprbots.ethereum.domain.BlockBody.*
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
 import com.chipprbots.ethereum.mpt.BranchNode
 import com.chipprbots.ethereum.mpt.ExtensionNode
 import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MptNode
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
-import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
 import com.chipprbots.ethereum.utils.Config
 
-object FixtureProvider {
+object FixtureProvider:
 
   case class Fixture(
       blockByNumber: Map[BigInt, Block],
@@ -44,9 +44,9 @@ object FixtureProvider {
   )
 
   // scalastyle:off
-  def prepareStorages(blockNumber: BigInt, fixtures: Fixture): BlockchainStorages = {
+  def prepareStorages(blockNumber: BigInt, fixtures: Fixture): BlockchainStorages =
 
-    val storages: BlockchainStorages = new BlockchainStorages with AppCaches with EphemDataSourceComponent {
+    val storages: BlockchainStorages = new BlockchainStorages with AppCaches with EphemDataSourceComponent:
 
       override val receiptStorage: ReceiptStorage = new ReceiptStorage(dataSource)
       override val evmCodeStorage: EvmCodeStorage = new EvmCodeStorage(dataSource)
@@ -67,7 +67,6 @@ object FixtureProvider {
             Some(CachedReferenceCountedStorage.saveOnlyNotificationHandler(nodeStorage))
           )
         )
-    }
 
     // Pre-load ALL EVM code from fixtures into storage
     // This is necessary because some fixtures have account codeHash values that don't match
@@ -80,7 +79,7 @@ object FixtureProvider {
     fixtures.blockHeaders.toSeq
       .sortBy { case (_, header) => header.number }
       .foreach { case (originalHash, header) =>
-        if (header.number <= blockNumber) {
+        if header.number <= blockNumber then
           val receiptsUpdates = fixtures.receipts
             .get(originalHash)
             .map(r => storages.receiptStorage.put(originalHash, r))
@@ -94,45 +93,37 @@ object FixtureProvider {
             .commit()
 
           def traverse(nodeHash: ByteString): Unit =
-            fixtures.stateMpt.get(nodeHash).orElse(fixtures.contractMpts.get(nodeHash)) match {
+            fixtures.stateMpt.get(nodeHash).orElse(fixtures.contractMpts.get(nodeHash)) match
               case Some(m: BranchNode) =>
                 storages.stateStorage.saveNode(ByteString(m.hash), m.toBytes, header.number)
                 m.children.collect { case HashNode(hash) => traverse(ByteString(hash)) }
 
               case Some(m: ExtensionNode) =>
                 storages.stateStorage.saveNode(ByteString(m.hash), m.toBytes, header.number)
-                m.next match {
+                m.next match
                   case HashNode(hash) if hash.nonEmpty => traverse(ByteString(hash))
                   case _                               =>
-                }
 
               case Some(m: LeafNode) =>
                 storages.stateStorage.saveNode(ByteString(m.hash), m.toBytes, header.number)
                 Try(m.value.toArray[Byte].toAccount).toOption.foreach { account =>
                   // Note: We've already saved all EVM code above, so this check is now redundant
                   // but kept for backwards compatibility with fixtures that have correct codeHash
-                  if (account.codeHash != DumpChainActor.emptyEvm) {
-                    fixtures.evmCode.get(account.codeHash).foreach { code =>
-                      storages.evmCodeStorage.put(account.codeHash, code).commit()
+                  if account.codeHash.value != DumpChainActor.emptyEvm then
+                    fixtures.evmCode.get(account.codeHash.value).foreach { code =>
+                      storages.evmCodeStorage.put(account.codeHash.value, code).commit()
                     }
-                  }
-                  if (account.storageRoot != DumpChainActor.emptyStorage) {
-                    traverse(account.storageRoot)
-                  }
+                  if account.storageRoot.value != DumpChainActor.emptyStorage then traverse(account.storageRoot.value)
                 }
 
               case _ =>
 
-            }
-
-          traverse(header.stateRoot)
-        }
+          traverse(header.stateRoot.value)
       }
 
     storages
-  }
 
-  def loadFixtures(path: String): Fixture = {
+  def loadFixtures(path: String): Fixture =
     val bodies: Map[ByteString, BlockBody] =
       withClose(Source.fromFile(getClass.getResource(s"$path/bodies.txt").getPath))(
         _.getLines()
@@ -230,7 +221,6 @@ object FixtureProvider {
       contractTrees,
       evmCode
     )
-  }
 
   private def withClose[A, B <: Closeable](closeable: B)(f: B => A): A =
     try f(closeable)
@@ -252,23 +242,20 @@ object FixtureProvider {
       headers: Map[ByteString, BlockHeader],
       stateTree: Map[ByteString, MptNode],
       contractTrees: Map[ByteString, MptNode]
-  ): Unit = {
+  ): Unit =
     val emptyRoot = ByteString(MerklePatriciaTrie.EmptyRootHash)
     val missing = headers.values
       .filter(_.number > 0)
-      .filterNot(_.stateRoot == emptyRoot) // an all-empty state needs no dumped node
-      .filterNot(header => stateTree.contains(header.stateRoot) || contractTrees.contains(header.stateRoot))
+      .filterNot(_.stateRoot.value == emptyRoot) // an all-empty state needs no dumped node
+      .filterNot(header => stateTree.contains(header.stateRoot.value) || contractTrees.contains(header.stateRoot.value))
       .map(header => header.number -> Hex.toHexString(header.stateRoot.toArray))
       .toSeq
       .sortBy(_._1)
 
-    if (missing.nonEmpty) {
+    if missing.nonEmpty then
       val details = missing.map { case (number, root) => s"  block $number -> stateRoot 0x$root" }.mkString("\n")
       throw new IllegalStateException(
         s"Corrupt txExecTest fixture at '$path': ${missing.size} block header(s) reference a stateRoot " +
           s"with no matching node in stateTree.txt. The fixture is truncated or out of sync with " +
           s"headers.txt and cannot reproduce the chain:\n$details"
       )
-    }
-  }
-}

@@ -30,13 +30,13 @@ package object rlp {
 
   case class RLPList(items: RLPEncodeable*) extends RLPEncodeable {
     def +:(item: RLPEncodeable): RLPList =
-      RLPList((item +: items): _*)
+      RLPList((item +: items)*)
 
     def :+(item: RLPEncodeable): RLPList =
-      RLPList((items :+ item): _*)
+      RLPList((items :+ item)*)
 
     def ++(other: RLPList): RLPList =
-      RLPList((items ++ other.items): _*)
+      RLPList((items ++ other.items)*)
   }
 
   case class RLPValue(bytes: Array[Byte]) extends RLPEncodeable {

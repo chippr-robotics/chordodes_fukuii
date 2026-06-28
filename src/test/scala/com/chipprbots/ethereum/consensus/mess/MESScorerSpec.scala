@@ -1,12 +1,12 @@
 package com.chipprbots.ethereum.consensus.mess
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class MESSConfigSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class MESSConfigSpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   "MESSConfig" should "have valid default values" taggedAs (UnitTest, ConsensusTest) in {
     val config = MESSConfig()
@@ -187,14 +187,13 @@ class MESSConfigSpec extends AnyFlatSpec with Matchers with ParallelTestExecutio
     config.isActiveAtBlock(OlympiaBlockMordor) shouldBe true
     config.isActiveAtBlock(OlympiaBlockMordor + 1000) shouldBe true
   }
-}
 
 /** Tests for ArtificialFinality (ECIP-1100 cubic polynomial).
   *
   * Verifies the polynomial curve and reorg rejection logic against the ECIP-1100 specification and cross-client
   * reference implementations (core-geth, Besu).
   */
-class ArtificialFinalitySpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class ArtificialFinalitySpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   // Constants from ECIP-1100 spec
   private val Denominator = BigInt(128)
@@ -359,4 +358,3 @@ class ArtificialFinalitySpec extends AnyFlatSpec with Matchers with ParallelTest
     )
     acceptOver3x shouldBe false
   }
-}

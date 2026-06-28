@@ -5,7 +5,7 @@ import java.io.File
 import org.apache.pekko.util.ByteString
 import io.circe.parser.decode
 import io.circe.generic.extras.Configuration
-import io.circe.generic.extras.auto._
+import io.circe.generic.extras.auto.*
 import io.circe.Error
 import scala.io.Source
 

@@ -1,23 +1,25 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem}
-import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
+import org.apache.pekko.actor.testkit.typed.scaladsl.{FishingOutcomes, ScalaTestWithActorTestKit}
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
 import com.chipprbots.ethereum.db.storage.{HealingFrontierStorage, Namespaces}
 import com.chipprbots.ethereum.mpt.{BranchNode, HashNode, LeafNode, MptNode, MptTraversals, NullNode}
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.{PeerTestHelpers, TestMptStorage}
 
 import java.io.File
@@ -41,56 +43,52 @@ import java.util.concurrent.{Executors, TimeUnit}
   * mirrors [[TrieNodeHealingScopedVerificationSpec]]. Deterministic: `awaitAssert` / `fishForMessage`, no
   * `Thread.sleep`.
   */
-class PrunedHealCrashSafetySpec
-    extends TestKit(ActorSystem("PrunedHealCrashSafetySpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
-  private def awaitStateHealingComplete(controller: TestProbe): Unit =
+  private def awaitStateHealingComplete(
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ): Unit =
     controller.fishForMessage(10.seconds) {
-      case SNAPSyncController.StateHealingComplete   => true
-      case _: SNAPSyncController.ProgressNodesHealed => false
-      case _                                         => false
+      case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+      case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+      case _                                         => FishingOutcomes.continueAndIgnore
     }
 
-  private def openFrontier(coordinator: ActorRef): Int = {
-    val probe = TestProbe()
-    coordinator.tell(Messages.HealingGetProgress, probe.ref)
-    val stats = probe.expectMsgType[HealingStatistics](2.seconds)
+  private def openFrontier(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
+    val probe = testKit.createTestProbe[HealingStatistics]()
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
+    val stats = probe.expectMessageType[HealingStatistics]
     stats.pendingTasks + stats.activeTasks
-  }
 
   /** True iff the node's bytes are durable in `mptStorage` (a `get` that does not throw). */
   private def nodeInStorage(storage: TestMptStorage, hash: ByteString): Boolean =
-    try { storage.get(hash.toArray); true }
-    catch { case _: Throwable => false }
+    try
+      storage.get(hash.toArray); true
+    catch case _: Throwable => false
 
   /** A clean storage-trie leaf (no children → genuine zero-missing closure ⇒ a subtree-complete candidate). */
-  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val leaf =
       LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(s"crash-clean-leaf-$seed")).toArray))
     val encoded = MptTraversals.encodeNode(leaf)
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"crash-clean-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded))
-  }
 
   /** A storage-trie BRANCH whose only child is MISSING (not in storage). Healing it commits X's bytes but does NOT
     * close X's subtree (a child remains missing). Returns (pathset, hash, encoded, missingChildHash).
     */
-  private def branchWithMissingChild(seed: Int): (Seq[ByteString], ByteString, ByteString, ByteString) = {
+  private def branchWithMissingChild(seed: Int): (Seq[ByteString], ByteString, ByteString, ByteString) =
     val missingChild = kec256(ByteString(s"crash-gap-missing-child-$seed"))
     val children = emptyChildren
     children(3) = HashNode(missingChild.toArray)
@@ -99,17 +97,22 @@ class PrunedHealCrashSafetySpec
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"crash-gap-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded), missingChild)
-  }
 
   private def withFixture(
       stateRoot: ByteString,
       storage: TestMptStorage
-  )(body: (ActorRef, HealingFrontierStorage, TestProbe) => Unit): Unit = {
+  )(
+      body: (
+          ActorRef[TrieNodeHealingCoordinator.Command],
+          HealingFrontierStorage,
+          org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+      ) => Unit
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("pruned-crash-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -119,43 +122,35 @@ class PrunedHealCrashSafetySpec
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
     store.markComplete()
 
-    val controller = TestProbe()
-    val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controller.ref,
-        healingFrontierStorage = Some(store),
-        healingWriterEcOverride = Some(ec)
-      )
+    val controller = testKit.createTestProbe[SNAPSyncController.Command]()
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = stateRoot,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controller.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec)
     )
-    val death = TestProbe()
-    death.watch(coordinator)
     try body(coordinator, store, controller)
-    finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+    finally
+      testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
-  private def storedRoot(storage: TestMptStorage): ByteString = {
+  private def storedRoot(storage: TestMptStorage): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(Array[Byte](0x02)))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
   // ── T-3: record written only after the subtree's bytes are durable ──────────────────────────────
 
@@ -170,10 +165,12 @@ class PrunedHealCrashSafetySpec
         nodeInStorage(storage, hash) shouldBe false
         store.isSubtreeComplete(hash) shouldBe false
 
-        val peer = PeerTestHelpers.createTestPeer("crash-clean-peer", TestProbe().ref)
-        coordinator ! Messages.QueueMissingNodes(Seq((pathset, hash)))
-        coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-        coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded)))
+        val peer = PeerTestHelpers.createTestPeer("crash-clean-peer", testKit.createTestProbe[Any]().ref.toClassic)
+        coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((pathset, hash)))
+        coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+        coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+          SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded))
+        )
 
         awaitStateHealingComplete(controller)
         // After completion: the bytes are durable (flushed via persist) AND the record exists. The record is written
@@ -193,17 +190,19 @@ class PrunedHealCrashSafetySpec
     val (pathset, hash, encoded, missingChild) = branchWithMissingChild(1)
 
     withFixture(root, storage) { (coordinator, store, _) =>
-      val peer = PeerTestHelpers.createTestPeer("crash-gap-peer", TestProbe().ref)
-      coordinator ! Messages.QueueMissingNodes(Seq((pathset, hash)))
-      coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-      coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded)))
+      val peer = PeerTestHelpers.createTestPeer("crash-gap-peer", testKit.createTestProbe[Any]().ref.toClassic)
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((pathset, hash)))
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded)))
 
       // X's bytes get committed, but its subtree did NOT close (the child is missing). The missing child surfaces in
       // the open frontier and X is NEVER recorded subtree-complete — so a later verification has no record to prune X
       // by and MUST descend it (the descend-on-missing-record fallback, FR-006). We assert the record-absence
       // directly (the precondition that forces descent; the descent itself is proven by T-2).
-      awaitAssert(openFrontier(coordinator) should be >= 1, 5.seconds, 100.millis)
-      awaitAssert(nodeInStorage(storage, hash) shouldBe true, 5.seconds, 100.millis) // X bytes committed
+      eventually(timeout(5.seconds), interval(100.millis))(openFrontier(coordinator) should be >= 1)
+      eventually(timeout(5.seconds), interval(100.millis))(
+        nodeInStorage(storage, hash) shouldBe true
+      ) // X bytes committed
       store.isSubtreeComplete(hash) shouldBe false // … but X NOT recorded ⇒ descend-on-missing-record
       missingChild.length shouldBe 32
     }
@@ -221,14 +220,16 @@ class PrunedHealCrashSafetySpec
       val (pathset, hash, encoded, _) = branchWithMissingChild(2)
 
       withFixture(root, storage) { (coordinator, store, _) =>
-        val peer = PeerTestHelpers.createTestPeer("d2-guard-peer", TestProbe().ref)
-        coordinator ! Messages.QueueMissingNodes(Seq((pathset, hash)))
-        coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-        coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded)))
+        val peer = PeerTestHelpers.createTestPeer("d2-guard-peer", testKit.createTestProbe[Any]().ref.toClassic)
+        coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((pathset, hash)))
+        coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+        coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+          SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded))
+        )
 
         // The child is enqueued (open frontier) and X's bytes flush, but the record must stay absent.
-        awaitAssert(openFrontier(coordinator) should be >= 1, 5.seconds, 100.millis)
-        awaitAssert(nodeInStorage(storage, hash) shouldBe true, 5.seconds, 100.millis)
+        eventually(timeout(5.seconds), interval(100.millis))(openFrontier(coordinator) should be >= 1)
+        eventually(timeout(5.seconds), interval(100.millis))(nodeInStorage(storage, hash) shouldBe true)
         store.isSubtreeComplete(hash) shouldBe false
         // Issue a progress query (a barrier on the single-thread actor: any earlier message — including a flush
         // completion — has been processed by the time the reply returns), then re-confirm the record is STILL absent.
@@ -245,4 +246,3 @@ class PrunedHealCrashSafetySpec
       // account leaf's storageRoot — is itself recorded subtree-complete) plus the genuine zero-missing root record
       // at the completion chokepoint. This spec proves the heal-side (C3b) arm of the guard deterministically.
     }
-}

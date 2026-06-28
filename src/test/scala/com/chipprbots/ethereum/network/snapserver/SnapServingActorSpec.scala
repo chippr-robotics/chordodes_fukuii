@@ -2,11 +2,11 @@ package com.chipprbots.ethereum.network.snapserver
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.BeforeAndAfterAll
@@ -19,13 +19,16 @@ import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerEventCmd
+import com.chipprbots.ethereum.network.PeerEventBusActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 // ── K9: Actor-level integration tests for NetworkPeerManagerActor's SNAP serving path.
@@ -35,11 +38,12 @@ import com.chipprbots.ethereum.testing.TestMptStorage
 // and sends responses via peerManagerActor.SendMessage, including when the peer is unknown,
 // storage is absent, or the state root falls outside the 128-block freshness window.
 
-class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory with BeforeAndAfterAll {
+class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory with BeforeAndAfterAll:
 
   implicit val system: ActorSystem = ActorSystem("SnapServingActorSpec_System")
 
-  override def afterAll(): Unit = { val _ = system.terminate() }
+  override def afterAll(): Unit =
+    val _ = system.terminate()
 
   private val zeroHash = ByteString(new Array[Byte](32))
   private val maxHash = ByteString(Array.fill[Byte](32)(0xff.toByte))
@@ -56,32 +60,34 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
       evmCodeStorageOpt: Option[com.chipprbots.ethereum.db.storage.EvmCodeStorage] = None,
       mptStorageOpt: Option[com.chipprbots.ethereum.db.storage.MptStorage] = None,
       blockchainReader: Option[BlockchainReader] = None
-  ): ActorRef = TestActorRef(
-    NetworkPeerManagerActor.props(
-      peerManagerActor = peerManager.ref,
-      peerEventBusActor = peerEventBus.ref,
-      appStateStorage = appStateStorage,
-      forkResolverOpt = None,
-      snapSyncControllerOpt = None,
-      evmCodeStorageOpt = evmCodeStorageOpt,
-      mptStorageOpt = mptStorageOpt,
-      blockchainReader = blockchainReader,
-      isPoWChain = false
+  ): ActorRef = system
+    .spawn(
+      NetworkPeerManagerActor.behavior(
+        peerManagerActor = peerManager.ref.toTyped[PeerManagerActor.Command],
+        peerEventBusActor = peerEventBus.ref.toTyped[PeerEventBusActor.Command],
+        appStateStorage = appStateStorage,
+        forkResolverOpt = None,
+        initialSnapSyncControllerOpt = None,
+        evmCodeStorageOpt = evmCodeStorageOpt,
+        mptStorageOpt = mptStorageOpt,
+        blockchainReader = blockchainReader,
+        isPoWChain = false
+      ),
+      s"npma-snap-${java.util.UUID.randomUUID()}"
     )
-  )
+    .toClassic
 
   /** Build a state trie with n EOA accounts and return (rootHash, storage). */
-  private def buildAccountTrie(n: Int): (ByteString, TestMptStorage) = {
+  private def buildAccountTrie(n: Int): (ByteString, TestMptStorage) =
     val storage = new TestMptStorage()
     val trie = (0 until n).foldLeft(MerklePatriciaTrie[ByteString, Account](storage)) { (t, i) =>
       t.put(kec256(ByteString(s"acct-actor-$i")), Account(nonce = i + 1, balance = 1000))
     }
     (ByteString(trie.getRootHash), storage)
-  }
 
   /** Drain one outbound SendMessage from the peerManager probe. */
-  private def nextSend(pm: TestProbe): PeerManagerActor.SendMessage =
-    pm.expectMsgType[PeerManagerActor.SendMessage](2.seconds)
+  private def nextSend(pm: TestProbe): PeerManagerActor.SendMessageCmd =
+    pm.expectMsgType[PeerManagerActor.SendMessageCmd](2.seconds)
 
   // ── Test 1: unknown peer → response still served ────────────────────────────
   //
@@ -99,15 +105,17 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
       val (root, storage) = buildAccountTrie(6)
       val actor = makeActor(pm, eb, mptStorageOpt = Some(storage))
 
-      actor ! MessageFromPeer(
-        GetAccountRange(
-          requestId = BigInt(1),
-          rootHash = root,
-          startingHash = zeroHash,
-          limitHash = maxHash,
-          responseBytes = bigBudget
-        ),
-        testPeer
+      actor ! PeerEventCmd(
+        MessageFromPeer(
+          GetAccountRange(
+            requestId = BigInt(1),
+            rootHash = root,
+            startingHash = zeroHash,
+            limitHash = maxHash,
+            responseBytes = bigBudget
+          ),
+          testPeer
+        )
       )
 
       val msg = nextSend(pm)
@@ -127,9 +135,11 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
     val eb = TestProbe("eb-no-codes")
     val actor = makeActor(pm, eb, evmCodeStorageOpt = None)
 
-    actor ! MessageFromPeer(
-      GetByteCodes(requestId = BigInt(42), hashes = Seq(kec256(ByteString("somecode"))), responseBytes = bigBudget),
-      testPeer
+    actor ! PeerEventCmd(
+      MessageFromPeer(
+        GetByteCodes(requestId = BigInt(42), hashes = Seq(kec256(ByteString("somecode"))), responseBytes = bigBudget),
+        testPeer
+      )
     )
 
     val resp = nextSend(pm).message.underlyingMsg.asInstanceOf[ByteCodes]
@@ -147,15 +157,17 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
     val eb = TestProbe("eb-no-mpt")
     val actor = makeActor(pm, eb, mptStorageOpt = None)
 
-    actor ! MessageFromPeer(
-      GetAccountRange(
-        requestId = BigInt(7),
-        rootHash = zeroHash,
-        startingHash = zeroHash,
-        limitHash = maxHash,
-        responseBytes = bigBudget
-      ),
-      testPeer
+    actor ! PeerEventCmd(
+      MessageFromPeer(
+        GetAccountRange(
+          requestId = BigInt(7),
+          rootHash = zeroHash,
+          startingHash = zeroHash,
+          limitHash = maxHash,
+          responseBytes = bigBudget
+        ),
+        testPeer
+      )
     )
 
     val resp = nextSend(pm).message.underlyingMsg.asInstanceOf[AccountRange]
@@ -175,19 +187,21 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
     val eb = TestProbe("eb-reqid-echo")
     val actor = makeActor(pm, eb, evmCodeStorageOpt = None, mptStorageOpt = None)
 
-    actor ! MessageFromPeer(GetAccountRange(BigInt(11), zeroHash, zeroHash, maxHash, bigBudget), testPeer)
+    actor ! PeerEventCmd(MessageFromPeer(GetAccountRange(BigInt(11), zeroHash, zeroHash, maxHash, bigBudget), testPeer))
     nextSend(pm).message.underlyingMsg.asInstanceOf[AccountRange].requestId shouldBe BigInt(11)
 
-    actor ! MessageFromPeer(
-      GetStorageRanges(BigInt(22), zeroHash, Seq(zeroHash), zeroHash, maxHash, bigBudget),
-      testPeer
+    actor ! PeerEventCmd(
+      MessageFromPeer(
+        GetStorageRanges(BigInt(22), zeroHash, Seq(zeroHash), zeroHash, maxHash, bigBudget),
+        testPeer
+      )
     )
     nextSend(pm).message.underlyingMsg.asInstanceOf[StorageRanges].requestId shouldBe BigInt(22)
 
-    actor ! MessageFromPeer(GetByteCodes(BigInt(33), Seq.empty, bigBudget), testPeer)
+    actor ! PeerEventCmd(MessageFromPeer(GetByteCodes(BigInt(33), Seq.empty, bigBudget), testPeer))
     nextSend(pm).message.underlyingMsg.asInstanceOf[ByteCodes].requestId shouldBe BigInt(33)
 
-    actor ! MessageFromPeer(GetTrieNodes(BigInt(44), zeroHash, Seq.empty, bigBudget), testPeer)
+    actor ! PeerEventCmd(MessageFromPeer(GetTrieNodes(BigInt(44), zeroHash, Seq.empty, bigBudget), testPeer))
     nextSend(pm).message.underlyingMsg.asInstanceOf[TrieNodes].requestId shouldBe BigInt(44)
   }
 
@@ -209,25 +223,27 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
     val staleRoot = kec256(ByteString("stale-state-root"))
     // A BlockHeader whose stateRoot is freshRoot. Derived from the genesis fixture so
     // all mandatory fields are valid; only stateRoot is replaced.
-    val freshHeader = Fixtures.Blocks.Genesis.header.copy(stateRoot = freshRoot)
+    val freshHeader = Fixtures.Blocks.Genesis.header.copy(stateRoot = TrieRoot(freshRoot))
 
     // Stub: tip=200, every canonical header has freshRoot → staleRoot is never in the cache.
     val readerStub = stub[BlockchainReader]
-    (readerStub.getBestBlockNumber _).when().returns(BigInt(200))
-    (readerStub.getBlockHeaderByNumber _).when(*).returns(Some(freshHeader))
+    (() => readerStub.getBestBlockNumber).when().returns(BigInt(200))
+    readerStub.getBlockHeaderByNumber.when(*).returns(Some(freshHeader))
 
     val (_, storage) = buildAccountTrie(6)
     val actor = makeActor(pm, eb, mptStorageOpt = Some(storage), blockchainReader = Some(readerStub))
 
-    actor ! MessageFromPeer(
-      GetAccountRange(
-        requestId = BigInt(99),
-        rootHash = staleRoot,
-        startingHash = zeroHash,
-        limitHash = maxHash,
-        responseBytes = bigBudget
-      ),
-      testPeer
+    actor ! PeerEventCmd(
+      MessageFromPeer(
+        GetAccountRange(
+          requestId = BigInt(99),
+          rootHash = staleRoot,
+          startingHash = zeroHash,
+          limitHash = maxHash,
+          responseBytes = bigBudget
+        ),
+        testPeer
+      )
     )
 
     val resp = nextSend(pm).message.underlyingMsg.asInstanceOf[AccountRange]
@@ -235,4 +251,3 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
     resp.accounts shouldBe empty
     resp.proof shouldBe empty
   }
-}

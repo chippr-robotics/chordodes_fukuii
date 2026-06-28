@@ -2,7 +2,7 @@ package com.chipprbots.scalanet.peergroup.dynamictls
 
 import java.net.InetSocketAddress
 import java.nio.ByteOrder
-import java.security._
+import java.security.*
 import java.security.cert.X509Certificate
 
 import cats.effect.IO
@@ -37,7 +37,7 @@ import com.chipprbots.scalanet.peergroup.dynamictls.DynamicTLSPeerGroupUtils.SSL
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.bootstrap.Bootstrap
 import io.netty.bootstrap.ServerBootstrap
-import io.netty.channel._
+import io.netty.channel.*
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel

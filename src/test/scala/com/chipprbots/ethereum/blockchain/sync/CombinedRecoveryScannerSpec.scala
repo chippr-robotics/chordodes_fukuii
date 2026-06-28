@@ -13,10 +13,12 @@ import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** CombinedRecoveryScanner is the cohesive integration of ShardEnumerator (#1) + CombinedRecoveryScan (#2) +
   * RecoveryProgress (#3). Its correctness bar:
@@ -28,11 +30,11 @@ import com.chipprbots.ethereum.testing.Tags._
   *     dedup).
   *   - DOWNLOAD-RESUME: a complete checkpoint skips the scan entirely and returns the persisted gaps.
   */
-class CombinedRecoveryScannerSpec extends AnyFunSuite {
+class CombinedRecoveryScannerSpec extends AnyFunSuite:
 
   /** A fresh in-memory state + EVM store with helpers to plant present/missing bytecode and storage. */
-  private class Fixture {
-    val ds = EphemDataSource()
+  private class Fixture:
+    val ds: EphemDataSource = EphemDataSource()
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(ds)
     val evm = new EvmCodeStorage(ds)
     private val build = stateStorage.getBackingStorage(0)
@@ -40,12 +42,11 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
     /** Fresh per-shard handle, as production uses (getBackingStorage(pivot)). */
     def handle(): MptStorage = stateStorage.getBackingStorage(0)
 
-    def presentCode(seed: Int): ByteString = {
+    def presentCode(seed: Int): ByteString =
       val code = Array.fill[Byte](8)(seed.toByte)
       val h = ByteString(kec256(code))
       evm.put(h, ByteString(code)).commit()
       h
-    }
     def missingCodeHash(seed: Int): ByteString = ByteString(kec256(Array[Byte](seed.toByte, 0x5a)))
 
     def presentStorageRoot(seed: Int): ByteString =
@@ -62,7 +63,9 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
 
     /** Account key with an explicit first nibble (to force two accounts into different shards). */
     def acctWithNibble(nibble: Int, tag: Int): ByteString =
-      ByteString(Array.tabulate[Byte](32)(i => if (i == 0) (nibble << 4).toByte else if (i == 1) tag.toByte else 0))
+      ByteString(
+        Array.tabulate[Byte](32)(i => if i == 0 then (nibble << 4).toByte else if i == 1 then tag.toByte else 0)
+      )
 
     def stateRootOf(accounts: Seq[(ByteString, Account)]): ByteString =
       ByteString(
@@ -72,28 +75,32 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
           }
           .getRootHash
       )
-  }
 
-  private def acc(storageRoot: ByteString, codeHash: ByteString): Account =
+  private def acc(storageRoot: TrieRoot, codeHash: CodeHash): Account =
     Account(nonce = UInt256.Zero, storageRoot = storageRoot, codeHash = codeHash)
 
   /** The proven single whole-trie pass (Task #2), used as the equivalence reference. */
-  private def referenceGaps(f: Fixture, stateRoot: ByteString): (Set[ByteString], Set[(ByteString, ByteString)]) = {
+  private def referenceGaps(f: Fixture, stateRoot: ByteString): (Set[ByteString], Set[(ByteString, ByteString)]) =
     val ref = new CombinedRecoveryScan(f.handle(), f.evm)
     ref.scanFrom(stateRoot)
     (ref.missingBytecodes.toSet, ref.missingStorageTries.toSet)
-  }
 
   /** A trie spanning several shards with a mix of present/missing bytecode and storage, every storageRoot unique. */
   private def gappyState(f: Fixture): ByteString =
     f.stateRootOf(
       Seq(
-        f.acct(1) -> acc(f.presentStorageRoot(1), f.presentCode(1)), // all present
-        f.acct(2) -> acc(Account.EmptyStorageRootHash, f.missingCodeHash(2)), // missing code
-        f.acct(3) -> acc(f.missingStorageRoot(3), Account.EmptyCodeHash), // missing storage
-        f.acct(4) -> acc(f.missingStorageRoot(4), f.presentCode(4)), // missing storage, present code
-        f.acct(5) -> acc(f.presentStorageRoot(5), f.missingCodeHash(5)), // present storage, missing code
-        f.acct(6) -> acc(f.presentStorageRoot(6), Account.EmptyCodeHash), // present
+        f.acct(1) -> acc(TrieRoot(f.presentStorageRoot(1)), CodeHash(f.presentCode(1))), // all present
+        f.acct(2) -> acc(Account.EmptyStorageRootHash, CodeHash(f.missingCodeHash(2))), // missing code
+        f.acct(3) -> acc(TrieRoot(f.missingStorageRoot(3)), Account.EmptyCodeHash), // missing storage
+        f.acct(4) -> acc(
+          TrieRoot(f.missingStorageRoot(4)),
+          CodeHash(f.presentCode(4))
+        ), // missing storage, present code
+        f.acct(5) -> acc(
+          TrieRoot(f.presentStorageRoot(5)),
+          CodeHash(f.missingCodeHash(5))
+        ), // present storage, missing code
+        f.acct(6) -> acc(TrieRoot(f.presentStorageRoot(6)), Account.EmptyCodeHash), // present
         f.acct(7) -> Account.empty() // EOA
       )
     )
@@ -134,7 +141,9 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
     val f = new Fixture
     // One account per nibble 1..8 → 8 shards, each with a missing storage gap.
     val root =
-      f.stateRootOf((1 to 8).map(n => f.acctWithNibble(n, 0) -> acc(f.missingStorageRoot(n), Account.EmptyCodeHash)))
+      f.stateRootOf(
+        (1 to 8).map(n => f.acctWithNibble(n, 0) -> acc(TrieRoot(f.missingStorageRoot(n)), Account.EmptyCodeHash))
+      )
     val (refCode, refStorage) = referenceGaps(f, root)
 
     val app = new AppStateStorage(EphemDataSource())
@@ -145,7 +154,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
         () => f.handle(),
         f.evm,
         app,
-        onShardPersisted = n => if (n == 1) throw new RuntimeException("boom")
+        onShardPersisted = n => if n == 1 then throw new RuntimeException("boom")
       )
     intercept[RuntimeException](crashing.run())
 
@@ -176,8 +185,8 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
     // Two accounts, forced into DIFFERENT shards (nibble 1 vs 15), both missing the SAME storage root.
     val root = f.stateRootOf(
       Seq(
-        f.acctWithNibble(1, 1) -> acc(sharedRoot, Account.EmptyCodeHash),
-        f.acctWithNibble(15, 2) -> acc(sharedRoot, Account.EmptyCodeHash)
+        f.acctWithNibble(1, 1) -> acc(TrieRoot(sharedRoot), Account.EmptyCodeHash),
+        f.acctWithNibble(15, 2) -> acc(TrieRoot(sharedRoot), Account.EmptyCodeHash)
       )
     )
     val r = new CombinedRecoveryScanner(
@@ -217,4 +226,3 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
     assert(r.missingBytecodes.isEmpty && r.missingStorageTries.isEmpty)
     assert(app.getRecoveryProgress().isEmpty, "an empty trie must not persist a checkpoint")
   }
-}

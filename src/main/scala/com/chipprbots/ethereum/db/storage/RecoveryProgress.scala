@@ -43,16 +43,15 @@ final case class RecoveryProgress(
     completedShards: Set[Int],
     missingBytecodes: Vector[ByteString],
     missingStorageTries: Vector[(ByteString, ByteString)]
-) {
+):
 
   /** True once every shard index has been walked — the gap lists are then complete and download can proceed. */
   def isComplete: Boolean = completedShards.size >= shardCount
 
   /** Shard indices still to be scanned on resume. */
   def remainingShards: Seq[Int] = (0 until shardCount).filterNot(completedShards)
-}
 
-object RecoveryProgress {
+object RecoveryProgress:
 
   /** Format version. Bump on any layout change; an unrecognised version deserialises to None (⇒ safe fresh scan). */
   private val Version = "v1"
@@ -68,7 +67,7 @@ object RecoveryProgress {
     * {{{v1 \n <scanRootHex> \n <shardCount> \n <completedIdxCsv> \n <bytecodeHexCsv> \n <accountHex:storageHex csv>}}}
     * Empty lists serialise to an empty field (not a stray token), so an all-empty progress round-trips faithfully.
     */
-  def serialize(p: RecoveryProgress): String = {
+  def serialize(p: RecoveryProgress): String =
     val completed = p.completedShards.toVector.sorted.map(_.toString).mkString(ListSep)
     val bytecodes = p.missingBytecodes.map(b => Hex.toHexString(b.toArray)).mkString(ListSep)
     val storage = p.missingStorageTries
@@ -76,7 +75,6 @@ object RecoveryProgress {
       .mkString(ListSep)
     Seq(Version, Hex.toHexString(p.scanRoot.toArray), p.shardCount.toString, completed, bytecodes, storage)
       .mkString(FieldSep)
-  }
 
   /** Total inverse of [[serialize]]: ANY malformed, truncated, wrong-version, or invariant-violating input yields None
     * so the caller falls back to a fresh (always-correct) scan rather than trusting a partially-written or corrupt
@@ -109,11 +107,9 @@ object RecoveryProgress {
     * it, so a 63-char field would still produce 32 bytes with a corrupted final byte and slip past a byte-length check.
     * Non-hex chars throw inside `Hex.decode` → caught by deserialize's `Try` → None.
     */
-  private def decodeHash(hex: String): ByteString = {
+  private def decodeHash(hex: String): ByteString =
     require(hex.length == 64, "hash field must be exactly 64 hex chars (32 bytes)")
     ByteString(Hex.decode(hex))
-  }
 
   /** Split a CSV field, treating "" as the empty list (Java's `"".split(",")` returns `Array("")`, not `Array()`). */
-  private def splitList(s: String): Array[String] = if (s.isEmpty) Array.empty else s.split(ListSep)
-}
+  private def splitList(s: String): Array[String] = if s.isEmpty then Array.empty else s.split(ListSep)

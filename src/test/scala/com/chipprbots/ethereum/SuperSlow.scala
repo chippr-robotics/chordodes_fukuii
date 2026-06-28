@@ -2,7 +2,7 @@ package com.chipprbots.ethereum
 
 import com.typesafe.config.ConfigFactory
 
-trait SuperSlow {
+trait SuperSlow:
   private lazy val skip = ConfigFactory.load().getBoolean("skip-super-slow-tests")
 
   /** Some assertions may be prohibitively slow and shouldn't run on every CI run. Use this method when that's the case.
@@ -11,5 +11,4 @@ trait SuperSlow {
     *   slow tests
     */
   def superSlow[T](f: => T): Option[T] =
-    if (skip) None else Some(f)
-}
+    if skip then None else Some(f)

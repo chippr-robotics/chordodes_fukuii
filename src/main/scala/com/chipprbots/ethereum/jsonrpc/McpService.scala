@@ -2,25 +2,30 @@ package com.chipprbots.ethereum.jsonrpc
 
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
 import scala.annotation.unused
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.*
 
 import org.json4s.JsonAST.JValue
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.mcp.{McpToolRegistry, McpResourceRegistry, McpPromptRegistry}
+import com.chipprbots.ethereum.network.PeerManagerActor
+import com.chipprbots.ethereum.jsonrpc.mcp.McpPromptRegistry
+import com.chipprbots.ethereum.jsonrpc.mcp.McpResourceRegistry
+import com.chipprbots.ethereum.jsonrpc.mcp.McpToolRegistry
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.NodeStatus
 
-object McpService {
+object McpService:
   // MCP Initialize
   case class McpInitializeRequest(params: Option[JValue])
   case class McpInitializeResponse(
@@ -102,20 +107,19 @@ object McpService {
 
   case class McpPromptsGetRequest(name: String, arguments: Option[JValue])
   case class McpPromptsGetResponse(description: Option[String], messages: List[JValue])
-}
 
 class McpService(
-    peerManager: ActorRef,
-    syncController: ActorRef,
+    peerManager: typed.ActorRef[PeerManagerActor.Command],
+    syncController: TypedActorRef[SyncController.Command],
     blockchainReader: BlockchainReader,
     blockchainConfig: BlockchainConfig,
     nodeStatusHolder: AtomicReference[NodeStatus],
     transactionMappingStorage: TransactionMappingStorage
-)(implicit val executionContext: ExecutionContext) {
+)(implicit val executionContext: ExecutionContext, scheduler: typed.Scheduler):
 
-  import McpService._
+  import McpService.*
 
-  implicit val timeout: Timeout = Timeout(10.seconds)
+  given timeout: Timeout = Timeout(10.seconds)
 
   /** Dependencies bundle passed to tool/resource registries */
   val deps: McpDependencies = McpDependencies(
@@ -124,7 +128,8 @@ class McpService(
     blockchainReader,
     blockchainConfig,
     nodeStatusHolder,
-    transactionMappingStorage
+    transactionMappingStorage,
+    scheduler
   )
 
   def initialize(@unused request: McpInitializeRequest): ServiceResponse[McpInitializeResponse] =
@@ -141,8 +146,8 @@ class McpService(
       )
     )
 
-  def toolsList(@unused request: McpToolsListRequest): ServiceResponse[McpToolsListResponse] = {
-    import org.json4s.JsonDSL._
+  def toolsList(@unused request: McpToolsListRequest): ServiceResponse[McpToolsListResponse] =
+    import org.json4s.JsonDSL.*
 
     val tools = McpToolRegistry.getAllTools().map { toolDef =>
       McpTool(
@@ -156,7 +161,6 @@ class McpService(
     }
 
     IO.pure(Right(McpToolsListResponse(tools)))
-  }
 
   def toolsCall(request: McpToolsCallRequest): ServiceResponse[McpToolsCallResponse] =
     McpToolRegistry
@@ -177,7 +181,7 @@ class McpService(
         )
       }
 
-  def resourcesList(@unused request: McpResourcesListRequest): ServiceResponse[McpResourcesListResponse] = {
+  def resourcesList(@unused request: McpResourcesListRequest): ServiceResponse[McpResourcesListResponse] =
     val resources = McpResourceRegistry.getAllResources().map { resDef =>
       McpResource(
         uri = resDef.uri,
@@ -188,10 +192,9 @@ class McpService(
     }
 
     IO.pure(Right(McpResourcesListResponse(resources)))
-  }
 
   def resourcesRead(request: McpResourcesReadRequest): ServiceResponse[McpResourcesReadResponse] =
-    McpResourceRegistry.readResource(request.uri, deps) match {
+    McpResourceRegistry.readResource(request.uri, deps) match
       case Right(contentIO) =>
         contentIO.map { content =>
           Right(
@@ -208,9 +211,8 @@ class McpService(
         }
       case Left(error) =>
         IO.pure(Left(JsonRpcError.InvalidParams(error)))
-    }
 
-  def promptsList(@unused request: McpPromptsListRequest): ServiceResponse[McpPromptsListResponse] = {
+  def promptsList(@unused request: McpPromptsListRequest): ServiceResponse[McpPromptsListResponse] =
     val prompts = McpPromptRegistry.getAllPrompts().map { promptDef =>
       McpPrompt(
         name = promptDef.name,
@@ -220,9 +222,8 @@ class McpService(
     }
 
     IO.pure(Right(McpPromptsListResponse(prompts)))
-  }
 
-  def promptsGet(request: McpPromptsGetRequest): ServiceResponse[McpPromptsGetResponse] = {
+  def promptsGet(request: McpPromptsGetRequest): ServiceResponse[McpPromptsGetResponse] =
     val (description, messages) = McpPromptRegistry.getPrompt(request.name)
 
     IO.pure(
@@ -233,15 +234,14 @@ class McpService(
         )
       )
     )
-  }
-}
 
 /** Bundle of dependencies available to MCP tools and resources */
 case class McpDependencies(
-    peerManager: ActorRef,
-    syncController: ActorRef,
+    peerManager: typed.ActorRef[PeerManagerActor.Command],
+    syncController: TypedActorRef[SyncController.Command],
     blockchainReader: BlockchainReader,
     blockchainConfig: BlockchainConfig,
     nodeStatusHolder: AtomicReference[NodeStatus],
-    transactionMappingStorage: TransactionMappingStorage
+    transactionMappingStorage: TransactionMappingStorage,
+    scheduler: typed.Scheduler
 )

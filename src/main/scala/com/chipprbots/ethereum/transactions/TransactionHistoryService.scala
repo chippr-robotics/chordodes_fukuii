@@ -1,18 +1,19 @@
 package com.chipprbots.ethereum.transactions
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.implicits._
+import cats.implicits.*
 
 import scala.collection.immutable.NumericRange
 import scala.concurrent.duration.FiniteDuration
 
 import fs2.Stream
 
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTxChecker
@@ -22,16 +23,17 @@ import com.chipprbots.ethereum.utils.Logger
 
 class TransactionHistoryService(
     blockchainReader: BlockchainReader,
-    pendingTransactionsManager: ActorRef,
-    getTransactionFromPoolTimeout: FiniteDuration
-) extends Logger {
+    pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
+    getTransactionFromPoolTimeout: FiniteDuration,
+    scheduler: Scheduler
+) extends Logger:
   def getAccountTransactions(
       account: Address,
       fromBlocks: NumericRange[BigInt]
-  )(implicit blockchainConfig: BlockchainConfig): IO[List[ExtendedTransactionData]] = {
+  )(implicit blockchainConfig: BlockchainConfig): IO[List[ExtendedTransactionData]] =
     val txnsFromBlocks = Stream
       .emits(fromBlocks.reverse.toSeq)
-      .parEvalMap(10)(blockNr => IO(blockchainReader.getBlockByNumber(blockchainReader.getBestBranch(), blockNr)))
+      .parEvalMap(10)(blockNr => IO(blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, blockNr)))
       .collect { case Some(block) => block }
       .flatMap { block =>
         val getBlockReceipts = IO {
@@ -42,10 +44,10 @@ class TransactionHistoryService(
           .emits(block.body.transactionList.reverse.toSeq)
           .collect(Function.unlift(MinedTxChecker.checkTx(_, account)))
           .evalMap { case (tx, mkExtendedData) =>
-            for {
+            for
               blockReceiptsIO <- getBlockReceipts
               blockReceipts <- blockReceiptsIO
-            } yield MinedTxChecker.getMinedTxData(tx, block, blockReceipts).map(mkExtendedData(_))
+            yield MinedTxChecker.getMinedTxData(tx, block, blockReceipts).map(mkExtendedData(_))
           }
           .collect { case Some(data) =>
             data
@@ -60,52 +62,45 @@ class TransactionHistoryService(
     }
 
     (txnsFromBlocks, txnsFromMempool).parMapN(_ ++ _)
-  }
 
-  private val getTransactionsFromPool: IO[List[PendingTransaction]] = {
-    implicit val timeout: Timeout = getTransactionFromPoolTimeout
+  private val getTransactionsFromPool: IO[List[PendingTransaction]] =
+    given timeout: Timeout = getTransactionFromPoolTimeout
+    given sc: Scheduler = scheduler
     pendingTransactionsManager
-      .askFor[PendingTransactionsManager.PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)
+      .askForTyped[PendingTransactionsManager.PendingTransactionsResponse](
+        PendingTransactionsManager.GetPendingTransactionsReq(_)
+      )
       .map(_.pendingTransactions.toList)
       .handleErrorWith { case ex: Throwable =>
         log.error("Failed to get pending transactions, passing empty transactions list", ex)
         IO.pure(List.empty)
       }
-  }
-}
-object TransactionHistoryService {
+object TransactionHistoryService:
   case class MinedTransactionData(
       header: BlockHeader,
       transactionIndex: Int,
       gasUsed: BigInt
-  ) {
+  ):
     lazy val timestamp: Long = header.unixTimestamp
-  }
   case class ExtendedTransactionData(
       stx: SignedTransaction,
       isOutgoing: Boolean,
       minedTransactionData: Option[MinedTransactionData]
-  ) {
+  ):
     val isPending: Boolean = minedTransactionData.isEmpty
-  }
 
-  object PendingTxChecker {
+  object PendingTxChecker:
     def isSender(tx: PendingTransaction, maybeSender: Address): Boolean = tx.stx.senderAddress == maybeSender
     def isReceiver(tx: PendingTransaction, maybeReceiver: Address): Boolean =
       tx.stx.tx.tx.receivingAddress.contains(maybeReceiver)
     def asSigned(tx: PendingTransaction): SignedTransaction = tx.stx.tx
 
     def checkTx(tx: PendingTransaction, address: Address): Option[ExtendedTransactionData] =
-      if (isSender(tx, address)) {
-        Some(ExtendedTransactionData(asSigned(tx), isOutgoing = true, None))
-      } else if (isReceiver(tx, address)) {
-        Some(ExtendedTransactionData(asSigned(tx), isOutgoing = false, None))
-      } else {
-        None
-      }
-  }
+      if isSender(tx, address) then Some(ExtendedTransactionData(asSigned(tx), isOutgoing = true, None))
+      else if isReceiver(tx, address) then Some(ExtendedTransactionData(asSigned(tx), isOutgoing = false, None))
+      else None
 
-  object MinedTxChecker {
+  object MinedTxChecker:
     def isSender(tx: SignedTransaction, maybeSender: Address)(implicit blockchainConfig: BlockchainConfig): Boolean =
       tx.safeSenderIsEqualTo(maybeSender)
     def isReceiver(tx: SignedTransaction, maybeReceiver: Address): Boolean =
@@ -117,34 +112,27 @@ object TransactionHistoryService {
     )(implicit
         blockchainConfig: BlockchainConfig
     ): Option[(SignedTransaction, MinedTransactionData => ExtendedTransactionData)] =
-      if (isSender(tx, address)) {
-        Some((tx, data => ExtendedTransactionData(tx, isOutgoing = true, Some(data))))
-      } else if (isReceiver(tx, address)) {
+      if isSender(tx, address) then Some((tx, data => ExtendedTransactionData(tx, isOutgoing = true, Some(data))))
+      else if isReceiver(tx, address) then
         Some((tx, data => ExtendedTransactionData(tx, isOutgoing = false, Some(data))))
-      } else {
-        None
-      }
+      else None
 
     def getMinedTxData(
         tx: SignedTransaction,
         block: Block,
         blockReceipts: Vector[Receipt]
-    ): Option[MinedTransactionData] = {
+    ): Option[MinedTransactionData] =
       val maybeIndex = block.body.transactionList.zipWithIndex.collectFirst {
         case (someTx, index) if someTx.hash == tx.hash => index
       }
 
-      val maybeGasUsed = for {
+      val maybeGasUsed = for
         index <- maybeIndex
         txReceipt <- blockReceipts.lift(index)
-      } yield {
+      yield
         val previousCumulativeGas: BigInt =
-          (if (index > 0) blockReceipts.lift(index - 1) else None).map(_.cumulativeGasUsed).getOrElse(0)
+          (if index > 0 then blockReceipts.lift(index - 1) else None).map(_.cumulativeGasUsed).getOrElse(0)
 
         txReceipt.cumulativeGasUsed - previousCumulativeGas
-      }
 
       (Some(block.header), maybeIndex, maybeGasUsed).mapN(MinedTransactionData.apply)
-    }
-  }
-}

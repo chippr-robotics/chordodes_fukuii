@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.sync
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigValueFactory
 import org.scalatest.BeforeAndAfterAll
@@ -12,21 +12,19 @@ import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.metrics.MetricsConfig
 import com.chipprbots.ethereum.sync.util.RegularSyncItSpecUtils.FakePeer
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
-import com.chipprbots.ethereum.testing.Tags._
-
-class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll {
+class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll:
   implicit val testRuntime: IORuntime = IORuntime.global
 
-  override def beforeAll(): Unit = {
+  override def beforeAll(): Unit =
     // Close any previous metrics instance so the new one starts with a clean registry
     Metrics.closeInstance("default")
     Metrics.configure(
       MetricsConfig(Config.config.withValue("metrics.enabled", ConfigValueFactory.fromAnyRef(true)))
     )
-  }
 
   override def afterAll(): Unit = {
     // No need to shutdown IORuntime.global
@@ -37,26 +35,26 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
       FakePeer.start2FakePeersRes()
     ) { case (peer1, peer2) =>
       val blockNumber: Int = 2000
-      for {
+      for
         _ <- peer1.importBlocksUntil(blockNumber)(IdentityUpdate)
         _ <- peer2.startRegularSync()
         _ <- peer2.connectToPeers(Set(peer1.node))
         _ <- peer2.waitForRegularSyncLoadLastBlock(blockNumber)
-      } yield assert(peer1.blockchainReader.getBestBlock().get.hash == peer2.blockchainReader.getBestBlock().get.hash)
+      yield assert(peer1.blockchainReader.getBestBlock.get.hash == peer2.blockchainReader.getBestBlock.get.hash)
     }
 
     "given a previously mined blockchain" taggedAs (IntegrationTest, SyncTest, SlowTest) in customTestCaseResourceM(
       FakePeer.start2FakePeersRes()
     ) { case (peer1, peer2) =>
       val blockHeadersPerRequest = peer2.syncConfig.blockHeadersPerRequest
-      for {
+      for
         _ <- peer1.startRegularSync()
         _ <- peer1.mineNewBlocks(500.milliseconds, blockHeadersPerRequest + 1)(IdentityUpdate)
         _ <- peer1.waitForRegularSyncLoadLastBlock(blockHeadersPerRequest + 1)
         _ <- peer2.startRegularSync()
         _ <- peer2.connectToPeers(Set(peer1.node))
         _ <- peer2.waitForRegularSyncLoadLastBlock(blockHeadersPerRequest + 1)
-      } yield assert(peer1.blockchainReader.getBestBlock().get.hash == peer2.blockchainReader.getBestBlock().get.hash)
+      yield assert(peer1.blockchainReader.getBestBlock.get.hash == peer2.blockchainReader.getBestBlock.get.hash)
     }
   }
 
@@ -68,7 +66,7 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
     FakePeer.start2FakePeersRes()
   ) { case (peer1, peer2) =>
     val blockNumer: Int = 2000
-    for {
+    for
       _ <- peer1.importBlocksUntil(blockNumer)(IdentityUpdate)
       _ <- peer1.startRegularSync()
       _ <- peer2.startRegularSync()
@@ -78,7 +76,7 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
       _ <- peer1.waitForRegularSyncLoadLastBlock(blockNumer + 2)
       _ <- peer1.mineNewBlocks(100.milliseconds, 2)(IdentityUpdate)
       _ <- peer2.waitForRegularSyncLoadLastBlock(blockNumer + 4)
-    } yield assert(peer1.blockchainReader.getBestBlock().get.hash == peer2.blockchainReader.getBestBlock().get.hash)
+    yield assert(peer1.blockchainReader.getBestBlock.get.hash == peer2.blockchainReader.getBestBlock.get.hash)
   }
 
   "peers with divergent chains will be forced to resolve branches" taggedAs (
@@ -89,7 +87,7 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
     FakePeer.start2FakePeersRes()
   ) { case (peer1, peer2) =>
     val blockNumer: Int = 2000
-    for {
+    for
       _ <- peer1.importBlocksUntil(blockNumer)(IdentityUpdate)
       _ <- peer2.importBlocksUntil(blockNumer)(IdentityUpdate)
       _ <- peer1.startRegularSync()
@@ -101,19 +99,19 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
       _ <- peer2.connectToPeers(Set(peer1.node))
       _ <- peer1.waitForRegularSyncLoadLastBlock(blockNumer + 3)
       _ <- peer2.waitForRegularSyncLoadLastBlock(blockNumer + 3)
-    } yield {
+    yield
       assert(
         peer1.blockchainReader.getChainWeightByHash(
-          peer1.blockchainReader.getBestBlock().get.hash
+          peer1.blockchainReader.getBestBlock.get.hash
         ) == peer2.blockchainReader
           .getChainWeightByHash(
-            peer2.blockchainReader.getBestBlock().get.hash
+            peer2.blockchainReader.getBestBlock.get.hash
           )
       )
       (
-        peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch(), blockNumer + 1),
-        peer2.blockchainReader.getBlockByNumber(peer2.blockchainReader.getBestBranch(), blockNumer + 1)
-      ) match {
+        peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, blockNumer + 1),
+        peer2.blockchainReader.getBlockByNumber(peer2.blockchainReader.getBestBranch, blockNumer + 1)
+      ) match
         case (Some(blockP1), Some(blockP2)) =>
           assert(
             peer1.blockchainReader.getChainWeightByHash(blockP1.hash) == peer2.blockchainReader.getChainWeightByHash(
@@ -121,8 +119,6 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
             )
           )
         case (_, _) => fail("invalid difficulty validation")
-      }
-    }
   }
 
   "A metric about mining a new block should be available" taggedAs (
@@ -132,29 +128,28 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
   ) in customTestCaseResourceM(
     FakePeer.start2FakePeersRes()
   ) { case (peer1, peer2) =>
-    import MetricsHelper._
+    import MetricsHelper.*
 
     val minedMetricBefore = sampleMetric(MinedBlockPropagation)
     val defaultMetricBefore = sampleMetric(DefaultBlockPropagation)
 
-    for {
+    for
       _ <- peer1.startRegularSync()
       _ <- peer1.mineNewBlocks(10.milliseconds, 1)(IdentityUpdate)
       _ <- peer1.waitForRegularSyncLoadLastBlock(1)
       _ <- peer2.startRegularSync()
       _ <- peer2.connectToPeers(Set(peer1.node))
       _ <- peer2.waitForRegularSyncLoadLastBlock(1)
-    } yield {
+    yield
 
       val minedMetricAfter = sampleMetric(MinedBlockPropagation)
       val defaultMetricAfter = sampleMetric(DefaultBlockPropagation)
 
       minedMetricAfter shouldBe minedMetricBefore + 1.0d
       defaultMetricAfter shouldBe defaultMetricBefore + 1.0d
-    }
   }
 
-  object MetricsHelper {
+  object MetricsHelper:
     val DefaultBlockPropagation = "DefaultBlockPropagation"
     val MinedBlockPropagation = "MinedBlockPropagation"
     def sampleMetric(blockType: String): Double =
@@ -170,5 +165,3 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
             .toDouble
         }
         .getOrElse(0.0)
-  }
-}

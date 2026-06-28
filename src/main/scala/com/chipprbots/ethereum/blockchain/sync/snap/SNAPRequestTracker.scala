@@ -1,15 +1,15 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.{Cancellable, Scheduler}
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.utils.Logger
 
 /** SNAP request tracker for managing pending requests and matching responses
@@ -23,9 +23,9 @@ import com.chipprbots.ethereum.utils.Logger
   *   - Response validation and matching
   *   - Peer management for SNAP requests
   */
-class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
+class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger:
 
-  import SNAPRequestTracker._
+  import SNAPRequestTracker.*
 
   /** Pending requests tracked by request ID */
   private val pendingRequests = mutable.Map[BigInt, PendingRequest]()
@@ -38,38 +38,34 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
   // per-phase request counters, download timers, and the timeout counter are emitted here in
   // one place instead of in each coordinator. Validation methods below emit the malformed-
   // response counter on structural violations (late responses are NOT counted as malformed).
-  private def recordDispatchMetric(t: RequestType): Unit = t match {
+  private def recordDispatchMetric(t: RequestType): Unit = t match
     case RequestType.GetAccountRange  => SNAPSyncMetrics.incrementAccountRangeRequests()
     case RequestType.GetStorageRanges => SNAPSyncMetrics.incrementStorageRangeRequests()
     case RequestType.GetByteCodes     => SNAPSyncMetrics.incrementBytecodeRequests()
     case RequestType.GetTrieNodes     => SNAPSyncMetrics.incrementHealingRequests()
-  }
 
-  private def recordFailureMetric(t: RequestType): Unit = t match {
+  private def recordFailureMetric(t: RequestType): Unit = t match
     case RequestType.GetAccountRange  => SNAPSyncMetrics.incrementAccountRangeFailures()
     case RequestType.GetStorageRanges => SNAPSyncMetrics.incrementStorageRangeFailures()
     case RequestType.GetByteCodes     => SNAPSyncMetrics.incrementBytecodeFailures()
     case RequestType.GetTrieNodes     => SNAPSyncMetrics.incrementHealingFailures()
-  }
 
-  private def recordDownloadTime(t: RequestType, elapsedMs: Long): Unit = t match {
+  private def recordDownloadTime(t: RequestType, elapsedMs: Long): Unit = t match
     case RequestType.GetAccountRange  => SNAPSyncMetrics.recordAccountRangeDownloadTime(elapsedMs)
     case RequestType.GetStorageRanges => SNAPSyncMetrics.recordStorageRangeDownloadTime(elapsedMs)
     case RequestType.GetByteCodes     => SNAPSyncMetrics.recordBytecodeDownloadTime(elapsedMs)
     case RequestType.GetTrieNodes     => SNAPSyncMetrics.recordStateHealingTime(elapsedMs)
-  }
 
-  private def compareUnsignedLexicographically(a: ByteString, b: ByteString): Int = {
+  private def compareUnsignedLexicographically(a: ByteString, b: ByteString): Int =
     val minLen = math.min(a.length, b.length)
     var i = 0
-    while (i < minLen) {
+    var result = 0
+    while i < minLen && result == 0 do
       val av = java.lang.Byte.toUnsignedInt(a(i))
       val bv = java.lang.Byte.toUnsignedInt(b(i))
-      if (av != bv) return av - bv
+      result = av - bv
       i += 1
-    }
-    a.length - b.length
-  }
+    if result != 0 then result else a.length - b.length
 
   /** Request ID counter */
   private var nextRequestId: BigInt = 1
@@ -109,7 +105,7 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
       requestType: RequestType,
       timeout: FiniteDuration = Duration.Zero // Zero = use adaptive
   )(onTimeout: => Unit): PendingRequest = synchronized {
-    val effectiveTimeout = if (timeout == Duration.Zero) rateTracker.targetTimeout() else timeout
+    val effectiveTimeout = if timeout == Duration.Zero then rateTracker.targetTimeout() else timeout
     recordDispatchMetric(requestType)
     val request = PendingRequest(
       requestId = requestId,
@@ -201,30 +197,26 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     */
   def validateAccountRange(response: AccountRange): Either[String, AccountRange] =
     // Check if request is pending
-    if (!isPending(response.requestId)) {
-      Left(s"No pending request for ID ${response.requestId}")
-    } else {
+    if !isPending(response.requestId) then Left(s"No pending request for ID ${response.requestId}")
+    else
       val pending = getPendingRequest(response.requestId).get
 
       // Verify it's the expected type
-      if (pending.requestType != RequestType.GetAccountRange) {
+      if pending.requestType != RequestType.GetAccountRange then
         SNAPSyncMetrics.incrementMalformedResponse()
         Left(s"Expected ${RequestType.GetAccountRange} but got response for ${pending.requestType}")
-      } else {
+      else
         // Check accounts are monotonically increasing
         val violation = (1 until response.accounts.size).find { i =>
           val prevHash = response.accounts(i - 1)._1
           val currHash = response.accounts(i)._1
           compareUnsignedLexicographically(prevHash, currHash) >= 0
         }
-        violation match {
+        violation match
           case Some(i) =>
             SNAPSyncMetrics.incrementMalformedResponse()
             Left(s"Accounts not monotonically increasing at index $i")
           case None => Right(response)
-        }
-      }
-    }
 
   /** Validate StorageRanges response
     *
@@ -234,14 +226,13 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     *   validation result
     */
   def validateStorageRanges(response: StorageRanges): Either[String, StorageRanges] =
-    if (!isPending(response.requestId)) {
-      Left(s"No pending request for ID ${response.requestId}")
-    } else {
+    if !isPending(response.requestId) then Left(s"No pending request for ID ${response.requestId}")
+    else
       val pending = getPendingRequest(response.requestId).get
-      if (pending.requestType != RequestType.GetStorageRanges) {
+      if pending.requestType != RequestType.GetStorageRanges then
         SNAPSyncMetrics.incrementMalformedResponse()
         Left(s"Expected ${RequestType.GetStorageRanges} but got response for ${pending.requestType}")
-      } else {
+      else
         // Validate storage slots are monotonically increasing within each account
         val violation = response.slots.zipWithIndex.collectFirst { case (accountSlots, accountIdx) =>
           (1 until accountSlots.size)
@@ -252,14 +243,11 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
             }
             .map(i => (accountIdx, i))
         }.flatten
-        violation match {
+        violation match
           case Some((accountIdx, i)) =>
             SNAPSyncMetrics.incrementMalformedResponse()
             Left(s"Storage slots not monotonically increasing for account $accountIdx at index $i")
           case None => Right(response)
-        }
-      }
-    }
 
   /** Validate ByteCodes response
     *
@@ -268,19 +256,14 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     * @return
     *   validation result
     */
-  def validateByteCodes(response: ByteCodes): Either[String, ByteCodes] = {
-    if (!isPending(response.requestId)) {
-      return Left(s"No pending request for ID ${response.requestId}")
-    }
-
-    val pending = getPendingRequest(response.requestId).get
-    if (pending.requestType != RequestType.GetByteCodes) {
-      SNAPSyncMetrics.incrementMalformedResponse()
-      return Left(s"Expected ${RequestType.GetByteCodes} but got response for ${pending.requestType}")
-    }
-
-    Right(response)
-  }
+  def validateByteCodes(response: ByteCodes): Either[String, ByteCodes] =
+    if !isPending(response.requestId) then Left(s"No pending request for ID ${response.requestId}")
+    else
+      val pending = getPendingRequest(response.requestId).get
+      if pending.requestType != RequestType.GetByteCodes then
+        SNAPSyncMetrics.incrementMalformedResponse()
+        Left(s"Expected ${RequestType.GetByteCodes} but got response for ${pending.requestType}")
+      else Right(response)
 
   /** Validate TrieNodes response
     *
@@ -289,19 +272,14 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     * @return
     *   validation result
     */
-  def validateTrieNodes(response: TrieNodes): Either[String, TrieNodes] = {
-    if (!isPending(response.requestId)) {
-      return Left(s"No pending request for ID ${response.requestId}")
-    }
-
-    val pending = getPendingRequest(response.requestId).get
-    if (pending.requestType != RequestType.GetTrieNodes) {
-      SNAPSyncMetrics.incrementMalformedResponse()
-      return Left(s"Expected ${RequestType.GetTrieNodes} but got response for ${pending.requestType}")
-    }
-
-    Right(response)
-  }
+  def validateTrieNodes(response: TrieNodes): Either[String, TrieNodes] =
+    if !isPending(response.requestId) then Left(s"No pending request for ID ${response.requestId}")
+    else
+      val pending = getPendingRequest(response.requestId).get
+      if pending.requestType != RequestType.GetTrieNodes then
+        SNAPSyncMetrics.incrementMalformedResponse()
+        Left(s"Expected ${RequestType.GetTrieNodes} but got response for ${pending.requestType}")
+      else Right(response)
 
   /** Get count of pending requests */
   def pendingCount: Int = synchronized {
@@ -315,15 +293,13 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
   }
 
   /** Map RequestType to PeerRateTracker message type ordinal */
-  private def requestTypeToMsgType(rt: RequestType): Int = rt match {
+  private def requestTypeToMsgType(rt: RequestType): Int = rt match
     case RequestType.GetAccountRange  => PeerRateTracker.MsgGetAccountRange
     case RequestType.GetStorageRanges => PeerRateTracker.MsgGetStorageRanges
     case RequestType.GetByteCodes     => PeerRateTracker.MsgGetByteCodes
     case RequestType.GetTrieNodes     => PeerRateTracker.MsgGetTrieNodes
-  }
-}
 
-object SNAPRequestTracker {
+object SNAPRequestTracker:
 
   /** Pending SNAP request */
   case class PendingRequest(
@@ -336,10 +312,8 @@ object SNAPRequestTracker {
 
   /** SNAP request types */
   sealed trait RequestType
-  object RequestType {
+  object RequestType:
     case object GetAccountRange extends RequestType
     case object GetStorageRanges extends RequestType
     case object GetByteCodes extends RequestType
     case object GetTrieNodes extends RequestType
-  }
-}

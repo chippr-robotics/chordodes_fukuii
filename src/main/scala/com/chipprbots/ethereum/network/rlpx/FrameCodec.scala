@@ -23,7 +23,7 @@ case class Frame(header: Header, `type`: Int, payload: ByteString)
 
 case class Header(bodySize: Int, protocol: Int, contextId: Option[Int], totalPacketSize: Option[Int])
 
-class FrameCodec(private val secrets: Secrets) extends Logger {
+class FrameCodec(private val secrets: Secrets) extends Logger:
 
   val HeaderLength = 32
   val MacSize = 16
@@ -31,18 +31,16 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
   private val allZerosIV = Array.fill[Byte](16)(0)
 
   // needs to be lazy to enable mocking
-  private lazy val enc: StreamCipher = {
+  private lazy val enc: StreamCipher =
     val cipher = new SICBlockCipher(new AESEngine): @annotation.nowarn("cat=deprecation")
     cipher.init(true, new ParametersWithIV(new KeyParameter(secrets.aes), allZerosIV))
     cipher
-  }
 
   // needs to be lazy to enable mocking
-  private lazy val dec: StreamCipher = {
+  private lazy val dec: StreamCipher =
     val cipher = new SICBlockCipher(new AESEngine): @annotation.nowarn("cat=deprecation")
     cipher.init(false, new ParametersWithIV(new KeyParameter(secrets.aes), allZerosIV))
     cipher
-  }
 
   private var unprocessedData: ByteString = ByteString.empty
 
@@ -53,15 +51,15 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
     * @param data
     * @return
     */
-  def readFrames(data: ByteString): Seq[Frame] = {
+  def readFrames(data: ByteString): Seq[Frame] =
     unprocessedData ++= data
     log.debug("FRAME_READ: Received {} bytes, total unprocessed: {}", data.length, unprocessedData.length)
 
     @tailrec
-    def readRecursive(framesSoFar: Seq[Frame] = Nil): Seq[Frame] = {
-      if (headerOpt.isEmpty) tryReadHeader()
+    def readRecursive(framesSoFar: Seq[Frame] = Nil): Seq[Frame] =
+      if headerOpt.isEmpty then tryReadHeader()
 
-      headerOpt match {
+      headerOpt match
         case Some(header) =>
           val padding = (16 - (header.bodySize % 16)) % 16
           val totalSizeToRead = header.bodySize + padding + MacSize
@@ -74,7 +72,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
             unprocessedData.length
           )
 
-          if (unprocessedData.length >= totalSizeToRead) {
+          if unprocessedData.length >= totalSizeToRead then
             val buffer = unprocessedData.take(totalSizeToRead).toArray
 
             val frameSize = totalSizeToRead - MacSize
@@ -98,31 +96,25 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
             )
 
             // Log payload hex for protocol debugging
-            if (payload.nonEmpty) {
-              log.debug("FRAME_READ: Frame payload hex: {}", MessageCodec.truncateHex(payload))
-            }
+            if payload.nonEmpty then log.debug("FRAME_READ: Frame payload hex: {}", MessageCodec.truncateHex(payload))
 
             headerOpt = None
             unprocessedData = unprocessedData.drop(totalSizeToRead)
             readRecursive(framesSoFar ++ Seq(Frame(header, `type`, ByteString(payload))))
-          } else {
+          else
             log.debug("FRAME_READ: Waiting for more data ({} < {})", unprocessedData.length, totalSizeToRead)
             framesSoFar
-          }
 
         case None =>
           log.debug("FRAME_READ: No header yet, waiting for more data (have {} bytes)", unprocessedData.length)
           framesSoFar
-      }
-    }
 
     val result = readRecursive()
     log.debug("FRAME_READ: Parsed {} frame(s)", result.length)
     result
-  }
 
   private def tryReadHeader(): Unit =
-    if (unprocessedData.size >= HeaderLength) {
+    if unprocessedData.size >= HeaderLength then
       val headBuffer = unprocessedData.take(HeaderLength).toArray
 
       updateMac(secrets.ingressMac, headBuffer, 0, headBuffer, 16, egress = false)
@@ -137,11 +129,10 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
       // Security: defense-in-depth frame body size limit (CVE-2026-26313)
       // Frame headers are MAC-protected so only authenticated peers can reach this,
       // but enforce an explicit upper bound matching MaxDecompressedLength
-      if (bodySize <= 0 || bodySize > MessageCodec.MaxDecompressedLength) {
+      if bodySize <= 0 || bodySize > MessageCodec.MaxDecompressedLength then
         throw new IOException(
           s"Invalid frame body size: $bodySize (max=${MessageCodec.MaxDecompressedLength})"
         )
-      }
 
       val rlpList = rlp.decode[Seq[Int]](headBuffer.drop(3))
       val protocol = rlpList.headOption.getOrElse(
@@ -152,9 +143,8 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
 
       unprocessedData = unprocessedData.drop(HeaderLength)
       headerOpt = Some(Header(bodySize, protocol, contextId, totalPacketSize))
-    }
 
-  def writeFrames(frames: Seq[Frame]): ByteString = {
+  def writeFrames(frames: Seq[Frame]): ByteString =
     log.debug("FRAME_WRITE: Writing {} frame(s)", frames.size)
 
     val bytes = frames.zipWithIndex.flatMap { case (frame, index) =>
@@ -175,7 +165,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
       val ptype = rlp.encode(frame.`type`)
 
       val totalSize =
-        if (firstFrame) frame.payload.length + ptype.length
+        if firstFrame then frame.payload.length + ptype.length
         else frame.payload.length
 
       headBuffer(0) = (totalSize >> 16).toByte
@@ -208,21 +198,19 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
       val buff: Array[Byte] = new Array[Byte](256)
       out ++= ByteString(headBuffer)
 
-      if (firstFrame) {
+      if firstFrame then
         // packet-type only in first frame
         enc.processBytes(ptype, 0, ptype.length, buff, 0)
         out ++= ByteString(buff.take(ptype.length))
         secrets.egressMac.update(buff, 0, ptype.length)
         log.debug("FRAME_WRITE: First frame packet-type RLP={} ({} bytes)", Hex.toHexString(ptype), ptype.length)
-      }
 
       out ++= processFramePayload(frame.payload)
 
-      if (lastFrame) {
+      if lastFrame then
         // padding and mac only in last frame
         out ++= processFramePadding(totalSize)
         out ++= processFrameMac()
-      }
 
       log.debug("FRAME_WRITE: Frame[{}] outputLen={}", index, out.length)
       out
@@ -231,45 +219,39 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
     val result = ByteString(bytes.toArray)
     log.debug("FRAME_WRITE: Total output {} bytes", result.length)
     result
-  }
 
-  private def processFramePayload(payload: ByteString): ByteString = {
-    import com.chipprbots.ethereum.utils.ByteStringUtils._
+  private def processFramePayload(payload: ByteString): ByteString =
+    import com.chipprbots.ethereum.utils.ByteStringUtils.*
     var i = 0
     val elements = new ArrayBuffer[ByteStringElement]()
-    while (i < payload.length) {
+    while i < payload.length do
       val bytes = payload.drop(i).take(256).toArray
       enc.processBytes(bytes, 0, bytes.length, bytes, 0)
       secrets.egressMac.update(bytes, 0, bytes.length)
       elements.append(bytes)
       i += bytes.length
-    }
     concatByteStrings(elements.iterator)
-  }
 
-  private def processFramePadding(totalSize: Int): ByteString = {
+  private def processFramePadding(totalSize: Int): ByteString =
     val padding = 16 - (totalSize % 16)
-    if (padding < 16) {
+    if padding < 16 then
       val pad = new Array[Byte](16)
       val buff = new Array[Byte](16)
       enc.processBytes(pad, 0, padding, buff, 0)
       secrets.egressMac.update(buff, 0, padding)
       ByteString(buff.take(padding))
-    } else ByteString()
-  }
+    else ByteString()
 
-  private def processFrameMac(): ByteString = {
+  private def processFrameMac(): ByteString =
     val macBuffer = new Array[Byte](secrets.egressMac.getDigestSize)
     doSum(secrets.egressMac, macBuffer)
     updateMac(secrets.egressMac, macBuffer, 0, macBuffer, 0, egress = true)
     ByteString(macBuffer.take(16))
-  }
 
-  private def makeMacCipher: AESEngine = {
+  private def makeMacCipher: AESEngine =
     val macc = new AESEngine: @annotation.nowarn("cat=deprecation")
     macc.init(true, new KeyParameter(secrets.mac))
     macc
-  }
 
   private def updateMac(
       mac: KeccakDigest,
@@ -278,7 +260,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
       out: Array[Byte],
       outOffset: Int,
       egress: Boolean
-  ): Array[Byte] = {
+  ): Array[Byte] =
     val aesBlock = new Array[Byte](mac.getDigestSize)
     doSum(mac, aesBlock)
     makeMacCipher.processBlock(aesBlock, 0, aesBlock, 0)
@@ -293,16 +275,13 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
     val result = new Array[Byte](mac.getDigestSize)
     doSum(mac, result)
 
-    if (egress) System.arraycopy(result, 0, out, outOffset, length)
+    if egress then System.arraycopy(result, 0, out, outOffset, length)
     else
       (0 until length).foreach { i =>
-        if (out(i + outOffset) != result(i)) throw new IOException("MAC mismatch")
+        if out(i + outOffset) != result(i) then throw new IOException("MAC mismatch")
       }
 
     result
-  }
 
   private def doSum(mac: KeccakDigest, out: Array[Byte]) =
     new KeccakDigest(mac).doFinal(out, 0)
-
-}

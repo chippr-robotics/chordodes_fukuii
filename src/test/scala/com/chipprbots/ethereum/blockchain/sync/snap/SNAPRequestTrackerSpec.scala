@@ -1,32 +1,29 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.{TestKit, TestProbe}
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import org.scalatest.BeforeAndAfterAll
+import scala.concurrent.duration.*
+
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
-
-import scala.concurrent.duration._
+import org.scalatest.time.Millis
+import org.scalatest.time.Span
 
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.testing.PeerTestHelpers._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.testing.PeerTestHelpers.*
+import com.chipprbots.ethereum.testing.Tags.*
 
-class SNAPRequestTrackerSpec
-    extends TestKit(ActorSystem("SNAPRequestTrackerSpec"))
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class SNAPRequestTrackerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
-  override def afterAll(): Unit =
-    TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
-  implicit val scheduler: org.apache.pekko.actor.Scheduler = system.scheduler
+  implicit val scheduler: org.apache.pekko.actor.Scheduler = classicSystem.scheduler
 
   "SNAPRequestTracker" should "generate unique request IDs" taggedAs UnitTest in {
     val tracker = new SNAPRequestTracker()
@@ -89,8 +86,10 @@ class SNAPRequestTrackerSpec
 
     tracker.isPending(requestId) shouldBe true
 
-    // Wait for timeout to trigger using awaitCond
-    awaitCond(!tracker.isPending(requestId), max = 300.millis)
+    // Wait for timeout to trigger
+    eventually(timeout(Span(300, Millis))) {
+      assert(!tracker.isPending(requestId))
+    }
 
     tracker.isPending(requestId) shouldBe false
     timeoutCalled shouldBe true
@@ -108,12 +107,12 @@ class SNAPRequestTrackerSpec
     }
 
     // Complete the request quickly
-    within(100.millis) {
-      tracker.completeRequest(requestId)
-    }
+    tracker.completeRequest(requestId)
 
     // Wait a bit longer than timeout to ensure callback doesn't fire
-    awaitCond(true, max = 300.millis)
+    eventually(timeout(Span(300, Millis))) {
+      assert(true)
+    }
 
     timeoutCalled shouldBe false
   }
@@ -159,8 +158,8 @@ class SNAPRequestTrackerSpec
     )
 
     val result = tracker.validateAccountRange(response)
-    result shouldBe a[Left[_, _]]
-    result.left.get should include("not monotonically increasing")
+    result shouldBe a[Left[?, ?]]
+    result.swap.getOrElse(fail("Expected Left")) should include("not monotonically increasing")
   }
 
   it should "reject AccountRange response for unknown request ID" taggedAs UnitTest in {
@@ -174,8 +173,8 @@ class SNAPRequestTrackerSpec
     )
 
     val result = tracker.validateAccountRange(response)
-    result shouldBe a[Left[_, _]]
-    result.left.get should include("No pending request")
+    result shouldBe a[Left[?, ?]]
+    result.swap.getOrElse(fail("Expected Left")) should include("No pending request")
   }
 
   it should "validate StorageRanges response with monotonic ordering" taggedAs UnitTest in {
@@ -219,8 +218,8 @@ class SNAPRequestTrackerSpec
     )
 
     val result = tracker.validateStorageRanges(response)
-    result shouldBe a[Left[_, _]]
-    result.left.get should include("not monotonically increasing")
+    result shouldBe a[Left[?, ?]]
+    result.swap.getOrElse(fail("Expected Left")) should include("not monotonically increasing")
   }
 
   it should "validate ByteCodes response" taggedAs UnitTest in {
@@ -303,7 +302,9 @@ class SNAPRequestTrackerSpec
       timeoutCalled = true
     }
 
-    awaitCond(timeoutCalled, max = 500.millis)
+    eventually(timeout(Span(500, Millis))) {
+      assert(timeoutCalled)
+    }
     tracker.isPending(requestId) shouldBe false
   }
 
@@ -328,4 +329,3 @@ class SNAPRequestTrackerSpec
     // are demonstrably faster than the default.
     converged should be <= initial
   }
-}

@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteUtils
 
-object StateSyncUtils extends EphemBlockchainTestSetup {
+object StateSyncUtils extends EphemBlockchainTestSetup:
 
   final case class MptNodeData(
       accountAddress: Address,
@@ -28,24 +28,22 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
       blockchainReader: BlockchainReader,
       evmCodeStorage: EvmCodeStorage,
       blockchainConfig: BlockchainConfig
-  ) {
+  ):
     def getNodes(hashes: List[ByteString]): List[SyncResponse] =
       hashes.map { hash =>
-        val maybeResult = blockchainReader.getMptNodeByHash(hash) match {
+        val maybeResult = blockchainReader.getMptNodeByHash(hash) match
           case Some(value) => Some(ByteString(value.encode))
           case None        => evmCodeStorage.get(hash)
-        }
-        maybeResult match {
+        maybeResult match
           case Some(result) => SyncResponse(hash, result)
           case None         => throw new RuntimeException("Missing expected data in storage")
-        }
       }
 
-    def buildWorld(accountData: Seq[MptNodeData], existingTree: Option[ByteString] = None): ByteString = {
+    def buildWorld(accountData: Seq[MptNodeData], existingTree: Option[ByteString] = None): ByteString =
       val init = InMemoryWorldStateProxy(
         evmCodeStorage,
         blockchain.getBackingMptStorage(1),
-        (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+        (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
         blockchainConfig.accountStartNonce,
         existingTree.getOrElse(ByteString(MerklePatriciaTrie.EmptyRootHash)),
         noEmptyAccounts = true,
@@ -62,20 +60,16 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
           .saveStorage(data.accountAddress, modifiedStorage)
 
         val finalWorld =
-          if (data.accountCode.isDefined)
-            worldWithAccAndStorage.saveCode(data.accountAddress, data.accountCode.get)
-          else
-            worldWithAccAndStorage
+          if data.accountCode.isDefined then worldWithAccAndStorage.saveCode(data.accountAddress, data.accountCode.get)
+          else worldWithAccAndStorage
         finalWorld
       }
 
       val persisted = InMemoryWorldStateProxy.persistState(modifiedWorld)
       persisted.stateRootHash
-    }
-  }
 
-  object TrieProvider {
-    def apply(): TrieProvider = {
+  object TrieProvider:
+    def apply(): TrieProvider =
       val freshStorage = getNewStorages
       val blockchainReader = BlockchainReader(freshStorage.storages)
       new TrieProvider(
@@ -84,8 +78,6 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
         freshStorage.storages.evmCodeStorage,
         blockchainConfig
       )
-    }
-  }
 
   def createNodeDataStartingFrom(initialNumber: Int, lastNumber: Int, storageOffset: Int): Seq[MptNodeData] =
     (initialNumber until lastNumber).map { i =>
@@ -102,28 +94,21 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
       blockchainReader: BlockchainReader,
       evmCodeStorage: EvmCodeStorage,
       blNumber: BigInt
-  ): Boolean = {
+  ): Boolean =
     def go(remaining: List[MptNodeData]): Boolean =
-      if (remaining.isEmpty) {
-        true
-      } else {
+      if remaining.isEmpty then true
+      else
         val dataToCheck = remaining.head
         val address =
-          blockchainReader.getAccount(blockchainReader.getBestBranch(), dataToCheck.accountAddress, blNumber)
-        val code = address.flatMap(a => evmCodeStorage.get(a.codeHash))
+          blockchainReader.getAccount(blockchainReader.getBestBranch, dataToCheck.accountAddress, blNumber)
+        val code = address.flatMap(a => evmCodeStorage.get(a.codeHash.value))
 
         val storageCorrect = dataToCheck.accountStorage.forall { case (key, value) =>
-          val stored = blockchain.getAccountStorageAt(address.get.storageRoot, key, ethCompatibleStorage = true)
+          val stored = blockchain.getAccountStorageAt(address.get.storageRoot.value, key, ethCompatibleStorage = true)
           ByteUtils.toBigInt(stored) == value
         }
 
-        if (address.isDefined && code.isDefined && storageCorrect) {
-          go(remaining.tail)
-        } else {
-          false
-        }
-      }
+        if address.isDefined && code.isDefined && storageCorrect then go(remaining.tail)
+        else false
 
     go(nodeData)
-  }
-}

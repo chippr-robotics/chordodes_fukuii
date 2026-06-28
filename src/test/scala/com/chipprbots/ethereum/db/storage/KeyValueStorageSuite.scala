@@ -9,22 +9,21 @@ import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.dataSource.DataSourceUpdate
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp.{decode => rlpDecode}
-import com.chipprbots.ethereum.rlp.{encode => rlpEncode}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.rlp.decode as rlpDecode
+import com.chipprbots.ethereum.rlp.encode as rlpEncode
+import com.chipprbots.ethereum.testing.Tags.*
 
-class KeyValueStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class KeyValueStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
   val iterationsNumber = 100
 
-  object IntStorage {
+  object IntStorage:
     val intNamespace: IndexedSeq[Byte] = IndexedSeq[Byte]('i'.toByte)
     val intSerializer: Int => IndexedSeq[Byte] = (i: Int) => rlpEncode(i).toIndexedSeq
     val intDeserializer: IndexedSeq[Byte] => Int =
       (encodedInt: IndexedSeq[Byte]) => rlpDecode[Int](encodedInt.toArray)
-  }
 
-  class IntStorage(val dataSource: DataSource) extends KeyValueStorage[Int, Int, IntStorage] {
-    import IntStorage._
+  class IntStorage(val dataSource: DataSource) extends KeyValueStorage[Int, Int, IntStorage]:
+    import IntStorage.*
 
     type T = IntStorage
 
@@ -35,14 +34,13 @@ class KeyValueStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks wit
     override def valueDeserializer: IndexedSeq[Byte] => Int = intDeserializer
 
     protected def apply(dataSource: DataSource): IntStorage = new IntStorage(dataSource)
-  }
 
   val initialIntStorage = new IntStorage(EphemDataSource())
 
-  val dataGenerator: Gen[(List[Int], List[Int])] = for {
+  val dataGenerator: Gen[(List[Int], List[Int])] = for
     intsInStorage <- Gen.nonEmptyListOf(intGen)
     intsNotInStorage <- Gen.nonEmptyListOf(intGen.suchThat(value => !intsInStorage.contains(value)))
-  } yield (intsInStorage, intsNotInStorage)
+  yield (intsInStorage, intsNotInStorage)
 
   test("Get ints from KeyValueStorage", UnitTest, DatabaseTest) {
     forAll(dataGenerator) { case (intsInStorage, intsNotInStorage) =>
@@ -118,4 +116,3 @@ class KeyValueStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks wit
       }
     }
   }
-}

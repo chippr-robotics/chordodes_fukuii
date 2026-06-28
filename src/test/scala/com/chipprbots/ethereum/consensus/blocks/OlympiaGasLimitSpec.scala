@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.consensus.blocks
 
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -12,12 +12,13 @@ import com.chipprbots.ethereum.consensus.mining.MiningConfig
 import com.chipprbots.ethereum.consensus.mining.Protocol
 import com.chipprbots.ethereum.consensus.pow.blocks.Ommers
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 // scalastyle:off magic.number
@@ -32,7 +33,7 @@ class OlympiaGasLimitSpec
     extends AnyFlatSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val OlympiaTestBlock: BigInt = BigInt(100)
 
@@ -57,12 +58,11 @@ class OlympiaGasLimitSpec
           staleThreshold = 7,
           recommitInterval = 0.seconds
         ),
-        new DifficultyCalculator {
+        new DifficultyCalculator:
           def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
               blockchainConfig: BlockchainConfig
-          ): BigInt = BigInt(1)
-        }
-      ) {
+          ): Difficulty = Difficulty(BigInt(1))
+      ):
     type X = Ommers
     override protected def newBlockBody(transactions: Seq[SignedTransaction], x: Ommers): BlockBody =
       BlockBody(transactions, Nil)
@@ -89,7 +89,6 @@ class OlympiaGasLimitSpec
     def calcGasLimit(parentGas: BigInt, blockNumber: BigInt = BigInt(0))(implicit
         bc: BlockchainConfig
     ): BigInt = calculateGasLimit(parentGas, blockNumber)
-  }
 
   "Olympia gas limit (EIP-7935)" should "converge from pre-Olympia 8M to 60M target" taggedAs (
     OlympiaTest,
@@ -100,10 +99,9 @@ class OlympiaGasLimitSpec
     val threshold = OlympiaGasTarget * 99 / 100
 
     var blocks = 0
-    while (limit < threshold && blocks < 200_000) {
+    while limit < threshold && blocks < 200_000 do
       limit = gen.calcGasLimit(limit, OlympiaTestBlock + blocks)
       blocks += 1
-    }
     limit should be >= threshold
     // Must match core-geth: 2,055 blocks
     blocks shouldBe 2055
@@ -152,9 +150,9 @@ class OlympiaGasLimitSpec
     val rng = new scala.util.Random(42)
 
     // Simulate 10,000 blocks with 70% honest (60M) / 30% adversary (30M)
-    for (i <- 1 to 10_000)
+    for i <- 1 to 10_000 do
       limit =
-        if (rng.nextInt(100) < 70) honestGen.calcGasLimit(limit, OlympiaTestBlock + i)
+        if rng.nextInt(100) < 70 then honestGen.calcGasLimit(limit, OlympiaTestBlock + i)
         else adversaryGen.calcGasLimit(limit, OlympiaTestBlock + i)
 
     // With 70% honest, should converge near 60M (within 5%)
@@ -162,5 +160,4 @@ class OlympiaGasLimitSpec
     limit should be <= OlympiaGasTarget * 105 / 100
     info(s"70/30 split equilibrium: $limit (${(limit.toDouble / OlympiaGasTarget.toDouble * 100).round}% of 60M)")
   }
-}
 // scalastyle:on magic.number

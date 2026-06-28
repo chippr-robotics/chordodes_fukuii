@@ -3,15 +3,15 @@ package com.chipprbots.ethereum.mpt
 import java.io.File
 import java.nio.file.Files
 
-import com.chipprbots.ethereum.db.dataSource._
-import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.dataSource.*
+import com.chipprbots.ethereum.db.storage.*
 
-trait PersistentStorage {
+trait PersistentStorage:
 
-  def withRocksDbNodeStorage(testCode: MptStorage => Unit): Unit = {
+  def withRocksDbNodeStorage(testCode: MptStorage => Unit): Unit =
     val dbPath = Files.createTempDirectory("rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -21,19 +21,15 @@ trait PersistentStorage {
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
 
     testExecution(testCode, dbPath, dataSource)
     dataSource.destroy()
-  }
 
   private def testExecution(testCode: MptStorage => Unit, dbPath: String, dataSource: DataSource): Unit =
     try testCode(new SerializingMptStorage(new ArchiveNodeStorage(new NodeStorage(dataSource))))
-    finally {
+    finally
       val dir = new File(dbPath)
       !dir.exists() || dir.delete()
-    }
-
-}

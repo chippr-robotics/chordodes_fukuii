@@ -6,7 +6,7 @@ import io.micrometer.core.instrument.Counter
 
 import com.chipprbots.ethereum.metrics.MetricsContainer
 
-case object NetworkMetrics extends MetricsContainer {
+case object NetworkMetrics extends MetricsContainer:
 
   final private val HandshakedIncomingPeersGauge =
     metrics.registry.gauge("network.peers.incoming.handshaked.gauge", new AtomicLong(0))
@@ -35,17 +35,9 @@ case object NetworkMetrics extends MetricsContainer {
     metrics.registry.gauge("network.tried.peers.gauge", new AtomicLong(0L))
 
   def registerAddHandshakedPeer(peer: Peer): Unit =
-    if (peer.incomingConnection) {
-      HandshakedIncomingPeersGauge.incrementAndGet()
-    } else {
-      HandshakedOutgoingPeersGauge.incrementAndGet()
-    }
+    if peer.incomingConnection then HandshakedIncomingPeersGauge.incrementAndGet()
+    else HandshakedOutgoingPeersGauge.incrementAndGet()
 
   def registerRemoveHandshakedPeer(peer: Peer): Unit =
-    if (peer.incomingConnection) {
-      HandshakedIncomingPeersGauge.decrementAndGet()
-    } else {
-      HandshakedOutgoingPeersGauge.decrementAndGet()
-    }
-
-}
+    if peer.incomingConnection then HandshakedIncomingPeersGauge.decrementAndGet()
+    else HandshakedOutgoingPeersGauge.decrementAndGet()

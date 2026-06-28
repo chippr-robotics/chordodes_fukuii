@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.domain.Address
   * @param initialCoinbase
   *   The initial coinbase address to use
   */
-class CoinbaseProvider(initialCoinbase: Address) {
+class CoinbaseProvider(initialCoinbase: Address):
   private val coinbaseRef = new AtomicReference[Address](initialCoinbase)
 
   /** Get the current coinbase address.
@@ -29,4 +29,3 @@ class CoinbaseProvider(initialCoinbase: Address) {
     */
   def update(newCoinbase: Address): Unit =
     coinbaseRef.set(newCoinbase)
-}

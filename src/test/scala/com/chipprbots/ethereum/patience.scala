@@ -2,11 +2,11 @@ package com.chipprbots.ethereum
 
 import org.apache.pekko.util.Timeout
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.concurrent.PatienceConfiguration
 
-trait NormalPatience {
+trait NormalPatience:
   self: PatienceConfiguration =>
 
   implicit abstract override val patienceConfig: PatienceConfig =
@@ -18,9 +18,8 @@ trait NormalPatience {
   implicit val actorAskTimeout: Timeout = Timeouts.normalTimeout
 
   implicit val taskTimeout: Duration = Timeouts.normalTimeout
-}
 
-trait LongPatience {
+trait LongPatience:
   self: PatienceConfiguration =>
 
   implicit abstract override val patienceConfig: PatienceConfig =
@@ -32,9 +31,8 @@ trait LongPatience {
   implicit val actorAskTimeout: Timeout = Timeouts.longTimeout
 
   implicit val taskTimeout: Duration = Timeouts.longTimeout
-}
 
-trait VeryLongPatience {
+trait VeryLongPatience:
   self: PatienceConfiguration =>
 
   implicit abstract override val patienceConfig: PatienceConfig =
@@ -46,9 +44,8 @@ trait VeryLongPatience {
   implicit val actorAskTimeout: Timeout = Timeouts.veryLongTimeout
 
   implicit val taskTimeout: Duration = Timeouts.veryLongTimeout
-}
 
-trait MiningPatience {
+trait MiningPatience:
   self: PatienceConfiguration =>
 
   implicit abstract override val patienceConfig: PatienceConfig =
@@ -60,4 +57,3 @@ trait MiningPatience {
   implicit val actorAskTimeout: Timeout = Timeouts.miningTimeout
 
   implicit val taskTimeout: Duration = Timeouts.miningTimeout
-}

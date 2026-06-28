@@ -1,33 +1,33 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.syntax.either._
+import cats.syntax.either.*
 
-import scala.reflect.ClassTag
+import scala.annotation.unused
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.crypto._
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.keystore.KeyStore
+import com.chipprbots.ethereum.ledger.BlockExecution.HistoryStorageAddress
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
-import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
-import com.chipprbots.ethereum.ledger.BlockExecution.HistoryStorageAddress
-
-import scala.annotation.unused
+import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm.PrecompiledContracts
 
-object EthInfoService {
+object EthInfoService:
   case class ChainIdRequest()
   case class ChainIdResponse(value: BigInt)
 
@@ -70,15 +70,13 @@ object EthInfoService {
   case class CallRequest(tx: CallTx, block: BlockParam)
   case class CallResponse(returnData: ByteString)
   case class EstimateGasResponse(gas: BigInt)
-  case class CreateAccessListRequest(tx: CallTx, block: BlockParam) {
+  case class CreateAccessListRequest(tx: CallTx, block: BlockParam):
     def toCallRequest: CallRequest = CallRequest(tx, block)
-  }
   case class CreateAccessListResponse(
       accessList: Seq[Map[String, Any]],
       gasUsed: BigInt,
       error: Option[String]
   )
-}
 
 class EthInfoService(
     val blockchain: Blockchain,
@@ -87,12 +85,15 @@ class EthInfoService(
     val mining: Mining,
     stxLedger: StxLedger,
     keyStore: KeyStore,
-    syncingController: ActorRef,
+    syncingController: TypedActorRef[SyncController.Command],
     capability: Capability,
-    askTimeout: Timeout
-) extends ResolveBlock {
+    askTimeout: Timeout,
+    scheduler: Scheduler
+) extends ResolveBlock:
 
-  import EthInfoService._
+  import EthInfoService.*
+
+  private given typedScheduler: Scheduler = scheduler
 
   def protocolVersion(@unused req: ProtocolVersionRequest): ServiceResponse[ProtocolVersionResponse] =
     IO.pure(Right(ProtocolVersionResponse(f"0x${capability.version}%x")))
@@ -107,7 +108,10 @@ class EthInfoService(
     */
   def syncing(@unused req: SyncingRequest): ServiceResponse[SyncingResponse] =
     syncingController
-      .askFor(SyncProtocol.GetStatus)(timeout = askTimeout, implicitly[ClassTag[SyncProtocol.Status]])
+      .askForTyped[SyncProtocol.Status](replyTo => SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo)))(
+        timeout = askTimeout,
+        scheduler = typedScheduler
+      )
       .map {
         case Status.Syncing(startingBlockNumber, blocksProgress, maybeStateNodesProgress) =>
           val stateNodesProgress = maybeStateNodesProgress.getOrElse(Progress.empty)
@@ -177,7 +181,7 @@ class EthInfoService(
       .sortBy(_._2)
       .distinctBy(_._2) // deduplicate by block number
 
-    val currentBlock = blockchainReader.getBestBlockNumber()
+    val currentBlock = blockchainReader.getBestBlockNumber
 
     def toForkConfig(
         @unused name: String,
@@ -195,13 +199,13 @@ class EthInfoService(
     val next = futureForks.headOption.map(f => toForkConfig(f._1, f._2, f._3, f._4))
     val last = forks.lastOption.map(f => toForkConfig(f._1, f._2, f._3, f._4))
 
-    Right(ConfigResponse(current, next, if (futureForks.nonEmpty) last else None))
+    Right(ConfigResponse(current, next, if futureForks.nonEmpty then last else None))
   }
 
   def call(req: CallRequest): ServiceResponse[CallResponse] =
     IO {
       doCall(req)(stxLedger.simulateTransaction).flatMap { r =>
-        r.vmError match {
+        r.vmError match
           case Some(com.chipprbots.ethereum.vm.RevertOccurs) =>
             val dataHex = "0x" + org.bouncycastle.util.encoders.Hex.toHexString(r.vmReturnData.toArray[Byte])
             Left(JsonRpcError(3, "execution reverted", Some(org.json4s.JString(dataHex))))
@@ -210,7 +214,6 @@ class EthInfoService(
             Right(CallResponse(r.vmReturnData))
           case None =>
             Right(CallResponse(r.vmReturnData))
-        }
       }
     }.recover { case _: MissingNodeException =>
       Left(JsonRpcError.NodeNotFound)
@@ -221,14 +224,13 @@ class EthInfoService(
       // First check if the tx reverts at the max gas limit
       val simCheck = doCall(req)(stxLedger.simulateTransaction)
       simCheck.flatMap { r =>
-        r.vmError match {
+        r.vmError match
           case Some(com.chipprbots.ethereum.vm.RevertOccurs) =>
             val dataHex = "0x" + org.bouncycastle.util.encoders.Hex.toHexString(r.vmReturnData.toArray[Byte])
             Left(JsonRpcError(3, "execution reverted", Some(org.json4s.JString(dataHex))))
           case _ =>
             // Tx doesn't revert — find minimum gas via binary search
             doCall(req)(stxLedger.binarySearchGasEstimation).map(gas => EstimateGasResponse(gas))
-        }
       }
     }.recover { case _: MissingNodeException =>
       Left(JsonRpcError.NodeNotFound)
@@ -253,25 +255,23 @@ class EthInfoService(
 
   private def doCall[A](req: CallRequest)(
       f: (SignedTransactionWithSender, BlockHeader, Option[InMemoryWorldStateProxy]) => A
-  ): Either[JsonRpcError, A] = for {
+  ): Either[JsonRpcError, A] = for
     stx <- prepareTransaction(req)
     block <- resolveBlock(req.block)
-  } yield {
+  yield
     // EIP-1559: When no gas price is explicitly specified, use baseFee=0 so calls
     // don't need to worry about funding. Matches geth behavior for eth_call/eth_estimateGas.
-    val header = if (!req.tx.gasPriceExplicit && block.block.header.baseFee.isDefined) {
-      import BlockHeader.HeaderExtraFields._
-      val zeroBaseFeeExtra = block.block.header.extraFields match {
+    val header = if !req.tx.gasPriceExplicit && block.block.header.baseFee.isDefined then
+      import BlockHeader.HeaderExtraFields.*
+      val zeroBaseFeeExtra = block.block.header.extraFields match
         case HefPostOlympia(_)                    => HefPostOlympia(0)
         case HefPostShanghai(_, wr)               => HefPostShanghai(0, wr)
         case HefPostCancun(_, wr, bg, eb, pb)     => HefPostCancun(0, wr, bg, eb, pb)
         case HefPostPrague(_, wr, bg, eb, pb, rh) => HefPostPrague(0, wr, bg, eb, pb, rh)
         case other                                => other
-      }
       block.block.header.copy(extraFields = zeroBaseFeeExtra)
-    } else block.block.header
+    else block.block.header
     f(stx, header, block.pendingState)
-  }
 
   private def getGasLimit(req: CallRequest): Either[JsonRpcError, BigInt] =
     req.tx.gas.map(Right.apply).getOrElse(resolveBlock(BlockParam.Latest).map(r => r.block.header.gasLimit))
@@ -281,8 +281,7 @@ class EthInfoService(
       val fromAddress = req.tx.from
         .map(Address.apply) // `from` param, if specified
         .getOrElse(
-          keyStore
-            .listAccounts()
+          keyStore.listAccounts
             .getOrElse(Nil)
             .headOption // first account, if exists and `from` param not specified
             .getOrElse(Address(0))
@@ -294,5 +293,3 @@ class EthInfoService(
       val fakeSignature = ECDSASignature(0, 0, 0)
       SignedTransactionWithSender(tx, fakeSignature, fromAddress)
     }
-
-}

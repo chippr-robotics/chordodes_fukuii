@@ -1,70 +1,66 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.{ActorSystem => ClassicSystem}
-import org.apache.pekko.testkit.TestActorRef
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.ActorSystem as ClassicSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalamock.handlers.CallHandler4
 import org.scalamock.handlers.CallHandler6
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.pow.MinerSpecSetup
 import com.chipprbots.ethereum.consensus.pow.PoWBlockCreator
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
-import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses._
+import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses.*
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.SubmitHashRateResponse
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
-
-import com.chipprbots.ethereum.testing.Tags._
 
 // SCALA 3 MIGRATION: Fixed by refactoring MinerSpecSetup to use abstract mock members pattern.
 // ACTOR SYSTEM FIX: TestSetup now overrides classicSystem to use TestKit's actor system,
 // preventing actor system conflicts between TestKit and MinerSpecSetup.
 class MockedMinerSpec
-    extends TestKit(ClassicSystem("MockedPowMinerSpec_System"))
+    extends ScalaTestWithActorTestKit
     with AnyWordSpecLike
     with Matchers
-    with WithActorSystemShutDown
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   implicit private val timeout: Duration = 1.minute
 
   "MockedPowMiner actor" should {
     "not mine blocks" when {
-      "there is no request" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+      "there is no request" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
         expectNoNewBlockMsg(noMessageTimeOut)
-      }
     }
 
     "not mine block and return MinerNotSupport msg" when {
-      "the request comes before miner started" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
-        val msg = MineBlocks(1, false, None)
+      "the request comes before miner started" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
+        val msg: MineBlocks = MineBlocks(1, false, None)
         sendToMiner(msg)
         expectNoNewBlockMsg(noMessageTimeOut)
         parentActor.expectMsg(MinerNotSupported(msg))
-      }
     }
 
     "stop mining in case of error" when {
-      "Unable to get block for mining" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+      "Unable to get block for mining" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
         val parent = origin
-        val bfm1 = createBlockForMining(parent, Seq.empty)
+        val bfm1: Block = createBlockForMining(parent, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm1)
 
@@ -89,29 +85,28 @@ class MockedMinerSpec
 
           validateBlock(block1, parent)
         }
-      }
 
-      "Unable to get parent block for mining" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+      "Unable to get parent block for mining" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
         val parentHash = origin.hash
 
-        val errorMsg = s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash)} for mining"
+        val errorMsg: String =
+          s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash.value)} for mining"
 
-        (blockchainReader.getBlockByHash _).expects(parentHash).returns(None)
+        blockchainReader.getBlockByHash.expects(parentHash).returns(None)
 
         withStartedMiner {
-          sendToMiner(MineBlocks(2, withTransactions = false, Some(parentHash)))
+          sendToMiner(MineBlocks(2, withTransactions = false, Some(parentHash.value)))
 
           expectNoNewBlockMsg(noMessageTimeOut)
 
           parentActor.expectMsg(MiningError(errorMsg))
         }
-      }
     }
 
     "return MinerIsWorking to requester" when {
-      "miner is working during next mine request" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+      "miner is working during next mine request" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
         val parent = origin
-        val bfm = createBlockForMining(parent, Seq.empty)
+        val bfm: Block = createBlockForMining(parent, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm)
 
@@ -127,24 +122,23 @@ class MockedMinerSpec
 
           validateBlock(block, parent)
         }
-      }
     }
 
     "mine valid blocks" when {
       "there is request for block with other parent than best block" taggedAs (
         UnitTest,
         ConsensusTest
-      ) in new TestSetup {
+      ) in new TestSetup:
         val parent = origin
         val parentHash = origin.hash
-        val bfm = createBlockForMining(parent, Seq.empty)
+        val bfm: Block = createBlockForMining(parent, Seq.empty)
 
-        (blockchainReader.getBlockByHash _).expects(parentHash).returns(Some(parent))
+        blockchainReader.getBlockByHash.expects(parentHash).returns(Some(parent))
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm)
 
         withStartedMiner {
-          sendToMiner(MineBlocks(1, withTransactions = false, Some(parentHash)))
+          sendToMiner(MineBlocks(1, withTransactions = false, Some(parentHash.value)))
 
           parentActor.expectMsg(MiningOrdered)
 
@@ -152,11 +146,10 @@ class MockedMinerSpec
 
           validateBlock(block, parent)
         }
-      }
 
-      "there is request for one block without transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+      "there is request for one block without transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
         val parent = origin
-        val bfm = createBlockForMining(parent, Seq.empty)
+        val bfm: Block = createBlockForMining(parent, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm)
 
@@ -169,11 +162,10 @@ class MockedMinerSpec
 
           validateBlock(block, parent)
         }
-      }
 
-      "there is request for one block with transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+      "there is request for one block with transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
         val parent = origin
-        val bfm = createBlockForMining(parent)
+        val bfm: Block = createBlockForMining(parent)
 
         blockCreatorBehaviour(parent, withTransactions = true, bfm)
 
@@ -186,12 +178,11 @@ class MockedMinerSpec
 
           validateBlock(block, parent, Seq(txToMine))
         }
-      }
 
-      "there is request for few blocks without transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+      "there is request for few blocks without transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
         val parent = origin
-        val bfm1 = createBlockForMining(parent, Seq.empty)
-        val bfm2 = createBlockForMining(bfm1, Seq.empty)
+        val bfm1: Block = createBlockForMining(parent, Seq.empty)
+        val bfm2: Block = createBlockForMining(bfm1, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm1)
 
@@ -208,12 +199,11 @@ class MockedMinerSpec
           validateBlock(block1, parent)
           validateBlock(block2, block1)
         }
-      }
 
-      "there is request for few blocks with transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+      "there is request for few blocks with transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
         val parent = origin
-        val bfm1 = createBlockForMining(parent)
-        val bfm2 = createBlockForMining(bfm1, Seq.empty)
+        val bfm1: Block = createBlockForMining(parent)
+        val bfm2: Block = createBlockForMining(bfm1, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = true, bfm1)
 
@@ -231,13 +221,12 @@ class MockedMinerSpec
           validateBlock(block1, parent, Seq(txToMine))
           validateBlock(block2, block1)
         }
-      }
     }
   }
 
-  class TestSetup extends MinerSpecSetup {
-    // Override classicSystem to use the TestKit's actor system instead of creating a new one
-    implicit override def classicSystem: ClassicSystem = MockedMinerSpec.this.system
+  class TestSetup extends MinerSpecSetup:
+    // Override classicSystem to use the ScalaTestWithActorTestKit's actor system (converted to classic)
+    implicit override def classicSystem: ClassicSystem = MockedMinerSpec.this.system.toClassic
     val noMessageTimeOut: FiniteDuration = 3.seconds
 
     // Implement abstract mock members - created in test class with MockFactory context
@@ -249,17 +238,22 @@ class MockedMinerSpec
     override lazy val mockEvmCodeStorage: EvmCodeStorage = mock[EvmCodeStorage]
     override lazy val mockMptStorage: MptStorage = mock[MptStorage]
 
-    val miner: TestActorRef[Nothing] = TestActorRef(
-      MockedMiner.props(
-        blockchainReader,
-        blockCreator,
-        sync.ref,
-        this
+    val miner: typed.ActorRef[MockedMiner.Command] =
+      testKit.spawn(
+        MockedMiner(
+          blockchainReader,
+          blockCreator,
+          sync.ref,
+          this
+        )
       )
-    )
+
+    // Reply target for the Typed ask/reply pattern (Classic sender() is gone in Typed).
+    private val parentReplyTo: typed.ActorRef[MockedMiner.MockedMinerResponse] =
+      parentActor.ref.toTyped[MockedMiner.MockedMinerResponse]
 
     // Allow getBestBlock to be called 0 or more times since some tests use getBlockByHash instead
-    (blockchainReader.getBestBlock _).expects().returns(Some(origin)).anyNumberOfTimes()
+    (() => blockchainReader.getBestBlock).expects().returns(Some(origin)).anyNumberOfTimes()
 
     // Implement abstract expectation methods
     // NOTE: MockedMiner tests use createBlockForMining() which doesn't call this method,
@@ -307,24 +301,20 @@ class MockedMinerSpec
         .returning(IO.pure(PendingBlockAndState(PendingBlock(resultBlock, Nil), fakeWorld)))
 
     override def setupMiningServiceExpectation(): Unit =
-      (ethMiningService.submitHashRate _)
+      ethMiningService.submitHashRate
         .expects(*)
         .returns(IO.pure(Right(SubmitHashRateResponse(true))))
         .atLeastOnce()
 
-    def validateBlock(block: Block, parent: Block, txs: Seq[SignedTransaction] = Seq.empty): Assertion = {
+    def validateBlock(block: Block, parent: Block, txs: Seq[SignedTransaction] = Seq.empty): Assertion =
       block.body.transactionList shouldBe txs
       block.header.nonce.length shouldBe 0
       block.header.parentHash shouldBe parent.hash
-    }
 
-    protected def withStartedMiner(behaviour: => Unit): Unit = {
-      miner ! MinerProtocol.StartMining
+    protected def withStartedMiner(behaviour: => Unit): Unit =
+      miner ! MockedMiner.Send(MockedMiner.StartMining, parentReplyTo)
       behaviour
-      miner ! MinerProtocol.StopMining
-    }
+      miner ! MockedMiner.Send(MockedMiner.StopMining, parentReplyTo)
 
-    protected def sendToMiner(msg: MinerProtocol): Unit =
-      miner.tell(msg, parentActor.ref)
-  }
-}
+    protected def sendToMiner(msg: MockedMiner.MockedMinerProtocol): Unit =
+      miner ! MockedMiner.Send(msg, parentReplyTo)

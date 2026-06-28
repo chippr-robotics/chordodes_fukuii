@@ -3,9 +3,10 @@ package com.chipprbots.ethereum.utils
 import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import com.chipprbots.ethereum.testing.Tags._
 
-class ConfigSpec extends AnyFlatSpec with Matchers {
+import com.chipprbots.ethereum.testing.Tags.*
+
+class ConfigSpec extends AnyFlatSpec with Matchers:
   "clientId" should "by default come from VersionInfo" taggedAs (UnitTest) in {
     Config.clientId shouldBe VersionInfo.nodeName()
   }
@@ -30,10 +31,9 @@ class ConfigSpec extends AnyFlatSpec with Matchers {
     val peerConfig = testConfig.getConfig("fukuii.network.peer")
 
     // Simulate the logic from Config.scala
-    val p2pVersion = if (peerConfig.hasPath("p2p-version")) peerConfig.getInt("p2p-version") else 5
+    val p2pVersion = if peerConfig.hasPath("p2p-version") then peerConfig.getInt("p2p-version") else 5
 
     // Verify default is applied when key is missing
     peerConfig.hasPath("p2p-version") shouldBe false
     p2pVersion shouldBe 5
   }
-}

@@ -2,29 +2,27 @@ package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 
-object ProgramContext {
+object ProgramContext:
   def apply[W <: WorldStateProxy[W, S], S <: Storage[S]](
       stx: SignedTransaction,
       blockHeader: BlockHeader,
       senderAddress: Address,
       world: W,
       evmConfig: EvmConfig
-  ): ProgramContext[W, S] = {
+  ): ProgramContext[W, S] =
     import stx.tx
     val accessList = Transaction.accessList(tx)
-    val authListSize = tx match {
+    val authListSize = tx match
       case sct: SetCodeTransaction => sct.authorizationList.size
       case _                       => 0
-    }
     val gasLimit =
       tx.gasLimit - evmConfig.calcTransactionIntrinsicGas(tx.payload, tx.isContractInit, accessList, authListSize)
 
-    val blobHashes = tx match {
-      case blob: BlobTransaction => blob.blobVersionedHashes
+    val blobHashes = tx match
+      case blob: BlobTransaction => blob.blobVersionedHashes.map(_.value)
       case _                     => Seq.empty
-    }
 
     ProgramContext(
       callerAddr = senderAddress,
@@ -50,11 +48,9 @@ object ProgramContext {
       evmConfig = evmConfig,
       originalWorld = world,
       warmAddresses = accessList.map(_.address).toSet,
-      warmStorage = accessList.flatMap(i => i.storageKeys.map((i.address, _))).toSet,
+      warmStorage = accessList.flatMap(i => i.storageKeys.map(sk => (i.address, sk))).toSet,
       blobVersionedHashes = blobHashes
     )
-  }
-}
 
 /** Input parameters to a program executed on the EVM. Apart from the code itself it should have all (interfaces to) the
   * data accessible from the EVM.
@@ -116,8 +112,8 @@ case class ProgramContext[W <: WorldStateProxy[W, S], S <: Storage[S]](
     staticCtx: Boolean = false,
     originalWorld: W,
     warmAddresses: Set[Address],
-    warmStorage: Set[(Address, BigInt)],
-    transientStorage: Map[(Address, BigInt), BigInt] = Map.empty,
+    warmStorage: Set[(Address, StorageKey)],
+    transientStorage: Map[(Address, StorageKey), BigInt] = Map.empty,
     precompileRelocations: Map[Address, Address] = Map.empty,
     blobVersionedHashes: Seq[ByteString] = Seq.empty,
     traceTransfers: Boolean = false,

@@ -1,19 +1,21 @@
 package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.ByteString.{empty => bEmpty}
+import org.apache.pekko.util.ByteString.empty as bEmpty
 
 import org.bouncycastle.util.encoders.Hex
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
 import com.chipprbots.ethereum.vm.MockWorldState.PC
 import com.chipprbots.ethereum.vm.MockWorldState.TestVM
@@ -22,7 +24,7 @@ class StoreOpCodeGasPostConstantinopleSpec
     extends AnyWordSpec
     with ScalaCheckPropertyChecks
     with Matchers
-    with TestSetup {
+    with TestSetup:
 
   val defaultGaspool = 1000000
 
@@ -91,20 +93,19 @@ class StoreOpCodeGasPostConstantinopleSpec
       result.error shouldEqual maybeError
     }
   }
-}
 
-trait TestSetup {
+trait TestSetup:
   val vm = new TestVM
 
   val senderAddr: Address = Address(0xcafebabeL)
   val senderAcc: Account = Account(nonce = 1, balance = 1000000)
 
-  val accountWithCode: ByteString => Account = code => Account.empty().withCode(kec256(code))
+  val accountWithCode: ByteString => Account = code => Account.empty().withCode(CodeHash(kec256(code)))
 
   def defaultWorld: MockWorldState = MockWorldState().saveAccount(senderAddr, senderAcc)
 
   def prepareBlockHeader(blockNumber: BigInt): BlockHeader = BlockFixtures.ValidBlock.header.copy(
-    difficulty = 1000000,
+    difficulty = Difficulty(1000000),
     number = blockNumber,
     gasLimit = 10000000,
     gasUsed = 0,
@@ -142,7 +143,7 @@ trait TestSetup {
       originalValue: BigInt,
       gaspool: BigInt,
       eipToCheck: EipToCheck
-  ): ProgramState[MockWorldState, MockStorage] = {
+  ): ProgramState[MockWorldState, MockStorage] =
     val newWorld = defaultWorld
       .saveAccount(senderAddr, accountWithCode(assemblyCode))
       .saveCode(senderAddr, assemblyCode)
@@ -152,20 +153,14 @@ trait TestSetup {
     val env = ExecEnv(context, assemblyCode, context.originAddr)
 
     ProgramState(vm, context, env)
-  }
 
-  sealed trait EipToCheck {
+  sealed trait EipToCheck:
     val blockHeader: BlockHeader
     val config: EvmConfig
-  }
-  object EipToCheck {
-    case object EIP1283 extends EipToCheck {
+  object EipToCheck:
+    case object EIP1283 extends EipToCheck:
       override val blockHeader: BlockHeader = prepareBlockHeader(blockchainConfig.constantinopleBlockNumber + 1)
       override val config: EvmConfig = EvmConfig.ConstantinopleConfigBuilder(blockchainConfig)
-    }
-    case object EIP2200 extends EipToCheck {
+    case object EIP2200 extends EipToCheck:
       override val blockHeader: BlockHeader = prepareBlockHeader(blockchainConfig.phoenixBlockNumber + 1)
       override val config: EvmConfig = EvmConfig.PhoenixConfigBuilder(blockchainConfig)
-    }
-  }
-}

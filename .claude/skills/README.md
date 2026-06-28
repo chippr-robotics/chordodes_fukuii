@@ -42,6 +42,20 @@ single source of truth.
 | `fukuii-security-hardening`  | IP block/unblock, trusted peers, RPC exposure review | runbooks/security; admin block/trusted methods |
 | `fukuii-custom-networks`     | Stand up a private/consortium/custom-genesis chain | runbooks/custom-networks, enterprise-deployment |
 
+## ETH/Sepolia — PoS operations
+
+ETH/Sepolia is post-Merge Proof-of-Stake: the Execution Layer (Fukuii) is driven
+by a Consensus Layer (CL) client over the Engine API. These skills cover that
+pairing; they do **not** apply to ETC/Mordor (PoW, no CL).
+
+| Skill | Workflow | Backing source |
+| :--- | :--- | :--- |
+| `fukuii-cl-setup`            | Pair a CL (Prysm/Lighthouse/Teku) with Fukuii; JWT, flags, startup order, 401 liveness check | `fukuii-engine-api-setup`, CL client docs |
+| `fukuii-engine-api-setup`    | EL-side Engine API authrpc config: JWT secret, enable authrpc, verify handshake | base/network.conf, ops sepolia.conf |
+| `fukuii-engine-api-debug`    | Troubleshoot Engine API faults: JWT 401, forkchoice timeout, newPayload INVALID, version mismatch, EL-vs-CL localization | sepolia-chain.conf, BEACON agent |
+| `fukuii-sepolia-sync`        | Sepolia sync: pre/post-Merge phases (block 1735371), CL-driven import, post-Cancun blobs | base/chains/sepolia-chain.conf |
+| `fukuii-pos-node-health`     | PoS-side health: CL↔EL liveness, attestation participation, blob gossip peers, Engine API latency | `fukuii-node-health-check`, Sepolia staking dashboard |
+
 ## Build & dependency
 
 | Skill | Workflow | Backing source |

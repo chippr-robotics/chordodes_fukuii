@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.rlp
 
 import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.ObjectGenerators
-import com.chipprbots.ethereum.domain.Block._
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
+import com.chipprbots.ethereum.domain.Block.*
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.Hex
 import org.scalacheck.Gen

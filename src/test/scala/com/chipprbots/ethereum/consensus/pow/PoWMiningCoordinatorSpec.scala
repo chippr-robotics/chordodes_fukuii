@@ -1,11 +1,11 @@
 package com.chipprbots.ethereum.consensus.pow
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.{ActorSystem => ClassicSystem}
+import org.apache.pekko.actor.ActorSystem as ClassicSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed
-import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActor
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -14,9 +14,8 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.chipprbots.ethereum.Timeouts
 import org.bouncycastle.util.encoders.Hex
 import org.scalamock.handlers.CallHandler4
 import org.scalamock.handlers.CallHandler6
@@ -24,25 +23,27 @@ import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
+import com.chipprbots.ethereum.Timeouts
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.MinedBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
-import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator._
+import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.*
+import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.MiningMode.*
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.consensus.pow.miners.Miner
 import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.SubmitHashRateResponse
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ommers.OmmersPool
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.utils.BlockchainConfig
-
-import com.chipprbots.ethereum.testing.Tags._
 
 // SCALA 3 MIGRATION: Fixed by refactoring MinerSpecSetup to use abstract mock members pattern.
 // ACTOR SYSTEM FIX: TestSetup now overrides classicSystem to use ScalaTestWithActorTestKit's
@@ -52,27 +53,24 @@ class PoWMiningCoordinatorSpec
     extends ScalaTestWithActorTestKit
     with AnyFreeSpecLike
     with Matchers
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   "PoWMinerCoordinator actor" - {
     "should throw exception when starting with other message than StartMining(mode)" taggedAs (
       UnitTest,
       ConsensusTest,
-      SlowTest,
-      FlakyTest
-    ) in new TestSetup {
+      SlowTest
+    ) in new TestSetup:
       override def coordinatorName = "FailedCoordinator"
       LoggingTestKit.error("StopMining").expect {
         coordinator ! StopMining
       }
-    }
 
     "should start recurrent mining when receiving message StartMining(RecurrentMining)" taggedAs (
       UnitTest,
       ConsensusTest,
-      SlowTest,
-      FlakyTest
-    ) in new TestSetup {
+      SlowTest
+    ) in new TestSetup:
       override def coordinatorName = "RecurrentMiningSetup"
       setBlockForMining(parentBlock)
 
@@ -82,14 +80,12 @@ class PoWMiningCoordinatorSpec
       sync.expectNoMessage(100.millis)
 
       coordinator ! StopMining
-    }
 
     "should start on demand mining when receiving message StartMining(OnDemandMining)" taggedAs (
       UnitTest,
       ConsensusTest,
-      SlowTest,
-      FlakyTest
-    ) in new TestSetup {
+      SlowTest
+    ) in new TestSetup:
       override def coordinatorName = "OnDemandMining"
 
       coordinator ! SetMiningMode(OnDemandMining)
@@ -98,32 +94,19 @@ class PoWMiningCoordinatorSpec
       sync.expectNoMessage(100.millis)
 
       coordinator ! StopMining
-    }
 
     "in Recurrent Mining" - {
-      "MineNext starts EthashMiner" taggedAs (
-        UnitTest,
-        ConsensusTest,
-        SlowTest,
-        FlakyTest
-      ) in new TestSetup {
-        override def coordinatorName = "EthashMining"
-        (blockchainReader.getBestBlock _).expects().returns(Some(parentBlock)).anyNumberOfTimes()
-        setBlockForMining(parentBlock)
+      // DELETED (P10): "MineNext starts EthashMiner"
+      // The mock for PoWBlockGenerator.generateBlock was never set up, so EthashMiner fired a
+      // TestFailedException inside its processMining Future on every run. The exception was swallowed
+      // by EthashMiner's error handler, so the test "passed" while emitting a spurious ERROR log.
+      // Full recurrent mining coverage is provided by "Miners mine recurrently" (InstantMiner).
 
-        coordinator ! SetMiningMode(RecurrentMining)
-
-        // Give the coordinator time to process the message using expectNoMessage instead of Thread.sleep
-        sync.expectNoMessage(100.millis)
-
-        coordinator ! StopMining
-      }
-
-      "Miners mine recurrently" taggedAs (UnitTest, ConsensusTest, SlowTest, FlakyTest) in new TestSetup {
-        override def coordinatorName = s"AutomaticMining-${System.nanoTime()}"
-        val probe = TestProbe()
+      "Miners mine recurrently" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup:
+        override def coordinatorName: String = s"AutomaticMining-${System.nanoTime()}"
+        val probe: TestProbe = TestProbe()
         val testMiner = new InstantMiner(blockCreator, sync.ref, ethMiningService)
-        override val coordinator = testKit.spawn(
+        override val coordinator: org.apache.pekko.actor.typed.ActorRef[CoordinatorProtocol] = testKit.spawn(
           PoWMiningCoordinator(
             sync.ref,
             ethMiningService,
@@ -136,28 +119,26 @@ class PoWMiningCoordinatorSpec
         )
         probe.watch(coordinator.ref.toClassic)
 
-        (blockchainReader.getBestBlock _).expects().returns(Some(parentBlock)).anyNumberOfTimes()
+        (() => blockchainReader.getBestBlock).expects().returns(Some(parentBlock)).anyNumberOfTimes()
         setBlockForMining(parentBlock)
         coordinator ! SetMiningMode(RecurrentMining)
 
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
 
         coordinator ! StopMining
         probe.expectTerminated(coordinator.ref.toClassic)
-      }
 
-      "Continue to attempt to mine if blockchainReader.getBestBlock() return None" taggedAs (
+      "Continue to attempt to mine if blockchainReader.getBestBlock return None" taggedAs (
         UnitTest,
         ConsensusTest,
-        SlowTest,
-        FlakyTest
-      ) in new TestSetup {
-        override def coordinatorName = s"AlwaysAttemptToMine-${System.nanoTime()}"
-        val probe = TestProbe()
+        SlowTest
+      ) in new TestSetup:
+        override def coordinatorName: String = s"AlwaysAttemptToMine-${System.nanoTime()}"
+        val probe: TestProbe = TestProbe()
         val testMiner = new InstantMiner(blockCreator, sync.ref, ethMiningService)
-        override val coordinator = testKit.spawn(
+        override val coordinator: org.apache.pekko.actor.typed.ActorRef[CoordinatorProtocol] = testKit.spawn(
           PoWMiningCoordinator(
             sync.ref,
             ethMiningService,
@@ -170,24 +151,23 @@ class PoWMiningCoordinatorSpec
         )
         probe.watch(coordinator.ref.toClassic)
 
-        (blockchainReader.getBestBlock _).expects().returns(None).twice()
-        (blockchainReader.getBestBlock _).expects().returns(Some(parentBlock)).anyNumberOfTimes()
+        (() => blockchainReader.getBestBlock).expects().returns(None).twice()
+        (() => blockchainReader.getBestBlock).expects().returns(Some(parentBlock)).anyNumberOfTimes()
 
         setBlockForMining(parentBlock)
         coordinator ! SetMiningMode(RecurrentMining)
 
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
 
         coordinator ! StopMining
         probe.expectTerminated(coordinator.ref.toClassic)
-      }
 
-      "StopMining stops PoWMinerCoordinator" taggedAs (UnitTest, ConsensusTest, SlowTest, FlakyTest) in new TestSetup {
-        override def coordinatorName = s"StoppingMining-${System.nanoTime()}"
-        val probe = TestProbe()
-        override val coordinator = testKit.spawn(
+      "StopMining stops PoWMinerCoordinator" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup:
+        override def coordinatorName: String = s"StoppingMining-${System.nanoTime()}"
+        val probe: TestProbe = TestProbe()
+        override val coordinator: org.apache.pekko.actor.typed.ActorRef[CoordinatorProtocol] = testKit.spawn(
           PoWMiningCoordinator(
             sync.ref,
             ethMiningService,
@@ -199,13 +179,12 @@ class PoWMiningCoordinatorSpec
         )
         probe.watch(coordinator.ref.toClassic)
 
-        (blockchainReader.getBestBlock _).expects().returns(Some(parentBlock)).anyNumberOfTimes()
+        (() => blockchainReader.getBestBlock).expects().returns(Some(parentBlock)).anyNumberOfTimes()
         setBlockForMining(parentBlock)
         coordinator ! SetMiningMode(RecurrentMining)
         coordinator ! StopMining
 
         probe.expectTerminated(coordinator.ref.toClassic)
-      }
     }
   }
 
@@ -217,7 +196,7 @@ class PoWMiningCoordinatorSpec
       syncController: ActorRef,
       ethMiningService: EthMiningService
   )(implicit runtime: IORuntime)
-      extends Miner {
+      extends Miner:
     def processMining(
         bestBlock: Block
     )(implicit blockchainConfig: BlockchainConfig): Future[CoordinatorProtocol] =
@@ -233,9 +212,8 @@ class PoWMiningCoordinatorSpec
           handleMiningResult(fakeResult, syncController, block)
         }
         .unsafeToFuture()
-  }
 
-  class TestSetup extends MinerSpecSetup {
+  class TestSetup extends MinerSpecSetup:
     def coordinatorName: String = "DefaultCoordinator"
 
     // Override classicSystem to use the ScalaTestWithActorTestKit's actor system (converted to classic)
@@ -256,7 +234,7 @@ class PoWMiningCoordinatorSpec
     val parentBlockNumber: Int = 23499
     override val origin: Block = Block(
       Fixtures.Blocks.Genesis.header.copy(
-        difficulty = UInt256(Hex.decode("0400")).toBigInt,
+        difficulty = Difficulty(UInt256(Hex.decode("0400")).toBigInt),
         number = 0,
         gasUsed = 0,
         unixTimestamp = 0
@@ -271,11 +249,12 @@ class PoWMiningCoordinatorSpec
     val coinbaseProvider = new CoinbaseProvider(miningConfig.coinbase)
 
     override lazy val blockCreator = new PoWBlockCreator(
-      pendingTransactionsManager = pendingTransactionsManager.ref,
+      pendingTransactionsManager = pendingTransactionsManager.ref.toTyped[PendingTransactionsManager.Command],
       getTransactionFromPoolTimeout = getTransactionFromPoolTimeout,
       mining = mining,
-      ommersPool = ommersPool.ref,
-      coinbaseProvider = coinbaseProvider
+      ommersPool = ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],
+      coinbaseProvider = coinbaseProvider,
+      system = classicSystem
     )
 
     val coordinator: typed.ActorRef[CoordinatorProtocol] = testKit.spawn(
@@ -335,19 +314,21 @@ class PoWMiningCoordinatorSpec
         .returning(IO.pure(PendingBlockAndState(PendingBlock(resultBlock, Nil), fakeWorld)))
 
     override def setupMiningServiceExpectation(): Unit =
-      (ethMiningService.submitHashRate _)
+      ethMiningService.submitHashRate
         .expects(*)
         .returns(IO.pure(Right(SubmitHashRateResponse(true))))
         .anyNumberOfTimes()
 
     // Allow mining service calls to happen 0 or more times since not all tests actually mine
-    (ethMiningService.submitHashRate _)
+    ethMiningService.submitHashRate
       .expects(*)
       .returns(IO.pure(Right(SubmitHashRateResponse(true))))
       .anyNumberOfTimes()
 
-    ommersPool.setAutoPilot { (sender: ActorRef, _: Any) =>
-      sender ! OmmersPool.Ommers(Nil)
+    ommersPool.setAutoPilot { (_: ActorRef, msg: Any) =>
+      msg match
+        case OmmersPool.GetOmmers(_, replyTo) => replyTo ! OmmersPool.Ommers(Nil)
+        case _                                => ()
       TestActor.KeepRunning
     }
 
@@ -355,5 +336,3 @@ class PoWMiningCoordinatorSpec
       sender ! PendingTransactionsManager.PendingTransactionsResponse(Nil)
       TestActor.KeepRunning
     }
-  }
-}

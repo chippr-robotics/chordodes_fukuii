@@ -11,9 +11,9 @@ import com.chipprbots.ethereum.db.dataSource.DataSource.Key
 import com.chipprbots.ethereum.db.dataSource.DataSource.Namespace
 import com.chipprbots.ethereum.db.dataSource.DataSource.Value
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.RocksDbDataSourceClosedException
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-trait DataSourceTestBehavior extends ScalaCheckPropertyChecks with ObjectGenerators {
+trait DataSourceTestBehavior extends ScalaCheckPropertyChecks with ObjectGenerators:
   this: AnyFlatSpec =>
 
   val KeySizeWithoutPrefix: Int = 32
@@ -26,27 +26,24 @@ trait DataSourceTestBehavior extends ScalaCheckPropertyChecks with ObjectGenerat
   ): Seq[DataSourceUpdate] =
     Seq(DataSourceUpdate(namespace, toRemove, toUpsert))
 
-  def withDir(testCode: String => Any): Unit = {
+  def withDir(testCode: String => Any): Unit =
     val path = Files.createTempDirectory("testdb").getFileName.toString
     try testCode(path)
-    finally {
+    finally
       val dir = new File(path)
       assert(!dir.exists() || dir.delete(), "File deletion failed")
-    }
-  }
 
   // scalastyle:off
-  def dataSource(createDataSource: => String => DataSource): Unit = {
+  def dataSource(createDataSource: => String => DataSource): Unit =
     it should "be able to insert and retrieve stored keys" taggedAs (UnitTest, DatabaseTest) in {
       val someByteString = byteStringOfLengthNGen(KeySizeWithoutPrefix).sample.get
       withDir { path =>
         val dataSource = createDataSource(path)
         dataSource.update(prepareUpdate(toUpsert = Seq(someByteString -> someByteString)))
 
-        dataSource.get(OtherNamespace, someByteString) match {
+        dataSource.get(OtherNamespace, someByteString) match
           case Some(b) if b == someByteString => succeed
           case _                              => fail()
-        }
 
         dataSource.destroy()
       }
@@ -124,6 +121,4 @@ trait DataSourceTestBehavior extends ScalaCheckPropertyChecks with ObjectGenerat
         dataSource.destroy()
       }
     }
-  }
   // scalastyle:on
-}

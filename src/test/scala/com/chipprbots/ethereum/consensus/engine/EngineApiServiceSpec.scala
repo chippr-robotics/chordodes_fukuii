@@ -1,5 +1,6 @@
 package com.chipprbots.ethereum.consensus.engine
 
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -7,18 +8,20 @@ import cats.effect.unsafe.IORuntime
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
-import com.chipprbots.ethereum.consensus.engine.PayloadStatus._
+import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager.BeaconHead
+import com.chipprbots.ethereum.consensus.engine.PayloadStatus.*
 import com.chipprbots.ethereum.consensus.validators.std.StdValidators
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
-import com.chipprbots.ethereum.ledger._
-import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
-class EngineApiServiceSpec extends AnyWordSpec with Matchers {
+class EngineApiServiceSpec extends AnyWordSpec with Matchers:
 
   implicit val ioRuntime: IORuntime = IORuntime.global
 
@@ -30,20 +33,20 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val correctStateRoot = ByteString(Array.fill(32)(0x11.toByte))
       val modifiedStateRoot = ByteString(Array.fill(32)(0xaa.toByte))
       val header = BlockHeader(
-        parentHash = ByteString(new Array[Byte](32)),
-        ommersHash = ByteString(new Array[Byte](32)),
+        parentHash = BlockHash(ByteString(new Array[Byte](32))),
+        ommersHash = BlockHash(ByteString(new Array[Byte](32))),
         beneficiary = ByteString(new Array[Byte](20)),
-        stateRoot = modifiedStateRoot, // block claims this stateRoot
-        transactionsRoot = ByteString(new Array[Byte](32)),
-        receiptsRoot = ByteString(new Array[Byte](32)),
-        logsBloom = ByteString(new Array[Byte](256)),
-        difficulty = 0,
+        stateRoot = TrieRoot(modifiedStateRoot), // block claims this stateRoot
+        transactionsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        logsBloom = BloomFilter.Empty,
+        difficulty = Difficulty.Zero,
         number = 1,
         gasLimit = 3000000,
         gasUsed = 21000,
         unixTimestamp = 1000,
         extraData = ByteString.empty,
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostOlympia(BigInt("1000000000"))
       )
@@ -63,22 +66,22 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
     "reject block with modified gasUsed" taggedAs UnitTest in {
       val validators = MockValidatorsAlwaysSucceed
-      val stateRoot = ByteString(Array.fill(32)(0x11.toByte))
+      val stateRoot = TrieRoot(ByteString(Array.fill(32)(0x11.toByte)))
       val header = BlockHeader(
-        parentHash = ByteString(new Array[Byte](32)),
-        ommersHash = ByteString(new Array[Byte](32)),
+        parentHash = BlockHash(ByteString(new Array[Byte](32))),
+        ommersHash = BlockHash(ByteString(new Array[Byte](32))),
         beneficiary = ByteString(new Array[Byte](20)),
         stateRoot = stateRoot,
-        transactionsRoot = ByteString(new Array[Byte](32)),
-        receiptsRoot = ByteString(new Array[Byte](32)),
-        logsBloom = ByteString(new Array[Byte](256)),
-        difficulty = 0,
+        transactionsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        logsBloom = BloomFilter.Empty,
+        difficulty = Difficulty.Zero,
         number = 1,
         gasLimit = 3000000,
         gasUsed = 99999, // block claims this gasUsed
         unixTimestamp = 1000,
         extraData = ByteString.empty,
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostOlympia(BigInt("1000000000"))
       )
@@ -87,7 +90,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val result = StdValidators.validateBlockAfterExecution(
         self = validators,
         block = block,
-        stateRootHash = stateRoot,
+        stateRootHash = stateRoot.value,
         receipts = Seq.empty,
         gasUsed = 21000 // execution computed different gasUsed
       )
@@ -98,22 +101,22 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
     "accept block with matching stateRoot and gasUsed" taggedAs UnitTest in {
       val validators = MockValidatorsAlwaysSucceed
-      val stateRoot = ByteString(Array.fill(32)(0x11.toByte))
+      val stateRoot = TrieRoot(ByteString(Array.fill(32)(0x11.toByte)))
       val header = BlockHeader(
-        parentHash = ByteString(new Array[Byte](32)),
-        ommersHash = ByteString(new Array[Byte](32)),
+        parentHash = BlockHash(ByteString(new Array[Byte](32))),
+        ommersHash = BlockHash(ByteString(new Array[Byte](32))),
         beneficiary = ByteString(new Array[Byte](20)),
         stateRoot = stateRoot,
-        transactionsRoot = ByteString(new Array[Byte](32)),
-        receiptsRoot = ByteString(new Array[Byte](32)),
-        logsBloom = ByteString(new Array[Byte](256)),
-        difficulty = 0,
+        transactionsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        logsBloom = BloomFilter.Empty,
+        difficulty = Difficulty.Zero,
         number = 1,
         gasLimit = 3000000,
         gasUsed = 21000,
         unixTimestamp = 1000,
         extraData = ByteString.empty,
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostOlympia(BigInt("1000000000"))
       )
@@ -122,7 +125,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val result = StdValidators.validateBlockAfterExecution(
         self = validators,
         block = block,
-        stateRootHash = stateRoot, // matches
+        stateRootHash = stateRoot.value, // matches
         receipts = Seq.empty,
         gasUsed = 21000 // matches
       )
@@ -134,7 +137,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
   /** End-to-end test: EngineApiService.newPayload with real block execution */
   "EngineApiService.newPayload" should {
 
-    trait EngineApiTestSetup extends EphemBlockchainTestSetup {
+    trait EngineApiTestSetup extends EphemBlockchainTestSetup:
 
       // Use real VM and validators (not mocks) to test actual validation
       override lazy val vm: VMImpl = new VMImpl
@@ -150,22 +153,30 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         blockValidation
       )
       lazy val forkChoiceManager = new ForkChoiceManager(blockchainReader, blockchainWriter)
-      lazy val pendingTxManager = org.apache.pekko.actor.ActorRef.noSender
+      lazy val pendingTxManager: org.apache.pekko.actor.typed.ActorRef[
+        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+      ] = classicSystem.spawn(
+        org.apache.pekko.actor.typed.scaladsl.Behaviors.ignore[
+          com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+        ],
+        "ptm-ignore-engine-spec"
+      )
+      implicit lazy val typedScheduler: org.apache.pekko.actor.typed.Scheduler = classicSystem.toTyped.scheduler
 
       lazy val engineApi = new EngineApiService(
         blockchainReader,
         blockchainWriter,
         blockExec,
         forkChoiceManager,
-        pendingTxManager
-      )(blockchainConfig)
+        Some(pendingTxManager)
+      )(blockchainConfig, typedScheduler)
 
       // Build a post-merge genesis block with accounts
-      private val genesisStateRoot = {
+      private val genesisStateRoot =
         val world = InMemoryWorldStateProxy(
           storagesInstance.storages.evmCodeStorage,
           blockchain.getBackingMptStorage(0),
-          (n: BigInt) => blockchainReader.getBlockHeaderByNumber(n).map(_.hash),
+          (n: BigInt) => blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value),
           UInt256.Zero,
           ByteString(com.chipprbots.ethereum.mpt.MerklePatriciaTrie.EmptyRootHash),
           noEmptyAccounts = false,
@@ -177,23 +188,22 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           Account(balance = UInt256(BigInt("1000000000000000000")))
         )
         InMemoryWorldStateProxy.persistState(funded).stateRootHash
-      }
 
-      val genesisHeader = BlockHeader(
-        parentHash = ByteString(new Array[Byte](32)),
-        ommersHash = BlockHeader.EmptyOmmers,
+      val genesisHeader: BlockHeader = BlockHeader(
+        parentHash = BlockHash(ByteString(new Array[Byte](32))),
+        ommersHash = BlockHash(BlockHeader.EmptyOmmers),
         beneficiary = ByteString(new Array[Byte](20)),
-        stateRoot = genesisStateRoot,
-        transactionsRoot = BlockHeader.EmptyMpt,
-        receiptsRoot = BlockHeader.EmptyMpt,
-        logsBloom = ByteString(new Array[Byte](256)),
-        difficulty = 0,
+        stateRoot = TrieRoot(genesisStateRoot),
+        transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
+        receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
+        logsBloom = BloomFilter.Empty,
+        difficulty = Difficulty.Zero,
         number = 0,
         gasLimit = 3000000,
         gasUsed = 0,
         unixTimestamp = 1000,
         extraData = ByteString.empty,
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostOlympia(BigInt("1000000000"))
       )
@@ -203,24 +213,24 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       storagesInstance.storages.appStateStorage.putBestBlockNumber(0).commit()
 
       /** Build a valid block 1 on top of genesis, execute it to get correct fields */
-      def buildValidBlock1(): (Block, Seq[Receipt]) = {
+      def buildValidBlock1(): (Block, Seq[Receipt]) =
         val emptyWithdrawalsRoot = BlockHeader.EmptyMpt
 
         val headerTemplate = BlockHeader(
           parentHash = genesisHeader.hash,
-          ommersHash = BlockHeader.EmptyOmmers,
+          ommersHash = BlockHash(BlockHeader.EmptyOmmers),
           beneficiary = ByteString(new Array[Byte](20)),
-          stateRoot = ByteString.empty, // will be filled after execution
-          transactionsRoot = BlockHeader.EmptyMpt,
-          receiptsRoot = BlockHeader.EmptyMpt,
-          logsBloom = ByteString(new Array[Byte](256)),
-          difficulty = 0,
+          stateRoot = TrieRoot(ByteString.empty), // will be filled after execution
+          transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
+          receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
+          logsBloom = BloomFilter.Empty,
+          difficulty = Difficulty.Zero,
           number = 1,
           gasLimit = 3000000,
           gasUsed = 0,
           unixTimestamp = 1001,
           extraData = ByteString("fukuii".getBytes),
-          mixHash = ByteString(Array.fill(32)(0x42.toByte)), // prevRandao
+          mixHash = BlockHash(ByteString(Array.fill(32)(0x42.toByte))), // prevRandao
           nonce = ByteString(new Array[Byte](8)),
           extraFields = HefPostShanghai(
             baseFee = BigInt("1000000000"),
@@ -230,66 +240,63 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         val block = Block(headerTemplate, BlockBody(Nil, Nil, withdrawals = Some(Nil)))
 
         // Execute to compute the correct stateRoot, receiptsRoot, gasUsed
-        blockExec.executeBlockNoValidation(block)(blockchainConfig) match {
+        blockExec.executeBlockNoValidation(block)(blockchainConfig) match
           case Right((receipts, gasUsed, computedStateRoot)) =>
             // Build the correct header with computed values
             val correctHeader = headerTemplate.copy(
-              stateRoot = computedStateRoot,
+              stateRoot = TrieRoot(computedStateRoot),
               gasUsed = gasUsed
             )
             (Block(correctHeader, block.body), receipts)
           case Left(error) =>
-            throw new RuntimeException(s"Failed to execute block: ${error.reason}")
-        }
-      }
+            throw new RuntimeException(s"Failed to execute block: ${error.describe}")
 
-      def blockToPayload(block: Block): ExecutionPayload = {
-        import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-        import com.chipprbots.ethereum.rlp.{encode => rlpEncode}
+      def blockToPayload(block: Block): ExecutionPayload =
+        import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+        import com.chipprbots.ethereum.rlp.encode as rlpEncode
 
         ExecutionPayload(
-          parentHash = block.header.parentHash,
+          parentHash = block.header.parentHash.value,
           feeRecipient = Address(block.header.beneficiary),
-          stateRoot = block.header.stateRoot,
-          receiptsRoot = block.header.receiptsRoot,
-          logsBloom = block.header.logsBloom,
-          prevRandao = block.header.mixHash,
+          stateRoot = block.header.stateRoot.value,
+          receiptsRoot = block.header.receiptsRoot.value,
+          logsBloom = block.header.logsBloom.value,
+          prevRandao = block.header.mixHash.value,
           blockNumber = block.header.number,
           gasLimit = block.header.gasLimit,
           gasUsed = block.header.gasUsed,
           timestamp = block.header.unixTimestamp,
           extraData = block.header.extraData,
           baseFeePerGas = block.header.baseFee.getOrElse(BigInt(0)),
-          blockHash = block.header.hash,
+          blockHash = block.header.hash.value,
           transactions = block.body.transactionList.map { stx =>
             ByteString(rlpEncode(SignedTransactionEnc(stx).toRLPEncodable))
           },
           withdrawals = block.body.withdrawals
         )
-      }
 
       /** Create modified payload with random stateRoot, recomputing blockHash */
-      def withModifiedStateRoot(payload: ExecutionPayload): ExecutionPayload = {
+      def withModifiedStateRoot(payload: ExecutionPayload): ExecutionPayload =
         val randomStateRoot = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
         val modified = payload.copy(stateRoot = randomStateRoot)
         // Recompute blockHash from the modified header
         val _ = engineApi.asInstanceOf[{ def payloadToBlock(p: ExecutionPayload): Block }]
         // Instead, manually build the header and compute hash
         val header = BlockHeader(
-          parentHash = modified.parentHash,
-          ommersHash = BlockHeader.EmptyOmmers,
+          parentHash = BlockHash(modified.parentHash),
+          ommersHash = BlockHash(BlockHeader.EmptyOmmers),
           beneficiary = modified.feeRecipient.bytes,
-          stateRoot = modified.stateRoot,
-          transactionsRoot = payload.blockHash, // placeholder, need real txRoot
-          receiptsRoot = modified.receiptsRoot,
-          logsBloom = modified.logsBloom,
-          difficulty = 0,
+          stateRoot = TrieRoot(modified.stateRoot),
+          transactionsRoot = TrieRoot(payload.blockHash), // placeholder, need real txRoot
+          receiptsRoot = TrieRoot(modified.receiptsRoot),
+          logsBloom = BloomFilter(modified.logsBloom),
+          difficulty = Difficulty.Zero,
           number = modified.blockNumber,
           gasLimit = modified.gasLimit,
           gasUsed = modified.gasUsed,
           unixTimestamp = modified.timestamp,
           extraData = modified.extraData,
-          mixHash = modified.prevRandao,
+          mixHash = BlockHash(modified.prevRandao),
           nonce = ByteString(new Array[Byte](8)),
           extraFields = HefPostShanghai(
             baseFee = modified.baseFeePerGas,
@@ -297,73 +304,67 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           )
         )
         // Need to use same txRoot as the original block
-        modified.copy(blockHash = header.hash)
-      }
-    }
+        modified.copy(blockHash = header.hash.value)
 
-    "return VALID for a correctly constructed empty block" taggedAs UnitTest in new EngineApiTestSetup {
+    "return VALID for a correctly constructed empty block" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
-      val payload = blockToPayload(validBlock)
+      val payload: ExecutionPayload = blockToPayload(validBlock)
 
-      val result = engineApi.newPayload(payload).unsafeRunSync()
+      val result: PayloadStatusV1 = engineApi.newPayload(payload).unsafeRunSync()
 
       result.status shouldBe Valid
       result.latestValidHash shouldBe Some(validBlock.header.hash)
-    }
 
     "return INVALID with null latestValidHash on hash mismatch (parent known)" taggedAs UnitTest in
-      new EngineApiTestSetup {
+      new EngineApiTestSetup:
         // Per execution-apis PR #338 (Shanghai+): hash mismatch returns INVALID (not
         // INVALID_BLOCK_HASH) with latestValidHash=null. The corruption is in the
         // payload envelope, not attributable to a specific ancestor. Aligns with hive
         // "Bad Hash on NewPayload" tests.
         val (validBlock, _) = buildValidBlock1()
-        val payload = blockToPayload(validBlock)
-        val badPayload = payload.copy(blockHash = ByteString(Array.fill(32)(0xff.toByte)))
+        val payload: ExecutionPayload = blockToPayload(validBlock)
+        val badPayload: ExecutionPayload = payload.copy(blockHash = ByteString(Array.fill(32)(0xff.toByte)))
 
-        val result = engineApi.newPayload(badPayload).unsafeRunSync()
+        val result: PayloadStatusV1 = engineApi.newPayload(badPayload).unsafeRunSync()
 
         result.status shouldBe Invalid
         result.latestValidHash shouldBe None
-      }
 
     "return INVALID with null latestValidHash on hash mismatch (parent unknown)" taggedAs UnitTest in
-      new EngineApiTestSetup {
+      new EngineApiTestSetup:
         val (validBlock, _) = buildValidBlock1()
-        val payload = blockToPayload(validBlock)
-        val badPayload = payload.copy(
+        val payload: ExecutionPayload = blockToPayload(validBlock)
+        val badPayload: ExecutionPayload = payload.copy(
           parentHash = ByteString(kec256(Array[Byte](9, 9, 9))),
           blockHash = ByteString(Array.fill(32)(0xff.toByte))
         )
 
-        val result = engineApi.newPayload(badPayload).unsafeRunSync()
+        val result: PayloadStatusV1 = engineApi.newPayload(badPayload).unsafeRunSync()
 
         result.status shouldBe Invalid
         result.latestValidHash shouldBe None
-      }
 
-    "return INVALID for block with modified stateRoot" taggedAs UnitTest in new EngineApiTestSetup {
+    "return INVALID for block with modified stateRoot" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
-      val payload = blockToPayload(validBlock)
+      val payload: ExecutionPayload = blockToPayload(validBlock)
 
       // Modify the stateRoot and recompute blockHash to match
-      val randomStateRoot = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
-      val modifiedHeader = validBlock.header.copy(stateRoot = randomStateRoot)
-      val modifiedPayload = payload.copy(
+      val randomStateRoot: ByteString = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
+      val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = TrieRoot(randomStateRoot))
+      val modifiedPayload: ExecutionPayload = payload.copy(
         stateRoot = randomStateRoot,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
-      val result = engineApi.newPayload(modifiedPayload).unsafeRunSync()
+      val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
 
       // Should be INVALID — execution produces different stateRoot than header claims
       result.status shouldBe Invalid
       result.latestValidHash shouldBe Some(genesisHeader.hash)
       result.validationError should not be empty
-    }
 
     "return INVALID when newPayloadV3 expectedBlobVersionedHashes mismatches payload txs" taggedAs UnitTest in
-      new EngineApiTestSetup {
+      new EngineApiTestSetup:
         // EIP-4844 / Engine API V3: the CL passes expectedBlobVersionedHashes as the 2nd param
         // to engine_newPayloadV3; the EL must compare the CL's list against the concatenation
         // of every blob tx's blobVersionedHashes in the payload and reject on mismatch. The
@@ -371,165 +372,158 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         // expected hash — so the comparison must fail and return INVALID with
         // latestValidHash = parent.hash.
         val (validBlock, _) = buildValidBlock1()
-        val payload = blockToPayload(validBlock)
-        val fakeHash = ByteString(kec256(Array[Byte](0xde.toByte, 0xad.toByte, 0xbe.toByte, 0xef.toByte)))
-        val payloadWithMismatchedHashes = payload.copy(
+        val payload: ExecutionPayload = blockToPayload(validBlock)
+        val fakeHash: ByteString = ByteString(kec256(Array[Byte](0xde.toByte, 0xad.toByte, 0xbe.toByte, 0xef.toByte)))
+        val payloadWithMismatchedHashes: ExecutionPayload = payload.copy(
           expectedBlobVersionedHashes = Some(Seq(fakeHash))
         )
 
-        val result = engineApi.newPayload(payloadWithMismatchedHashes).unsafeRunSync()
+        val result: PayloadStatusV1 = engineApi.newPayload(payloadWithMismatchedHashes).unsafeRunSync()
 
         result.status shouldBe Invalid
         result.latestValidHash shouldBe Some(genesisHeader.hash)
         result.validationError.getOrElse("") should include("INVALID_VERSIONED_HASHES")
-      }
 
-    "return INVALID for block with modified gasUsed" taggedAs UnitTest in new EngineApiTestSetup {
+    "return INVALID for block with modified gasUsed" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
-      val payload = blockToPayload(validBlock)
+      val payload: ExecutionPayload = blockToPayload(validBlock)
 
       // Modify gasUsed and recompute blockHash
-      val modifiedGasUsed = validBlock.header.gasUsed + 999
-      val modifiedHeader = validBlock.header.copy(gasUsed = modifiedGasUsed)
-      val modifiedPayload = payload.copy(
+      val modifiedGasUsed: BigInt = validBlock.header.gasUsed + 999
+      val modifiedHeader: BlockHeader = validBlock.header.copy(gasUsed = modifiedGasUsed)
+      val modifiedPayload: ExecutionPayload = payload.copy(
         gasUsed = modifiedGasUsed,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
-      val result = engineApi.newPayload(modifiedPayload).unsafeRunSync()
+      val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
 
       result.status shouldBe Invalid
-    }
 
-    "return ACCEPTED/SYNCING for block with unknown parentHash" taggedAs UnitTest in new EngineApiTestSetup {
+    "return ACCEPTED/SYNCING for block with unknown parentHash" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
-      val payload = blockToPayload(validBlock)
+      val payload: ExecutionPayload = blockToPayload(validBlock)
 
       // Modify parentHash to unknown hash and recompute blockHash
-      val unknownParent = ByteString(kec256(Array[Byte](9, 8, 7, 6)))
-      val modifiedHeader = validBlock.header.copy(parentHash = unknownParent)
-      val modifiedPayload = payload.copy(
+      val unknownParent: ByteString = ByteString(kec256(Array[Byte](9, 8, 7, 6)))
+      val modifiedHeader: BlockHeader = validBlock.header.copy(parentHash = BlockHash(unknownParent))
+      val modifiedPayload: ExecutionPayload = payload.copy(
         parentHash = unknownParent,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
-      val result = engineApi.newPayload(modifiedPayload).unsafeRunSync()
+      val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
 
       // Parent unknown → ACCEPTED (not INVALID, not VALID)
       result.status shouldBe Accepted
       result.latestValidHash shouldBe None
-    }
 
-    "store ACCEPTED blocks by hash only (not by number)" taggedAs UnitTest in new EngineApiTestSetup {
+    "store ACCEPTED blocks by hash only (not by number)" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
-      val payload = blockToPayload(validBlock)
+      val payload: ExecutionPayload = blockToPayload(validBlock)
 
-      val unknownParent = ByteString(kec256(Array[Byte](9, 8, 7, 6)))
-      val modifiedHeader = validBlock.header.copy(parentHash = unknownParent)
-      val modifiedPayload = payload.copy(
+      val unknownParent: ByteString = ByteString(kec256(Array[Byte](9, 8, 7, 6)))
+      val modifiedHeader: BlockHeader = validBlock.header.copy(parentHash = BlockHash(unknownParent))
+      val modifiedPayload: ExecutionPayload = payload.copy(
         parentHash = unknownParent,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
       engineApi.newPayload(modifiedPayload).unsafeRunSync()
 
       // ACCEPTED block IS stored by hash (for later re-validation)
-      blockchainReader.getBlockHeaderByHash(modifiedPayload.blockHash) shouldBe defined
+      blockchainReader.getBlockHeaderByHash(BlockHash(modifiedPayload.blockHash)) shouldBe defined
       // But NOT stored by number
       blockchainReader.getBlockHeaderByNumber(1).map(_.hash) should not be Some(modifiedPayload.blockHash)
-    }
 
-    "return INVALID for block with modified timestamp (header validation)" taggedAs UnitTest in new EngineApiTestSetup {
+    "return INVALID for block with modified timestamp (header validation)" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
-      val payload = blockToPayload(validBlock)
+      val payload: ExecutionPayload = blockToPayload(validBlock)
 
       // Set timestamp <= parent timestamp (invalid per spec)
-      val modifiedHeader = validBlock.header.copy(unixTimestamp = genesisHeader.unixTimestamp)
-      val modifiedPayload = payload.copy(
+      val modifiedHeader: BlockHeader = validBlock.header.copy(unixTimestamp = genesisHeader.unixTimestamp)
+      val modifiedPayload: ExecutionPayload = payload.copy(
         timestamp = genesisHeader.unixTimestamp,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
-      val result = engineApi.newPayload(modifiedPayload).unsafeRunSync()
+      val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
 
       result.status shouldBe Invalid
       result.validationError.getOrElse("") should include("timestamp")
-    }
 
-    "return INVALID for block with wrong number (header validation)" taggedAs UnitTest in new EngineApiTestSetup {
+    "return INVALID for block with wrong number (header validation)" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
-      val payload = blockToPayload(validBlock)
+      val payload: ExecutionPayload = blockToPayload(validBlock)
 
       // Set number != parent.number + 1
-      val modifiedHeader = validBlock.header.copy(number = 5)
-      val modifiedPayload = payload.copy(
+      val modifiedHeader: BlockHeader = validBlock.header.copy(number = 5)
+      val modifiedPayload: ExecutionPayload = payload.copy(
         blockNumber = 5,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
-      val result = engineApi.newPayload(modifiedPayload).unsafeRunSync()
+      val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
 
       result.status shouldBe Invalid
       result.validationError.getOrElse("") should include("block number")
-    }
 
-    "not store INVALID blocks in hash storage" taggedAs UnitTest in new EngineApiTestSetup {
+    "not store INVALID blocks in hash storage" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
-      val payload = blockToPayload(validBlock)
+      val payload: ExecutionPayload = blockToPayload(validBlock)
 
-      val randomStateRoot = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
-      val modifiedHeader = validBlock.header.copy(stateRoot = randomStateRoot)
-      val modifiedPayload = payload.copy(
+      val randomStateRoot: ByteString = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
+      val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = TrieRoot(randomStateRoot))
+      val modifiedPayload: ExecutionPayload = payload.copy(
         stateRoot = randomStateRoot,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
-      val result = engineApi.newPayload(modifiedPayload).unsafeRunSync()
+      val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
       result.status shouldBe Invalid
 
       // The INVALID block should NOT be accessible by hash
-      blockchainReader.getBlockHeaderByHash(modifiedPayload.blockHash) shouldBe None
-    }
+      blockchainReader.getBlockHeaderByHash(BlockHash(modifiedPayload.blockHash)) shouldBe None
 
-    "mark child of INVALID block as INVALID" taggedAs UnitTest in new EngineApiTestSetup {
+    "mark child of INVALID block as INVALID" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
-      val payload = blockToPayload(validBlock)
+      val payload: ExecutionPayload = blockToPayload(validBlock)
 
       // First send an INVALID block (bad stateRoot)
-      val randomStateRoot = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
-      val modifiedHeader = validBlock.header.copy(stateRoot = randomStateRoot)
-      val invalidPayload = payload.copy(
+      val randomStateRoot: ByteString = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
+      val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = TrieRoot(randomStateRoot))
+      val invalidPayload: ExecutionPayload = payload.copy(
         stateRoot = randomStateRoot,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
-      val r1 = engineApi.newPayload(invalidPayload).unsafeRunSync()
+      val r1: PayloadStatusV1 = engineApi.newPayload(invalidPayload).unsafeRunSync()
       r1.status shouldBe Invalid
 
       // Now send a child block referencing the invalid parent
-      val childHeader = BlockHeader(
-        parentHash = invalidPayload.blockHash,
-        ommersHash = BlockHeader.EmptyOmmers,
+      val childHeader: BlockHeader = BlockHeader(
+        parentHash = BlockHash(invalidPayload.blockHash),
+        ommersHash = BlockHash(BlockHeader.EmptyOmmers),
         beneficiary = ByteString(new Array[Byte](20)),
-        stateRoot = ByteString(new Array[Byte](32)),
-        transactionsRoot = BlockHeader.EmptyMpt,
-        receiptsRoot = BlockHeader.EmptyMpt,
-        logsBloom = ByteString(new Array[Byte](256)),
-        difficulty = 0,
+        stateRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
+        receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
+        logsBloom = BloomFilter.Empty,
+        difficulty = Difficulty.Zero,
         number = 2,
         gasLimit = 3000000,
         gasUsed = 0,
         unixTimestamp = 1002,
         extraData = ByteString("fukuii".getBytes),
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostShanghai(BigInt("1000000000"), BlockHeader.EmptyMpt)
       )
-      val childPayload = ExecutionPayload(
+      val childPayload: ExecutionPayload = ExecutionPayload(
         parentHash = invalidPayload.blockHash,
         feeRecipient = Address(ByteString(new Array[Byte](20))),
         stateRoot = ByteString(new Array[Byte](32)),
         receiptsRoot = BlockHeader.EmptyMpt,
-        logsBloom = ByteString(new Array[Byte](256)),
+        logsBloom = BloomFilter.Empty.value,
         prevRandao = ByteString(new Array[Byte](32)),
         blockNumber = 2,
         gasLimit = 3000000,
@@ -537,18 +531,17 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         timestamp = 1002,
         extraData = ByteString("fukuii".getBytes),
         baseFeePerGas = BigInt("1000000000"),
-        blockHash = childHeader.hash,
+        blockHash = childHeader.hash.value,
         transactions = Seq.empty,
         withdrawals = Some(Nil)
       )
 
-      val r2 = engineApi.newPayload(childPayload).unsafeRunSync()
+      val r2: PayloadStatusV1 = engineApi.newPayload(childPayload).unsafeRunSync()
       r2.status shouldBe Invalid
       r2.validationError.getOrElse("") should include("parent")
       // latestValidHash should propagate from the invalid parent — it should be the genesis hash
       // (the last valid ancestor before the invalid block)
       r2.latestValidHash shouldBe Some(genesisHeader.hash)
-    }
 
     /** Regression for cold-start sync bootstrap (post-merge chains).
       *
@@ -559,30 +552,28 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       * fukuii accepted every newPayload as `ACCEPTED (parent unknown)` but never started actually syncing.
       */
     "publish BeaconHead to ForkChoiceManager listener even when the head is unknown (SYNCING short-circuit)"
-      .taggedAs(UnitTest) in new EngineApiTestSetup {
+      .taggedAs(UnitTest) in new EngineApiTestSetup:
       import org.apache.pekko.testkit.TestProbe
 
-      // EphemBlockchainTestSetup provides `system: ActorSystem` for us.
-      val probe = TestProbe()(system)
+      val probe: TestProbe = TestProbe()(classicSystem)
       forkChoiceManager.setListener(probe.ref)
 
-      val unknownHead = ByteString(Array.fill(32)(0xab.toByte))
-      val state = ForkChoiceState(
+      val unknownHead: ByteString = ByteString(Array.fill(32)(0xab.toByte))
+      val state: ForkChoiceState = ForkChoiceState(
         headBlockHash = unknownHead,
         safeBlockHash = ByteString(new Array[Byte](32)),
         finalizedBlockHash = ByteString(new Array[Byte](32))
       )
 
-      val response = engineApi.forkchoiceUpdated(state, payloadAttributes = None).unsafeRunSync()
+      val response: Either[String, ForkchoiceUpdatedResponse] =
+        engineApi.forkchoiceUpdated(state, payloadAttributes = None).unsafeRunSync()
       response.isRight shouldBe true
       response.toOption.get.payloadStatus.status shouldBe Syncing
 
       // Critical assertion: BeaconHead must reach the listener so SyncController can drive
       // SNAP sync's CL-PIVOT trigger. Pre-fix this would TIMEOUT — applyForkChoiceState
       // was never called on the SYNCING short-circuit path.
-      val beacon = probe.expectMsgType[ForkChoiceManager.BeaconHead]
+      val beacon: BeaconHead = probe.expectMsgType[ForkChoiceManager.BeaconHead]
       beacon.headHash shouldBe unknownHead
       beacon.knownHeader shouldBe None
-    }
   }
-}

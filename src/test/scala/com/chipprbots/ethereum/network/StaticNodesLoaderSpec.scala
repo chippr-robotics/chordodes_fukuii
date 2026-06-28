@@ -6,7 +6,7 @@ import java.nio.file.Path
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for StaticNodesLoader.
   *
@@ -18,21 +18,19 @@ import com.chipprbots.ethereum.testing.Tags._
   *   - Malformed JSON → empty Seq with warning
   *   - Mixed valid/invalid → only valid entries returned
   */
-class StaticNodesLoaderSpec extends AnyFlatSpec with Matchers {
+class StaticNodesLoaderSpec extends AnyFlatSpec with Matchers:
 
   private val validEnode1 =
     "enode://8f977a3c99a2f3d3beaebf3cc62cf73a7f09c41b4e8cfa06e4e3bbca82d7e66a5a7ef638a4c57b4b07c9c6caac0e2f4f1e9b5f3e6c7a12345678@127.0.0.1:30303"
   private val validEnode2 =
     "enode://1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890@10.0.0.1:30304"
 
-  private def withTempDir(body: Path => Unit): Unit = {
+  private def withTempDir(body: Path => Unit): Unit =
     val dir = Files.createTempDirectory("static-nodes-test")
     try body(dir)
-    finally {
+    finally
       dir.toFile.listFiles().foreach(_.delete())
       dir.toFile.delete()
-    }
-  }
 
   // ── missing file ──────────────────────────────────────────────────────────
 
@@ -139,4 +137,3 @@ class StaticNodesLoaderSpec extends AnyFlatSpec with Matchers {
       result should have size 1
     }
   }
-}

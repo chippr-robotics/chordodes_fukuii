@@ -1,15 +1,15 @@
 package com.chipprbots.ethereum.consensus.validators.std
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** EIP-7934: Verify block RLP size cap validation. */
-class BlockRLPSizeCapSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class BlockRLPSizeCapSpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   // ETC adapts the Ethereum 10 MiB cap (EIP-7934) down to 8 MiB to match ETC's lower gas limits.
   "BlockRLPSizeCap constant" should "be 8388608 (8 MiB, ETC adaptation of EIP-7934)" taggedAs (
@@ -29,4 +29,3 @@ class BlockRLPSizeCapSpec extends AnyFlatSpec with Matchers with ParallelTestExe
     error.size shouldBe 9_000_000L
     error.cap shouldBe 8_388_608L
   }
-}

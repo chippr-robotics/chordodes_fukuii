@@ -17,29 +17,29 @@ import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessage
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessageCmd
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
-import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.rlp.RLPList
+import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class NetworkPeerManagerFake(
     syncConfig: SyncConfig,
     peers: Map[Peer, PeerInfo],
     blocks: List[Block]
-)(implicit system: ActorSystem, ioRuntime: IORuntime) {
+)(implicit system: ActorSystem, ioRuntime: IORuntime):
   private val responsesTopicIO: IO[Topic[IO, MessageFromPeer]] = Topic[IO, MessageFromPeer]
-  private val requestsTopicIO: IO[Topic[IO, SendMessage]] = Topic[IO, SendMessage]
+  private val requestsTopicIO: IO[Topic[IO, SendMessageCmd]] = Topic[IO, SendMessageCmd]
   private val responsesTopic: Topic[IO, MessageFromPeer] = responsesTopicIO.unsafeRunSync()
-  private val requestsTopic: Topic[IO, SendMessage] = requestsTopicIO.unsafeRunSync()
+  private val requestsTopic: Topic[IO, SendMessageCmd] = requestsTopicIO.unsafeRunSync()
   private val peersConnectedDeferred = Deferred.unsafe[IO, Unit]
 
   val probe: TestProbe = TestProbe("network_peer_manager")
@@ -55,7 +55,7 @@ class NetworkPeerManagerFake(
 
   def ref = probe.ref
 
-  val requests: Stream[IO, SendMessage] = requestsTopic.subscribe(100)
+  val requests: Stream[IO, SendMessageCmd] = requestsTopic.subscribe(100)
   val responses: Stream[IO, MessageFromPeer] = responsesTopic.subscribe(100)
   val onPeersConnected: IO[Unit] = peersConnectedDeferred.get
   val pivotBlockSelected: Stream[IO, BlockHeader] = responses
@@ -67,11 +67,8 @@ class NetworkPeerManagerFake(
       val headersFromPeers = headersFromPeersChunk.toList
       val (headers, respondedPeers) = headersFromPeers.unzip
 
-      if (headers.distinct.size == 1 && respondedPeers.toSet == peers.keySet.map(_.id)) {
-        Stream.emit(headers.head)
-      } else {
-        Stream.empty
-      }
+      if headers.distinct.size == 1 && respondedPeers.toSet == peers.keySet.map(_.id) then Stream.emit(headers.head)
+      else Stream.empty
     }
 
   val fetchedHeaders: Stream[IO, Seq[BlockHeader]] = responses.collect {
@@ -83,10 +80,9 @@ class NetworkPeerManagerFake(
   }
   val requestedReceipts: Stream[IO, Seq[ByteString]] = requests.collect(
     Function.unlift(msg =>
-      msg.message.underlyingMsg match {
+      msg.message.underlyingMsg match
         case GetReceipts(_, hashes) => Some(hashes)
         case _                      => None
-      }
     )
   )
   val fetchedBlocks: Stream[IO, List[Block]] = fetchedBodies
@@ -101,24 +97,23 @@ class NetworkPeerManagerFake(
     case MessageFromPeer(ETHPackets.NodeData(values), _) => values
   }
 
-}
-object NetworkPeerManagerFake {
+object NetworkPeerManagerFake:
   class NetworkPeerManagerAutoPilot(
-      requests: Topic[IO, SendMessage],
+      requests: Topic[IO, SendMessageCmd],
       responses: Topic[IO, MessageFromPeer],
       peersConnected: Deferred[IO, Unit],
       peers: Map[Peer, PeerInfo],
       blocks: List[Block]
   )(implicit ioRuntime: IORuntime)
-      extends AutoPilot {
-    def run(sender: ActorRef, msg: Any): NetworkPeerManagerAutoPilot = {
-      msg match {
-        case NetworkPeerManagerActor.GetHandshakedPeers =>
-          sender ! NetworkPeerManagerActor.HandshakedPeers(peers)
+      extends AutoPilot:
+    def run(sender: ActorRef, msg: Any): NetworkPeerManagerAutoPilot =
+      msg match
+        case NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo) =>
+          replyTo ! NetworkPeerManagerActor.HandshakedPeers(peers)
           peersConnected.complete(()).handleError(_ => ()).unsafeRunSync()
-        case sendMsg @ NetworkPeerManagerActor.SendMessage(rawMsg, peerId) =>
+        case sendMsg @ NetworkPeerManagerActor.SendMessageCmd(rawMsg, peerId) =>
           requests.publish1(sendMsg).unsafeRunSync()
-          val response = rawMsg.underlyingMsg match {
+          val response = rawMsg.underlyingMsg match
             case GetBlockHeaders(requestId, startingBlock, maxHeaders, skip, reverse) =>
               BlockHeaders(requestId, headersFor(startingBlock, maxHeaders, skip, reverse))
 
@@ -130,39 +125,32 @@ object NetworkPeerManagerFake {
 
             case ETHPackets.GetNodeData(mptElementsHashes) =>
               ETHPackets.NodeData(Seq.empty)
-          }
           val theResponse = MessageFromPeer(response, peerId)
           sender ! theResponse
           responses.publish1(theResponse).unsafeRunSync()
-      }
       this
-    }
 
     private def headersFor(
         startingBlock: Either[BigInt, ByteString],
         maxHeaders: BigInt,
         skip: BigInt,
         reverse: Boolean
-    ): Seq[BlockHeader] = {
+    ): Seq[BlockHeader] =
       val startIndex = blocks.indexWhere(blockMatchesStart(_, startingBlock))
-      if (startIndex < 0) Seq.empty
-      else {
-        val orderedBlocks = if (reverse) blocks.take(startIndex + 1).reverse else blocks.drop(startIndex)
+      if startIndex < 0 then Seq.empty
+      else
+        val orderedBlocks = if reverse then blocks.take(startIndex + 1).reverse else blocks.drop(startIndex)
         val step = (skip + 1).toInt
         orderedBlocks.zipWithIndex
           .collect { case (block, index) if index % step == 0 => block }
           .take(maxHeaders.toInt)
           .map(_.header)
-      }
-    }
 
     private def bodiesFor(hashes: Seq[ByteString]): Seq[BlockBody] =
-      hashes.flatMap(hash => blocks.find(_.hash == hash)).map(_.body)
+      hashes.flatMap(hash => blocks.find(_.hash.value == hash)).map(_.body)
 
     private def emptyReceiptsRlp(count: Int): RLPList =
-      RLPList(List.fill(count)(RLPList()): _*)
+      RLPList(List.fill(count)(RLPList())*)
 
     def blockMatchesStart(block: Block, startingBlock: Either[BigInt, ByteString]): Boolean =
-      startingBlock.fold(nr => block.number == nr, hash => block.hash == hash)
-  }
-}
+      startingBlock.fold(nr => block.number == nr, hash => block.hash.value == hash)

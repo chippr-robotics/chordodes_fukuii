@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.vm
 
 import org.scalatest.funsuite.AnyFunSuite
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class EvmConfigEtcForkSelectionSpec extends AnyFunSuite {
+class EvmConfigEtcForkSelectionSpec extends AnyFunSuite:
 
   val allMaxCfg: BlockchainConfigForEvm = BlockchainConfigForEvm(
     frontierBlockNumber = Long.MaxValue,
@@ -89,4 +89,3 @@ class EvmConfigEtcForkSelectionSpec extends AnyFunSuite {
   test("EtcForks.Olympia is highest enum value", UnitTest, VMTest) {
     assert(BlockchainConfigForEvm.EtcForks.Olympia > BlockchainConfigForEvm.EtcForks.Spiral)
   }
-}

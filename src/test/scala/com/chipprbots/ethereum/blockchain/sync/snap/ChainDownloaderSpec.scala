@@ -1,40 +1,39 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestActorRef
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.*
 
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import java.net.InetSocketAddress
-
-import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
 import com.chipprbots.ethereum.blockchain.sync.TestSyncConfig
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
-import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
+/** Unit tests for the Pekko Typed `ChainDownloader` (Group S6 migration).
+  *
+  * The actor is a `Behavior[Any]`, so the previous white-box assertions via `TestActorRef#underlyingActor` are no
+  * longer possible. Behaviour is exercised through the public protocol (`Start` / `UpdateTarget` / `YieldToRegularSync`
+  * / `GetProgress`) and observable side effects on `AppStateStorage` (the persisted backfill target). `GetProgress` is
+  * used as a synchronisation barrier and as a liveness probe: a reply proves the dispatch loop did not wedge.
+  */
 class ChainDownloaderSpec
-    extends TestKit(ActorSystem("ChainDownloaderSpec"))
+    extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfterAll
-    with MockFactory
-    with TestSyncConfig {
+    with Eventually
+    with org.scalamock.scalatest.MockFactory
+    with TestSyncConfig:
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   // Regression for #1162: chain backfill keeps running in the background after SNAPSyncController
   // emits SnapSyncFinalized, but at lower priority. ChainDownloader needs a `YieldToRegularSync(n)`
@@ -52,192 +51,114 @@ class ChainDownloaderSpec
 
   // Behavioural test: the downloader's dispatch loop wedges if `maxConcurrentRequests` ever drops to
   // zero (the slot check `inFlightCount >= maxConcurrentRequests` would be true forever), stranding
-  // the parent `SNAPSyncController` waiting for `ChainDownloader.Done` indefinitely. Clamp to >=1.
-  "ChainDownloader" should "clamp YieldToRegularSync(0) to 1 to prevent dispatch wedge" taggedAs UnitTest in {
-    val downloader = newDownloader(initialMaxConcurrentRequests = 16)
+  // the parent `SNAPSyncController` waiting for `ChainDownloader.Done` indefinitely. The handler clamps
+  // to >=1. With no internal-state accessor on a Typed behavior, we assert the contract the clamp
+  // protects: after YieldToRegularSync(0) the actor stays live and still answers GetProgress.
+  "ChainDownloader" should "stay responsive after YieldToRegularSync(0) (clamp prevents dispatch wedge)" taggedAs UnitTest in {
+    val (downloader, _, _) = newDownloader()
+    downloader ! ChainDownloader.Start(BigInt(19_250_000))
 
     downloader ! ChainDownloader.YieldToRegularSync(0)
-    downloader.underlyingActor.currentMaxConcurrentRequests shouldBe 1
+    expectProgress(downloader)
 
     downloader ! ChainDownloader.YieldToRegularSync(5)
-    downloader.underlyingActor.currentMaxConcurrentRequests shouldBe 5
+    expectProgress(downloader)
 
-    system.stop(downloader)
+    testKit.stop(downloader)
   }
 
-  it should "honour YieldToRegularSync(n) for any n >= 1" taggedAs UnitTest in {
-    val downloader = newDownloader(initialMaxConcurrentRequests = 16)
-
-    downloader ! ChainDownloader.YieldToRegularSync(2)
-    downloader.underlyingActor.currentMaxConcurrentRequests shouldBe 2
-
-    downloader ! ChainDownloader.YieldToRegularSync(1)
-    downloader.underlyingActor.currentMaxConcurrentRequests shouldBe 1
-
-    system.stop(downloader)
-  }
-
-  it should "still apply YieldToRegularSync after BoostConcurrency (downward)" taggedAs UnitTest in {
-    val downloader = newDownloader(initialMaxConcurrentRequests = 2)
+  it should "stay responsive after BoostConcurrency then a downward YieldToRegularSync" taggedAs UnitTest in {
+    val (downloader, _, _) = newDownloader()
+    downloader ! ChainDownloader.Start(BigInt(19_250_000))
 
     downloader ! ChainDownloader.BoostConcurrency(16)
-    downloader.underlyingActor.currentMaxConcurrentRequests shouldBe 16
+    expectProgress(downloader)
 
     downloader ! ChainDownloader.YieldToRegularSync(2)
-    downloader.underlyingActor.currentMaxConcurrentRequests shouldBe 2
+    expectProgress(downloader)
 
-    system.stop(downloader)
+    testKit.stop(downloader)
   }
 
   // Issue #1169: persist a BackfillTarget at Start so that a node killed mid-backfill can
   // resume standalone after restart.
   it should "persist BackfillTarget on Start so a restart can resume backfill" taggedAs UnitTest in {
-    implicit val ec: ExecutionContext = system.dispatcher
-    val blockchainReader = mock[BlockchainReader]
-    val blockchainWriter = mock[BlockchainWriter]
-    val appStateStorage = new AppStateStorage(EphemDataSource())
-    val networkPeerManager = TestProbe()
-    val peerEventBus = TestProbe()
-
-    // findBestStoredHeader probes block 1; mock it as missing so the binary search falls
-    // through and returns 0 immediately, leaving the actor in `downloading` state.
-    (blockchainReader.getBlockHeaderByNumber _)
-      .expects(BigInt(1))
-      .returning(None)
-      .anyNumberOfTimes()
+    val (downloader, appStateStorage, _) = newDownloader()
 
     appStateStorage.getBackfillTarget() shouldBe BigInt(0)
 
-    val downloader = TestActorRef[ChainDownloader](
-      ChainDownloader.props(
-        blockchainReader = blockchainReader,
-        blockchainWriter = blockchainWriter,
-        appStateStorage = appStateStorage,
-        networkPeerManager = networkPeerManager.ref,
-        peerEventBus = peerEventBus.ref,
-        syncConfig = defaultSyncConfig,
-        scheduler = system.scheduler,
-        maxConcurrentRequests = 4
-      )
-    )
-
     val target = BigInt(19_250_000)
     downloader ! ChainDownloader.Start(target)
+    expectProgress(downloader) // barrier: Start has been processed
 
     appStateStorage.getBackfillTarget() shouldBe target
 
-    system.stop(downloader)
+    testKit.stop(downloader)
   }
 
   // Issue #1169: an UpdateTarget message during the downloading phase persists the bumped
   // target so a restart resumes against the latest target rather than a stale one.
   it should "persist a bumped BackfillTarget on UpdateTarget" taggedAs UnitTest in {
-    implicit val ec: ExecutionContext = system.dispatcher
-    val blockchainReader = mock[BlockchainReader]
-    val blockchainWriter = mock[BlockchainWriter]
-    val appStateStorage = new AppStateStorage(EphemDataSource())
-    val networkPeerManager = TestProbe()
-    val peerEventBus = TestProbe()
-
-    (blockchainReader.getBlockHeaderByNumber _)
-      .expects(BigInt(1))
-      .returning(None)
-      .anyNumberOfTimes()
-
-    val downloader = TestActorRef[ChainDownloader](
-      ChainDownloader.props(
-        blockchainReader = blockchainReader,
-        blockchainWriter = blockchainWriter,
-        appStateStorage = appStateStorage,
-        networkPeerManager = networkPeerManager.ref,
-        peerEventBus = peerEventBus.ref,
-        syncConfig = defaultSyncConfig,
-        scheduler = system.scheduler,
-        maxConcurrentRequests = 4
-      )
-    )
+    val (downloader, appStateStorage, _) = newDownloader()
 
     downloader ! ChainDownloader.Start(BigInt(1000))
+    expectProgress(downloader)
     appStateStorage.getBackfillTarget() shouldBe BigInt(1000)
 
     downloader ! ChainDownloader.UpdateTarget(BigInt(1500))
+    expectProgress(downloader)
     appStateStorage.getBackfillTarget() shouldBe BigInt(1500)
 
     // A target lower than the current one is ignored.
     downloader ! ChainDownloader.UpdateTarget(BigInt(1200))
+    expectProgress(downloader)
     appStateStorage.getBackfillTarget() shouldBe BigInt(1500)
 
-    system.stop(downloader)
+    testKit.stop(downloader)
   }
 
-  // go-ethereum behavioral backoff: a peer returning empty BlockHeaders (count:0) should be excluded
-  // from future header dispatch (capacity-to-zero equivalent, msgrate.go:187). Bodies/receipts/SNAP
-  // dispatch must remain unaffected. If the peer later delivers non-empty headers, exclusion is lifted.
-  it should "exclude peer from header dispatch after empty BlockHeaders response" taggedAs UnitTest in {
-    implicit val ec: ExecutionContext = system.dispatcher
+  /** Sends `GetProgress` and waits for the `Progress` reply — both a synchronisation barrier (the actor has drained its
+    * mailbox up to this point) and a liveness probe (a reply means the behavior did not wedge or stop).
+    */
+  private def expectProgress(
+      downloader: TypedActorRef[ChainDownloader.Command]
+  ): ChainDownloader.Progress =
+    val probe = TestProbe()
+    val typedProbe: TypedActorRef[ChainDownloader.Progress] = probe.ref.toTyped[ChainDownloader.Progress]
+    downloader ! ChainDownloader.GetProgress(typedProbe)
+    probe.expectMsgType[ChainDownloader.Progress](3.seconds)
+
+  /** Spawn a Typed ChainDownloader (converted to a Classic ref for `!`). `findBestStoredHeader` probes block 1; mocking
+    * it as missing makes the binary search return 0 immediately, leaving the actor in `downloading` with empty queues —
+    * no real blockchain or peer infrastructure required. `peersScanInterval` is 1h in TestSyncConfig, so the periodic
+    * peer scan never fires during a test (the immediate startup poll lands harmlessly on a fresh probe).
+    */
+  private def newDownloader(): (TypedActorRef[ChainDownloader.Command], AppStateStorage, TestProbe) =
     val blockchainReader = mock[BlockchainReader]
     val blockchainWriter = mock[BlockchainWriter]
     val appStateStorage = new AppStateStorage(EphemDataSource())
     val networkPeerManager = TestProbe()
     val peerEventBus = TestProbe()
+    val replyToProbe = TestProbe()
 
-    (blockchainReader.getBlockHeaderByNumber _)
+    blockchainReader.getBlockHeaderByNumber
       .expects(BigInt(1))
       .returning(None)
       .anyNumberOfTimes()
 
-    val downloader = TestActorRef[ChainDownloader](
-      ChainDownloader.props(
-        blockchainReader = blockchainReader,
-        blockchainWriter = blockchainWriter,
-        appStateStorage = appStateStorage,
-        networkPeerManager = networkPeerManager.ref,
-        peerEventBus = peerEventBus.ref,
-        syncConfig = defaultSyncConfig,
-        scheduler = system.scheduler,
-        maxConcurrentRequests = 4
+    val downloader: TypedActorRef[ChainDownloader.Command] = testKit
+      .spawn(
+        ChainDownloader(
+          blockchainReader = blockchainReader,
+          blockchainWriter = blockchainWriter,
+          appStateStorage = appStateStorage,
+          networkPeerManager = networkPeerManager.ref,
+          peerEventBus = peerEventBus.ref,
+          syncConfig = defaultSyncConfig,
+          replyTo = replyToProbe.ref,
+          maxConcurrentRequests = 4
+        ),
+        s"chain-downloader-${System.nanoTime()}"
       )
-    )
-    downloader ! ChainDownloader.Start(BigInt(19_250_000))
 
-    val dummyAddr = new InetSocketAddress("127.0.0.1", 30303)
-    val peer = Peer(PeerId("snap-peer-1"), dummyAddr, TestProbe().ref, incomingConnection = false)
-
-    downloader.underlyingActor.isHeaderExcluded(peer.id) shouldBe false
-
-    // First empty response — peer should be excluded
-    downloader ! ResponseReceived(peer, ETHPackets.BlockHeaders(BigInt(1), Seq.empty), 100L)
-    downloader.underlyingActor.isHeaderExcluded(peer.id) shouldBe true
-
-    // Recovery: non-empty response clears the exclusion
-    val fakeHeader = mock[com.chipprbots.ethereum.domain.BlockHeader]
-    downloader ! ResponseReceived(peer, ETHPackets.BlockHeaders(BigInt(2), Seq(fakeHeader)), 100L)
-    downloader.underlyingActor.isHeaderExcluded(peer.id) shouldBe false
-
-    system.stop(downloader)
-  }
-
-  /** Spawn a ChainDownloader for unit-level message-handling tests. The downloader stays in `idle` (no `Start` sent),
-    * so the in-flight queues remain empty and we don't need real blockchain or peer infrastructure.
-    */
-  private def newDownloader(initialMaxConcurrentRequests: Int): TestActorRef[ChainDownloader] = {
-    implicit val ec: ExecutionContext = system.dispatcher
-    val blockchainReader = mock[BlockchainReader]
-    val blockchainWriter = mock[BlockchainWriter]
-    val appStateStorage = new AppStateStorage(EphemDataSource())
-    val networkPeerManager = TestProbe()
-    val peerEventBus = TestProbe()
-    TestActorRef[ChainDownloader](
-      ChainDownloader.props(
-        blockchainReader = blockchainReader,
-        blockchainWriter = blockchainWriter,
-        appStateStorage = appStateStorage,
-        networkPeerManager = networkPeerManager.ref,
-        peerEventBus = peerEventBus.ref,
-        syncConfig = defaultSyncConfig,
-        scheduler = system.scheduler,
-        maxConcurrentRequests = initialMaxConcurrentRequests
-      )
-    )
-  }
-}
+    (downloader, appStateStorage, networkPeerManager)

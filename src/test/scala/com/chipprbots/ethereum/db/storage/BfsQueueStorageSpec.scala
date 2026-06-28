@@ -1,13 +1,15 @@
 package com.chipprbots.ethereum.db.storage
 
+import java.io.File
+import java.nio.file.Files
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.db.dataSource.{EphemDataSource, RocksDbConfig, RocksDbDataSource}
-import com.chipprbots.ethereum.testing.Tags._
-
-import java.io.File
-import java.nio.file.Files
+import com.chipprbots.ethereum.db.dataSource.EphemDataSource
+import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** BfsQueueStorage over a real RocksDB instance — exercises the native range-tombstone delete path
   * (`DataSource.deleteRange`) that replaced per-key tombstone batches. The per-key implementation wrote ~140M
@@ -17,17 +19,17 @@ import java.nio.file.Files
   * Also covers the crash-restart contract: the write counter is in-memory only, so a fresh storage instance over a
   * column family still holding a dead walk's entries must `clear()` them despite `counter == 0`.
   */
-class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
+class BfsQueueStorageSpec extends AnyFlatSpec with Matchers:
 
   private def entry(i: Int): (Array[Byte], Seq[Array[Byte]], Boolean) =
     (Array.fill(32)(i.toByte), Seq(Array(i.toByte, (i + 1).toByte)), i % 2 == 0)
 
   private def drain(it: Iterator[Seq[BfsEntry]]): Seq[BfsEntry] = it.flatten.toSeq
 
-  private def withRocksDb(test: RocksDbDataSource => Unit): Unit = {
+  private def withRocksDb(test: RocksDbDataSource => Unit): Unit =
     val dbPath = Files.createTempDirectory("bfs-queue-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -37,16 +39,14 @@ class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     try test(dataSource)
-    finally {
+    finally
       dataSource.destroy()
       val dir = new File(dbPath)
       !dir.exists() || dir.delete()
-    }
-  }
 
   "RocksDbBfsQueueStorage" should "round-trip entries through enqueueBatch/iterateRange" taggedAs UnitTest in
     withRocksDb { ds =>
@@ -128,10 +128,9 @@ class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
     (0 until 10).forall(i => ds.getOptimized(nsB, key(i)).isDefined) shouldBe true
   }
 
-  private def keyUpsert(ns: IndexedSeq[Byte], k: Array[Byte]) = {
+  private def keyUpsert(ns: IndexedSeq[Byte], k: Array[Byte]) =
     import com.chipprbots.ethereum.db.dataSource.DataSourceUpdateOptimized
     Seq(DataSourceUpdateOptimized(ns, toRemove = Seq.empty, toUpsert = Seq((k, Array(1.toByte)))))
-  }
 
   "InMemoryBfsQueueStorage" should "match RocksDb semantics for deleteRange and clear" taggedAs UnitTest in {
     val q = new InMemoryBfsQueueStorage()
@@ -148,7 +147,7 @@ class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
   "RocksDbDataSource" should "open and round-trip at raised max-open-files (-1) and block-cache-size (US4)" taggedAs UnitTest in {
     val dbPath = Files.createTempDirectory("bfs-queue-rocksdb-raised").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -158,18 +157,17 @@ class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 268435456L // 256MB (raised from the 32MB test default)
-      },
+      ,
       Namespaces.nsSeq
     )
-    try {
+    try
       val q = new RocksDbBfsQueueStorage(dataSource, Namespaces.BfsQueueNamespace)
       q.enqueueBatch((0 until 32).map(entry))
       drain(q.iterateRange(0L, 32L)).size shouldBe 32
-    } finally {
+    finally
       dataSource.destroy()
       val dir = new File(dbPath)
       !dir.exists() || dir.delete()
-    }
   }
 
   // ---- US5 (spec 002): forward-scan DataSource.scanRange ----
@@ -210,7 +208,6 @@ class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
       it.next().size shouldBe 10 // consume only the first chunk, then drop `it`
       // withRocksDb's finally destroys the DataSource; a leaked open native iterator would error there.
       // scanRange closes its iterator per chunk, so nothing is open between chunks. Reaching here is the assertion.
-      succeed
     }
 
   "EphemDataSource.scanRange" should "return sorted, namespace-isolated entries within [from,to) (US5/FR-017)" taggedAs UnitTest in {
@@ -225,4 +222,3 @@ class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
     // sorted ascending, half-open [2,8), and nsB entries excluded
     scanned.map(_._1.toSeq) shouldBe Seq(2L, 4L, 7L).map(i => BfsQueueStorage.longToBytes(i).toSeq)
   }
-}

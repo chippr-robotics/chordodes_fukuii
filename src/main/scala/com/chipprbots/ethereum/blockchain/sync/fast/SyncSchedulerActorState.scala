@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
@@ -11,6 +11,8 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.Processin
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SchedulerState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.PeerRequest
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.RequestResult
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.StateSyncStats
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.SyncStateSchedulerActorResponse
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 
@@ -19,11 +21,12 @@ case class SyncSchedulerActorState(
     currentDownloaderState: DownloaderState,
     currentStats: ProcessingStatistics,
     targetBlock: BigInt,
-    syncInitiator: ActorRef,
+    syncInitiator: TypedActorRef[SyncStateSchedulerActorResponse],
+    statsInitiator: TypedActorRef[StateSyncStats],
     nodesToProcess: Queue[RequestResult],
     processing: Boolean,
-    restartRequested: Option[ActorRef]
-) {
+    restartRequested: Option[TypedActorRef[SyncStateSchedulerActorResponse]]
+):
   def hasRemainingPendingRequests: Boolean = currentSchedulerState.numberOfPendingRequests > 0
   def isProcessing: Boolean = processing
   def restartHasBeenRequested: Boolean = restartRequested.isDefined
@@ -44,7 +47,7 @@ case class SyncSchedulerActorState(
   def withNewDownloaderState(newDownloaderState: DownloaderState): SyncSchedulerActorState =
     copy(currentDownloaderState = newDownloaderState)
 
-  def withRestartRequested(restartRequester: ActorRef): SyncSchedulerActorState =
+  def withRestartRequested(restartRequester: TypedActorRef[SyncStateSchedulerActorResponse]): SyncSchedulerActorState =
     copy(restartRequested = Some(restartRequester))
 
   def initProcessing: SyncSchedulerActorState =
@@ -56,7 +59,7 @@ case class SyncSchedulerActorState(
   def assignTasksToPeers(
       freePeers: NonEmptyList[Peer],
       nodesPerPeer: Int
-  ): (Seq[PeerRequest], SyncSchedulerActorState) = {
+  ): (Seq[PeerRequest], SyncSchedulerActorState) =
     val retryQueue = currentDownloaderState.nonDownloadedNodes
     val maxNewNodes = ((freePeers.size * nodesPerPeer) - retryQueue.size).max(0)
     val (newNodes, newState) = currentSchedulerState.getMissingHashes(maxNewNodes)
@@ -77,7 +80,6 @@ case class SyncSchedulerActorState(
       req.copy(pathInfo = pathInfo)
     }
     (enrichedRequests, copy(currentSchedulerState = newState, currentDownloaderState = newDownloaderState))
-  }
 
   def getRequestToProcess: Option[(RequestResult, SyncSchedulerActorState)] =
     nodesToProcess.dequeueOption.map { case (result, restOfResults) =>
@@ -100,14 +102,14 @@ case class SyncSchedulerActorState(
        | Number of not requested hashes: ${currentStats.notRequestedHashes},
        | Number of active peer requests: ${currentDownloaderState.activeRequests.size}
                         """.stripMargin
-}
 
-object SyncSchedulerActorState {
+object SyncSchedulerActorState:
   def initial(
       initialSchedulerState: SchedulerState,
       initialStats: ProcessingStatistics,
       targetBlock: BigInt,
-      syncInitiator: ActorRef
+      syncInitiator: TypedActorRef[SyncStateSchedulerActorResponse],
+      statsInitiator: TypedActorRef[StateSyncStats]
   ): SyncSchedulerActorState =
     SyncSchedulerActorState(
       initialSchedulerState,
@@ -115,9 +117,8 @@ object SyncSchedulerActorState {
       initialStats,
       targetBlock,
       syncInitiator,
+      statsInitiator,
       Queue(),
       processing = false,
       restartRequested = None
     )
-
-}

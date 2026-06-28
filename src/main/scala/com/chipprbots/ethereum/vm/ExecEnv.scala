@@ -6,9 +6,9 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
 
-object ExecEnv {
-  def apply(context: ProgramContext[_, _], code: ByteString, ownerAddr: Address): ExecEnv = {
-    import context._
+object ExecEnv:
+  def apply(context: ProgramContext[?, ?], code: ByteString, ownerAddr: Address): ExecEnv =
+    import context.*
 
     ExecEnv(
       ownerAddr,
@@ -27,8 +27,6 @@ object ExecEnv {
       context.traceTransfers,
       context.tracer
     )
-  }
-}
 
 /** Execution environment constants of an EVM program. See section 9.3 in Yellow Paper for more detail.
   * @param ownerAddr

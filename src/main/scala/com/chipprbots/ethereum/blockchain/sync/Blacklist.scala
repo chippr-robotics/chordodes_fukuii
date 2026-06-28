@@ -1,9 +1,9 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import scala.jdk.DurationConverters._
-import scala.jdk.OptionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
+import scala.jdk.DurationConverters.*
+import scala.jdk.OptionConverters.*
 
 import com.github.blemale.scaffeine.Cache
 import com.github.blemale.scaffeine.Scaffeine
@@ -14,308 +14,236 @@ import com.chipprbots.ethereum.network.NetworkMetrics
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.utils.Logger
 
-import Blacklist._
+import Blacklist.*
 
-trait Blacklist {
+trait Blacklist:
   def isBlacklisted(id: BlacklistId): Boolean
   def add(id: BlacklistId, duration: FiniteDuration, reason: BlacklistReason): Unit
   def remove(id: BlacklistId): Unit
   def keys: Set[BlacklistId]
-}
 
 // scalastyle:off number.of.types number.of.methods
-object Blacklist {
-  import BlacklistReason._
-  import BlacklistReasonType._
-  import BlacklistGroup._
+object Blacklist:
+  import BlacklistReason.*
+  import BlacklistReasonType.*
+  import BlacklistGroup.*
 
-  trait BlacklistId {
+  trait BlacklistId:
     def value: String
-  }
 
-  sealed trait BlacklistReason {
+  sealed trait BlacklistReason:
     def reasonType: BlacklistReasonType
     def description: String
-  }
 
-  object BlacklistGroup {
-    trait FastSyncBlacklistGroup {
+  object BlacklistGroup:
+    trait FastSyncBlacklistGroup:
       val group = "FastSyncBlacklistGroup"
-    }
-    trait RegularSyncBlacklistGroup {
+    trait RegularSyncBlacklistGroup:
       val group = "RegularSyncBlacklistGroup"
-    }
     // this group is directly translated from WireProtocol
-    trait P2PBlacklistGroup {
+    trait P2PBlacklistGroup:
       val group = "P2PBlacklistGroup"
-    }
-  }
 
-  object BlacklistReason {
-    sealed trait BlacklistReasonType {
+  object BlacklistReason:
+    sealed trait BlacklistReasonType:
       def code: Int
       def name: String
       def group: String
-    }
-    object BlacklistReasonType {
+    object BlacklistReasonType:
 
-      case object WrongBlockHeadersType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object WrongBlockHeadersType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 1
         val name: String = "WrongBlockHeadersType"
-      }
-      case object BlockHeaderValidationFailedType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object BlockHeaderValidationFailedType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 2
         val name: String = "BlockHeaderValidationFailed"
-      }
-      case object ErrorInBlockHeadersType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object ErrorInBlockHeadersType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 3
         val name: String = "ErrorInBlockHeaders"
-      }
-      case object EmptyBlockBodiesType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object EmptyBlockBodiesType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 4
         val name: String = "EmptyBlockBodies"
-      }
-      case object BlockBodiesNotMatchingHeadersType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object BlockBodiesNotMatchingHeadersType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 5
         val name: String = "BlockBodiesNotMatchingHeaders"
-      }
-      case object EmptyReceiptsType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object EmptyReceiptsType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 6
         val name: String = "EmptyReceipts"
-      }
-      case object InvalidReceiptsType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object InvalidReceiptsType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 7
         val name: String = "InvalidReceipts"
-      }
-      case object FastSyncRequestFailedType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object FastSyncRequestFailedType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 8
         val name: String = "FastSyncRequestFailed"
-      }
-      case object PeerActorTerminatedType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object PeerActorTerminatedType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 9
         val name: String = "PeerActorTerminated"
-      }
-      case object InvalidStateResponseType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object InvalidStateResponseType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 10
         val name: String = "InvalidStateResponse"
-      }
-      case object InvalidPivotBlockElectionResponseType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object InvalidPivotBlockElectionResponseType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 11
         val name: String = "InvalidPivotElectionResponse"
-      }
-      case object PivotBlockElectionTimeoutType extends BlacklistReasonType with FastSyncBlacklistGroup {
+      case object PivotBlockElectionTimeoutType extends BlacklistReasonType with FastSyncBlacklistGroup:
         val code: Int = 12
         val name: String = "PivotBlockElectionTimeout"
-      }
-      case object DisconnectRequestedType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object DisconnectRequestedType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 13
         val name: String = "DisconnectRequested"
-      }
-      case object TcpSubsystemErrorType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object TcpSubsystemErrorType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 14
         val name: String = "TcpSubsystemError"
-      }
-      case object UselessPeerType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object UselessPeerType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 15
         val name: String = "UselessPeer"
-      }
-      case object TooManyPeersType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object TooManyPeersType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 16
         val name: String = "TooManyPeers"
-      }
-      case object AlreadyConnectedType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object AlreadyConnectedType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 17
         val name: String = "AlreadyConnected"
-      }
-      case object IncompatibleP2pProtocolVersionType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object IncompatibleP2pProtocolVersionType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 18
         val name: String = "IncompatibleP2pProtocolVersion"
-      }
-      case object NullNodeIdentityReceivedType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object NullNodeIdentityReceivedType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 19
         val name: String = "NullNodeIdentityReceived"
-      }
-      case object ClientQuittingType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object ClientQuittingType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 20
         val name: String = "ClientQuitting"
-      }
-      case object UnexpectedIdentityType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object UnexpectedIdentityType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 21
         val name: String = "UnexpectedIdentity"
-      }
-      case object IdentityTheSameType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object IdentityTheSameType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 22
         val name: String = "IdentityTheSame"
-      }
-      case object TimeoutOnReceivingAMessageType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object TimeoutOnReceivingAMessageType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 23
         val name: String = "TimeoutOnReceivingAMessage"
-      }
-      case object OtherSubprotocolSpecificReasonType extends BlacklistReasonType with P2PBlacklistGroup {
+      case object OtherSubprotocolSpecificReasonType extends BlacklistReasonType with P2PBlacklistGroup:
         val code: Int = 24
         val name: String = "OtherSubprotocolSpecificReason"
-      }
-      case object EmptyStateNodeResponseType extends BlacklistReasonType with RegularSyncBlacklistGroup {
+      case object EmptyStateNodeResponseType extends BlacklistReasonType with RegularSyncBlacklistGroup:
         val code: Int = 25
         val name: String = "EmptyStateNodeResponse"
-      }
-      case object WrongStateNodeResponseType extends BlacklistReasonType with RegularSyncBlacklistGroup {
+      case object WrongStateNodeResponseType extends BlacklistReasonType with RegularSyncBlacklistGroup:
         val code: Int = 26
         val name: String = "WrongStateNodeResponse"
-      }
-      case object UnrequestedBodiesType extends BlacklistReasonType with RegularSyncBlacklistGroup {
+      case object UnrequestedBodiesType extends BlacklistReasonType with RegularSyncBlacklistGroup:
         val code: Int = 27
         val name: String = "UnrequestedBodies"
-      }
-      case object UnrequestedHeadersType extends BlacklistReasonType with RegularSyncBlacklistGroup {
+      case object UnrequestedHeadersType extends BlacklistReasonType with RegularSyncBlacklistGroup:
         val code: Int = 28
         val name: String = "UnrequestedHeaders"
-      }
-      case object RegularSyncRequestFailedType extends BlacklistReasonType with RegularSyncBlacklistGroup {
+      case object RegularSyncRequestFailedType extends BlacklistReasonType with RegularSyncBlacklistGroup:
         val code: Int = 29
         val name: String = "RegularSyncRequestFailed"
-      }
-      case object BlockImportErrorType extends BlacklistReasonType with RegularSyncBlacklistGroup {
+      case object BlockImportErrorType extends BlacklistReasonType with RegularSyncBlacklistGroup:
         val code: Int = 30
         val name: String = "BlockImportError"
-      }
-    }
 
-    case object WrongBlockHeaders extends BlacklistReason {
+    case object WrongBlockHeaders extends BlacklistReason:
       val reasonType: BlacklistReasonType = WrongBlockHeadersType
       val description: String = "Wrong blockheaders response: Peer didn't respond with requested block headers."
-    }
-    case object BlockHeaderValidationFailed extends BlacklistReason {
+    case object BlockHeaderValidationFailed extends BlacklistReason:
       val reasonType: BlacklistReasonType = BlockHeaderValidationFailedType
       val description: String = "Block header validation failed"
-    }
-    case object ErrorInBlockHeaders extends BlacklistReason {
+    case object ErrorInBlockHeaders extends BlacklistReason:
       val reasonType: BlacklistReasonType = ErrorInBlockHeadersType
       val description: String = "Error in block headers response"
-    }
-    final case class EmptyBlockBodies(knownHashes: Seq[String]) extends BlacklistReason {
+    final case class EmptyBlockBodies(knownHashes: Seq[String]) extends BlacklistReason:
       val reasonType: BlacklistReasonType = EmptyBlockBodiesType
       val description: String = s"Got empty block bodies response for known hashes: $knownHashes"
-    }
-    case object BlockBodiesNotMatchingHeaders extends BlacklistReason {
+    case object BlockBodiesNotMatchingHeaders extends BlacklistReason:
       val reasonType: BlacklistReasonType = BlockBodiesNotMatchingHeadersType
       val description = "Block bodies not matching block headers"
-    }
-    final case class EmptyReceipts(knownHashes: Seq[String]) extends BlacklistReason {
+    final case class EmptyReceipts(knownHashes: Seq[String]) extends BlacklistReason:
       val reasonType: BlacklistReasonType = EmptyReceiptsType
       val description: String = s"Got empty receipts for known hashes: $knownHashes"
-    }
-    final case class InvalidReceipts(knownHashes: Seq[String], error: BlockError) extends BlacklistReason {
+    final case class InvalidReceipts(knownHashes: Seq[String], error: BlockError) extends BlacklistReason:
       val reasonType: BlacklistReasonType = InvalidReceiptsType
       val description: String = s"Got invalid receipts for known hashes: $knownHashes due to: $error"
-    }
-    final case class FastSyncRequestFailed(error: String) extends BlacklistReason {
+    final case class FastSyncRequestFailed(error: String) extends BlacklistReason:
       val reasonType: BlacklistReasonType = FastSyncRequestFailedType
       val description: String = s"Request failed with error: $error"
-    }
-    case object PeerActorTerminated extends BlacklistReason {
+    case object PeerActorTerminated extends BlacklistReason:
       val reasonType: BlacklistReasonType = PeerActorTerminatedType
       val description: String = "Peer actor terminated"
-    }
-    final case class InvalidStateResponse(details: String) extends BlacklistReason {
+    final case class InvalidStateResponse(details: String) extends BlacklistReason:
       val reasonType: BlacklistReasonType = InvalidStateResponseType
       val description: String = s"Invalid response while syncing state trie: $details"
-    }
-    case object InvalidPivotBlockElectionResponse extends BlacklistReason {
+    case object InvalidPivotBlockElectionResponse extends BlacklistReason:
       val reasonType: BlacklistReasonType = InvalidStateResponseType
       val description: String = "Invalid response while selecting pivot block"
-    }
-    case object PivotBlockElectionTimeout extends BlacklistReason {
+    case object PivotBlockElectionTimeout extends BlacklistReason:
       val reasonType: BlacklistReasonType = InvalidStateResponseType
       val description: String = "Peer didn't respond with requested pivot block candidate in a timely manner"
-    }
-    case object DisconnectRequested extends BlacklistReason {
+    case object DisconnectRequested extends BlacklistReason:
       val reasonType: BlacklistReasonType = DisconnectRequestedType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.DisconnectRequested)
-    }
-    case object TcpSubsystemError extends BlacklistReason {
+    case object TcpSubsystemError extends BlacklistReason:
       val reasonType: BlacklistReasonType = TcpSubsystemErrorType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.TcpSubsystemError)
-    }
-    case object UselessPeer extends BlacklistReason {
+    case object UselessPeer extends BlacklistReason:
       val reasonType: BlacklistReasonType = UselessPeerType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.UselessPeer)
-    }
-    case object TooManyPeers extends BlacklistReason {
+    case object TooManyPeers extends BlacklistReason:
       val reasonType: BlacklistReasonType = TooManyPeersType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.TooManyPeers)
-    }
-    case object AlreadyConnected extends BlacklistReason {
+    case object AlreadyConnected extends BlacklistReason:
       val reasonType: BlacklistReasonType = AlreadyConnectedType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.AlreadyConnected)
-    }
-    case object IncompatibleP2pProtocolVersion extends BlacklistReason {
+    case object IncompatibleP2pProtocolVersion extends BlacklistReason:
       val reasonType: BlacklistReasonType = IncompatibleP2pProtocolVersionType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.IncompatibleP2pProtocolVersion)
-    }
-    case object NullNodeIdentityReceived extends BlacklistReason {
+    case object NullNodeIdentityReceived extends BlacklistReason:
       val reasonType: BlacklistReasonType = NullNodeIdentityReceivedType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.NullNodeIdentityReceived)
-    }
-    case object ClientQuitting extends BlacklistReason {
+    case object ClientQuitting extends BlacklistReason:
       val reasonType: BlacklistReasonType = ClientQuittingType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.ClientQuitting)
-    }
-    case object UnexpectedIdentity extends BlacklistReason {
+    case object UnexpectedIdentity extends BlacklistReason:
       val reasonType: BlacklistReasonType = UnexpectedIdentityType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.UnexpectedIdentity)
-    }
-    case object IdentityTheSame extends BlacklistReason {
+    case object IdentityTheSame extends BlacklistReason:
       val reasonType: BlacklistReasonType = IdentityTheSameType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.IdentityTheSame)
-    }
-    case object TimeoutOnReceivingAMessage extends BlacklistReason {
+    case object TimeoutOnReceivingAMessage extends BlacklistReason:
       val reasonType: BlacklistReasonType = TimeoutOnReceivingAMessageType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.TimeoutOnReceivingAMessage)
-    }
-    case object OtherSubprotocolSpecificReason extends BlacklistReason {
+    case object OtherSubprotocolSpecificReason extends BlacklistReason:
       val reasonType: BlacklistReasonType = OtherSubprotocolSpecificReasonType
       val description: String = Disconnect.reasonToString(Disconnect.Reasons.Other)
-    }
-    case object EmptyStateNodeResponse extends BlacklistReason {
+    case object EmptyStateNodeResponse extends BlacklistReason:
       val reasonType: BlacklistReasonType = EmptyStateNodeResponseType
       val description: String = "Empty state node response from peer"
-    }
-    case object WrongStateNodeResponse extends BlacklistReason {
+    case object WrongStateNodeResponse extends BlacklistReason:
       val reasonType: BlacklistReasonType = WrongStateNodeResponseType
       val description: String = "Fetched node state hash doesn't match requested one"
-    }
-    case object UnrequestedBodies extends BlacklistReason {
+    case object UnrequestedBodies extends BlacklistReason:
       val reasonType: BlacklistReasonType = UnrequestedBodiesType
       val description: String = "Received unrequested bodies"
-    }
-    case object UnrequestedHeaders extends BlacklistReason {
+    case object UnrequestedHeaders extends BlacklistReason:
       val reasonType: BlacklistReasonType = UnrequestedHeadersType
       val description: String = "Received unrequested headers"
-    }
     // Specific reasons that previously all folded into UnrequestedHeaders. The name there is
     // misleading — these cases are responses we DID request, they just fail chain validation
     // relative to our current queue state. Split out so diagnosis is possible from logs alone.
-    case object HeadersNotFormingChain extends BlacklistReason {
+    case object HeadersNotFormingChain extends BlacklistReason:
       val reasonType: BlacklistReasonType = UnrequestedHeadersType
       val description: String = "Received headers do not form an internal parent->child chain"
-    }
-    case object HeadersDontExtendReadyBlocks extends BlacklistReason {
+    case object HeadersDontExtendReadyBlocks extends BlacklistReason:
       val reasonType: BlacklistReasonType = UnrequestedHeadersType
       val description: String = "Received headers do not extend our last ready block (possible stale tip)"
-    }
-    case object HeadersDontExtendWaitingQueue extends BlacklistReason {
+    case object HeadersDontExtendWaitingQueue extends BlacklistReason:
       val reasonType: BlacklistReasonType = UnrequestedHeadersType
       val description: String = "Received headers do not extend our waiting-headers queue (possible reorg)"
-    }
-    final case class RegularSyncRequestFailed(error: String) extends BlacklistReason {
+    final case class RegularSyncRequestFailed(error: String) extends BlacklistReason:
       val reasonType: BlacklistReasonType = RegularSyncRequestFailedType
       val description: String = s"Request failed with error: $error"
-    }
-    final case class BlockImportError(error: String) extends BlacklistReason {
+    final case class BlockImportError(error: String) extends BlacklistReason:
       val reasonType: BlacklistReasonType = BlockImportErrorType
       val description: String = s"Block import error: $error"
-    }
 
     private val allP2PReasons = List(
       DisconnectRequested,
@@ -334,55 +262,47 @@ object Blacklist {
 
     def getP2PBlacklistReasonByDescription(description: String): BlacklistReason =
       allP2PReasons.find(_.description == description).getOrElse(OtherSubprotocolSpecificReason)
-  }
-}
 
-final case class CacheBasedBlacklist(cache: Cache[BlacklistId, BlacklistReasonType]) extends Blacklist with Logger {
+final case class CacheBasedBlacklist(cache: Cache[BlacklistId, BlacklistReasonType]) extends Blacklist with Logger:
 
-  import CacheBasedBlacklist._
+  import CacheBasedBlacklist.*
 
   override def isBlacklisted(id: BlacklistId): Boolean = cache.getIfPresent(id).isDefined
 
-  override def add(id: BlacklistId, duration: FiniteDuration, reason: BlacklistReason): Unit = {
+  override def add(id: BlacklistId, duration: FiniteDuration, reason: BlacklistReason): Unit =
     log.info("Blacklisting peer [{}] for {}. Reason: {}", id, duration, reason.description)
-    reason.reasonType.group match {
+    reason.reasonType.group match
       case "FastSyncBlacklistGroup"    => NetworkMetrics.BlacklistedReasonsFastSyncGroup.increment()
       case "RegularSyncBlacklistGroup" => NetworkMetrics.BlacklistedReasonsRegularSyncGroup.increment()
       case "P2PBlacklistGroup"         => NetworkMetrics.BlacklistedReasonsP2PGroup.increment()
-    }
     // Top-level total counter — increments on every blacklist event, regardless of group.
     // Dashboards key off this to compute blacklists/min via rate(). The per-group counters
     // above remain for cause attribution. The snapsync-domain duplicate kept for the SNAP
     // dashboard panel that scopes itself to snapsync.* metrics.
     com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncMetrics.incrementPeerBlacklisted()
-    cache.policy().expireVariably().toScala match {
+    cache.policy().expireVariably().toScala match
       case Some(varExpiration) => varExpiration.put(id, reason.reasonType, duration.toJava)
       case None =>
         log.warn(customExpirationError(id))
         cache.put(id, reason.reasonType)
-    }
     // Refresh the size gauge after the new entry settles in cache. Without this, the gauge
     // only updates when PeerManagerActor's periodic peer-discovery cycle calls keys.size,
     // which on high-churn nets can lag the actual blacklist by 10s+ and undercount peaks.
     NetworkMetrics.BlacklistedPeersSize.set(cache.underlying.estimatedSize())
-  }
-  override def remove(id: BlacklistId): Unit = {
+  override def remove(id: BlacklistId): Unit =
     cache.invalidate(id)
     NetworkMetrics.BlacklistedPeersSize.set(cache.underlying.estimatedSize())
-  }
 
-  override def keys: Set[BlacklistId] = {
+  override def keys: Set[BlacklistId] =
     cache.cleanUp() // Remove expired entries before returning keys
     cache.underlying.asMap().keySet().asScala.toSet
-  }
-}
 
-object CacheBasedBlacklist {
+object CacheBasedBlacklist:
 
   def customExpirationError(id: BlacklistId): String =
     s"Unexpected error while adding peer [${id.value}] to blacklist using custom expiration time. Falling back to default expiration."
 
-  def empty(maxSize: Int): CacheBasedBlacklist = {
+  def empty(maxSize: Int): CacheBasedBlacklist =
     val cache =
       Scaffeine()
         .expireAfter[BlacklistId, BlacklistReasonType](
@@ -395,6 +315,3 @@ object CacheBasedBlacklist {
         ) // uses Window TinyLfu eviction policy, see https://github.com/ben-manes/caffeine/wiki/Efficiency
         .build[BlacklistId, BlacklistReasonType]()
     CacheBasedBlacklist(cache)
-  }
-
-}

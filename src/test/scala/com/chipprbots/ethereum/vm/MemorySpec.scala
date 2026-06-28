@@ -9,25 +9,21 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.vm.Generators._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.vm.Generators.*
 
-class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers {
+class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers:
 
   def zeros(size: Int): ByteString =
-    if (size <= 0)
-      ByteString()
-    else
-      ByteString(Array.fill[Byte](size)(0))
+    if size <= 0 then ByteString()
+    else ByteString(Array.fill[Byte](size)(0))
 
   def consecutiveBytes(size: Int, start: Int = 0): ByteString =
-    if (size <= 0)
-      ByteString()
-    else
-      ByteString((start until (start + size)).map(_.toByte): _*)
+    if size <= 0 then ByteString()
+    else ByteString((start until (start + size)).map(_.toByte)*)
 
-  import Arbitrary._
-  import Gen._
+  import Arbitrary.*
+  import Gen.*
 
   test("Store a Byte", UnitTest, VMTest) {
     forAll(choose(10, 100), arbitrary[Byte], choose(0, 200)) { (initialMemorySize, b, idx) =>
@@ -64,13 +60,11 @@ class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers
       whenever(initialMemorySize >= 0 && idx >= 0) {
         val memory = Memory.empty.store(0, zeros(initialMemorySize)).store(idx, arr)
 
-        val requiredSize = if (arr.length == 0) 0 else idx + arr.length
+        val requiredSize = if arr.length == 0 then 0 else idx + arr.length
         val expectedSize = math.max(initialMemorySize, requiredSize)
         val expectedContents =
-          if (arr.length == 0)
-            zeros(initialMemorySize)
-          else
-            zeros(idx) ++ ByteString(arr) ++ zeros(memory.size - idx - arr.length)
+          if arr.length == 0 then zeros(initialMemorySize)
+          else zeros(idx) ++ ByteString(arr) ++ zeros(memory.size - idx - arr.length)
 
         memory.size shouldEqual expectedSize
         memory.load(0, memory.size)._1 shouldEqual expectedContents
@@ -84,13 +78,11 @@ class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers
         val bs = ByteString(arr)
         val memory = Memory.empty.store(0, zeros(initialMemorySize)).store(idx, bs)
 
-        val requiredSize = if (bs.isEmpty) 0 else idx + bs.length
+        val requiredSize = if bs.isEmpty then 0 else idx + bs.length
         val expectedSize = math.max(initialMemorySize, requiredSize)
         val expectedContents =
-          if (bs.isEmpty)
-            zeros(initialMemorySize)
-          else
-            zeros(idx) ++ ByteString(arr) ++ zeros(memory.size - idx - bs.size)
+          if bs.isEmpty then zeros(initialMemorySize)
+          else zeros(idx) ++ ByteString(arr) ++ zeros(memory.size - idx - bs.size)
 
         memory.size shouldEqual expectedSize
         memory.load(0, memory.size)._1 shouldEqual expectedContents
@@ -107,12 +99,10 @@ class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers
         val expectedMemorySize = math.max(initialMemorySize, idx + UInt256.Size)
         val expectedContents = consecutiveBytes(initialMemorySize) ++ zeros(expectedMemorySize - initialMemorySize)
         val expectedResult = UInt256(
-          if (idx >= initialMemorySize)
-            zeros(UInt256.Size)
-          else if (idx + UInt256.Size > initialMemorySize)
+          if idx >= initialMemorySize then zeros(UInt256.Size)
+          else if idx + UInt256.Size > initialMemorySize then
             consecutiveBytes(initialMemorySize - idx, idx) ++ zeros(idx + UInt256.Size - initialMemorySize)
-          else
-            consecutiveBytes(UInt256.Size, idx)
+          else consecutiveBytes(UInt256.Size, idx)
         )
 
         memory.size shouldEqual expectedMemorySize
@@ -128,16 +118,14 @@ class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers
         val initialMemory = Memory.empty.store(0, consecutiveBytes(initialMemorySize))
         val (bs, memory) = initialMemory.load(idx, size)
 
-        val requiredSize = if (size == 0) 0 else idx + size
+        val requiredSize = if size == 0 then 0 else idx + size
         val expectedMemorySize = math.max(initialMemorySize, requiredSize)
         val expectedContents = consecutiveBytes(initialMemorySize) ++ zeros(expectedMemorySize - initialMemorySize)
         val expectedResult =
-          if (idx >= initialMemorySize)
-            zeros(size)
-          else if (idx + size > initialMemorySize)
+          if idx >= initialMemorySize then zeros(size)
+          else if idx + size > initialMemorySize then
             consecutiveBytes(initialMemorySize - idx, idx) ++ zeros(idx + size - initialMemorySize)
-          else
-            consecutiveBytes(size, idx)
+          else consecutiveBytes(size, idx)
 
         memory.size shouldEqual expectedMemorySize
         memory.load(0, memory.size)._1 shouldEqual expectedContents
@@ -206,4 +194,3 @@ class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers
       (updatedMem.size - initMem.size) shouldEqual expectedDelta
     }
   }
-}

@@ -5,19 +5,16 @@ import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-import cats.effect.{Deferred, IO, Resource, Temporal}
-import cats.effect.std.Queue
-import cats.implicits._
-import com.chipprbots.scalanet.discovery.crypto.{PrivateKey, PublicKey, SigAlg, Signature}
-import com.chipprbots.scalanet.discovery.ethereum.{EthereumNodeRecord, Node}
+import cats.effect.{Deferred, IO, Temporal}
+import com.chipprbots.scalanet.discovery.crypto.{PrivateKey, PublicKey, SigAlg}
+import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 import com.chipprbots.scalanet.peergroup.CloseableQueue
 import com.typesafe.scalalogging.LazyLogging
 import fs2.Stream
 import scodec.Codec
-import scodec.bits.{BitVector, ByteVector}
+import scodec.bits.ByteVector
 
 /** discv5 async pipeline — outbound RPC + inbound dispatch.
   *
@@ -73,13 +70,13 @@ object DiscoveryNetwork {
 
   def apply[A](
       peerGroup: PeerGroupSender[A],
-      privateKey: PrivateKey,
-      publicKey: PublicKey,
+      @annotation.unused privateKey: PrivateKey,
+      @annotation.unused publicKey: PublicKey,
       localNodeId: ByteVector,
-      localEnrRef: AtomicReference[EthereumNodeRecord],
+      @annotation.unused localEnrRef: AtomicReference[EthereumNodeRecord],
       sessions: Session.SessionCache,
-      challenges: Discv5SyncResponder.ChallengeCache,
-      bystanders: Discv5SyncResponder.BystanderEnrTable,
+      @annotation.unused challenges: Discv5SyncResponder.ChallengeCache,
+      @annotation.unused bystanders: Discv5SyncResponder.BystanderEnrTable,
       dispatchQueue: CloseableQueue[(InetSocketAddress, ByteVector)],
       config: DiscoveryConfig
   )(implicit
@@ -305,10 +302,10 @@ object DiscoveryNetwork {
       /** Route a decoded payload: responses complete pending Deferreds;
         * requests fall through to the handler (no reply — sync did that). */
       private def routePayload(
-          sender: InetSocketAddress,
+          @annotation.unused sender: InetSocketAddress,
           srcId: ByteVector,
           payload: Payload,
-          handler: DiscoveryRPC[Peer[A]]
+          @annotation.unused handler: DiscoveryRPC[Peer[A]]
       ): IO[Unit] = payload match {
         case response: Payload.Response =>
           val key = (srcId, response.requestId)
@@ -350,12 +347,12 @@ object DiscoveryNetwork {
         */
       private def sendHandshakeReply(
           sender: InetSocketAddress,
-          who: Packet.WhoareyouPacket,
-          pending: PendingOutbound
+          @annotation.unused who: Packet.WhoareyouPacket,
+          @annotation.unused pending: PendingOutbound
       ): IO[Unit] = IO {
         // Ephemeral keypair
         val (_, ephPriv) = sigalg.newKeyPair
-        val ephPub = Session.pubFromPriv(ephPriv.value.bytes, compressed = true)
+        val _ = Session.pubFromPriv(ephPriv.value.bytes, compressed = true) // MIGRATION: ephPub unused — handshake stub, TODO: complete when peerNodeId is tracked
 
         // The recipient's nodeId is what's encoded in the WHOAREYOU's auth data
         // we cannot recover from here directly — but we tracked it via outbound.

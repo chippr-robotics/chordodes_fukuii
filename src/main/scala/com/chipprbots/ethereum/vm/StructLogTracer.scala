@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 
 import com.chipprbots.ethereum.domain.UInt256
 
@@ -37,7 +37,7 @@ class StructLogTracer(
     enableMemory: Boolean = false,
     enableStorage: Boolean = false,
     limit: Int = 0
-) extends ExecutionTracer {
+) extends ExecutionTracer:
   private val steps = scala.collection.mutable.ArrayBuffer[StructLog]()
   private var _gas: BigInt = 0
   private var _failed: Boolean = false
@@ -47,39 +47,39 @@ class StructLogTracer(
       opCode: OpCode,
       prevState: ProgramState[W, S],
       nextState: ProgramState[W, S]
-  ): Unit = {
-    if (limit > 0 && steps.size >= limit) return
+  ): Unit =
+    if limit > 0 && steps.size >= limit then return
 
     val gasCost = prevState.gas - nextState.gas
 
-    val memorySnapshot = if (enableMemory) {
+    val memorySnapshot = if enableMemory then
       val mem = prevState.memory
-      if (mem.size > 0) {
+      if mem.size > 0 then
         val words = (0 until mem.size by 32).map { offset =>
           val word = mem.load(UInt256(offset), UInt256(32))._1
           word.toArray.map("%02x".format(_)).mkString
         }
         Some(words.toSeq)
-      } else Some(Seq.empty)
-    } else None
+      else Some(Seq.empty)
+    else None
 
-    val storageSnapshot = if (enableStorage) {
-      opCode match {
-        case SLOAD if prevState.stack.size >= 1 =>
-          val slot = prevState.stack.toSeq.head.toBigInt
-          val value = nextState.stack.toSeq.head.toBigInt
-          val k = "0x" + slot.toString(16).reverse.padTo(64, '0').reverse
-          val v = "0x" + value.toString(16).reverse.padTo(64, '0').reverse
-          Some(Map(k -> v))
-        case SSTORE if prevState.stack.size >= 2 =>
-          val slot = prevState.stack.toSeq(0).toBigInt
-          val value = prevState.stack.toSeq(1).toBigInt
-          val k = "0x" + slot.toString(16).reverse.padTo(64, '0').reverse
-          val v = "0x" + value.toString(16).reverse.padTo(64, '0').reverse
-          Some(Map(k -> v))
-        case _ => None
-      }
-    } else None
+    val storageSnapshot =
+      if enableStorage then
+        opCode match
+          case SLOAD if prevState.stack.size >= 1 =>
+            val slot = prevState.stack.toSeq.head.toBigInt
+            val value = nextState.stack.toSeq.head.toBigInt
+            val k = "0x" + slot.toString(16).reverse.padTo(64, '0').reverse
+            val v = "0x" + value.toString(16).reverse.padTo(64, '0').reverse
+            Some(Map(k -> v))
+          case SSTORE if prevState.stack.size >= 2 =>
+            val slot = prevState.stack.toSeq(0).toBigInt
+            val value = prevState.stack.toSeq(1).toBigInt
+            val k = "0x" + slot.toString(16).reverse.padTo(64, '0').reverse
+            val v = "0x" + value.toString(16).reverse.padTo(64, '0').reverse
+            Some(Map(k -> v))
+          case _ => None
+      else None
 
     val error = nextState.error.map(_.toString)
 
@@ -94,13 +94,11 @@ class StructLogTracer(
       storage = storageSnapshot,
       error = error
     )
-  }
 
-  def setResult(gas: BigInt, returnValue: ByteString, failed: Boolean): Unit = {
+  def setResult(gas: BigInt, returnValue: ByteString, failed: Boolean): Unit =
     _gas = gas
     _returnValue = returnValue
     _failed = failed
-  }
 
   def getSteps: Seq[StructLog] = steps.toSeq
   def gas: BigInt = _gas
@@ -111,4 +109,3 @@ class StructLogTracer(
     * getSteps/gas/failed/returnValue. Exists to satisfy the ExecutionTracer trait.
     */
   override def getResult: JValue = JNothing
-}

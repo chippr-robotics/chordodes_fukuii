@@ -3,37 +3,45 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits._
+import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits.given
 
 /** Test to verify that genesis block is serialized correctly:
   *   1. mixHash field should be present
   */
-class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers {
+class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers:
 
   "BlockResponse for genesis block" should "include mixHash field" in {
     val genesisHeader = BlockHeader(
-      parentHash = ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000")),
-      ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+      parentHash =
+        BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
+      ommersHash =
+        BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
       beneficiary = ByteString(Hex.decode("0000000000000000000000000000000000000000")),
-      stateRoot = ByteString(Hex.decode("c22374cb808edd849fae4ef966b459424a1e6ada8d3752eaae4c60b15689ddd0")),
-      transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      logsBloom = ByteString(Hex.decode("0" * 512)),
-      difficulty = BigInt("131072"),
+      stateRoot = TrieRoot(ByteString(Hex.decode("c22374cb808edd849fae4ef966b459424a1e6ada8d3752eaae4c60b15689ddd0"))),
+      transactionsRoot =
+        TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+      receiptsRoot =
+        TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+      logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
+      difficulty = Difficulty(BigInt("131072")),
       number = 0,
       gasLimit = BigInt("8000000"),
       gasUsed = 0,
       unixTimestamp = 1701302272L,
       extraData = ByteString(Hex.decode("00")),
-      mixHash = ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000")),
+      mixHash = BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
       nonce = ByteString(Hex.decode("0000000000000042"))
     )
 
@@ -57,25 +65,28 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers {
 
   it should "have correct hash calculation without checkpoint fields" in {
     val genesisHeader = BlockHeader(
-      parentHash = ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000")),
-      ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+      parentHash =
+        BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
+      ommersHash =
+        BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
       beneficiary = ByteString(Hex.decode("0000000000000000000000000000000000000000")),
-      stateRoot = ByteString(Hex.decode("c22374cb808edd849fae4ef966b459424a1e6ada8d3752eaae4c60b15689ddd0")),
-      transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      logsBloom = ByteString(Hex.decode("0" * 512)),
-      difficulty = BigInt("131072"),
+      stateRoot = TrieRoot(ByteString(Hex.decode("c22374cb808edd849fae4ef966b459424a1e6ada8d3752eaae4c60b15689ddd0"))),
+      transactionsRoot =
+        TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+      receiptsRoot =
+        TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+      logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
+      difficulty = Difficulty(BigInt("131072")),
       number = 0,
       gasLimit = BigInt("8000000"),
       gasUsed = 0,
       unixTimestamp = 1701302272L,
       extraData = ByteString(Hex.decode("00")),
-      mixHash = ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000")),
+      mixHash = BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
       nonce = ByteString(Hex.decode("0000000000000042"))
     )
 
     // The hash should be calculated from RLP encoding
     // This verifies that the hash calculation is correct
-    genesisHeader.hash.length shouldBe 32 // Hash should be 32 bytes
+    genesisHeader.hash.value.length shouldBe 32 // Hash should be 32 bytes
   }
-}

@@ -7,9 +7,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage.TransactionLocation
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class LegacyTransactionMappingStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class LegacyTransactionMappingStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
   test("TransactionMappingStorage insert", UnitTest, DatabaseTest) {
     forAll(Gen.listOf(byteStringOfLengthNGen(32))) { txByteArrayHashes =>
       val txHashes = txByteArrayHashes.distinct
@@ -63,4 +63,3 @@ class LegacyTransactionMappingStorageSuite extends AnyFunSuite with ScalaCheckPr
       toDelete.foreach { case (txHash, _) => assert(storage.get(txHash).isEmpty) }
     }
   }
-}

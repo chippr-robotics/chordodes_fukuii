@@ -10,13 +10,13 @@ import org.scalatest.wordspec.AnyWordSpec
 import com.chipprbots.ethereum.Mocks
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.utils.ByteStringUtils._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
 
-class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
-  import BlockValidationTestSetup._
+class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory:
+  import BlockValidationTestSetup.*
 
   "BlockValidation" should {
     "validate block after execution" when {
@@ -44,15 +44,13 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
   }
 
   // scalastyle:off magic.number
-  object BlockValidationTestSetup {
-    private val setup = new EphemBlockchainTestSetup {
+  object BlockValidationTestSetup:
+    private val setup = new EphemBlockchainTestSetup:
       override lazy val blockchainReader: BlockchainReader = mock[BlockchainReader]
       override lazy val blockchain: BlockchainImpl = mock[BlockchainImpl]
 
-      override lazy val validators: Mocks.MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed {
+      override lazy val validators: Mocks.MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed:
         override val blockValidator: StdBlockValidator.type = StdBlockValidator
-      }
-    }
 
     implicit val blockchainConfig: BlockchainConfig = setup.blockchainConfig
 
@@ -81,24 +79,25 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
       signature = hash2ByteString(signature)
     )
 
-    val bloomFilter: ByteString = hash2ByteString("0" * 512)
+    val bloomFilter: BloomFilter = BloomFilter(hash2ByteString("0" * 512))
 
     val block: Block = Block(
       BlockHeader(
-        parentHash = hash2ByteString("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71"),
-        ommersHash = hash2ByteString("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"),
+        parentHash = BlockHash(hash2ByteString("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71")),
+        ommersHash = BlockHash(hash2ByteString("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
         beneficiary = hash2ByteString("df7d7e053933b5cc24372f878c90e62dadad5d42"),
-        stateRoot = hash2ByteString("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67"),
-        transactionsRoot = hash2ByteString("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac"),
-        receiptsRoot = hash2ByteString("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d"),
+        stateRoot = TrieRoot(hash2ByteString("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67")),
+        transactionsRoot =
+          TrieRoot(hash2ByteString("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac")),
+        receiptsRoot = TrieRoot(hash2ByteString("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d")),
         logsBloom = bloomFilter,
-        difficulty = BigInt("14005986920576"),
+        difficulty = Difficulty(BigInt("14005986920576")),
         number = 3125369,
         gasLimit = 4699996,
         gasUsed = 84000,
         unixTimestamp = 1486131165,
         extraData = hash2ByteString("d5830104098650617269747986312e31332e30826c69"),
-        mixHash = hash2ByteString("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a"),
+        mixHash = BlockHash(hash2ByteString("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a")),
         nonce = hash2ByteString("2b0fb0c002946392")
       ),
       BlockBody(
@@ -142,8 +141,5 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
       mkReceipt("0c6e052bc83482bafaccffc4217adad49f3a9533c69c820966d75ed0154091e6", 84000)
     )
 
-    val stateRootHash: ByteString = block.header.stateRoot
+    val stateRootHash: ByteString = block.header.stateRoot.value
     val gasUsed: BigInt = block.header.gasUsed
-
-  }
-}

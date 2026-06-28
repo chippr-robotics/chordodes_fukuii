@@ -3,12 +3,14 @@ package com.chipprbots.ethereum.jsonrpc
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
+
+import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.network.PeerId
@@ -17,9 +19,8 @@ import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus.Listening
 import com.chipprbots.ethereum.utils.ServerStatus.NotListening
-import org.bouncycastle.util.encoders.Hex
 
-object NetService {
+object NetService:
   case class VersionRequest()
   case class VersionResponse(value: String)
 
@@ -77,16 +78,13 @@ object NetService {
 
   case class NetServiceConfig(peerManagerTimeout: FiniteDuration)
 
-  object NetServiceConfig {
-    def apply(etcClientConfig: com.typesafe.config.Config): NetServiceConfig = {
+  object NetServiceConfig:
+    def apply(etcClientConfig: com.typesafe.config.Config): NetServiceConfig =
       val netServiceConfig = etcClientConfig.getConfig("network.rpc.net")
       NetServiceConfig(peerManagerTimeout = netServiceConfig.getDuration("peer-manager-timeout").toMillis.millis)
-    }
-  }
-}
 
-trait NetServiceAPI {
-  import NetService._
+trait NetServiceAPI:
+  import NetService.*
 
   def version(req: VersionRequest): ServiceResponse[VersionResponse]
   def listening(req: ListeningRequest): ServiceResponse[ListeningResponse]
@@ -102,16 +100,16 @@ trait NetServiceAPI {
   def listBlacklistedPeers(req: ListBlacklistedPeersRequest): ServiceResponse[ListBlacklistedPeersResponse]
   def addToBlacklist(req: AddToBlacklistRequest): ServiceResponse[AddToBlacklistResponse]
   def removeFromBlacklist(req: RemoveFromBlacklistRequest): ServiceResponse[RemoveFromBlacklistResponse]
-}
 
 class NetService(
     nodeStatusHolder: AtomicReference[NodeStatus],
-    peerManager: ActorRef,
+    peerManager: typed.ActorRef[PeerManagerActor.Command],
     blacklist: Blacklist,
     config: NetService.NetServiceConfig
-) extends NetServiceAPI {
-  import NetService._
-  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+)(implicit scheduler: typed.Scheduler)
+    extends NetServiceAPI:
+  import NetService.*
+  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 
   def version(req: VersionRequest): ServiceResponse[VersionResponse] =
     IO.pure(Right(VersionResponse(Config.Network.peer.networkId.toString())))
@@ -119,25 +117,23 @@ class NetService(
   def listening(req: ListeningRequest): ServiceResponse[ListeningResponse] =
     IO.pure {
       Right(
-        nodeStatusHolder.get().serverStatus match {
+        nodeStatusHolder.get().serverStatus match
           case _: Listening => ListeningResponse(true)
           case NotListening => ListeningResponse(false)
-        }
       )
     }
 
-  def peerCount(req: PeerCountRequest): ServiceResponse[PeerCountResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+  def peerCount(req: PeerCountRequest): ServiceResponse[PeerCountResponse] =
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+      .askForTyped[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map(peers => Right(PeerCountResponse(peers.handshaked.size)))
-  }
 
   def nodeInfo(req: NodeInfoRequest): ServiceResponse[NodeInfoResponse] = IO.pure {
     val status = nodeStatusHolder.get()
     val nodeId = Hex.toHexString(status.nodeId)
 
-    status.serverStatus match {
+    status.serverStatus match
       case Listening(address) if address != null =>
         val host =
           Option(address.getAddress).map(com.chipprbots.ethereum.network.getHostName).getOrElse(address.getHostString)
@@ -147,13 +143,12 @@ class NetService(
         Right(NodeInfoResponse(nodeId, Some(enode), Some(listenAddr), listening = true))
       case _ =>
         Right(NodeInfoResponse(nodeId, None, None, listening = false))
-    }
   }
 
-  def listPeers(req: ListPeersRequest): ServiceResponse[ListPeersResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+  def listPeers(req: ListPeersRequest): ServiceResponse[ListPeersResponse] =
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+      .askForTyped[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map { peersData =>
         val peerInfoList = peersData.peers.map { case (peer, status) =>
           PeerInfo(
@@ -166,29 +161,26 @@ class NetService(
         }.toList
         Right(ListPeersResponse(peerInfoList))
       }
-  }
 
-  def disconnectPeer(req: DisconnectPeerRequest): ServiceResponse[DisconnectPeerResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+  def disconnectPeer(req: DisconnectPeerRequest): ServiceResponse[DisconnectPeerResponse] =
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.DisconnectPeerResponse](
-        PeerManagerActor.DisconnectPeerById(PeerId(req.peerId))
+      .askForTyped[PeerManagerActor.DisconnectPeerResponse](ref =>
+        PeerManagerActor.DisconnectPeerByIdCmd(PeerId(req.peerId), ref)
       )
       .map(response => Right(DisconnectPeerResponse(response.disconnected)))
-  }
 
   def connectToPeer(req: ConnectToPeerRequest): ServiceResponse[ConnectToPeerResponse] =
-    try {
+    try
       val uri = new URI(req.uri)
       // Note: This sends the connect message and returns immediately.
       // Success=true means the URI is valid and connection attempt was initiated,
       // not that the connection succeeded. Check net_listPeers to verify connection.
-      peerManager ! PeerManagerActor.ConnectToPeer(uri)
+      peerManager ! PeerManagerActor.ConnectToPeerCmd(uri)
       IO.pure(Right(ConnectToPeerResponse(success = true)))
-    } catch {
+    catch
       case e: Exception =>
         IO.pure(Left(JsonRpcError.InvalidParams(s"Invalid peer URI: ${e.getMessage}")))
-    }
 
   def listBlacklistedPeers(req: ListBlacklistedPeersRequest): ServiceResponse[ListBlacklistedPeersResponse] =
     IO.pure {
@@ -204,25 +196,25 @@ class NetService(
       Right(ListBlacklistedPeersResponse(blacklistedPeers))
     }
 
-  def addToBlacklist(req: AddToBlacklistRequest): ServiceResponse[AddToBlacklistResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+  def addToBlacklist(req: AddToBlacklistRequest): ServiceResponse[AddToBlacklistResponse] =
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.AddToBlacklistResponse](
-        PeerManagerActor.AddToBlacklistRequest(
-          address = req.address,
-          duration = req.duration.map(_.seconds),
-          reason = req.reason
+      .askForTyped[PeerManagerActor.AddToBlacklistResponse](ref =>
+        PeerManagerActor.AddToBlacklistCmd(
+          PeerManagerActor.AddToBlacklistRequest(
+            address = req.address,
+            duration = req.duration.map(_.seconds),
+            reason = req.reason
+          ),
+          ref
         )
       )
       .map(response => Right(AddToBlacklistResponse(response.added)))
-  }
 
-  def removeFromBlacklist(req: RemoveFromBlacklistRequest): ServiceResponse[RemoveFromBlacklistResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+  def removeFromBlacklist(req: RemoveFromBlacklistRequest): ServiceResponse[RemoveFromBlacklistResponse] =
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.RemoveFromBlacklistResponse](
-        PeerManagerActor.RemoveFromBlacklistRequest(req.address)
+      .askForTyped[PeerManagerActor.RemoveFromBlacklistResponse](ref =>
+        PeerManagerActor.RemoveFromBlacklistCmd(PeerManagerActor.RemoveFromBlacklistRequest(req.address), ref)
       )
       .map(response => Right(RemoveFromBlacklistResponse(response.removed)))
-  }
-}

@@ -99,6 +99,24 @@ grep -rn "import akka\." /media/dev/2tb/dev/fukuii/src/main/scala/ \
 | Classic `extends Actor` | Varies | See migration decision table in `pekko-typed-migration-p2.md` |
 | Any `import akka.` | **CRITICAL** | BSL 1.1 — block and remove immediately |
 
+## Reference repos
+
+Cross-check the inventory output against upstream for accuracy:
+
+```bash
+REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
+for r in scala3 pekko; do
+  git -C "$REFS/$r" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
+done
+```
+
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| scala3 | https://github.com/scala/scala3 | `changelogs/` — patterns that moved to "idiomatic" since last inventory (may remove from the debt list rather than add to it) |
+| pekko | https://github.com/apache/pekko | `CHANGELOG.md` — verify remaining Classic API is still migration-targeted; check if any Typed patterns have changed |
+
+Full index: [`.claude/skills/REFERENCES.md`](../REFERENCES.md)
+
 ## Output
 
 Emit a structured inventory table:

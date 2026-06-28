@@ -8,13 +8,13 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.SignedTransaction.getSender
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Hex
 import com.chipprbots.ethereum.vm.Generators
-import com.chipprbots.ethereum.utils.BlockchainConfig
 
-class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBehavior with ScalaCheckPropertyChecks {
+class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBehavior with ScalaCheckPropertyChecks:
 
   private def allowedPointSigns(chainId: BigInt) = Set(chainId * 2 + 35, chainId * 2 + 36)
 
@@ -72,7 +72,7 @@ class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBeha
     )
 
     forAll(testValues) { (binaryRLP: String, expectedSender: String) =>
-      import SignedTransactions.SignedTransactionDec
+      import SignedTransactions.*
       val decodedSignedTransaction = Hex.decode(binaryRLP).toSignedTransaction
 
       val expectedSenderAddress = Address(expectedSender)
@@ -118,4 +118,3 @@ class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBeha
 
     Hex.toHexString(encodedSignedTransaction) shouldEqual expectedSignedTransaction
   }
-}

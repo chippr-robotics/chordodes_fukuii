@@ -3,17 +3,18 @@ package com.chipprbots.ethereum.vm
 import java.security.SecureRandom
 
 import org.apache.pekko.util.ByteString
+
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 /** Tests for EIP-3860: Limit and meter initcode https://eips.ethereum.org/EIPS/eip-3860
@@ -21,7 +22,7 @@ import com.chipprbots.ethereum.utils.Config
   * EIP-3860 introduces:
   *   1. Maximum initcode size of 49152 bytes (2 * MAX_CODE_SIZE) 2. Gas cost of 2 per 32-byte word of initcode
   */
-class Eip3860Spec extends AnyWordSpec with Matchers {
+class Eip3860Spec extends AnyWordSpec with Matchers:
 
   val blockchainConfig = Fixtures.blockchainConfig
   val fullBlockchainConfig = Config.blockchains.blockchainConfig
@@ -30,10 +31,10 @@ class Eip3860Spec extends AnyWordSpec with Matchers {
 
   // EIP-3860 constants
   val MaxCodeSize = 24576 // EIP-170
-  val MaxInitCodeSize = MaxCodeSize * 2 // 49152 bytes
+  val MaxInitCodeSize: Int = MaxCodeSize * 2 // 49152 bytes
   val InitCodeWordCost = 2 // Gas per 32-byte word
 
-  object fxt {
+  object fxt:
     val fakeHeaderPreSpiral: BlockHeader =
       BlockFixtures.ValidBlock.header.copy(number = Fixtures.MystiqueBlockNumber)
     val fakeHeaderSpiral: BlockHeader =
@@ -80,16 +81,14 @@ class Eip3860Spec extends AnyWordSpec with Matchers {
     )
 
     // Create init code of specific size (padding with JUMPDEST opcodes)
-    def initCodeOfSize(size: Int): ByteString = {
+    def initCodeOfSize(size: Int): ByteString =
       // Simple init code: PUSH1 0 PUSH1 0 RETURN
       val returnCode = Assembly(PUSH1, 0, PUSH1, 0, RETURN).code
       val padding = ByteString(Array.fill(size - returnCode.size)(JUMPDEST.code))
       padding ++ returnCode
-    }
 
     val world: MockWorldState =
       MockWorldState().saveAccount(creatorAddr, Account.empty().increaseBalance(UInt256(1000000)))
-  }
 
   "EIP-3860" when {
     "testing maxInitCodeSize calculation" should {
@@ -261,4 +260,3 @@ class Eip3860Spec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

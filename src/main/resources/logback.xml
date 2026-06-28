@@ -168,8 +168,6 @@
     <!-- Network discovery - detailed discovery operations -->
     <logger name="com.chipprbots.ethereum.network.discovery" level="ERROR" />
     <logger name="com.chipprbots.ethereum.network.discovery.Node" level="ERROR" />
-    <logger name="com.chipprbots.ethereum.network.discovery.StaticNodesLoader" level="ERROR" />
-    
     <!-- Network handshaking - protocol handshake details -->
     <logger name="com.chipprbots.ethereum.network.handshaker" level="INFO" />
     <logger name="com.chipprbots.ethereum.network.handshaker.EtcHelloExchangeState" level="ERROR" />

@@ -9,19 +9,17 @@ import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.mpt.ByteArrayEncoder
 import com.chipprbots.ethereum.utils.ByteUtils.padLeft
 
-object Address {
+object Address:
 
   val Length = 20
 
-  implicit val hashedAddressEncoder: ByteArrayEncoder[Address] = new ByteArrayEncoder[Address] {
+  implicit val hashedAddressEncoder: ByteArrayEncoder[Address] = new ByteArrayEncoder[Address]:
     override def toBytes(addr: Address): Array[Byte] = crypto.kec256(addr.toArray)
-  }
 
-  def apply(bytes: ByteString): Address = {
+  def apply(bytes: ByteString): Address =
     val truncated = bytes.takeRight(Length)
     val extended = padLeft(truncated, Length)
     new Address(extended)
-  }
 
   def apply(uint: UInt256): Address = Address(uint.bytes)
 
@@ -31,28 +29,25 @@ object Address {
 
   def apply(addr: Long): Address = Address(UInt256(addr))
 
-  def apply(hexString: String): Address = {
+  def apply(hexString: String): Address =
     val bytes = Hex.decode(hexString.replaceFirst("^0x", ""))
     require(bytes.nonEmpty && bytes.length <= Length, s"Invalid address: $hexString")
     Address(bytes)
-  }
 
-  def apply(keyPair: AsymmetricCipherKeyPair): Address = {
+  def apply(keyPair: AsymmetricCipherKeyPair): Address =
     val pub = crypto.pubKeyFromKeyPair(keyPair)
     Address(crypto.kec256(pub))
-  }
-}
 
-class Address private (val bytes: ByteString) {
+class Address private (val bytes: ByteString):
 
   def toArray: Array[Byte] = bytes.toArray
 
   def toUInt256: UInt256 = UInt256(bytes)
 
-  override def equals(that: Any): Boolean = that match {
-    case addr: Address => addr.bytes == bytes
-    case _             => false
-  }
+  override def equals(that: Any): Boolean =
+    that match // §3h: FORGE-confirmed — java.lang.Object.equals signature is fixed by JVM
+      case addr: Address => addr.bytes == bytes
+      case _             => false
 
   override def hashCode: Int =
     bytes.hashCode
@@ -62,5 +57,3 @@ class Address private (val bytes: ByteString) {
 
   def toUnprefixedString: String =
     Hex.toHexString(toArray)
-
-}

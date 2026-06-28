@@ -27,11 +27,11 @@ case class StorageTask(
     next: ByteString,
     last: ByteString,
     // Runtime fields
-    var pending: Boolean = false,
-    var done: Boolean = false,
-    var slots: Seq[(ByteString, ByteString)] = Seq.empty, // (slotHash, slotValue)
-    var proof: Seq[ByteString] = Seq.empty
-) {
+    val pending: Boolean = false,
+    val done: Boolean = false,
+    val slots: Seq[(ByteString, ByteString)] = Seq.empty, // (slotHash, slotValue)
+    val proof: Seq[ByteString] = Seq.empty
+):
 
   /** Check if this task is completed */
   def isComplete: Boolean = done
@@ -40,11 +40,10 @@ case class StorageTask(
   def isPending: Boolean = pending
 
   /** Get the range as a human-readable string */
-  def rangeString: String = {
-    val nextStr = if (next.isEmpty) "0x00..." else next.take(4).toArray.map("%02x".format(_)).mkString
-    val lastStr = if (last.isEmpty) "0xFF..." else last.take(4).toArray.map("%02x".format(_)).mkString
+  def rangeString: String =
+    val nextStr = if next.isEmpty then "0x00..." else next.take(4).toArray.map("%02x".format(_)).mkString
+    val lastStr = if last.isEmpty then "0xFF..." else last.take(4).toArray.map("%02x".format(_)).mkString
     s"[$nextStr...$lastStr]"
-  }
 
   /** Get account identifier for logging */
   def accountString: String =
@@ -52,16 +51,14 @@ case class StorageTask(
 
   /** Calculate progress based on downloaded storage slots */
   def progress: Double =
-    if (done) 1.0
-    else if (slots.isEmpty) 0.0
-    else {
+    if done then 1.0
+    else if slots.isEmpty then 0.0
+    else
       // Rough estimate based on slot count
       // Typical storage ranges can vary widely (from 0 to thousands of slots)
       math.min(0.9, slots.size.toDouble / StorageTask.ESTIMATED_SLOTS_FOR_NEAR_COMPLETE)
-    }
-}
 
-object StorageTask {
+object StorageTask:
 
   /** Estimated number of storage slots that represents "almost complete" (90% progress). This is a rough heuristic.
     * Actual storage ranges vary dramatically:
@@ -82,7 +79,7 @@ object StorageTask {
     * @return
     *   Storage task covering full storage space
     */
-  def createStorageTask(accountHash: ByteString, storageRoot: ByteString): StorageTask = {
+  def createStorageTask(accountHash: ByteString, storageRoot: ByteString): StorageTask =
     val min = ByteString(Array.fill(32)(0.toByte))
     val max = ByteString(Array.fill(32)(0xff.toByte))
     StorageTask(
@@ -91,7 +88,6 @@ object StorageTask {
       next = min, // 0x00... (start)
       last = max // 0xFF... (end, exclusive)
     )
-  }
 
   /** Create storage tasks for multiple accounts
     *
@@ -150,36 +146,31 @@ object StorageTask {
       from: ByteString,
       to: ByteString,
       numChunks: Int
-  ): Seq[StorageTask] = {
+  ): Seq[StorageTask] =
     require(numChunks > 0, s"numChunks must be positive, got $numChunks")
-    if (numChunks == 1) return Seq(StorageTask(accountHash, storageRoot, from, to))
+    if numChunks == 1 then return Seq(StorageTask(accountHash, storageRoot, from, to))
     val fromBig = BigInt(1, from.toArray.padTo(32, 0.toByte))
     val toBig = BigInt(1, to.toArray.padTo(32, 0.toByte))
     val step = (toBig - fromBig) / numChunks
     (0 until numChunks).map { i =>
-      val start = if (i == 0) from else bigIntTo32(fromBig + step * i)
-      val end = if (i == numChunks - 1) to else bigIntTo32(fromBig + step * (i + 1) - 1)
+      val start = if i == 0 then from else bigIntTo32(fromBig + step * i)
+      val end = if i == numChunks - 1 then to else bigIntTo32(fromBig + step * (i + 1) - 1)
       StorageTask(accountHash, storageRoot, start, end)
     }
-  }
 
-  private[snap] def incrementHash32(hash: ByteString): ByteString = {
+  private[snap] def incrementHash32(hash: ByteString): ByteString =
     require(hash.length == 32, s"Expected 32-byte hash, got ${hash.length}")
     val bytes = hash.toArray
     var i = bytes.length - 1
     var carry = 1
-    while (i >= 0 && carry != 0) {
+    while i >= 0 && carry != 0 do
       val sum = (bytes(i) & 0xff) + carry
       bytes(i) = (sum & 0xff).toByte
-      carry = if (sum > 0xff) 1 else 0
+      carry = if sum > 0xff then 1 else 0
       i -= 1
-    }
     ByteString(bytes)
-  }
 
-  private def bigIntTo32(bi: BigInt): ByteString = {
+  private def bigIntTo32(bi: BigInt): ByteString =
     val raw = bi.toByteArray
-    val unsigned = if (raw.nonEmpty && raw(0) == 0) raw.drop(1) else raw
+    val unsigned = if raw.nonEmpty && raw(0) == 0 then raw.drop(1) else raw
     ByteString(Array.fill((32 - unsigned.length).max(0))(0.toByte) ++ unsigned.takeRight(32))
-  }
-}

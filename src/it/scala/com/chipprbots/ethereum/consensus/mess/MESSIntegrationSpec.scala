@@ -5,14 +5,18 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.domain.TrieRoot
 
 /** Integration test for MESS (ECIP-1100: Modified Exponential Subjective Scoring).
   *
   * Tests the polynomial antigravity curve and reorg rejection logic using realistic blockchain scenarios. Verifies
   * cross-client consistency with core-geth and Besu.
   */
-class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
+class MESSIntegrationSpec extends AnyFlatSpec with Matchers:
 
   def createHeader(
       number: BigInt,
@@ -21,20 +25,20 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
       @scala.annotation.unused hash: ByteString = ByteString.empty
   ): BlockHeader =
     BlockHeader(
-      parentHash = ByteString.empty,
-      ommersHash = ByteString.empty,
+      parentHash = BlockHash(ByteString.empty),
+      ommersHash = BlockHash(ByteString.empty),
       beneficiary = ByteString.empty,
-      stateRoot = ByteString.empty,
-      transactionsRoot = ByteString.empty,
-      receiptsRoot = ByteString.empty,
-      logsBloom = ByteString.empty,
-      difficulty = difficulty,
+      stateRoot = TrieRoot(ByteString.empty),
+      transactionsRoot = TrieRoot(ByteString.empty),
+      receiptsRoot = TrieRoot(ByteString.empty),
+      logsBloom = BloomFilter(ByteString.empty),
+      difficulty = Difficulty(difficulty),
       number = number,
       gasLimit = 0,
       gasUsed = 0,
       unixTimestamp = timestamp,
       extraData = ByteString.empty,
-      mixHash = ByteString.empty,
+      mixHash = BlockHash(ByteString.empty),
       nonce = ByteString.empty
     )
 
@@ -154,4 +158,3 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
     // Negative-equivalent: polynomial should handle zero gracefully
     ArtificialFinality.polynomialV(BigInt(0)) shouldBe BigInt(128)
   }
-}

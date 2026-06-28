@@ -138,7 +138,7 @@ object Dependencies {
   val crypto = Seq(
     "org.bouncycastle" % "bcprov-jdk18on" % "1.84",
     "org.bouncycastle" % "bcpkix-jdk18on" % "1.84",
-    "tech.pegasys" % "jc-kzg-4844" % "1.0.0", // EIP-4844 KZG point evaluation (c-kzg-4844 JNI bindings)
+    "io.consensys.protocols" % "jc-kzg-4844" % "2.0.0", // EIP-4844/7594 KZG ops (c-kzg-4844 JNI bindings, PeerDAS cell proofs)
     "org.hyperledger.besu" % "bls12-381" % "1.0.0" // EIP-2537 BLS12-381 precompiles (gnark/Constantine backends)
   )
 
@@ -168,8 +168,7 @@ object Dependencies {
     "org.jupnp" % "org.jupnp" % "3.0.4",
     "org.jupnp" % "org.jupnp.support" % "3.0.4",
     "org.jupnp" % "org.jupnp.tool" % "3.0.4",
-    "javax.servlet" % "javax.servlet-api" % "4.0.1",
-    "com.thesamet.scalapb" %% "scalapb-runtime" % "0.11.20"
+    "javax.servlet" % "javax.servlet-api" % "4.0.1"
   )
 
   val guava: Seq[ModuleID] = {

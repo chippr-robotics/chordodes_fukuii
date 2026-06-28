@@ -3,11 +3,11 @@ package com.chipprbots.ethereum
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.console._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.console.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for TuiState - state management for TUI data. */
-class TuiStateSpec extends AnyFlatSpec with Matchers {
+class TuiStateSpec extends AnyFlatSpec with Matchers:
 
   "TuiState" should "have initial default values" taggedAs (UnitTest) in {
     val state = TuiState.initial
@@ -146,10 +146,9 @@ class TuiStateSpec extends AnyFlatSpec with Matchers {
     state.networkName shouldBe "mordor"
     state.connectionStatus shouldBe "Initializing"
   }
-}
 
 /** Tests for NodeSettings. */
-class NodeSettingsSpec extends AnyFlatSpec with Matchers {
+class NodeSettingsSpec extends AnyFlatSpec with Matchers:
 
   "NodeSettings" should "have empty default values" taggedAs (UnitTest) in {
     val settings = NodeSettings()
@@ -183,4 +182,3 @@ class NodeSettingsSpec extends AnyFlatSpec with Matchers {
     settings.rpcPort shouldBe 8546
     settings.miningEnabled shouldBe true
   }
-}

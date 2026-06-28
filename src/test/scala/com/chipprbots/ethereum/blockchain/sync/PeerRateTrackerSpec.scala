@@ -5,16 +5,16 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for PeerRateTracker (ARCH-001).
   *
   * Verifies EMA-smoothed capacity tracking for ETH message types (ordinals 4–6). All assertions are deterministic; no
   * actor choreography.
   */
-class PeerRateTrackerSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+class PeerRateTrackerSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
 
-  import PeerRateTracker._
+  import PeerRateTracker.*
 
   "PeerRateTracker" should "return capacity floor before any measurement" taggedAs UnitTest in {
     val tracker = new PeerRateTracker()
@@ -55,11 +55,10 @@ class PeerRateTrackerSpec extends AnyFlatSpec with Matchers with ScalaCheckPrope
     val tracker = new PeerRateTracker()
     tracker.addPeer("p1")
     tracker.addPeer("p2") // 2 peers → confidence detunes to 0.5
-    for (_ <- 1 to 10) {
+    for _ <- 1 to 10 do
       tracker.update("p1", MsgGetBlockHeaders, 2000L, 10)
       tracker.update("p2", MsgGetBlockHeaders, 2000L, 10)
       tracker.tune()
-    }
     tracker.currentConfidence should be > 0.5
   }
 
@@ -80,8 +79,7 @@ class PeerRateTrackerSpec extends AnyFlatSpec with Matchers with ScalaCheckPrope
   it should "converge capacity within 50% of expected after 20 identical updates" taggedAs UnitTest in {
     forAll(Gen.choose(1, 100), Gen.choose(10, 5000)) { (items: Int, elapsed: Int) =>
       val tracker = new PeerRateTracker()
-      for (_ <- 1 to 20)
-        tracker.update("p1", MsgGetBlockHeaders, elapsed.toLong, items)
+      for _ <- 1 to 20 do tracker.update("p1", MsgGetBlockHeaders, elapsed.toLong, items)
       val targetRttMs = 10000L
       val got = tracker.capacity("p1", MsgGetBlockHeaders, targetRttMs)
       val throughput = items.toDouble / (elapsed.toDouble / 1000.0)
@@ -91,4 +89,3 @@ class PeerRateTrackerSpec extends AnyFlatSpec with Matchers with ScalaCheckPrope
       got.toDouble should be <= expected.toDouble * 1.5 + 2
     }
   }
-}

@@ -1,20 +1,19 @@
 package com.chipprbots.ethereum.consensus.pow
 
 import org.apache.pekko.util.ByteString
+
 import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** SlowTest: verifies Ethash nonce search and PoW verification using the light-client cache.
   *
   * Cache generation is a shared lazy val (~1-5s); individual hashimotoLight calls are fast. All tests operate on epoch
   * 0 (Mordor genesis epoch) to avoid generating multiple caches.
   */
-class EthashNonceSearchSpec extends AnyFlatSpec with Matchers {
-
-  import EthashUtils._
+class EthashNonceSearchSpec extends AnyFlatSpec with Matchers:
 
   private val ecip1099Block: Long = 2_520_000L
   private val epoch0: Long = EthashUtils.epoch(0L, ecip1099Block)
@@ -28,13 +27,13 @@ class EthashNonceSearchSpec extends AnyFlatSpec with Matchers {
   private def searchNonce(
       headerHash: Array[Byte],
       difficulty: Long,
-      maxIterations: Int = 500_000
+      maxIterations: Int
   ): Option[(ByteString, ByteString)] =
     (0L until maxIterations.toLong).iterator
       .map { nonce =>
         val nb = java.nio.ByteBuffer.allocate(8).putLong(nonce).array()
         val pow = EthashUtils.hashimotoLight(headerHash, nb, epoch0FullSize, epoch0Cache)
-        if (EthashUtils.checkDifficulty(difficulty, pow)) Some((pow.mixHash, ByteString(nb))) else None
+        if EthashUtils.checkDifficulty(difficulty, pow) then Some((pow.mixHash, ByteString(nb))) else None
       }
       .collectFirst { case Some(x) => x }
 
@@ -66,4 +65,3 @@ class EthashNonceSearchSpec extends AnyFlatSpec with Matchers {
     val pow = EthashUtils.hashimotoLight(hash, nonce, epoch0FullSize, epoch0Cache)
     pow.mixHash shouldBe ByteString(Hex.decode("5bb43c0772e58084b221c8e0c859a45950c103c712c5b8f11d9566ee078a4501"))
   }
-}

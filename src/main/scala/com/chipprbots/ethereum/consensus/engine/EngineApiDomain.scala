@@ -50,16 +50,19 @@ case class PayloadAttributes(
 )
 
 /** Status values for PayloadStatusV1 */
-sealed trait PayloadStatus {
+sealed trait PayloadStatus:
   def value: String
-}
-object PayloadStatus {
-  case object Valid extends PayloadStatus { val value = "VALID" }
-  case object Invalid extends PayloadStatus { val value = "INVALID" }
-  case object Syncing extends PayloadStatus { val value = "SYNCING" }
-  case object Accepted extends PayloadStatus { val value = "ACCEPTED" }
-  case class InvalidBlockHash(msg: String) extends PayloadStatus { val value = "INVALID_BLOCK_HASH" }
-}
+object PayloadStatus:
+  case object Valid extends PayloadStatus:
+    val value = "VALID"
+  case object Invalid extends PayloadStatus:
+    val value = "INVALID"
+  case object Syncing extends PayloadStatus:
+    val value = "SYNCING"
+  case object Accepted extends PayloadStatus:
+    val value = "ACCEPTED"
+  case class InvalidBlockHash(msg: String) extends PayloadStatus:
+    val value = "INVALID_BLOCK_HASH"
 
 /** Response to engine_newPayload */
 case class PayloadStatusV1(
@@ -76,3 +79,6 @@ case class ForkchoiceUpdatedResponse(
 
 /** Payload ID for tracking built payloads */
 case class PayloadId(id: ByteString)
+
+/** BlobAndProofV2 per EIP-7594 / engine_getBlobsV2 — blob + CELLS_PER_EXT_BLOB cell proofs (48 bytes each). */
+case class BlobAndProofV2(blob: ByteString, cellProofs: Seq[ByteString])

@@ -1,21 +1,20 @@
 package com.chipprbots.ethereum.metrics
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
 final case class MetricsConfig(
     enabled: Boolean,
     port: Int
 )
 
-object MetricsConfig {
-  object Keys {
+object MetricsConfig:
+  object Keys:
     final val Metrics = "metrics"
 
     final val Enabled = "enabled"
     final val Port = "port"
-  }
 
-  def apply(config: TypesafeConfig): MetricsConfig = {
+  def apply(config: TypesafeConfig): MetricsConfig =
     val metricsConfig = config.getConfig(Keys.Metrics)
 
     val enabled = metricsConfig.getBoolean(Keys.Enabled)
@@ -25,5 +24,3 @@ object MetricsConfig {
       enabled = enabled,
       port = port
     )
-  }
-}

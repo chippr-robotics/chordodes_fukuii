@@ -7,14 +7,18 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError._
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
-import com.chipprbots.ethereum.testing.Tags._
 
 // scalastyle:off magic.number
 /** Validates gas limit boundary enforcement in the block header validator.
@@ -24,22 +28,20 @@ import com.chipprbots.ethereum.testing.Tags._
   *
   * Reference: Besu implicit gas limit tests + fukuii validateGasLimit() at BlockHeaderValidatorSkeleton.scala:204-217
   */
-class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
+class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
 
   // Use a validator that mocks PoW and difficulty so we can test gas limit in isolation
-  private object GasLimitTestValidator extends BlockHeaderValidatorSkeleton() {
+  private object GasLimitTestValidator extends BlockHeaderValidatorSkeleton():
     // Always return parent's difficulty so validateDifficulty passes
-    override protected def difficulty: DifficultyCalculator = new DifficultyCalculator {
+    override protected def difficulty: DifficultyCalculator = new DifficultyCalculator:
       def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
           blockchainConfig: BlockchainConfig
-      ): BigInt = parent.difficulty
-    }
+      ): Difficulty = parent.difficulty
 
     override protected def validateEvenMore(blockHeader: BlockHeader)(implicit
         blockchainConfig: BlockchainConfig
     ): Either[BlockHeaderError, BlockHeaderValid] =
       Right(BlockHeaderValid)
-  }
 
   implicit private val blockchainConfig: BlockchainConfig = BlockchainConfig(
     forkBlockNumbers = ForkBlockNumbers.Empty.copy(
@@ -63,20 +65,21 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
 
   // Minimal valid parent/child pair — only fields relevant to gas limit validation
   private val parentHeader = BlockHeader(
-    parentHash = ByteString(Hex.decode("00" * 32)),
-    ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+    parentHash = BlockHash(ByteString(Hex.decode("00" * 32))),
+    ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("00" * 20)),
-    stateRoot = ByteString(Hex.decode("00" * 32)),
-    transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-    receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-    logsBloom = ByteString(Hex.decode("00" * 256)),
-    difficulty = 1000,
+    stateRoot = TrieRoot(ByteString(Hex.decode("00" * 32))),
+    transactionsRoot =
+      TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+    logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
+    difficulty = Difficulty(1000),
     number = 100,
     gasLimit = 1024000, // 1024 * 1000 — easy math for bound calculations
     gasUsed = 0,
     unixTimestamp = 1000000,
     extraData = ByteString.empty,
-    mixHash = ByteString(Hex.decode("00" * 32)),
+    mixHash = BlockHash(ByteString(Hex.decode("00" * 32))),
     nonce = ByteString(Hex.decode("00" * 8))
   )
 
@@ -222,10 +225,9 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
   // Parent at 8M for Spiral-epoch tests — bound = 8M/1024 = 7812.
   private val spiralParent = parentHeader.copy(gasLimit = 8_000_000, number = 100)
 
-  private def validateEtc(child: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] = {
+  private def validateEtc(child: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] =
     implicit val cfg: BlockchainConfig = etcBlockchainConfig
     GasLimitTestValidator.validate(child, spiralParent)
-  }
 
   it should "accept (SHOULD) peer block 1 below Spiral gas limit target — block still valid" taggedAs (
     UnitTest,
@@ -267,10 +269,9 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
     extraFields = HefPostOlympia(BigInt(1_000_000_000))
   )
 
-  private def validateEtcOlympia(child: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] = {
+  private def validateEtcOlympia(child: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] =
     implicit val cfg: BlockchainConfig = etcBlockchainConfig
     GasLimitTestValidator.validate(child, olympiaParent)
-  }
 
   it should "accept (SHOULD) peer block 1 below Olympia gas limit target — block still valid" taggedAs (
     UnitTest,
@@ -309,5 +310,4 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
     // Default blockchainConfig has no spiralGasTarget / olympiaGasTarget → no warning, Right
     validate(childWithGasLimit(1024000)) shouldBe Right(BlockHeaderValid)
   }
-}
 // scalastyle:on magic.number

@@ -10,11 +10,11 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.Reasons
 import com.chipprbots.ethereum.utils.Logger
 
-trait NodeStatusExchangeState[T <: Message] extends InProgressState[PeerInfo] with Logger {
+trait NodeStatusExchangeState[T <: Message] extends InProgressState[PeerInfo] with Logger:
 
   val handshakerConfiguration: NetworkHandshakerConfiguration
 
-  import handshakerConfiguration._
+  import handshakerConfiguration.*
 
   def nextMessage: NextMessage =
     NextMessage(
@@ -22,33 +22,26 @@ trait NodeStatusExchangeState[T <: Message] extends InProgressState[PeerInfo] wi
       timeout = peerConfiguration.waitForStatusTimeout
     )
 
-  def processTimeout: HandshakerState[PeerInfo] = {
+  def processTimeout: HandshakerState[PeerInfo] =
     log.debug("Timeout while waiting status")
     DisconnectedState(Disconnect.Reasons.TimeoutOnReceivingAMessage)
-  }
 
-  protected def applyRemoteStatusMessage: RemoteStatus => HandshakerState[PeerInfo] = { (status: RemoteStatus) =>
+  protected def applyRemoteStatusMessage: RemoteStatus => HandshakerState[PeerInfo] = (status: RemoteStatus) =>
     log.debug("Peer returned status ({})", status)
 
     val validNetworkID = status.networkId == handshakerConfiguration.peerConfiguration.networkId
-    val validGenesisHash = status.genesisHash == blockchainReader.genesisHeader.hash
+    val validGenesisHash = status.genesisHash == blockchainReader.genesisHeader.hash.value
 
-    if (validNetworkID && validGenesisHash) {
-      forkResolverOpt match {
+    if validNetworkID && validGenesisHash then
+      forkResolverOpt match
         case Some(forkResolver) =>
           IrregularStateChangeDaoForkBlockExchangeState(handshakerConfiguration, forkResolver, status)
         case None =>
           ConnectedState(PeerInfo.withForkAccepted(status))
-      }
-    } else
-      DisconnectedState(Reasons.DisconnectRequested)
-  }
+    else DisconnectedState(Reasons.DisconnectRequested)
 
-  protected def getBestBlockHeader(): BlockHeader = {
-    val bestBlockNumber = blockchainReader.getBestBlockNumber()
+  protected def getBestBlockHeader(): BlockHeader =
+    val bestBlockNumber = blockchainReader.getBestBlockNumber
     blockchainReader.getBlockHeaderByNumber(bestBlockNumber).getOrElse(blockchainReader.genesisHeader)
-  }
 
   protected def createStatusMsg(): MessageSerializable
-
-}

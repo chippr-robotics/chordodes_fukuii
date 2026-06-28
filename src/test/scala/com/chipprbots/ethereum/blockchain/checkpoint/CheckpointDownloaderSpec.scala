@@ -1,15 +1,14 @@
 package com.chipprbots.ethereum.blockchain.checkpoint
-
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
 
+import scala.compiletime.uninitialized
 import scala.util.Using
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
-
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should.Matchers
@@ -17,41 +16,38 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.testing.Tags.UnitTest
 
-class CheckpointDownloaderSpec extends AnyWordSpec with Matchers with EitherValues with BeforeAndAfterEach {
+class CheckpointDownloaderSpec extends AnyWordSpec with Matchers with EitherValues with BeforeAndAfterEach:
 
-  private var server: HttpServer = _
-  private var port: Int = _
-  private var tmpDir: Path = _
+  private var server: HttpServer = uninitialized
+  private var port: Int = uninitialized
+  private var tmpDir: Path = uninitialized
 
-  override def beforeEach(): Unit = {
+  override def beforeEach(): Unit =
     tmpDir = Files.createTempDirectory("checkpoint-download-spec")
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0)
     port = server.getAddress.getPort
     server.start()
-  }
 
-  override def afterEach(): Unit = {
-    if (server != null) server.stop(0)
-    if (tmpDir != null) {
-      import scala.jdk.CollectionConverters._
+  override def afterEach(): Unit =
+    if server != null then server.stop(0)
+    if tmpDir != null then
+      import scala.jdk.CollectionConverters.*
       val walk = Files.walk(tmpDir)
       try
         walk.iterator.asScala.toSeq.reverse.foreach(p => Files.deleteIfExists(p))
       finally walk.close()
-    }
-  }
 
   private def urlFor(path: String): String = s"http://127.0.0.1:$port$path"
 
   /** Static-bytes handler that supports HTTP Range. */
-  private class RangeHandler(body: Array[Byte], ignoreRange: Boolean = false) extends HttpHandler {
+  private class RangeHandler(body: Array[Byte], ignoreRange: Boolean = false) extends HttpHandler:
     @volatile var lastRangeHeader: Option[String] = None
 
     override def handle(exchange: HttpExchange): Unit =
-      try {
+      try
         lastRangeHeader = Option(exchange.getRequestHeaders.getFirst("Range"))
-        val range = if (ignoreRange) None else lastRangeHeader
-        range match {
+        val range = if ignoreRange then None else lastRangeHeader
+        range match
           case Some(r) if r.startsWith("bytes=") =>
             val spec = r.stripPrefix("bytes=")
             val from = spec.split("-").head.toLong.toInt
@@ -66,11 +62,7 @@ class CheckpointDownloaderSpec extends AnyWordSpec with Matchers with EitherValu
             val out = exchange.getResponseBody
             try out.write(body)
             finally out.close()
-        }
-      } catch {
-        case _: Throwable => exchange.close()
-      }
-  }
+      catch case _: Throwable => exchange.close()
 
   "CheckpointDownloader" should {
 
@@ -120,20 +112,17 @@ class CheckpointDownloaderSpec extends AnyWordSpec with Matchers with EitherValu
     "surface non-success HTTP status" taggedAs UnitTest in {
       server.createContext(
         "/missing",
-        new HttpHandler {
-          override def handle(exchange: HttpExchange): Unit = {
+        new HttpHandler:
+          override def handle(exchange: HttpExchange): Unit =
             val body = "not here".getBytes
             exchange.sendResponseHeaders(404, body.length.toLong)
             Using.resource(exchange.getResponseBody)(_.write(body))
-          }
-        }
       )
       val target = tmpDir.resolve("missing.bin")
       val result = new CheckpointDownloader().download(urlFor("/missing"), target)
-      result.left.value match {
+      result.left.value match
         case CheckpointDownloader.HttpError(404, _) => succeed
         case other                                  => fail(s"expected HttpError(404, _), got $other")
-      }
       // .tmp is left in place for the next attempt to inspect
       Files.exists(target) shouldBe false
     }
@@ -143,15 +132,13 @@ class CheckpointDownloaderSpec extends AnyWordSpec with Matchers with EitherValu
       Files.write(target, "existing".getBytes("UTF-8"))
       server.createContext(
         "/checkpoint",
-        new HttpHandler {
+        new HttpHandler:
           override def handle(exchange: HttpExchange): Unit =
             // Should never be called
             exchange.sendResponseHeaders(500, -1)
-        }
       )
       val result = new CheckpointDownloader().download(urlFor("/checkpoint"), target)
       result shouldBe Right(())
       Files.readAllBytes(target).toSeq shouldBe "existing".getBytes("UTF-8").toSeq
     }
   }
-}

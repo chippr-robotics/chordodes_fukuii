@@ -5,13 +5,13 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks
 import com.chipprbots.ethereum.vm.PrecompiledContracts.P256Verify
 
 /** EIP-7951: Verify P256VERIFY gas cost = 6,900. */
-class P256VerifyGasSpec extends AnyFlatSpec with Matchers {
+class P256VerifyGasSpec extends AnyFlatSpec with Matchers:
 
   val etcFork: EtcForks.Value = EtcForks.Spiral
   val ethFork: EthForks.Value = EthForks.Berlin
@@ -30,4 +30,3 @@ class P256VerifyGasSpec extends AnyFlatSpec with Matchers {
     P256Verify.gas(short, etcFork, ethFork) shouldBe BigInt(6900)
     P256Verify.gas(full, etcFork, ethFork) shouldBe BigInt(6900)
   }
-}

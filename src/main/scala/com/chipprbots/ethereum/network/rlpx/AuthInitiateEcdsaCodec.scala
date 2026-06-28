@@ -9,10 +9,10 @@ import com.chipprbots.ethereum.crypto.ECDSASignature.RLength
 import com.chipprbots.ethereum.crypto.ECDSASignature.SLength
 import com.chipprbots.ethereum.utils.ByteUtils
 
-trait AuthInitiateEcdsaCodec {
+trait AuthInitiateEcdsaCodec:
 
-  def encodeECDSA(sig: ECDSASignature): ByteString = {
-    import sig._
+  def encodeECDSA(sig: ECDSASignature): ByteString =
+    import sig.*
 
     val recoveryId: Byte = (v - 27).toByte
 
@@ -21,9 +21,8 @@ trait AuthInitiateEcdsaCodec {
         asUnsignedByteArray(s.bigInteger).reverse.padTo(SLength, 0.toByte).reverse ++
         Array(recoveryId)
     )
-  }
 
-  def decodeECDSA(input: Array[Byte]): ECDSASignature = {
+  def decodeECDSA(input: Array[Byte]): ECDSASignature =
     val SIndex = 32
     val VIndex = 64
 
@@ -31,5 +30,3 @@ trait AuthInitiateEcdsaCodec {
     val s = input.slice(SIndex, SIndex + SLength)
     val v = input(VIndex) + 27
     ECDSASignature(ByteUtils.bytesToBigInt(r), ByteUtils.bytesToBigInt(s), BigInt(v))
-  }
-}

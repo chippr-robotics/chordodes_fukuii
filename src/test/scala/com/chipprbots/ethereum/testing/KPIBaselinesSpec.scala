@@ -1,9 +1,11 @@
 package com.chipprbots.ethereum.testing
 
+import scala.concurrent.duration.*
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scala.concurrent.duration.*
-import com.chipprbots.ethereum.testing.Tags._
+
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite to validate KPI baselines are properly defined and accessible.
   *
@@ -13,7 +15,7 @@ import com.chipprbots.ethereum.testing.Tags._
   * @see
   *   [[KPIBaselines]]
   */
-class KPIBaselinesSpec extends AnyFlatSpec with Matchers {
+class KPIBaselinesSpec extends AnyFlatSpec with Matchers:
 
   "KPIBaselines" should "have a valid baseline date" taggedAs (UnitTest) in {
     KPIBaselines.baselineDate should not be empty
@@ -197,4 +199,3 @@ class KPIBaselinesSpec extends AnyFlatSpec with Matchers {
     summary should include("Ethereum/Tests Compliance")
     summary should include("Memory Baselines")
   }
-}

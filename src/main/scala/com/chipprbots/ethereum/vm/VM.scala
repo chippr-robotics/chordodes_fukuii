@@ -9,17 +9,18 @@ import org.bouncycastle.util.encoders.Hex
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.SetCodeTransaction
+import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.ethereum.rlp.UInt256RLPImplicits._
+import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
 import com.chipprbots.ethereum.utils.DebugTrace
 import com.chipprbots.ethereum.utils.Logger
 
 class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
     val tracer: Option[ExecutionTracer] = None
-) extends Logger {
+) extends Logger:
 
   type PC = ProgramContext[W, S]
   type PR = ProgramResult[W, S]
@@ -31,9 +32,9 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
     * @return
     *   result of the execution
     */
-  def run(context: ProgramContext[W, S]): ProgramResult[W, S] = {
+  def run(context: ProgramContext[W, S]): ProgramResult[W, S] =
     {
-      import context._
+      import context.*
       import org.bouncycastle.util.encoders.Hex
       log.trace(
         s"caller:  $callerAddr | recipient: $recipientAddr | gasPrice: $gasPrice | value: $value | inputData: ${Hex
@@ -41,20 +42,18 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
       )
     }
 
-    context.recipientAddr match {
+    context.recipientAddr match
       case Some(recipientAddr) =>
         call(context, recipientAddr)
 
       case None =>
         create(context)._1
-    }
-  }
 
   /** Message call - Θ function in YP
     */
-  private[vm] def call(context: PC, ownerAddr: Address): PR = {
+  private[vm] def call(context: PC, ownerAddr: Address): PR =
     val isSubCall = context.callDepth > 0
-    if (isSubCall)
+    if isSubCall then
       tracer.foreach(
         _.onCallEnter(
           callTypeName(context),
@@ -65,56 +64,55 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
           context.inputData
         )
       )
+    var exitResult: PR = invalidCallResult(context, Set.empty, Set.empty)
     val result =
-      if (!isValidCall(context))
-        invalidCallResult(context, Set.empty, Set.empty)
-      else {
-        val recipientAddr = context.recipientAddr.getOrElse(
-          throw new IllegalArgumentException("Recipient address must be defined for message call")
-        )
+      try
+        val r =
+          if !isValidCall(context) then invalidCallResult(context, Set.empty, Set.empty)
+          else
+            val recipientAddr = context.recipientAddr.getOrElse(
+              throw new IllegalArgumentException("Recipient address must be defined for message call")
+            )
 
-        def makeTransfer = context.world.transfer(context.callerAddr, recipientAddr, context.endowment)
-        val world1 = if (context.doTransfer) makeTransfer else context.world
-        val context1: PC = context.copy(world = world1)
+            def makeTransfer = context.world.transfer(context.callerAddr, recipientAddr, context.endowment)
+            val world1 = if context.doTransfer then makeTransfer else context.world
+            val context1: PC = context.copy(world = world1)
 
-        if (PrecompiledContracts.isDefinedAt(context1))
-          PrecompiledContracts.run(context1)
-        else {
-          val code = resolveCode(world1, recipientAddr)
-          val env = ExecEnv(context1, code, ownerAddr)
+            if PrecompiledContracts.isDefinedAt(context1) then PrecompiledContracts.run(context1)
+            else
+              val code = resolveCode(world1, recipientAddr)
+              val env = ExecEnv(context1, code, ownerAddr)
 
-          // EIP-7702: If code was resolved from a delegation, warm the delegation target
-          val delegationTarget =
-            try
-              SetCodeTransaction.parseDelegation(world1.getCode(recipientAddr))
-            catch {
-              case _: Exception => None
-            }
-          val initialState: PS = ProgramState(this, context1, env)
-          val warmState = delegationTarget match {
-            case Some(target) => initialState.addAccessedAddress(target)
-            case None         => initialState
-          }
-          exec(warmState).toResult
-        }
-      }
-    if (isSubCall)
-      tracer.foreach(
-        _.onCallExit(context.startGas - result.gasRemaining, result.returnData, result.error.map(_.toString))
-      )
+              // EIP-7702: If code was resolved from a delegation, warm the delegation target
+              val delegationTarget =
+                try SetCodeTransaction.parseDelegation(world1.getCode(recipientAddr))
+                catch case _: Exception => None
+              val initialState: PS = ProgramState(this, context1, env)
+              val warmState = delegationTarget match
+                case Some(target) => initialState.addAccessedAddress(target)
+                case None         => initialState
+              exec(warmState).toResult
+        exitResult = r
+        r
+      finally
+        if isSubCall then
+          tracer.foreach(
+            _.onCallExit(
+              context.startGas - exitResult.gasRemaining,
+              exitResult.returnData,
+              exitResult.error.map(_.toString)
+            )
+          )
     result
-  }
 
   /** EIP-7702: Resolve delegation code one level deep. If the account has a delegation prefix (0xef0100), load the
     * target's code instead.
     */
-  private def resolveCode(world: W, addr: Address): ByteString = {
+  private def resolveCode(world: W, addr: Address): ByteString =
     val code = world.getCode(addr)
-    SetCodeTransaction.parseDelegation(code) match {
+    SetCodeTransaction.parseDelegation(code) match
       case Some(target) => world.getCode(target)
       case None         => code
-    }
-  }
 
   /** Contract creation - Λ function in YP salt is used to create contract by CREATE2 opcode. See
     * https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1014.md
@@ -122,99 +120,106 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
   private[vm] def create(
       context: PC,
       salt: Option[UInt256] = None
-  ): (PR, Address) = {
+  ): (PR, Address) =
     val isSubCall = context.callDepth > 0
-    val opName = if (salt.isDefined) "CREATE2" else "CREATE"
-    if (isSubCall)
+    val opName = if salt.isDefined then "CREATE2" else "CREATE"
+    if isSubCall then
       tracer.foreach(
         _.onCallEnter(opName, context.callerAddr, Address(0), context.startGas, context.endowment, context.inputData)
       )
+    var exitResult: PR = invalidCallResult(context, Set.empty, Set.empty)
     val (result, newAddress) =
-      if (!isValidCall(context))
-        (invalidCallResult(context, Set.empty, Set.empty), Address(0))
-      else {
-        require(context.recipientAddr.isEmpty, "recipient address must be empty for contract creation")
-        require(context.doTransfer, "contract creation will always transfer funds")
+      try
+        val pair =
+          if !isValidCall(context) then (invalidCallResult(context, Set.empty, Set.empty), Address(0))
+          else
+            require(context.recipientAddr.isEmpty, "recipient address must be empty for contract creation")
+            require(context.doTransfer, "contract creation will always transfer funds")
 
-        // EIP-3860: Check initcode size limit
-        val maxInitCodeSize = context.evmConfig.maxInitCodeSize
-        if (context.evmConfig.eip3860Enabled && maxInitCodeSize.exists(max => context.inputData.size > max)) {
-          // Exceptional abort: initcode too large (consumes all gas)
-          return (
-            invalidCallResult(context, Set.empty, Set.empty).copy(error = Some(InitCodeSizeLimit), gasRemaining = 0),
-            Address(0)
-          )
-        }
+            // EIP-3860: Check initcode size limit — abort arm flows through onCallExit below.
+            val maxInitCodeSize = context.evmConfig.maxInitCodeSize
+            if context.evmConfig.eip3860Enabled && maxInitCodeSize.exists(max => context.inputData.size > max) then
+              (
+                invalidCallResult(context, Set.empty, Set.empty)
+                  .copy(error = Some(InitCodeSizeLimit), gasRemaining = 0),
+                Address(0)
+              )
+            else
 
-        if (DebugTrace.enabledForBlock(context.blockHeader.number)) {
-          val callerAccountNonce = context.world.getAccount(context.callerAddr).map(_.nonce)
-          callerAccountNonce.foreach { n =>
-            val nonceForCreate = n - 1
-            // Address must be encoded as a single RLP string (20 bytes), not as a Seq[Byte].
-            val rlpPreimage =
-              rlp.encode(RLPList(RLPValue(context.callerAddr.bytes.toArray), nonceForCreate.toRLPEncodable))
-            val hash = kec256(rlpPreimage)
-            val derived = Address(hash)
-            log.info(
-              s"TRACE_CREATE_ADDR block=${context.blockHeader.number} caller=${context.callerAddr} " +
-                s"callerNonce=$n nonceForCreate=$nonceForCreate rlp=${Hex.toHexString(rlpPreimage.toArray)} " +
-                s"hash=${Hex.toHexString(hash.toArray)} derived=$derived"
+              if DebugTrace.enabledForBlock(context.blockHeader.number) then
+                val callerAccountNonce = context.world.getAccount(context.callerAddr).map(_.nonce)
+                callerAccountNonce.foreach { n =>
+                  val nonceForCreate = n - 1
+                  // Address must be encoded as a single RLP string (20 bytes), not as a Seq[Byte].
+                  val rlpPreimage =
+                    rlp.encode(RLPList(RLPValue(context.callerAddr.bytes.toArray), nonceForCreate.toRLPEncodable))
+                  val hash = kec256(rlpPreimage)
+                  val derived = Address(hash)
+                  log.info(
+                    s"TRACE_CREATE_ADDR block=${context.blockHeader.number} caller=${context.callerAddr} " +
+                      s"callerNonce=$n nonceForCreate=$nonceForCreate rlp=${Hex.toHexString(rlpPreimage.toArray)} " +
+                      s"hash=${Hex.toHexString(hash.toArray)} derived=$derived"
+                  )
+                }
+
+              val contractAddr = salt
+                .map(s => context.world.create2Address(context.callerAddr, s, context.inputData))
+                .getOrElse(context.world.createAddress(context.callerAddr))
+
+              // EIP-684: revert a CREATE if the target address already has non-empty code/nonce.
+              // EIP-7610 (Paris+): additionally revert if the address has non-empty storage.
+              // Activation matches the EELS test marker `valid_from("Paris")` — we use
+              // BlockHeader.isPoS (difficulty==0 && baseFee set) as the Paris / PoS signal.
+              val conflict =
+                if context.blockHeader.isPoS then context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
+                else context.world.nonEmptyCodeOrNonceAccount(contractAddr)
+
+              /** Specification of https://eips.ethereum.org/EIPS/eip-1283 states, that `originalValue` should be taken
+                * from world which is left after `a reversion happens on the current transaction`, so in current scope
+                * `context.originalWorld`.
+                *
+                * But ets test expects that it should be taken from world after the new account initialisation, which
+                * clears account storage. As it seems other implementations encountered similar problems with this
+                * ambiguity: ambiguity: https://gist.github.com/holiman/0154f00d5fcec5f89e85894cbb46fcb2 - explanation
+                * of geth and parity treating this situation differently. https://github.com/mana-ethereum/mana/pull/579
+                * \- elixir eth client dealing with same problem.
+                */
+              val originInitialisedAccount = context.originalWorld.initialiseAccount(contractAddr)
+
+              val world1: W =
+                context.world
+                  .initialiseAccount(contractAddr)
+                  .transfer(context.callerAddr, contractAddr, context.endowment)
+
+              val code = if conflict then ByteString(INVALID.code) else context.inputData
+
+              val env = ExecEnv(context, code, contractAddr).copy(inputData = ByteString.empty)
+
+              val initialState: PS =
+                ProgramState(this, context.copy(world = world1, originalWorld = originInitialisedAccount): PC, env)
+                  .addAccessedAddress(contractAddr)
+
+              val execResult = exec(initialState).toResult
+
+              val newContractResult = saveNewContract(context, contractAddr, execResult, env.evmConfig)
+              (newContractResult, contractAddr)
+        exitResult = pair._1
+        pair
+      finally
+        if isSubCall then
+          tracer.foreach(
+            _.onCallExit(
+              context.startGas - exitResult.gasRemaining,
+              exitResult.returnData,
+              exitResult.error.map(_.toString)
             )
-          }
-        }
-
-        val contractAddr = salt
-          .map(s => context.world.create2Address(context.callerAddr, s, context.inputData))
-          .getOrElse(context.world.createAddress(context.callerAddr))
-
-        // EIP-684: revert a CREATE if the target address already has non-empty code/nonce.
-        // EIP-7610 (Paris+): additionally revert if the address has non-empty storage.
-        // Activation matches the EELS test marker `valid_from("Paris")` — we use
-        // BlockHeader.isPostMerge (difficulty==0 && baseFee set) as the Paris signal.
-        val conflict =
-          if (context.blockHeader.isPostMerge)
-            context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
-          else context.world.nonEmptyCodeOrNonceAccount(contractAddr)
-
-        /** Specification of https://eips.ethereum.org/EIPS/eip-1283 states, that `originalValue` should be taken from
-          * world which is left after `a reversion happens on the current transaction`, so in current scope
-          * `context.originalWorld`.
-          *
-          * But ets test expects that it should be taken from world after the new account initialisation, which clears
-          * account storage. As it seems other implementations encountered similar problems with this ambiguity:
-          * ambiguity: https://gist.github.com/holiman/0154f00d5fcec5f89e85894cbb46fcb2 - explanation of geth and parity
-          * treating this situation differently. https://github.com/mana-ethereum/mana/pull/579 - elixir eth client
-          * dealing with same problem.
-          */
-        val originInitialisedAccount = context.originalWorld.initialiseAccount(contractAddr)
-
-        val world1: W =
-          context.world.initialiseAccount(contractAddr).transfer(context.callerAddr, contractAddr, context.endowment)
-
-        val code = if (conflict) ByteString(INVALID.code) else context.inputData
-
-        val env = ExecEnv(context, code, contractAddr).copy(inputData = ByteString.empty)
-
-        val initialState: PS =
-          ProgramState(this, context.copy(world = world1, originalWorld = originInitialisedAccount): PC, env)
-            .addAccessedAddress(contractAddr)
-
-        val execResult = exec(initialState).toResult
-
-        val newContractResult = saveNewContract(context, contractAddr, execResult, env.evmConfig)
-        (newContractResult, contractAddr)
-      }
-    if (isSubCall)
-      tracer.foreach(
-        _.onCallExit(context.startGas - result.gasRemaining, result.returnData, result.error.map(_.toString))
-      )
+          )
     (result, newAddress)
-  }
 
   @tailrec
-  final private[vm] def exec(state: ProgramState[W, S]): ProgramState[W, S] = {
+  final private[vm] def exec(state: ProgramState[W, S]): ProgramState[W, S] =
     val byte = state.program.getByte(state.pc)
-    state.config.byteToOpCode.get(byte) match {
+    state.config.byteToOpCode.get(byte) match
       case Some(opCode) =>
         val newState = opCode.execute(state)
         // Per-opcode hook. VM-level `tracer` and the tracer carried in state.env.tracer
@@ -222,34 +227,33 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         // either way observe the step.
         tracer.foreach(_.onStep(opCode, state, newState))
         state.env.tracer.foreach(_.onStep(opCode, state, newState))
-        import newState._
+        import newState.*
         log.trace(
-          s"$opCode | pc: $pc | depth: ${env.callDepth} | gasUsed: ${state.gas - gas} | gas: $gas | stack: $stack"
+          "op={} pc={} depth={} gasUsed={} gas={} stack={}",
+          opCode,
+          pc,
+          env.callDepth,
+          state.gas - gas,
+          gas,
+          stack
         )
         // Opcode-level tracing for targeted debugging
-        if (DebugTrace.enabledForBlock(state.env.blockHeader.number) && state.env.callDepth == 0) {
-          System.err.println(
-            s"[EVM] pc=${state.pc} op=$opCode gas=${state.gas} -> gasAfter=$gas depth=${env.callDepth}"
-          )
-        }
-        if (newState.halted)
-          newState
-        else
-          exec(newState)
+        if DebugTrace.enabledForBlock(state.env.blockHeader.number) && state.env.callDepth == 0 then
+          log.debug("[EVM] pc={} op={} gas={} gasAfter={} depth={}", state.pc, opCode, state.gas, gas, env.callDepth)
+        if newState.halted then newState
+        else exec(newState)
 
       case None =>
         state.withError(InvalidOpCode(byte)).halt
-    }
-  }
 
   /** Derives the EVM opcode name for a sub-call from its ProgramContext. All four CALL variants reach VM.call() via the
     * same method but differ in staticCtx/doTransfer/endowment (verified against OpCode.scala CallOp.exec() lines
     * ~1125-1143).
     */
   private def callTypeName(context: PC): String =
-    if (context.staticCtx) "STATICCALL"
-    else if (!context.doTransfer && context.endowment == UInt256.Zero) "DELEGATECALL"
-    else if (!context.doTransfer) "CALLCODE"
+    if context.staticCtx then "STATICCALL"
+    else if !context.doTransfer && context.endowment == UInt256.Zero then "DELEGATECALL"
+    else if !context.doTransfer then "CALLCODE"
     else "CALL"
 
   protected def isValidCall(context: PC): Boolean =
@@ -259,7 +263,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
   private def invalidCallResult(
       context: PC,
       accessedAddresses: Set[Address],
-      accessedStorageKeys: Set[(Address, BigInt)]
+      accessedStorageKeys: Set[(Address, StorageKey)]
   ): PR =
     ProgramResult(
       ByteString.empty,
@@ -274,21 +278,20 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
       accessedStorageKeys
     )
 
-  private def exceedsMaxContractSize(context: PC, config: EvmConfig, contractCode: ByteString): Boolean = {
+  private def exceedsMaxContractSize(context: PC, config: EvmConfig, contractCode: ByteString): Boolean =
     lazy val maxCodeSizeExceeded = config.maxCodeSize.exists(codeSizeLimit => contractCode.size > codeSizeLimit)
     val currentBlock = context.blockHeader.number
     // Max code size was enabled on eip161 block number on eth network, and on atlantis block number on etc
     (currentBlock >= config.blockchainConfig.eip161BlockNumber || currentBlock >= config.blockchainConfig.atlantisBlockNumber) &&
     maxCodeSizeExceeded
-  }
 
-  private def saveNewContract(context: PC, address: Address, result: PR, config: EvmConfig): PR = {
+  private def saveNewContract(context: PC, address: Address, result: PR, config: EvmConfig): PR =
     val tracing = DebugTrace.enabledForBlock(context.blockHeader.number)
 
     val out: PR =
-      if (result.error.isDefined) {
-        if (result.error.contains(RevertOccurs)) result else result.copy(gasRemaining = 0)
-      } else {
+      if result.error.isDefined then
+        if result.error.contains(RevertOccurs) then result else result.copy(gasRemaining = 0)
+      else
         val contractCode = result.returnData
         val codeDepositCost = config.calcCodeDepositCost(contractCode)
 
@@ -297,25 +300,23 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         // EIP-3541: Reject new contracts starting with 0xEF byte
         val startsWithEF = config.eip3541Enabled && contractCode.nonEmpty && contractCode.head == 0xef.toByte
 
-        if (startsWithEF) {
+        if startsWithEF then
           // EIP-3541: Code starting with 0xEF byte causes exceptional abort
           result.copy(error = Some(InvalidCode), gasRemaining = 0)
-        } else if (maxCodeSizeExceeded || (codeStoreOutOfGas && config.exceptionalFailedCodeDeposit)) {
+        else if maxCodeSizeExceeded || (codeStoreOutOfGas && config.exceptionalFailedCodeDeposit) then
           // Code size too big or code storage causes out-of-gas with exceptionalFailedCodeDeposit enabled
           result.copy(error = Some(OutOfGas), gasRemaining = 0)
-        } else if (codeStoreOutOfGas && !config.exceptionalFailedCodeDeposit) {
+        else if codeStoreOutOfGas && !config.exceptionalFailedCodeDeposit then
           // Code storage causes out-of-gas with exceptionalFailedCodeDeposit disabled
           result
-        } else {
+        else
           // Code storage succeeded
           result.copy(
             gasRemaining = result.gasRemaining - codeDepositCost,
             world = result.world.saveCode(address, result.returnData)
           )
-        }
-      }
 
-    if (tracing) {
+    if tracing then
       val contractCodeSize = result.returnData.size
       val codeDepositCost = config.calcCodeDepositCost(result.returnData)
       val maxCodeSizeExceeded = exceedsMaxContractSize(context, config, result.returnData)
@@ -328,8 +329,5 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
           s"codeStoreOutOfGas=$codeStoreOutOfGas exceptionalFailedCodeDeposit=${config.exceptionalFailedCodeDeposit} " +
           s"errorBefore=${result.error.map(_.toString)} errorAfter=${out.error.map(_.toString)}"
       )
-    }
 
     out
-  }
-}

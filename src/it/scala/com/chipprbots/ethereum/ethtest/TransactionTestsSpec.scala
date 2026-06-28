@@ -1,14 +1,16 @@
 package com.chipprbots.ethereum.ethtest
 
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 import java.io.File
-import io.circe._
-import io.circe.parser._
+
 import scala.io.Source
 import scala.util.Using
 
-import com.chipprbots.ethereum.testing.Tags._
+import io.circe.*
+import io.circe.parser.*
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite for ethereum/tests TransactionTests category
   *
@@ -31,7 +33,7 @@ import com.chipprbots.ethereum.testing.Tags._
   * See https://github.com/ethereum/tests/tree/develop/TransactionTests See ADR-015 for implementation details See
   * ADR-017 for test categorization strategy
   */
-class TransactionTestsSpec extends AnyFlatSpec with Matchers {
+class TransactionTestsSpec extends AnyFlatSpec with Matchers:
 
   // Base path for transaction tests - configurable via system property or environment variable
   private val transactionTestsBasePath = sys.props
@@ -40,7 +42,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
     .getOrElse(new File(System.getProperty("user.dir"), "ets/tests/TransactionTests").getPath)
 
   // Supported networks (pre-Spiral fork only)
-  val supportedNetworks = Set(
+  val supportedNetworks: Set[String] = Set(
     "Frontier",
     "Homestead",
     "EIP150", // Tangerine Whistle
@@ -59,12 +61,11 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
     * @return
     *   List of test file paths
     */
-  def discoverTransactionTests(testCategory: String): Seq[String] = {
+  def discoverTransactionTests(testCategory: String): Seq[String] =
     val categoryPath = new File(s"$transactionTestsBasePath/$testCategory")
 
-    if (!categoryPath.exists() || !categoryPath.isDirectory) {
-      Seq.empty
-    } else {
+    if !categoryPath.exists() || !categoryPath.isDirectory then Seq.empty
+    else
       Option(categoryPath.listFiles())
         .fold(Seq.empty[String])(files =>
           files
@@ -72,8 +73,6 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
             .map(f => s"$transactionTestsBasePath/$testCategory/${f.getName}")
             .toSeq
         )
-    }
-  }
 
   /** Load a transaction test file
     *
@@ -85,10 +84,9 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
   def loadTransactionTest(filePath: String): Json =
     Using(Source.fromFile(filePath)) { source =>
       val jsonString = source.mkString
-      parse(jsonString) match {
+      parse(jsonString) match
         case Right(json) => json
         case Left(error) => throw new RuntimeException(s"Failed to parse JSON: $error")
-      }
     }.fold(throw _, identity)
 
   /** Validate transaction test structure
@@ -101,10 +99,10 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
     *   True if test has valid structure
     */
   def validateTestStructure(testJson: Json): Boolean =
-    testJson.asObject match {
+    testJson.asObject match
       case Some(testObject) =>
         // Get the first (and usually only) test case
-        testObject.toMap.headOption match {
+        testObject.toMap.headOption match
           case Some((_, testData)) =>
             val hasRlp = testData.hcursor.downField("rlp").succeeded
             val hasNetworkData = supportedNetworks.exists { network =>
@@ -112,136 +110,125 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
             }
             hasRlp && hasNetworkData
           case None => false
-        }
       case None => false
-    }
 
   "TransactionTests" should "discover ttNonce tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       info("Run 'git submodule init && git submodule update' to initialize")
       pending
-    } else {
+    else
       val tests = discoverTransactionTests("ttNonce")
       info(s"Discovered ${tests.size} test files in ttNonce")
       tests.size should be > 0
-    }
   }
 
   it should "discover ttData tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverTransactionTests("ttData")
       info(s"Discovered ${tests.size} test files in ttData")
       tests.size should be > 0
-    }
   }
 
   it should "discover ttGasLimit tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverTransactionTests("ttGasLimit")
       info(s"Discovered ${tests.size} test files in ttGasLimit")
       tests.size should be > 0
-    }
   }
 
   it should "discover ttGasPrice tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverTransactionTests("ttGasPrice")
       info(s"Discovered ${tests.size} test files in ttGasPrice")
       tests.size should be > 0
-    }
   }
 
   it should "discover ttValue tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverTransactionTests("ttValue")
       info(s"Discovered ${tests.size} test files in ttValue")
       tests.size should be > 0
-    }
   }
 
   it should "discover ttSignature tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverTransactionTests("ttSignature")
       info(s"Discovered ${tests.size} test files in ttSignature")
       tests.size should be > 0
-    }
   }
 
   it should "discover ttVValue tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverTransactionTests("ttVValue")
       info(s"Discovered ${tests.size} test files in ttVValue")
       tests.size should be > 0
-    }
   }
 
   it should "discover ttRSValue tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverTransactionTests("ttRSValue")
       info(s"Discovered ${tests.size} test files in ttRSValue")
       tests.size should be > 0
-    }
   }
 
   it should "discover ttWrongRLP tests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val baseDir = new File(transactionTestsBasePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $transactionTestsBasePath")
       pending
-    } else {
+    else
       val tests = discoverTransactionTests("ttWrongRLP")
       info(s"Discovered ${tests.size} test files in ttWrongRLP")
       tests.size should be > 0
-    }
   }
 
   it should "load and validate a sample transaction test" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val testFile = s"$transactionTestsBasePath/ttNonce/TransactionWithHighNonce256.json"
     val file = new File(testFile)
 
-    if (!file.exists()) {
+    if !file.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized")
       pending
-    } else {
+    else
       val testJson = loadTransactionTest(testFile)
       info("Loaded transaction test file")
 
@@ -250,7 +237,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
 
       // Verify it has expected fields
       val testObject = testJson.asObject.get
-      testObject.toMap.headOption match {
+      testObject.toMap.headOption match
         case Some((testName, testData)) =>
           info(s"Test name: $testName")
 
@@ -265,7 +252,4 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
           info("✓ Test has Frontier network results")
 
         case None => fail("Test file has no test cases")
-      }
-    }
   }
-}

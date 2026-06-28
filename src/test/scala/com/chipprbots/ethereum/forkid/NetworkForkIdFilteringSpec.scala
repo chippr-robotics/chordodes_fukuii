@@ -2,17 +2,18 @@ package com.chipprbots.ethereum.forkid
 
 import org.apache.pekko.util.ByteString
 
-import org.bouncycastle.util.encoders.{Hex => BCHex}
-import org.scalatest.matchers.should._
-import org.scalatest.wordspec.AnyWordSpec
-import scodec.bits.{BitVector, ByteVector}
-
-import com.chipprbots.ethereum.forkid.ForkId._
-import com.chipprbots.ethereum.network.discovery.ForkIdTag
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.utils.Config._
 import com.chipprbots.scalanet.discovery.crypto.Signature
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
+import org.bouncycastle.util.encoders.Hex as BCHex
+import org.scalatest.matchers.should.*
+import org.scalatest.wordspec.AnyWordSpec
+import scodec.bits.BitVector
+import scodec.bits.ByteVector
+
+import com.chipprbots.ethereum.forkid.ForkId.*
+import com.chipprbots.ethereum.network.discovery.ForkIdTag
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.utils.Config.*
 
 /** Cross-chain ForkId filtering tests — the networkId=1 collision case.
   *
@@ -23,7 +24,7 @@ import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
   *   1. Mordor's forkId is rejected by ETC mainnet's ForkIdTag (and vice versa) 2. ETH forkIds are rejected by ETC
   *      mainnet's ForkIdTag 3. The Olympia fork signal state machine transitions correctly through all three states
   */
-class NetworkForkIdFilteringSpec extends AnyWordSpec with Matchers {
+class NetworkForkIdFilteringSpec extends AnyWordSpec with Matchers:
 
   private val config = blockchains
   private val etcConf = config.blockchains("etc")
@@ -65,13 +66,13 @@ class NetworkForkIdFilteringSpec extends AnyWordSpec with Matchers {
     "reject a Mordor peer (Mordor Spiral forkId 0x3a6b00d7) on the ETC mainnet ForkIdTag" in {
       // Mordor's checksum chain diverges at genesis (different genesis hash).
       // 0x3a6b00d7 never appears in ETC mainnet's checksum chain → incompatible.
-      etcTag(20000000).toFilter(enrWith(MordorSpiralForkId)) shouldBe a[Left[_, _]]
+      etcTag(20000000).toFilter(enrWith(MordorSpiralForkId)) shouldBe a[Left[?, ?]]
     }
 
     "reject an ETH mainnet peer (ETH Petersburg forkId 0x668db0af) on the ETC mainnet ForkIdTag" in {
       // ETH diverges from ETC at the DAO fork (block 1,920,000).
       // Both have networkId=1 — forkId is the only reliable filter.
-      etcTag(20000000).toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[_, _]]
+      etcTag(20000000).toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[?, ?]]
     }
 
     // -----------------------------------------------------------------------
@@ -84,11 +85,11 @@ class NetworkForkIdFilteringSpec extends AnyWordSpec with Matchers {
 
     "reject an ETC mainnet peer (ETC Spiral forkId 0xbe46d57c) on the Mordor ForkIdTag" in {
       // ETC mainnet's checksum 0xbe46d57c never appears in Mordor's chain (different genesis).
-      mordorTag(20000000).toFilter(enrWith(EtcSpiralForkId)) shouldBe a[Left[_, _]]
+      mordorTag(20000000).toFilter(enrWith(EtcSpiralForkId)) shouldBe a[Left[?, ?]]
     }
 
     "reject an ETH mainnet peer on the Mordor ForkIdTag" in {
-      mordorTag(20000000).toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[_, _]]
+      mordorTag(20000000).toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[?, ?]]
     }
 
     // -----------------------------------------------------------------------
@@ -142,15 +143,15 @@ class NetworkForkIdFilteringSpec extends AnyWordSpec with Matchers {
     // The filter must reject ETH peers in all three states (regression guard for the Olympia-pending bug).
     "reject ETH mainnet peers in all three Olympia state machine states" in {
       // State 1: no Olympia configured
-      etcTag(20000000).toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[_, _]]
+      etcTag(20000000).toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[?, ?]]
 
       // State 2: Olympia pending
       val tag2 = new ForkIdTag(() => etcGenesisHash, olympiaConf, () => 25000000)
-      tag2.toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[_, _]]
+      tag2.toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[?, ?]]
 
       // State 3: Olympia activated
       val tag3 = new ForkIdTag(() => etcGenesisHash, olympiaConf, () => 31000000)
-      tag3.toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[_, _]]
+      tag3.toFilter(enrWith(EthPetersburgForkId)) shouldBe a[Left[?, ?]]
     }
 
     "accept a syncing ETC peer that knows about Olympia from a post-Spiral head" in {
@@ -161,4 +162,3 @@ class NetworkForkIdFilteringSpec extends AnyWordSpec with Matchers {
       tag.toFilter(enrWith(spiralWithOlympiaPending)) shouldBe Right(())
     }
   }
-}

@@ -12,7 +12,7 @@ package com.chipprbots.ethereum.rlp
   *
   * For existing code using explicit derivation:
   * {{{
-  *   import RLPImplicitDerivations._
+  *   import RLPImplicitDerivations.*
   *   given RLPCodec[MyData] = deriveLabelledGenericRLPCodec[MyData]
   * }}}
   */

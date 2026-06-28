@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.network
 
 import java.time.Instant
-import scala.concurrent.duration._
+
+import scala.concurrent.duration.*
 
 /** Peer scoring system for enhanced peer selection
   *
@@ -20,7 +21,7 @@ final case class PeerScore(
     blacklistCount: Int = 0,
     lastSeen: Option[Instant] = None,
     firstSeen: Option[Instant] = None
-) {
+):
 
   /** Calculate composite score (0.0 to 1.0, higher is better)
     *
@@ -31,7 +32,7 @@ final case class PeerScore(
     *   - Protocol compliance (15%)
     *   - Recency (10%)
     */
-  def score: Double = {
+  def score: Double =
     val handshakeScore = calculateHandshakeScore
     val responseScore = calculateResponseScore
     val latencyScore = calculateLatencyScore
@@ -43,42 +44,36 @@ final case class PeerScore(
       (latencyScore * 0.2) +
       (complianceScore * 0.15) +
       (recencyScore * 0.1)
-  }
 
-  private def calculateHandshakeScore: Double = {
+  private def calculateHandshakeScore: Double =
     val total = successfulHandshakes + failedHandshakes
-    if (total == 0) 0.5 // neutral score for new peers
+    if total == 0 then 0.5 // neutral score for new peers
     else successfulHandshakes.toDouble / total
-  }
 
-  private def calculateResponseScore: Double = {
+  private def calculateResponseScore: Double =
     val total = responsesReceived + requestsTimedOut
-    if (total == 0) 0.5 // neutral score for new peers
+    if total == 0 then 0.5 // neutral score for new peers
     else responsesReceived.toDouble / total
-  }
 
   private def calculateLatencyScore: Double =
-    averageLatencyMs match {
+    averageLatencyMs match
       case None          => 0.5 // neutral score if no data
       case Some(latency) =>
         // Score decreases with latency: 0ms=1.0, 1000ms=0.5, >2000ms=0.0
         math.max(0.0, 1.0 - (latency / 2000.0))
-    }
 
-  private def calculateComplianceScore: Double = {
+  private def calculateComplianceScore: Double =
     val totalInteractions = responsesReceived + requestsTimedOut + 1 // avoid division by zero
     val violationRate = protocolViolations.toDouble / totalInteractions
     math.max(0.0, 1.0 - (violationRate * 2.0)) // penalty for violations
-  }
 
   private def calculateRecencyScore: Double =
-    lastSeen match {
+    lastSeen match
       case None => 0.0 // never seen
       case Some(timestamp) =>
         val ageMinutes = java.time.Duration.between(timestamp, Instant.now()).toMinutes
         // Score decreases with age: <5min=1.0, 30min=0.5, >60min=0.0
         math.max(0.0, 1.0 - (ageMinutes / 60.0))
-    }
 
   /** Update score after successful handshake */
   def recordSuccessfulHandshake: PeerScore =
@@ -97,20 +92,18 @@ final case class PeerScore(
     )
 
   /** Update score after successful response */
-  def recordResponse(bytes: Long, latencyMs: Long): PeerScore = {
-    val newAverageLatency = averageLatencyMs match {
+  def recordResponse(bytes: Long, latencyMs: Long): PeerScore =
+    val newAverageLatency = averageLatencyMs match
       case None      => latencyMs.toDouble
       case Some(avg) =>
         // Exponential moving average with alpha=0.3
         (avg * 0.7) + (latencyMs * 0.3)
-    }
     copy(
       responsesReceived = responsesReceived + 1,
       bytesDownloaded = bytesDownloaded + bytes,
       averageLatencyMs = Some(newAverageLatency),
       lastSeen = Some(Instant.now())
     )
-  }
 
   /** Update score after request timeout */
   def recordTimeout: PeerScore =
@@ -134,7 +127,7 @@ final case class PeerScore(
     )
 
   /** Check if peer should be retried despite blacklist history */
-  def shouldRetry(currentBlacklistDuration: FiniteDuration): Boolean = {
+  def shouldRetry(currentBlacklistDuration: FiniteDuration): Boolean =
     // Exponential penalty based on blacklist count, capped at 1 hour.
     // Cap the exponent first to avoid Int/Long overflow: 2^30 ≈ 1e9 seconds >> 1h already.
     val maxBackoff = 3600.seconds
@@ -142,16 +135,13 @@ final case class PeerScore(
     val penaltyFactor = math.pow(2.0, safeExponent.toDouble)
     val adjustedMs = math.min(currentBlacklistDuration.toMillis * penaltyFactor, maxBackoff.toMillis.toDouble).toLong
 
-    lastSeen match {
+    lastSeen match
       case None => true // never blacklisted, can retry
       case Some(timestamp) =>
         val elapsed = java.time.Duration.between(timestamp, Instant.now())
         elapsed.toMillis >= adjustedMs
-    }
-  }
-}
 
-object PeerScore {
+object PeerScore:
   val empty: PeerScore = PeerScore()
 
   /** Create initial score for newly discovered peer */
@@ -159,4 +149,3 @@ object PeerScore {
     firstSeen = Some(Instant.now()),
     lastSeen = Some(Instant.now())
   )
-}

@@ -18,10 +18,10 @@ case class ByteCodeTask(
     codeHashes: Seq[ByteString],
     accountHashes: Seq[ByteString] = Seq.empty,
     // Runtime fields
-    var pending: Boolean = false,
-    var done: Boolean = false,
-    var bytecodes: Seq[ByteString] = Seq.empty
-) {
+    pending: Boolean = false,
+    done: Boolean = false,
+    bytecodes: Seq[ByteString] = Seq.empty
+):
 
   require(codeHashes.nonEmpty, "ByteCodeTask must have at least one code hash")
   require(
@@ -36,23 +36,21 @@ case class ByteCodeTask(
   def isPending: Boolean = pending
 
   /** Get task identifier for logging */
-  def taskString: String = {
+  def taskString: String =
     val hashesStr = codeHashes.take(3).map(_.take(4).toArray.map("%02x".format(_)).mkString).mkString(", ")
-    val suffix = if (codeHashes.size > 3) s", ... (${codeHashes.size} total)" else ""
+    val suffix = if codeHashes.size > 3 then s", ... (${codeHashes.size} total)" else ""
     s"[$hashesStr$suffix]"
-  }
 
   /** Calculate progress based on downloaded bytecodes */
   def progress: Double =
-    if (done) 1.0
-    else if (bytecodes.isEmpty) 0.0
+    if done then 1.0
+    else if bytecodes.isEmpty then 0.0
     else bytecodes.size.toDouble / codeHashes.size
 
   /** Get number of hashes in this task */
   def size: Int = codeHashes.size
-}
 
-object ByteCodeTask {
+object ByteCodeTask:
 
   /** Default batch size for bytecode requests.
     *
@@ -76,23 +74,20 @@ object ByteCodeTask {
   def createBytecodeTasksFromAccounts(
       contractAccounts: Seq[(ByteString, ByteString)],
       batchSize: Int = DEFAULT_BATCH_SIZE
-  ): Seq[ByteCodeTask] = {
+  ): Seq[ByteCodeTask] =
     require(batchSize > 0, "Batch size must be positive")
 
-    if (contractAccounts.isEmpty) {
-      return Seq.empty
-    }
-
-    // Group into batches
-    contractAccounts
-      .grouped(batchSize)
-      .map { batch =>
-        val accountHashes = batch.map(_._1)
-        val codeHashes = batch.map(_._2)
-        ByteCodeTask(codeHashes, accountHashes)
-      }
-      .toSeq
-  }
+    if contractAccounts.isEmpty then Seq.empty
+    else
+      // Group into batches
+      contractAccounts
+        .grouped(batchSize)
+        .map { batch =>
+          val accountHashes = batch.map(_._1)
+          val codeHashes = batch.map(_._2)
+          ByteCodeTask(codeHashes, accountHashes)
+        }
+        .toSeq
 
   /** Create a single bytecode task from code hashes
     *
@@ -101,10 +96,9 @@ object ByteCodeTask {
     * @return
     *   ByteCode task
     */
-  def createTask(codeHashes: Seq[ByteString]): ByteCodeTask = {
+  def createTask(codeHashes: Seq[ByteString]): ByteCodeTask =
     require(codeHashes.nonEmpty, "Must provide at least one code hash")
     ByteCodeTask(codeHashes)
-  }
 
   /** Create bytecode tasks by batching code hashes
     *
@@ -118,16 +112,12 @@ object ByteCodeTask {
   def createBatchedTasks(
       codeHashes: Seq[ByteString],
       batchSize: Int = DEFAULT_BATCH_SIZE
-  ): Seq[ByteCodeTask] = {
+  ): Seq[ByteCodeTask] =
     require(batchSize > 0, "Batch size must be positive")
 
-    if (codeHashes.isEmpty) {
-      return Seq.empty
-    }
-
-    codeHashes
-      .grouped(batchSize)
-      .map(batch => ByteCodeTask(batch))
-      .toSeq
-  }
-}
+    if codeHashes.isEmpty then Seq.empty
+    else
+      codeHashes
+        .grouped(batchSize)
+        .map(batch => ByteCodeTask(batch))
+        .toSeq

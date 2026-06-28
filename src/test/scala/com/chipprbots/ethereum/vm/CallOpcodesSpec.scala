@@ -6,18 +6,19 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.ByteUtils
-import com.chipprbots.ethereum.vm.MockWorldState._
+import com.chipprbots.ethereum.vm.MockWorldState.*
 
 import Fixtures.blockchainConfig
 
-trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
+trait CallOpCodesBehaviors extends Matchers:
+  this: AnyWordSpec =>
 
-  def callNormalTermination(fxt: CallOpFixture, call: CallResult): Unit = {
+  def callNormalTermination(fxt: CallOpFixture, call: CallResult): Unit =
 
     "update external account's storage" in {
       call.ownStorage shouldEqual MockStorage.Empty
@@ -50,9 +51,18 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       val actualSize = call.stateOut.memory.size
       expectedSize shouldEqual actualSize
     }
-  }
 
-  def callDepthLimitReached(fxt: CallOpFixture, call: CallResult): Unit = {
+  def callDepthLimitReached(fxt: CallOpFixture, call: CallResult): Unit =
+
+    "not modify world state" in {
+      call.world shouldEqual fxt.worldWithExtAccount
+    }
+
+    "return 0" in {
+      call.stateOut.stack.pop()._1 shouldEqual UInt256.Zero
+    }
+
+  def callValueGreaterThanBalance(fxt: CallOpFixture, call: CallResult): Unit =
 
     "not modify world state" in {
       call.world shouldEqual fxt.worldWithExtAccount
@@ -62,20 +72,7 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       call.stateOut.stack.pop()._1 shouldEqual UInt256.Zero
     }
 
-  }
-
-  def callValueGreaterThanBalance(fxt: CallOpFixture, call: CallResult): Unit = {
-
-    "not modify world state" in {
-      call.world shouldEqual fxt.worldWithExtAccount
-    }
-
-    "return 0" in {
-      call.stateOut.stack.pop()._1 shouldEqual UInt256.Zero
-    }
-  }
-
-  def callAbnormalTermination(fxt: CallOpFixture, call: CallResult): Unit = {
+  def callAbnormalTermination(fxt: CallOpFixture, call: CallResult): Unit =
     "should not modify world state" in {
       call.world shouldEqual fxt.worldWithInvalidProgram
     }
@@ -87,9 +84,8 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
     "extend memory" in {
       UInt256(call.stateOut.memory.size) shouldEqual call.outOffset + call.outSize
     }
-  }
 
-  def callNonExistent(fxt: CallOpFixture, call: CallResult): Unit = {
+  def callNonExistent(fxt: CallOpFixture, call: CallResult): Unit =
 
     "create new account and add to its balance" in {
       call.extBalance shouldEqual call.value
@@ -100,9 +96,7 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       call.stateOut.stack.pop()._1 shouldEqual UInt256.One
     }
 
-  }
-
-  def callPrecompiled(fxt: CallOpFixture, call: CallResult): Unit = {
+  def callPrecompiled(fxt: CallOpFixture, call: CallResult): Unit =
 
     "compute a correct result" in {
       // For invalid signature the return data should be empty, so the memory should not be modified.
@@ -122,9 +116,7 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       call.ownBalance shouldEqual fxt.initialBalance - call.value
     }
 
-  }
-
-  def callSelfdestruct(fxt: CallOpFixture): Unit = {
+  def callSelfdestruct(fxt: CallOpFixture): Unit =
     "refund the correct amount of gas" in {
       val context: PC = fxt.context.copy(world = fxt.worldWithSelfDestructProgram)
       val call = fxt.ExecuteCall(op = CALL, context)
@@ -144,9 +136,8 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       call.stateOut.world.getGuaranteedAccount(fxt.extAddr).balance shouldEqual UInt256.Zero
       call.stateOut.addressesToDelete.contains(fxt.extAddr) shouldBe true
     }
-  }
 
-  def callRevert(fxt: CallOpFixture): Unit = {
+  def callRevert(fxt: CallOpFixture): Unit =
     val context: PC = fxt.context.copy(world = fxt.worldWithRevertProgram)
     val call = fxt.ExecuteCall(op = CALL, context)
 
@@ -162,15 +153,13 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
     "extend memory" in {
       UInt256(call.stateOut.memory.size) shouldEqual call.outOffset + call.outSize
     }
-  }
 
-  def callMoreGasProvided(fxt: CallOpFixture): Unit = {
-    def call(config: EvmConfig): fxt.ExecuteCall = {
+  def callMoreGasProvided(fxt: CallOpFixture): Unit =
+    def call(config: EvmConfig): fxt.ExecuteCall =
       val context: PC = fxt.context.copy(evmConfig = config)
       fxt.ExecuteCall(op = CALL, context = context, gas = UInt256.MaxValue / 2)
-    }
 
-    def callVarMemCost(config: EvmConfig): fxt.ExecuteCall = {
+    def callVarMemCost(config: EvmConfig): fxt.ExecuteCall =
 
       /** Amount of memory which causes the improper OOG exception, if we don take memcost into account during
         * calculation of post EIP150 CALLOp gasCap: gasCap(state, gas, gExtra + memCost)
@@ -186,7 +175,6 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
         outOffset = fxt.inputData.size,
         outSize = gasFailingBeforeEIP150Fix
       )
-    }
 
     "go OOG before EIP-150" in {
       call(EvmConfig.HomesteadConfigBuilder(blockchainConfig)).stateOut.error shouldEqual Some(OutOfGas)
@@ -204,9 +192,8 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       val CallResult = callVarMemCost(EvmConfig.PostEIP150ConfigBuilder(blockchainConfig))
       CallResult.stateOut.stack.pop()._1 shouldEqual UInt256.One
     }
-  }
 
-  def callCodeNormalTermination(fxt: CallOpFixture, call: CallResult): Unit = {
+  def callCodeNormalTermination(fxt: CallOpFixture, call: CallResult): Unit =
     "update own account's storage" in {
       call.extStorage shouldEqual MockStorage.Empty
       call.ownStorage.data.size shouldEqual 3
@@ -238,9 +225,8 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       val actualSize = call.stateOut.memory.size
       expectedSize shouldEqual actualSize
     }
-  }
 
-  def callCodeNonExistent(fxt: CallOpFixture, call: CallResult): Unit = {
+  def callCodeNonExistent(fxt: CallOpFixture, call: CallResult): Unit =
 
     "not modify world state" in {
       call.world shouldEqual fxt.worldWithoutExtAccount
@@ -249,9 +235,8 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
     "return 1" in {
       call.stateOut.stack.pop()._1 shouldEqual UInt256(1)
     }
-  }
 
-  def callCodePrecompiled(fxt: CallOpFixture, call: CallResult): Unit = {
+  def callCodePrecompiled(fxt: CallOpFixture, call: CallResult): Unit =
     "compute a correct result" in {
       val (result, _) = call.stateOut.memory.load(call.outOffset, call.outSize)
       val expected = sha256(call.inputData)
@@ -268,9 +253,7 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       call.ownBalance shouldEqual fxt.initialBalance
     }
 
-  }
-
-  def delegateCallNormalTermination(fxt: CallOpFixture, call: CallResult): Unit = {
+  def delegateCallNormalTermination(fxt: CallOpFixture, call: CallResult): Unit =
     "update own account's storage" in {
       call.extStorage shouldEqual MockStorage.Empty
       call.ownStorage.data.size shouldEqual 3
@@ -302,9 +285,8 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       val actualSize = call.stateOut.memory.size
       expectedSize shouldEqual actualSize
     }
-  }
 
-  def delegateCallPrecompile(fxt: CallOpFixture, call: CallResult): Unit = {
+  def delegateCallPrecompile(fxt: CallOpFixture, call: CallResult): Unit =
     "compute a correct result" in {
       val (result, _) = call.stateOut.memory.load(call.outOffset, call.outSize)
       val expected = ByteUtils.padLeft(ripemd160(call.inputData), 32)
@@ -321,16 +303,13 @@ trait CallOpCodesBehaviors extends Matchers { this: AnyWordSpec =>
       call.ownBalance shouldEqual fxt.initialBalance
     }
 
-  }
-}
-
 // scalastyle:off object.name
 // scalastyle:off file.size.limit
-class CallOpcodesSpec extends AnyWordSpec with CallOpCodesBehaviors with Matchers with ScalaCheckPropertyChecks {
+class CallOpcodesSpec extends AnyWordSpec with CallOpCodesBehaviors with Matchers with ScalaCheckPropertyChecks:
 
   val config: EvmConfig = EvmConfig.ByzantiumConfigBuilder(blockchainConfig)
   val startState: MockWorldState = MockWorldState(touchedAccounts = Set.empty)
-  import config.feeSchedule._
+  import config.feeSchedule.*
 
   val fxt = new CallOpFixture(config, startState)
 
@@ -566,10 +545,9 @@ class CallOpcodesSpec extends AnyWordSpec with CallOpCodesBehaviors with Matcher
     }
 
     "more gas than available is provided" should {
-      def call(config: EvmConfig): fxt.ExecuteCall = {
+      def call(config: EvmConfig): fxt.ExecuteCall =
         val context: PC = fxt.context.copy(evmConfig = config)
         fxt.ExecuteCall(op = CALLCODE, context = context, gas = UInt256.MaxValue / 2)
-      }
 
       "go OOG before EIP-150" in {
         call(EvmConfig.HomesteadConfigBuilder(blockchainConfig)).stateOut.error shouldEqual Some(OutOfGas)
@@ -677,10 +655,9 @@ class CallOpcodesSpec extends AnyWordSpec with CallOpCodesBehaviors with Matcher
     }
 
     "more gas than available is provided" should {
-      def call(config: EvmConfig): fxt.ExecuteCall = {
+      def call(config: EvmConfig): fxt.ExecuteCall =
         val context: PC = fxt.context.copy(evmConfig = config)
         fxt.ExecuteCall(op = DELEGATECALL, context = context, gas = UInt256.MaxValue / 2)
-      }
 
       "go OOG before EIP-150" in {
         call(EvmConfig.HomesteadConfigBuilder(blockchainConfig)).stateOut.error shouldEqual Some(OutOfGas)
@@ -753,4 +730,3 @@ class CallOpcodesSpec extends AnyWordSpec with CallOpCodesBehaviors with Matcher
       }
     }
   }
-}

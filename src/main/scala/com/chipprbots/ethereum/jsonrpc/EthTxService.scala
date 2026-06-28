@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
@@ -15,6 +16,7 @@ import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage.TransactionLocation
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.Receipt
@@ -24,7 +26,7 @@ import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTr
 import com.chipprbots.ethereum.transactions.TransactionPicker
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-object EthTxService {
+object EthTxService:
   case class GetTransactionByHashRequest(txHash: ByteString) // rename to match request
   case class GetTransactionByHashResponse(txResponse: Option[TransactionResponse])
   case class GetTransactionByBlockHashAndIndexRequest(blockHash: ByteString, transactionIndex: BigInt)
@@ -40,19 +42,19 @@ object EthTxService {
   case class GetTransactionReceiptRequest(txHash: ByteString)
   case class GetTransactionReceiptResponse(txResponse: Option[TransactionReceiptResponse])
   case class RawTransactionResponse(transactionResponse: Option[SignedTransaction])
-}
 
 class EthTxService(
     val blockchain: Blockchain,
     val blockchainReader: BlockchainReader,
     val mining: Mining,
-    val pendingTransactionsManager: ActorRef,
+    val pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
     val getTransactionFromPoolTimeout: FiniteDuration,
-    transactionMappingStorage: TransactionMappingStorage
+    transactionMappingStorage: TransactionMappingStorage,
+    val scheduler: Scheduler
 )(implicit val blockchainConfig: BlockchainConfig)
     extends TransactionPicker
-    with ResolveBlock {
-  import EthTxService._
+    with ResolveBlock:
+  import EthTxService.*
   // blockchainConfig is taken as an implicit constructor parameter so multi-instance
   // runtime callers (NodeBuilder) automatically supply the per-instance config in scope
   // (see NodeBuilder line 72), instead of every service silently shadowing it with the
@@ -96,32 +98,30 @@ class EthTxService(
     * @return
     *   the tx requested or None if the client doesn't have the tx
     */
-  def getTransactionByHash(req: GetTransactionByHashRequest): ServiceResponse[GetTransactionByHashResponse] = {
+  def getTransactionByHash(req: GetTransactionByHashRequest): ServiceResponse[GetTransactionByHashResponse] =
     val eventualMaybeData = getTransactionDataByHash(req.txHash)
     eventualMaybeData.map(txResponse => Right(GetTransactionByHashResponse(txResponse.map(TransactionResponse(_)))))
-  }
 
-  private def getTransactionDataByHash(txHash: ByteString): IO[Option[TransactionData]] = {
+  private def getTransactionDataByHash(txHash: ByteString): IO[Option[TransactionData]] =
     val maybeTxPendingResponse: IO[Option[TransactionData]] = getTransactionsFromPool.map {
-      _.pendingTransactions.map(_.stx.tx).find(_.hash == txHash).map(TransactionData(_))
+      _.pendingTransactions.map(_.stx.tx).find(_.hash.value == txHash).map(TransactionData(_))
     }
 
     maybeTxPendingResponse.map { txPending =>
       txPending.orElse {
-        for {
+        for
           TransactionLocation(blockHash, txIndex) <- transactionMappingStorage.get(txHash)
-          Block(header, body) <- blockchainReader.getBlockByHash(blockHash)
+          Block(header, body) <- blockchainReader.getBlockByHash(BlockHash(blockHash))
           stx <- body.transactionList.lift(txIndex)
-        } yield TransactionData(stx, Some(header), Some(txIndex))
+        yield TransactionData(stx, Some(header), Some(txIndex))
       }
     }
-  }
 
   def getTransactionReceipt(req: GetTransactionReceiptRequest): ServiceResponse[GetTransactionReceiptResponse] =
     IO {
-      val result: Option[TransactionReceiptResponse] = for {
+      val result: Option[TransactionReceiptResponse] = for
         TransactionLocation(blockHash, txIndex) <- transactionMappingStorage.get(req.txHash)
-        Block(header, body) <- blockchainReader.getBlockByHash(blockHash)
+        Block(header, body) <- blockchainReader.getBlockByHash(BlockHash(blockHash))
         // Only surface receipts for CANONICAL transactions. Under engine-API, a block
         // may be stored (with receipts + tx-location mapping) immediately after newPayload
         // but not promoted to canonical until a subsequent forkchoiceUpdated — hive's
@@ -130,18 +130,18 @@ class EthTxService(
         // index, AND (b) its number is <= the client's best-block pointer (i.e. FCU has
         // advanced past it). (a) alone is true right after newPayload's storeBlock but
         // (b) flips only when the subsequent FCU updates saveBestKnownBlocks.
-        _ <- blockchainReader.getBlockHeaderByNumber(header.number).filter(_.hash == blockHash)
-        bestNum = blockchainReader.getBestBlockNumber() if header.number <= bestNum
+        _ <- blockchainReader.getBlockHeaderByNumber(header.number).filter(_.hash.value == blockHash)
+        bestNum = blockchainReader.getBestBlockNumber if header.number <= bestNum
         stx <- body.transactionList.lift(txIndex)
-        receipts <- blockchainReader.getReceiptsByHash(blockHash)
+        receipts <- blockchainReader.getReceiptsByHash(BlockHash(blockHash))
         receipt: Receipt <- receipts.lift(txIndex)
         // another possibility would be to throw an exception and fail hard, as if we cannot calculate sender for transaction
         // included in blockchain it means that something is terribly wrong
         sender <- SignedTransaction.getSender(stx)
-      } yield {
+      yield
 
         val gasUsed =
-          if (txIndex == 0) receipt.cumulativeGasUsed
+          if txIndex == 0 then receipt.cumulativeGasUsed
           else receipt.cumulativeGasUsed - receipts(txIndex - 1).cumulativeGasUsed
 
         // Compute cumulative log index from prior receipts in the block
@@ -156,7 +156,6 @@ class EthTxService(
           gasUsedByTransaction = gasUsed,
           baseLogIndex = baseLogIndex
         )
-      }
 
       Right(GetTransactionReceiptResponse(result))
     }
@@ -175,11 +174,11 @@ class EthTxService(
 
   private def getTransactionByBlockHashAndIndex(blockHash: ByteString, transactionIndex: BigInt) =
     IO {
-      for {
-        blockWithTx <- blockchainReader.getBlockByHash(blockHash)
+      for
+        blockWithTx <- blockchainReader.getBlockByHash(BlockHash(blockHash))
         blockTxs = blockWithTx.body.transactionList if transactionIndex >= 0 && transactionIndex < blockTxs.size
         transaction <- blockTxs.lift(transactionIndex.toInt)
-      } yield TransactionData(transaction, Some(blockWithTx.header), Some(transactionIndex.toInt))
+      yield TransactionData(transaction, Some(blockWithTx.header), Some(transactionIndex.toInt))
     }
 
   private val GasPriceMaxCap: BigInt = BigInt(500) * BigInt(10).pow(9) // 500 gwei — matches go-ethereum
@@ -193,15 +192,12 @@ class EthTxService(
   //   Post-EIP-1559: max(currentBaseFee, baseFeeFloor) + minTip, minimum 1 wei.
   //     ETC/Mordor post-Olympia: max(≥1 gwei, 1 gwei) + 1 gwei = ≥ 2 gwei
   //     ETH post-London:         baseFee (dynamic) + 1 gwei (minTip default)
-  private[jsonrpc] def minimumGasPrice(): BigInt = {
-    val minViable = blockchainReader
-      .getBestBlock()
-      .flatMap(_.header.baseFee) match {
+  private[jsonrpc] def minimumGasPrice(): BigInt =
+    val minViable = blockchainReader.getBestBlock
+      .flatMap(_.header.baseFee) match
       case Some(baseFee) => baseFee.max(blockchainConfig.baseFeeFloor) + blockchainConfig.minTip
       case None          => BigInt(0) // floor set by .max(1) below
-    }
     minViable.max(BigInt(1)) // always non-zero on every network
-  }
 
   // Synchronous gas price oracle — used by both eth_gasPrice RPC and PersonalService.sendTransaction.
   //
@@ -211,10 +207,10 @@ class EthTxService(
   //   - Take the 60th percentile of effective gas prices (not median — geth uses 60th).
   //   - Clamp to [minimumGasPrice(), GasPriceMaxCap].
   //   - Fall back to minimumGasPrice() when no transactions are available (never returns 0).
-  private[jsonrpc] def suggestGasPrice(): BigInt = {
+  private[jsonrpc] def suggestGasPrice(): BigInt =
     val floor = minimumGasPrice()
-    val bestBlock = blockchainReader.getBestBlockNumber()
-    val bestBranch = blockchainReader.getBestBranch()
+    val bestBlock = blockchainReader.getBestBlockNumber
+    val bestBranch = blockchainReader.getBestBranch
 
     val gasPrices = ((bestBlock - GasPriceCheckBlocks + 1).max(BigInt(0)) to bestBlock)
       .flatMap(nb => blockchainReader.getBlockByNumber(bestBranch, nb))
@@ -229,34 +225,30 @@ class EthTxService(
           .map(_.tx.gasPrice)
       }
 
-    if (gasPrices.nonEmpty) {
+    if gasPrices.nonEmpty then
       val sorted = gasPrices.sorted
       // 60th percentile — matches go-ethereum/core-geth default (configurable there, fixed here).
       // Biases slightly above the median to reduce stuck-transaction risk during fee spikes.
       val idx = math.min((sorted.length * 60) / 100, sorted.length - 1)
       sorted(idx).max(floor).min(GasPriceMaxCap)
-    } else {
-      floor // no transactions in window: return floor, never 0
-    }
-  }
+    else floor // no transactions in window: return floor, never 0
 
   def getGetGasPrice(@unused req: GetGasPriceRequest): ServiceResponse[GetGasPriceResponse] =
     IO(Right(GetGasPriceResponse(suggestGasPrice())))
 
-  def sendRawTransaction(req: SendRawTransactionRequest): ServiceResponse[SendRawTransactionResponse] = {
-    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.SignedTransactionDec
+  def sendRawTransaction(req: SendRawTransactionRequest): ServiceResponse[SendRawTransactionResponse] =
+    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
 
-    Try(req.data.toArray.toSignedTransactionWithSidecar) match {
+    Try(req.data.toArray.toSignedTransactionWithSidecar) match
       case Success((signedTransaction, rawBytesOpt)) =>
-        if (SignedTransaction.getSender(signedTransaction).isEmpty) {
-          IO.pure(Left(JsonRpcError.InvalidRequest))
-        } else {
+        if SignedTransaction.getSender(signedTransaction).isEmpty then IO.pure(Left(JsonRpcError.InvalidRequest))
+        else
           // EIP-3860 (Shanghai+): reject contract-creation txs whose initcode exceeds the
           // per-EVM-config maximum. Derived from the CURRENT chain tip's fork state. Must
           // use the timestamp-aware forBlock variant — Shanghai activates by timestamp on
           // post-merge chains, not block number.
-          val tip = blockchainReader.getBestBlock().map(_.header)
-          val bestNum = tip.map(_.number).getOrElse(blockchainReader.getBestBlockNumber())
+          val tip = blockchainReader.getBestBlock.map(_.header)
+          val bestNum = tip.map(_.number).getOrElse(blockchainReader.getBestBlockNumber)
           val ts = tip.map(_.unixTimestamp).getOrElse(0L)
           val evmConfig = com.chipprbots.ethereum.vm.EvmConfig.forBlock(bestNum, ts, blockchainConfig)
           val tx = signedTransaction.tx
@@ -264,7 +256,7 @@ class EthTxService(
             tx.isContractInit &&
               evmConfig.eip3860Enabled &&
               evmConfig.maxInitCodeSize.exists(max => tx.payload.size > max)
-          if (initCodeTooLarge) {
+          if initCodeTooLarge then
             IO.pure(
               Left(
                 JsonRpcError.InvalidParams(
@@ -273,18 +265,14 @@ class EthTxService(
                 )
               )
             )
-          } else {
+          else
             pendingTransactionsManager ! PendingTransactionsManager.AddOrOverrideTransaction(
               signedTransaction,
               rawBytesOpt.map(org.apache.pekko.util.ByteString(_))
             )
-            IO.pure(Right(SendRawTransactionResponse(signedTransaction.hash)))
-          }
-        }
+            IO.pure(Right(SendRawTransactionResponse(signedTransaction.hash.value)))
       case Failure(_) =>
         IO.pure(Left(JsonRpcError.InvalidRequest))
-    }
-  }
 
   /** eth_getTransactionByBlockNumberAndIndex Returns the information about a transaction with the block number and
     * index of which it was mined.
@@ -322,7 +310,7 @@ class EthTxService(
     resolveBlock(block)
       .map { blockWithTx =>
         val blockTxs = blockWithTx.block.body.transactionList
-        if (transactionIndex >= 0 && transactionIndex < blockTxs.size)
+        if transactionIndex >= 0 && transactionIndex < blockTxs.size then
           Some(
             TransactionData(
               blockTxs(transactionIndex.toInt),
@@ -349,4 +337,3 @@ class EthTxService(
     getTransactionsFromPool.map { resp =>
       Right(EthPendingTransactionsResponse(resp.pendingTransactions))
     }
-}

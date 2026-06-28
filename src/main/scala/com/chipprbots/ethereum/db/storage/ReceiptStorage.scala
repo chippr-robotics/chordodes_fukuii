@@ -2,21 +2,21 @@ package com.chipprbots.ethereum.db.storage
 
 import org.apache.pekko.util.ByteString
 
-import boopickle.DefaultBasic._
+import boopickle.DefaultBasic.*
 import boopickle.Pickler
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.storage.ReceiptStorage.BlockHash
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.ByteUtils.byteSequenceToBuffer
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 
 /** This class is used to store the Receipts, by using: Key: hash of the block to which the list of receipts belong
   * Value: the list of receipts
   */
-class ReceiptStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[BlockHash, Seq[Receipt]] {
+class ReceiptStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[BlockHash, Seq[Receipt]]:
 
-  import ReceiptStorage._
+  import ReceiptStorage.{given, *}
 
   override val namespace: IndexedSeq[Byte] = Namespaces.ReceiptsNamespace
 
@@ -28,75 +28,73 @@ class ReceiptStorage(val dataSource: DataSource) extends TransactionalKeyValueSt
     compactPickledBytes(Pickle.intoBytes(receipts))
 
   override def valueDeserializer: IndexedSeq[Byte] => ReceiptSeq =
-    (byteSequenceToBuffer _).andThen(Unpickle[Seq[Receipt]].fromBytes)
-}
+    byteSequenceToBuffer.andThen(Unpickle[Seq[Receipt]].fromBytes)
 
-object ReceiptStorage {
+object ReceiptStorage:
   type BlockHash = ByteString
   type ReceiptSeq = Seq[Receipt]
 
-  implicit val byteStringPickler: Pickler[ByteString] =
+  given byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])
-  implicit val hashOutcomePickler: Pickler[HashOutcome] = transformPickler[HashOutcome, ByteString] { hash =>
+  given hashOutcomePickler: Pickler[HashOutcome] = transformPickler[HashOutcome, ByteString] { hash =>
     HashOutcome(hash)
   }(outcome => outcome.stateHash)
-  implicit val successOutcomePickler: Pickler[SuccessOutcome.type] = transformPickler[SuccessOutcome.type, ByteString] {
-    _ => SuccessOutcome
+  given successOutcomePickler: Pickler[SuccessOutcome.type] = transformPickler[SuccessOutcome.type, ByteString] { _ =>
+    SuccessOutcome
   }(_ => ByteString(Array(1.toByte)))
-  implicit val failureOutcomePickler: Pickler[FailureOutcome.type] = transformPickler[FailureOutcome.type, ByteString] {
-    _ => FailureOutcome
+  given failureOutcomePickler: Pickler[FailureOutcome.type] = transformPickler[FailureOutcome.type, ByteString] { _ =>
+    FailureOutcome
   }(_ => ByteString(Array(0.toByte)))
-  implicit val transactionOutcomePickler: Pickler[TransactionOutcome] = compositePickler[TransactionOutcome]
+  given transactionOutcomePickler: Pickler[TransactionOutcome] = compositePickler[TransactionOutcome]
     .addConcreteType[HashOutcome]
     .addConcreteType[SuccessOutcome.type]
     .addConcreteType[FailureOutcome.type]
 
-  implicit val addressPickler: Pickler[Address] =
+  given addressPickler: Pickler[Address] =
     transformPickler[Address, ByteString](bytes => Address(bytes))(address => address.bytes)
-  implicit val txLogEntryPickler: Pickler[TxLogEntry] =
+  given txLogEntryPickler: Pickler[TxLogEntry] =
     transformPickler[TxLogEntry, (Address, Seq[ByteString], ByteString)] { case (address, topics, data) =>
       TxLogEntry(address, topics, data)
     }(entry => (entry.loggerAddress, entry.logTopics, entry.data))
 
-  implicit val legacyReceiptPickler: Pickler[LegacyReceipt] =
+  given legacyReceiptPickler: Pickler[LegacyReceipt] =
     transformPickler[LegacyReceipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => LegacyReceipt(state, gas, filter, logs)
+      case (state, gas, filter, logs) => LegacyReceipt(state, gas, BloomFilter(filter), logs)
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
-  implicit val type01ReceiptPickler: Pickler[Type01Receipt] =
+  given type01ReceiptPickler: Pickler[Type01Receipt] =
     transformPickler[Type01Receipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => Type01Receipt(LegacyReceipt(state, gas, filter, logs))
+      case (state, gas, filter, logs) => Type01Receipt(LegacyReceipt(state, gas, BloomFilter(filter), logs))
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
-  implicit val type02ReceiptPickler: Pickler[Type02Receipt] =
+  given type02ReceiptPickler: Pickler[Type02Receipt] =
     transformPickler[Type02Receipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => Type02Receipt(LegacyReceipt(state, gas, filter, logs))
+      case (state, gas, filter, logs) => Type02Receipt(LegacyReceipt(state, gas, BloomFilter(filter), logs))
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
-  implicit val type03ReceiptPickler: Pickler[Type03Receipt] =
+  given type03ReceiptPickler: Pickler[Type03Receipt] =
     transformPickler[Type03Receipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => Type03Receipt(LegacyReceipt(state, gas, filter, logs))
+      case (state, gas, filter, logs) => Type03Receipt(LegacyReceipt(state, gas, BloomFilter(filter), logs))
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
-  implicit val type04ReceiptPickler: Pickler[Type04Receipt] =
+  given type04ReceiptPickler: Pickler[Type04Receipt] =
     transformPickler[Type04Receipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => Type04Receipt(LegacyReceipt(state, gas, filter, logs))
+      case (state, gas, filter, logs) => Type04Receipt(LegacyReceipt(state, gas, BloomFilter(filter), logs))
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
-  implicit val receiptPickler: Pickler[Receipt] = compositePickler[Receipt]
+  given receiptPickler: Pickler[Receipt] = compositePickler[Receipt]
     .addConcreteType[LegacyReceipt]
     .addConcreteType[Type01Receipt]
     .addConcreteType[Type02Receipt]
     .addConcreteType[Type03Receipt]
     .addConcreteType[Type04Receipt]
-}

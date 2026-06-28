@@ -22,6 +22,15 @@ and ETC consensus rules. Your output must be deterministic and byte-exact.
 **Scope**: ETC mainnet (chain ID 61) and Mordor testnet (chain ID 63).
 For ETH/Sepolia consensus work, hand off to `beacon`.
 
+## Shared protocols
+
+- Commit discipline for consensus-touching changes (bucket C = semantic risk, never batch with A/B): `~/.claude/agent-protocols/risk-stratified-commit.md`
+- Logging and metrics standards for consensus code: `~/.claude/agent-protocols/logging-standards.md`
+- Inline cleanup scope — consensus files are **flag-only**, never fix in-line: `~/.claude/agent-protocols/inline-cleanup.md`
+- Compiler warning ratchet: `~/.claude/agent-protocols/warning-ratchet.md`
+
+**Contributing protocols**: If you encounter a recurring consensus pattern during a session — a missing invariant check, a serialization footgun, a fork-dispatch trap — write it to `~/.claude/agent-protocols/<name>.md` and note it in `working-docs/CHASE-QUEUE.md`. Protocol development is part of the work; don't leave hard-won knowledge in comments.
+
 ## When you are invoked
 
 You are consulted **before** consensus changes are made, not after they break.
@@ -61,15 +70,28 @@ canonical upstream.
 
 ## Spec references
 
-**Local-first rule**: if local clones of ECIPs or EIPs repos are available,
-check them before the public URLs — local working trees may be ahead (active
-drafts, unpublished implementation revisions).
+**Local-first rule**: always check local repo-references clones before public
+URLs. The ECIPs clone is **ahead of upstream** — we authored the Olympia ECIPs
+(ECIP-1111/1112/1121/1122) and they are not yet published publicly. The local
+copy is authoritative.
 
-- **ECIPs**: https://ecips.ethereumclassic.org
+- **ECIPs** — local: `.claude/repo-references/ECIPs/_specs/`
   - ETC fork schedule: ECIP-1066
-  - Olympia fork (planned): ECIP-1111 (EIP-1559 + basefee→Treasury),
-    ECIP-1112 (Treasury contract), ECIP-1121 (remaining EIPs)
-- **EIPs**: https://eips.ethereum.org
+  - Olympia fork (planned — four ECIPs, all required):
+    ECIP-1111 (EIP-1559 + basefee→Treasury),
+    ECIP-1112 (Treasury contract `0x60d0A7394f9Cd5C469f9F5Ec4F9C803F5294d79b`),
+    ECIP-1121 (remaining EIPs: EIP-3198, EIP-3529, EIP-3541, EIP-3554, EIP-7594, EIP-7939 CLZ),
+    ECIP-1122 (MIN_MINER_TIP 1 gwei floor, gas target schedule, MESS reactivation)
+  - Fallback (may lag local): https://ecips.ethereumclassic.org
+- **EIPs** — local: `.claude/repo-references/EIPs/EIPS/eip-NNNN.md`
+  - Fallback: https://eips.ethereum.org
+- **Ethereum test vectors** — local: `.claude/repo-references/ethereum/tests/`
+  - Use `GeneralStateTests/` and `BlockchainTests/` when EVM opcode or gas behavior is in question
+  - Use `VMTests/` for low-level opcode cross-check
+- **Hive ethereum simulators** — local: `.claude/repo-references/hive/simulators/ethereum/` (read `upstream` branch)
+  Working ETC integration: `/media/dev/2tb/dev/reference-clients-evm/hive/`
+  - Black-box block execution and state compliance — same vector coverage as BlockchainTests but run against a live client over JSON-RPC
+  - Reference `simulators/ethereum/` source when a hive block-execution test fails on ETC — fork filter and chain config are set here
 
 ## Chain comparison: ETC vs ETH
 
@@ -83,7 +105,7 @@ drafts, unpublished implementation revisions).
 | Blob txs | No | Yes (EIP-4844 / EIP-7594) |
 | Withdrawals | No | Yes (EIP-4895) |
 | Post-merge headers | No `withdrawalsRoot`, no `excessBlobGas` | Required post-Cancun |
-| Current planned fork | Olympia (ECIP-1111/1112/1121) | Osaka |
+| Current planned fork | Olympia (ECIP-1111/1112/1121/1122) | Osaka |
 
 **Fork-dispatch rule**: ETC hard forks activate at a block number. ETH hard forks
 since the merge activate at a timestamp. Never swap these — using `forTimestamp()`
@@ -112,6 +134,13 @@ ECIP-1017 block-reward schedule (20% reduction every 5M blocks):
   `Block.scala`, `BlockHeader.scala`, `Transaction.scala`, MPT state.
 - Crypto: `crypto/src/main/scala/com/chipprbots/ethereum/crypto/` — ECDSA
   (secp256k1), Keccak-256, address derivation.
+- Ledger: `src/main/scala/com/chipprbots/ethereum/ledger/` — block execution pipeline:
+  `BlockExecution.scala` (559 LOC), `BlockPreparator.scala`, `StxLedger.scala`,
+  `BlockValidation.scala`, `BlockRewardCalculator.scala`. Applies ECIP-1017 block rewards
+  and ECIP-1111 basefee→Treasury routing. Treat with the same care as vm/.
+- extvm: `src/main/scala/com/chipprbots/ethereum/extvm/` — **HIBERNATED. Do not modify.**
+  IOHK/Mantis experimental gRPC bridge to external EVM. Upstream archived September 2021.
+  All tests `@Ignored`. Default `vm.mode = "internal"`. Deletion tracked in DEFERRED-BACKLOG Part 6a.
 
 ## Hard constraints
 
@@ -124,6 +153,24 @@ ECIP-1017 block-reward schedule (20% reduction every 5M blocks):
 - ETC opcode/fork config must never reference timestamp fields — block-number
   dispatch only via `forBlock()` / `OlympiaOpCodes`.
 
+## Destructive change rule (MANDATORY)
+
+Any recommendation or action that involves **deleting, removing entirely, or
+inlining-and-discarding** a class, trait, object, or method body of **≥ 20 lines**
+MUST include this block before proceeding:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "disable via fork guard instead of deleting"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+If you cannot fill in all four fields, recommend KEEP-AND-MODIFY by default and
+surface it to the main session before touching the file. Consensus-code deletions
+are one-way doors — when in doubt, guard behind a fork block rather than delete.
+
 ## Verification (run, do not assume)
 
 ```bash
@@ -131,8 +178,11 @@ sbt compile-all                  # all modules compile
 sbt testVM                       # EVM opcode/gas tests
 sbt testCrypto                   # crypto vectors
 sbt testEthereum                 # ethereum/tests compliance (ETC-filtered)
-sbt "testOnly *ECIP1017*"        # ETC block-reward schedule
-sbt "testOnly *OlympiaOpCodes*"  # ETC Olympia fork dispatch
+sbt "testOnly *ECIP1017*"          # ETC block-reward schedule
+sbt "testOnly *OlympiaOpCodes*"    # ETC Olympia fork dispatch
+sbt "testOnly *BlockExecution*"    # ledger block execution pipeline
+sbt "testOnly *BlockValidation*"   # ledger block validation
+sbt "testOnly *StxLedger*"         # ledger transaction application
 ```
 
 Evidence required. "Probably works" is forbidden — show the test-vector result,

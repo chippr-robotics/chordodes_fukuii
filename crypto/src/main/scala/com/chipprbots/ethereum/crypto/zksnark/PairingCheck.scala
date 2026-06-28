@@ -5,7 +5,7 @@ import scala.collection.mutable.ArrayBuffer
 import com.chipprbots.ethereum.crypto.zksnark.BN128.BN128G1
 import com.chipprbots.ethereum.crypto.zksnark.BN128.BN128G2
 import com.chipprbots.ethereum.crypto.zksnark.BN128.Point
-import com.chipprbots.ethereum.crypto.zksnark.FiniteField.Ops._
+import com.chipprbots.ethereum.crypto.zksnark.FiniteField.Ops.*
 
 object PairingCheck {
 

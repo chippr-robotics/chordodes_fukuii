@@ -21,32 +21,30 @@ import org.apache.pekko.util.ByteString
   * @param nodeData
   *   The RLP-encoded trie node data once retrieved
   */
-case class HealingTask(
-    path: Seq[ByteString],
-    hash: ByteString,
-    rootHash: ByteString,
+class HealingTask(
+    val path: Seq[ByteString],
+    val hash: ByteString,
+    val rootHash: ByteString,
     var pending: Boolean = true,
     var done: Boolean = false,
     var nodeData: Option[ByteString] = None
-) {
+):
 
   /** Returns a short string representation for debugging */
-  def toShortString: String = {
-    val pathStr = if (path.isEmpty) "root" else s"depth=${path.length}"
+  def toShortString: String =
+    val pathStr = if path.isEmpty then "root" else s"depth=${path.length}"
     val hashStr = hash.take(4).map(b => f"$b%02x").mkString
-    val status = if (done) "done" else if (pending) "pending" else "active"
+    val status = if done then "done" else if pending then "pending" else "active"
     s"HealingTask($pathStr, hash=$hashStr..., $status)"
-  }
 
   /** Returns the progress of this task (0.0 to 1.0) */
   def progress: Double =
-    if (done) 1.0
-    else if (nodeData.isDefined) 0.9
-    else if (!pending) 0.5
+    if done then 1.0
+    else if nodeData.isDefined then 0.9
+    else if !pending then 0.5
     else 0.0
-}
 
-object HealingTask {
+object HealingTask:
 
   /** Creates a healing task for a missing node at the given path and hash.
     *
@@ -61,6 +59,20 @@ object HealingTask {
     */
   def apply(path: Seq[ByteString], hash: ByteString, rootHash: ByteString): HealingTask =
     new HealingTask(path, hash, rootHash)
+
+  def apply(
+      path: Seq[ByteString],
+      hash: ByteString,
+      rootHash: ByteString,
+      pending: Boolean,
+      done: Boolean,
+      nodeData: Option[ByteString] = None
+  ): HealingTask =
+    val task = new HealingTask(path, hash, rootHash)
+    task.pending = pending
+    task.done = done
+    task.nodeData = nodeData
+    task
 
   /** Creates healing tasks from a list of missing node paths and hashes.
     *
@@ -86,4 +98,3 @@ object HealingTask {
   /** Maximum iterations for iterative healing process. Prevents infinite loops in case of persistent missing nodes.
     */
   val MAX_HEALING_ITERATIONS: Int = 10
-}

@@ -7,34 +7,31 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
+import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks
 import com.chipprbots.ethereum.vm.PrecompiledContracts.ModExp
 
-import MockWorldState._
+import MockWorldState.*
 import Fixtures.blockchainConfig
 
-class PrecompiledContractsSpec
-    extends AnyFunSuite
-    with Matchers
-    with ScalaCheckPropertyChecks
-    with SecureRandomBuilder {
+class PrecompiledContractsSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks with SecureRandomBuilder:
 
   val vm = new TestVM
 
-  def buildContext(recipient: Address, inputData: ByteString, gas: UInt256 = 1000000, blockNumber: BigInt = 0): PC = {
+  def buildContext(recipient: Address, inputData: ByteString, gas: UInt256 = 1000000, blockNumber: BigInt = 0): PC =
     val origin = Address(0xcafebabe)
 
     val fakeHeader = BlockFixtures.ValidBlock.header.copy(
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       number = blockNumber,
       gasLimit = 0,
       gasUsed = 0,
@@ -62,7 +59,6 @@ class PrecompiledContractsSpec
       warmAddresses = Set.empty,
       warmStorage = Set.empty
     )
-  }
 
   test("ECDSARECOVER", UnitTest, VMTest) {
     val keyPair = generateKeyPair(secureRandom)
@@ -462,5 +458,3 @@ class PrecompiledContractsSpec
       result.returnData shouldEqual ByteString(Hex.decode(expectedResult))
     }
   }
-
-}

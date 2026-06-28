@@ -10,8 +10,8 @@ import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransaction
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Hex
@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.utils.Hex
   *      includes chainId 4. Signature verification works for all chain IDs 5. No silent truncation in the pipeline 6.
   *      RLP encoding/decoding handles BigInt chain IDs correctly 7. Pre-EIP-155 transactions (v=27/28) still work
   */
-class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers {
+class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
 
   "EIP-155 BigInt chain ID" should "handle ETC mainnet (chain ID 61)" taggedAs (UnitTest) in {
     implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = 61)
@@ -218,4 +218,3 @@ class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers {
     // Each chain ID should produce a different hash
     hashes.distinct.length shouldEqual chainIds.length
   }
-}

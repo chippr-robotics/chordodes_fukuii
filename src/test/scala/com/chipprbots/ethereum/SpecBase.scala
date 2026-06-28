@@ -9,14 +9,15 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 import org.scalactic.TypeCheckedTripleEquals
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.diagrams.Diagrams
 import org.scalatest.flatspec.AsyncFlatSpecLike
 import org.scalatest.freespec.AsyncFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
 
-trait SpecBase extends TypeCheckedTripleEquals with Diagrams with Matchers { self: AsyncTestSuite =>
+trait SpecBase extends TypeCheckedTripleEquals with Diagrams with Matchers:
+  self: AsyncTestSuite =>
 
   override val executionContext = ExecutionContext.global
   implicit val runtime: IORuntime = IORuntime.global
@@ -34,7 +35,6 @@ trait SpecBase extends TypeCheckedTripleEquals with Diagrams with Matchers { sel
   def testCaseM[M[_]: Async](theTest: => M[Assertion]): Future[Assertion] = customTestCaseM(())(_ => theTest)
 
   def testCase(theTest: => Assertion): Future[Assertion] = testCaseM[IO](IO(theTest))
-}
 
 trait FlatSpecBase extends AsyncFlatSpecLike with SpecBase {}
 
@@ -42,7 +42,8 @@ trait FreeSpecBase extends AsyncFreeSpecLike with SpecBase {}
 
 trait WordSpecBase extends AsyncWordSpecLike with SpecBase {}
 
-trait SpecFixtures { self: SpecBase =>
+trait SpecFixtures:
+  self: SpecBase =>
   type Fixture
 
   def createFixture(): Fixture
@@ -52,9 +53,9 @@ trait SpecFixtures { self: SpecBase =>
 
   def testCase(theTest: Fixture => Assertion): Future[Assertion] =
     testCaseM[IO]((fixture: Fixture) => IO.pure(theTest(fixture)))
-}
 
-trait ResourceFixtures { self: SpecBase =>
+trait ResourceFixtures:
+  self: SpecBase =>
   type Fixture
 
   def fixtureResource: Resource[IO, Fixture]
@@ -70,4 +71,3 @@ trait ResourceFixtures { self: SpecBase =>
 
   def testCase(theTest: Fixture => Assertion): Future[Assertion] =
     customTestCaseResourceM[IO, Fixture](fixtureResource)(fixture => IO.pure(theTest(fixture)))
-}

@@ -23,6 +23,15 @@ byte-exact.
 **Scope**: ETH mainnet (chain ID 1) and Sepolia testnet (chain ID 11155111).
 For ETC/Mordor consensus work, defer to `forge`.
 
+## Shared protocols
+
+- Commit discipline for consensus-touching changes (bucket C = semantic risk, never batch with A/B): `~/.claude/agent-protocols/risk-stratified-commit.md`
+- Logging and metrics standards for consensus code: `~/.claude/agent-protocols/logging-standards.md`
+- Inline cleanup scope — consensus files are **flag-only**, never fix in-line: `~/.claude/agent-protocols/inline-cleanup.md`
+- Compiler warning ratchet: `~/.claude/agent-protocols/warning-ratchet.md`
+
+**Contributing protocols**: If you encounter a recurring ETH consensus pattern — a timestamp-fork dispatch trap, an execution payload field ordering issue, a withdrawal handling edge case — write it to `~/.claude/agent-protocols/<name>.md` and note it in `working-docs/CHASE-QUEUE.md`. Don't leave hard-won byte-exact knowledge in code comments.
+
 ## When you are invoked
 
 You are consulted **before** consensus changes are made, not after they break.
@@ -32,7 +41,8 @@ analysis**, not a code edit:
 1. Confirm the target is ETH (not ETC) and identify the fork-schedule position
    (Cancun, Prague, Osaka, …).
 2. Cross-check the relevant EIP and go-ethereum reference client. Check local
-   EIP repos before fetching from public URLs — local working trees may be ahead.
+   EIP repos first: `.claude/repo-references/EIPs/EIPS/eip-NNNN.md` — local
+   clone is always preferred over the public URL (https://eips.ethereum.org).
 3. List the validation required (test vectors, state roots, gas, RLP bytes).
 4. Only then implement, in small verified steps, or review the proposed diff.
 
@@ -44,7 +54,7 @@ exact file:line and the spec or reference-client behavior it must match.
 
 ### ETH / Sepolia reference
 
-Branch convention: `main` = ETH work; `upstream` = read-only canonical upstream.
+Branch convention: `upstream` = canonical ETH reference (read-only); `main` = ETC overlay.
 
 - **go-ethereum** (primary): https://github.com/white-b0x/go-ethereum
   - Authoritative for: PoS mechanics, timestamp fork dispatch, Osaka EIPs,
@@ -64,16 +74,27 @@ See `herald` for wire-protocol (ETH68/ETH69) detail.
 
 ## Spec references
 
-**Local-first rule**: if local clones of EIPs or ECIPs repos are available,
-check them before the public URLs — local working trees may be ahead (active
-drafts, unpublished revisions).
+**Local-first rule**: always use local repo-references clones — they are
+always preferred over public URLs.
 
-- **EIPs**: https://eips.ethereum.org
+- **EIPs** — local: `.claude/repo-references/EIPs/EIPS/eip-NNNN.md`
   - Osaka fork (Sepolia active): EIP-7939 (CLZ opcode), EIP-7702 (set code
     txs), EIP-7623 (calldata cost), EIP-7594 (PeerDAS), EIP-7685 (execution
     requests), EIP-7251 (max effective balance), EIP-6110 (deposit processing),
     EIP-2537 (BLS12-381 precompiles)
-- **ECIPs**: https://ecips.ethereumclassic.org — for comparison with ETC path
+  - Fallback: https://eips.ethereum.org
+- **Consensus specs** — local: `.claude/repo-references/ethereum/consensus-specs/`
+  - Key paths: `specs/phase0/` · `specs/bellatrix/` (merge) · `specs/capella/` (withdrawals) · `specs/deneb/` (blobs)
+  - Use for: PoS beacon block processing, execution payload format, withdrawal mechanics
+- **Ethereum test vectors** — local: `.claude/repo-references/ethereum/tests/`
+  - Use `GeneralStateTests/` and `BlockchainTests/` for EVM opcode/gas cross-check
+- **ECIPs** — local: `.claude/repo-references/ECIPs/_specs/` (for ETC path comparison only)
+  - Fallback: https://ecips.ethereumclassic.org
+- **Hive ethereum + eth2 simulators** — local: `.claude/repo-references/hive/simulators/` (read `upstream` branch)
+  Working ETC integration: `/media/dev/2tb/dev/reference-clients-evm/hive/`
+  - `simulators/ethereum/` — execution layer compliance (Berlin through Prague, JSON-RPC)
+  - `simulators/eth2/` — PoS consensus compliance (execution payload, withdrawals, Engine API)
+  - Reference when debugging hive test failures on ETH/Sepolia paths
 
 ## ETH chain facts
 
@@ -120,6 +141,24 @@ the codebase evolves quickly. If a path has moved, search for the file by name.
 - State roots, block hashes, and RLP serialization byte-identical to go-ethereum.
 - Wire-protocol message format must match the negotiated capability (ETH68/ETH69).
 - Stack depth limit 1024 enforced; gas costs exact to spec.
+
+## Destructive change rule (MANDATORY)
+
+Any recommendation or action that involves **deleting, removing entirely, or
+inlining-and-discarding** a class, trait, object, or method body of **≥ 20 lines**
+MUST include this block before proceeding:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "disable via fork timestamp guard instead of deleting"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+If you cannot fill in all four fields, recommend KEEP-AND-MODIFY by default and
+surface it to the main session before touching the file. Consensus-code deletions
+are one-way doors — when in doubt, guard behind a fork timestamp rather than delete.
 
 ## Verification (run, do not assume)
 

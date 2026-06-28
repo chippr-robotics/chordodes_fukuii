@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.util.ByteString
 
+import org.scalacheck.Gen
 import org.scalactic.anyvals.PosInt
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
@@ -10,14 +11,16 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.SuperSlow
-import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.MptNodeData
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.TrieProvider
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.checkAllDataExists
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.AlreadyProcessedItem
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.CannotDecodeMptNode
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.CriticalError
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.NotRequestedItem
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ProcessingStatistics
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ResponseProcessingError
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SchedulerState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SyncResponse
 import com.chipprbots.ethereum.db.components.EphemDataSourceComponent
@@ -26,22 +29,20 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
+import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Generators.genMultipleNodeData
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.CriticalError
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ProcessingStatistics
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ResponseProcessingError
-import org.scalacheck.Gen
 
 class SyncStateSchedulerSpec
     extends AnyFlatSpec
     with Matchers
     with EitherValues
     with ScalaCheckPropertyChecks
-    with SuperSlow {
+    with SuperSlow:
   "SyncStateScheduler" should "sync with mptTrie with one account (1 leaf node)" taggedAs (
     UnitTest,
     SyncTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val prov = getTrieProvider
     val worldHash: ByteString = prov.buildWorld(Seq(MptNodeData(Address(1), None, Seq(), 20)))
     val (syncStateScheduler, _, _, _, schedulerDb) = buildScheduler()
@@ -59,9 +60,8 @@ class SyncStateSchedulerSpec
     assert(newRequests.isEmpty)
     assert(state.numberOfPendingRequests == 0)
     assert(schedulerDb.storages.nodeStorage.get(missingNodes.head).isDefined)
-  }
 
-  it should "sync with mptTrie with one account with code and storage" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "sync with mptTrie with one account with code and storage" taggedAs (UnitTest, SyncTest) in new TestSetup:
     val prov = getTrieProvider
     val worldHash: ByteString = prov.buildWorld(
       Seq(MptNodeData(Address(1), Some(ByteString(1, 2, 3)), Seq((1, 1)), 20))
@@ -79,9 +79,8 @@ class SyncStateSchedulerSpec
     assert(state3.numberOfPendingRequests == 0)
     // 1 leaf node + 1 code + 1 storage
     assert(schedulerDb.dataSource.storage.size == 3)
-  }
 
-  it should "not request already known lead nodes" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "not request already known lead nodes" taggedAs (UnitTest, SyncTest) in new TestSetup:
     val prov = getTrieProvider
     val worldHash: ByteString = prov.buildWorld(
       Seq(
@@ -110,12 +109,11 @@ class SyncStateSchedulerSpec
 
     // branch got 3 leaf nodes, but we already known 2 of them, so there are pending requests only for: 1 branch + 1 unknown leaf
     assert(state1a.numberOfPendingRequests == 2)
-  }
 
   it should "sync with mptTrie with 2 accounts with different code and storage" taggedAs (
     UnitTest,
     SyncTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes
     val worldHash: ByteString = prov.buildWorld(
@@ -157,9 +155,8 @@ class SyncStateSchedulerSpec
     // 1 branch node + 2 leaf nodes + 4 code and storage data
     assert(state9.numberOfPendingRequests == 0)
     assert(schedulerDb.dataSource.storage.size == 7)
-  }
 
-  it should "should not request already known code or storage" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "should not request already known code or storage" taggedAs (UnitTest, SyncTest) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes, two different account with same code and same storage
     val worldHash: ByteString = prov.buildWorld(
@@ -189,9 +186,8 @@ class SyncStateSchedulerSpec
     assert(remaingNodes == 0)
     // 1 branch node + 2 leaf node + 1 code + 1 storage (code and storage are shared by 2 leaf nodes)
     assert(schedulerDb.dataSource.storage.size == 5)
-  }
 
-  it should "should return error when processing unrequested response" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "should return error when processing unrequested response" taggedAs (UnitTest, SyncTest) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes, two different account with same code and same storage
     val worldHash: ByteString = prov.buildWorld(
@@ -207,12 +203,11 @@ class SyncStateSchedulerSpec
       syncStateScheduler.processResponse(state1, SyncResponse(ByteString(1), ByteString(2)))
     assert(result1.isLeft)
     assert(result1.left.value == NotRequestedItem)
-  }
 
   it should "should return error when processing already processed response" taggedAs (
     UnitTest,
     SyncTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes, two different account with same code and same storage
     val worldHash: ByteString = prov.buildWorld(
@@ -234,9 +229,8 @@ class SyncStateSchedulerSpec
     assert(result1.isRight)
     assert(result2.isLeft)
     assert(result2.left.value == AlreadyProcessedItem)
-  }
 
-  it should "should return critical error when node is malformed" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "should return critical error when node is malformed" taggedAs (UnitTest, SyncTest) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes, two different account with same code and same storage
     val worldHash: ByteString = prov.buildWorld(
@@ -253,14 +247,13 @@ class SyncStateSchedulerSpec
       syncStateScheduler.processResponse(state1, firstMissingResponse.head.copy(data = ByteString(1, 2, 3)))
     assert(result1.isLeft)
     assert(result1.left.value == CannotDecodeMptNode)
-  }
 
   implicit override val generatorDrivenConfig: PropertyCheckConfiguration =
     PropertyCheckConfiguration(minSuccessful = PosInt(3))
 
   // Long running test generating random mpt tries and checking that scheduler is able to correctly
   // traverse them
-  it should "sync whole trie when receiving all nodes from remote side" taggedAs (UnitTest, SyncTest) in new TestSetup {
+  it should "sync whole trie when receiving all nodes from remote side" taggedAs (UnitTest, SyncTest) in new TestSetup:
     val nodeDataGen: Gen[List[MptNodeData]] = genMultipleNodeData(
       superSlow(2000).getOrElse(20) // use smaller test set for CI as it is super slow there
     )
@@ -269,16 +262,15 @@ class SyncStateSchedulerSpec
       val worldHash = prov.buildWorld(nodeData)
       val (scheduler, schedulerBlockchain, schedulerBlockchainWriter, schedulerBlockchainReader, allStorages) =
         buildScheduler()
-      val header = Fixtures.Blocks.ValidBlock.header.copy(stateRoot = worldHash, number = 1)
+      val header = Fixtures.Blocks.ValidBlock.header.copy(stateRoot = TrieRoot(worldHash), number = 1)
       schedulerBlockchainWriter.storeBlockHeader(header).commit()
       schedulerBlockchainWriter.saveBestKnownBlocks(header.hash, 1)
       var state = scheduler.initState(worldHash).get
-      while (state.activeRequest.nonEmpty) {
+      while state.activeRequest.nonEmpty do
         val (allMissingNodes1, state2) = scheduler.getAllMissingNodes(state)
         val allMissingNodes1Response = prov.getNodes(allMissingNodes1)
         val state3 = scheduler.processResponses(state2, allMissingNodes1Response).value._1
         state = state3
-      }
       assert(state.memBatch.nonEmpty)
       val finalState = scheduler.persistBatch(state, 1)
       assert(finalState.memBatch.isEmpty)
@@ -294,39 +286,35 @@ class SyncStateSchedulerSpec
         )
       )
     }
-  }
 
-  trait TestSetup extends EphemBlockchainTestSetup {
-    def getTrieProvider: TrieProvider = {
+  trait TestSetup extends EphemBlockchainTestSetup:
+    def getTrieProvider: TrieProvider =
       val freshStorage = getNewStorages
       val freshBlockchainReader = BlockchainReader(freshStorage.storages)
       val freshBlockchain = BlockchainImpl(freshStorage.storages, freshBlockchainReader)
       new TrieProvider(freshBlockchain, freshBlockchainReader, freshStorage.storages.evmCodeStorage, blockchainConfig)
-    }
     val bloomFilterSize = 1000
 
     def exchangeAllNodes(
         initState: SchedulerState,
         scheduler: SyncStateScheduler,
         provider: TrieProvider
-    ): SchedulerState = {
+    ): SchedulerState =
       var state = initState
-      while (state.activeRequest.nonEmpty) {
+      while state.activeRequest.nonEmpty do
         val (allMissingNodes1, state2) = scheduler.getAllMissingNodes(state)
         val allMissingNodes1Response = provider.getNodes(allMissingNodes1)
         val state3 = scheduler.processResponses(state2, allMissingNodes1Response).value._1
         state = state3
-      }
       state
-    }
 
     def buildScheduler(): (
         SyncStateScheduler,
         BlockchainImpl,
         BlockchainWriter,
         BlockchainReader,
-        EphemDataSourceComponent with LocalPruningConfigBuilder with Storages.DefaultStorages
-    ) = {
+        EphemDataSourceComponent & LocalPruningConfigBuilder & Storages.DefaultStorages
+    ) =
       val freshStorage = getNewStorages
       val freshBlockchainReader = BlockchainReader(freshStorage.storages)
       val freshBlockchain = BlockchainImpl(freshStorage.storages, freshBlockchainReader)
@@ -344,18 +332,12 @@ class SyncStateSchedulerSpec
         freshBlockchainReader,
         freshStorage
       )
-    }
 
     def exchangeSingleNode(
         initState: SchedulerState,
         scheduler: SyncStateScheduler,
         provider: TrieProvider
-    ): Either[SyncStateScheduler.ResponseProcessingError, SchedulerState] = {
+    ): Either[SyncStateScheduler.ResponseProcessingError, SchedulerState] =
       val (missingNodes, newState) = scheduler.getMissingNodes(initState, 1)
       val providedResponse = provider.getNodes(missingNodes)
       scheduler.processResponses(newState, providedResponse).map(_._1)
-    }
-
-  }
-
-}

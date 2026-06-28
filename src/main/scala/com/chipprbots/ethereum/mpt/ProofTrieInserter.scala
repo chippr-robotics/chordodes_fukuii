@@ -14,8 +14,8 @@ import org.apache.pekko.util.ByteString
   *
   * Not thread-safe — one instance per verification task.
   */
-final class ProofTrieInserter(initialRoot: MptNode) {
-  import StackTrie._
+final class ProofTrieInserter(initialRoot: MptNode):
+  import StackTrie.*
 
   // No-op callback: we only care about the final root hash, not intermediate node writes.
   private val hasher = new StackTrie((_, _, _) => ())
@@ -36,7 +36,7 @@ final class ProofTrieInserter(initialRoot: MptNode) {
 
   // ── MptNode → StNode conversion ────────────────────────────────────────────
 
-  private def mptToStNode(node: MptNode): StNode = node match {
+  private def mptToStNode(node: MptNode): StNode = node match
     case NullNode =>
       StNode.empty
 
@@ -51,10 +51,9 @@ final class ProofTrieInserter(initialRoot: MptNode) {
     case branch: BranchNode =>
       val st = StNode.newBranch()
       var i = 0
-      while (i < 16) {
+      while i < 16 do
         st.children(i) = mptToStNode(branch.children(i))
         i += 1
-      }
       // branch.terminator is always None in SNAP account tries (keys are fixed 64-nibble hashes).
       st
 
@@ -64,18 +63,14 @@ final class ProofTrieInserter(initialRoot: MptNode) {
       st.typ = Hashed
       st.value = hash.clone()
       st
-  }
 
   /** Convert a ByteString whose bytes are nibbles (values 0–15) to a plain Array[Byte]. Matches the internal
     * representation used by LeafNode.key and ExtensionNode.sharedKey.
     */
-  private def toNibbleArray(bs: ByteString): Array[Byte] = {
+  private def toNibbleArray(bs: ByteString): Array[Byte] =
     val arr = new Array[Byte](bs.length)
     var i = 0
-    while (i < bs.length) {
+    while i < bs.length do
       arr(i) = (bs(i) & 0xff).toByte
       i += 1
-    }
     arr
-  }
-}

@@ -1,19 +1,19 @@
 package com.chipprbots.ethereum.consensus.pow
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class EthashEpochBoundarySpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with ParallelTestExecution {
+    with ParallelTestExecution:
 
-  import com.chipprbots.ethereum.consensus.pow.EthashUtils._
+  import com.chipprbots.ethereum.consensus.pow.EthashUtils.*
 
   // ECIP-1099 doubles epoch length from 30K to 60K blocks at this block number
   val ecip1099ForkBlock: Long = 11460000
@@ -131,4 +131,3 @@ class EthashEpochBoundarySpec
     // Epoch approximately halves (83 → 42), keeping DAG manageable
     epoch(mordorEcip1099Block, mordorEcip1099Block) should be < epoch(mordorEcip1099Block - 1, mordorEcip1099Block)
   }
-}

@@ -7,10 +7,10 @@ import cats.effect.IO
 import cats.effect.Ref
 import cats.effect.Resource
 import cats.effect.Temporal
-import cats.implicits._
+import cats.implicits.*
 
 import scala.collection.immutable.SortedSet
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 
 import com.chipprbots.scalanet.discovery.crypto.PrivateKey
@@ -102,7 +102,7 @@ object DiscoveryService {
           // Use the current time to set the ENR sequence to something fresh.
           now <- temporal.monotonic.map(_.toMillis)
           enr <- IO {
-            EthereumNodeRecord.fromNode(node, privateKey, seq = now, tags.flatMap(_.toAttr): _*).require
+            EthereumNodeRecord.fromNode(node, privateKey, seq = now, tags.flatMap(_.toAttr)*).require
           }
 
           stateRef <- Ref[IO].of(State[A](node, enr, SubnetLimits.fromConfig(config)))
@@ -910,7 +910,7 @@ object DiscoveryService {
 
       init.flatMap {
         case (localNode, closestNodes) =>
-          loop(localNode, closest = SortedSet(closestNodes: _*), asked = Set(localNode), neighbors = closestNodes.toSet)
+          loop(localNode, closest = SortedSet(closestNodes*), asked = Set(localNode), neighbors = closestNodes.toSet)
       }
     }
 

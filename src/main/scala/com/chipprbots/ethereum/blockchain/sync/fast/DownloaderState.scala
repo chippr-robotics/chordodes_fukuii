@@ -20,30 +20,25 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
 final case class DownloaderState(
     activeRequests: Map[PeerId, NonEmptyList[ByteString]],
     nodesToGet: Map[ByteString, Option[PeerId]]
-) {
+):
   lazy val nonDownloadedNodes: Seq[ByteString] = nodesToGet.collect {
     case (hash, maybePeer) if maybePeer.isEmpty => hash
   }.toSeq
 
-  def scheduleNewNodesForRetrieval(nodes: Seq[ByteString]): DownloaderState = {
+  def scheduleNewNodesForRetrieval(nodes: Seq[ByteString]): DownloaderState =
     val newNodesToGet = nodes.foldLeft(nodesToGet) { case (map, node) =>
-      if (map.contains(node)) {
-        map
-      } else {
-        map + (node -> None)
-      }
+      if map.contains(node) then map
+      else map + (node -> None)
     }
 
     copy(nodesToGet = newNodesToGet)
-  }
 
-  private def addActiveRequest(peerRequest: PeerRequest): DownloaderState = {
+  private def addActiveRequest(peerRequest: PeerRequest): DownloaderState =
     val newNodesToget = peerRequest.nodes.foldLeft(nodesToGet) { case (map, node) =>
       map + (node -> Some(peerRequest.peer.id))
     }
 
     copy(activeRequests = activeRequests + (peerRequest.peer.id -> peerRequest.nodes), nodesToGet = newNodesToget)
-  }
 
   def handleRequestFailure(from: Peer): DownloaderState =
     activeRequests
@@ -67,7 +62,7 @@ final case class DownloaderState(
   def process(
       requested: NonEmptyList[ByteString],
       received: NonEmptyList[ByteString]
-  ): (List[ByteString], List[SyncResponse]) = {
+  ): (List[ByteString], List[SyncResponse]) =
     // Build a hash→data map from all received nodes
     val receivedByHash: Map[ByteString, ByteString] = received.toList.map { data =>
       kec256(data) -> data
@@ -78,13 +73,12 @@ final case class DownloaderState(
     val responses = matched.map(hash => SyncResponse(hash, receivedByHash(hash)))
 
     (notReceived, responses)
-  }
 
   def handleRequestSuccess(from: Peer, receivedMessage: NodeData): (ResponseProcessingResult, DownloaderState) =
     activeRequests
       .get(from.id)
       .map { requestedHashes =>
-        if (receivedMessage.values.isEmpty) {
+        if receivedMessage.values.isEmpty then
           val rescheduleRequestedHashes = requestedHashes.foldLeft(nodesToGet) { case (map, hash) =>
             map + (hash -> None)
           }
@@ -92,10 +86,10 @@ final case class DownloaderState(
             NoUsefulDataInResponse,
             copy(activeRequests = activeRequests - from.id, nodesToGet = rescheduleRequestedHashes)
           )
-        } else {
+        else
           val (notReceived, received) =
             process(requestedHashes, NonEmptyList.fromListUnsafe(receivedMessage.values.toList))
-          if (received.isEmpty) {
+          if received.isEmpty then
             val rescheduleRequestedHashes = notReceived.foldLeft(nodesToGet) { case (map, hash) =>
               map + (hash -> None)
             }
@@ -103,12 +97,10 @@ final case class DownloaderState(
               NoUsefulDataInResponse,
               copy(activeRequests = activeRequests - from.id, nodesToGet = rescheduleRequestedHashes)
             )
-          } else {
+          else
             val afterNotReceive = notReceived.foldLeft(nodesToGet) { case (map, hash) => map + (hash -> None) }
             val afterReceived = received.foldLeft(afterNotReceive) { case (map, received) => map - received.hash }
             (UsefulData(received), copy(activeRequests = activeRequests - from.id, nodesToGet = afterReceived))
-          }
-        }
       }
       .getOrElse((UnrequestedResponse, this))
 
@@ -116,7 +108,7 @@ final case class DownloaderState(
       peers: NonEmptyList[Peer],
       newNodes: Option[Seq[ByteString]],
       nodesPerPeerCapacity: Int
-  ): (Seq[PeerRequest], DownloaderState) = {
+  ): (Seq[PeerRequest], DownloaderState) =
     @tailrec
     def go(
         peersRemaining: List[Peer],
@@ -124,9 +116,9 @@ final case class DownloaderState(
         createdRequests: List[PeerRequest],
         currentState: DownloaderState
     ): (Seq[PeerRequest], DownloaderState) =
-      if (peersRemaining.isEmpty || nodesRemaining.isEmpty) {
+      if peersRemaining.isEmpty || nodesRemaining.isEmpty then
         (createdRequests.reverse, currentState.scheduleNewNodesForRetrieval(nodesRemaining))
-      } else {
+      else
         val nextPeer = peersRemaining.head
         val (nodes, nodesAfterAssignment) = nodesRemaining.splitAt(nodesPerPeerCapacity)
         val peerRequest = PeerRequest(nextPeer, NonEmptyList.fromListUnsafe(nodes.toList))
@@ -136,18 +128,10 @@ final case class DownloaderState(
           peerRequest :: createdRequests,
           currentState.addActiveRequest(peerRequest)
         )
-      }
 
     val currentNodesToDeliver = newNodes.map(nodes => nonDownloadedNodes ++ nodes).getOrElse(nonDownloadedNodes)
-    if (currentNodesToDeliver.isEmpty) {
-      (Seq(), this)
-    } else {
-      go(peers.toList, currentNodesToDeliver, List.empty, this)
-    }
-  }
+    if currentNodesToDeliver.isEmpty then (Seq(), this)
+    else go(peers.toList, currentNodesToDeliver, List.empty, this)
 
-}
-
-object DownloaderState {
+object DownloaderState:
   def apply(): DownloaderState = new DownloaderState(Map.empty, Map.empty)
-}

@@ -2,19 +2,23 @@ package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
 
-import cats.implicits._
+import cats.implicits.*
 
 import scala.annotation.tailrec
 
+import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockExecutionError.MissingParentError
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.DaoForkConfig
-import com.chipprbots.ethereum.vm.{EvmConfig, ProgramContext}
 import com.chipprbots.ethereum.utils.Logger
+import com.chipprbots.ethereum.vm.EvmConfig
+import com.chipprbots.ethereum.vm.ProgramContext
 
 class BlockExecution(
     blockchain: BlockchainImpl,
@@ -23,7 +27,7 @@ class BlockExecution(
     evmCodeStorage: EvmCodeStorage,
     blockPreparator: BlockPreparator,
     blockValidation: BlockValidation
-) extends Logger {
+) extends Logger:
 
   /** Executes and validate a block
     *
@@ -43,12 +47,12 @@ class BlockExecution(
   def executeAndValidateBlockFull(
       block: Block,
       alreadyValidated: Boolean = false
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, (Seq[Receipt], Seq[ByteString])] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, (Seq[Receipt], Seq[ByteString])] =
     val preExecValidationResult =
-      if (alreadyValidated) Right(block) else blockValidation.validateBlockBeforeExecution(block)
+      if alreadyValidated then Right(block) else blockValidation.validateBlockBeforeExecution(block)
 
     val blockExecResult =
-      for {
+      for
         _ <- preExecValidationResult
         result <- executeBlock(block)
         _ <- blockValidation.validateBlockAfterExecution(
@@ -57,14 +61,12 @@ class BlockExecution(
           result.receipts,
           result.gasUsed
         )
-      } yield (result.receipts, result.executionRequests)
+      yield (result.receipts, result.executionRequests)
 
-    if (blockExecResult.isRight) {
+    if blockExecResult.isRight then
       log.debug(s"Block ${block.header.number} (with hash: ${block.header.hashAsHexString}) executed correctly")
-    }
 
     blockExecResult
-  }
 
   /** Executes a block without pre/post validation. Returns the execution result including receipts, gasUsed, and the
     * persisted world state. Used by ChainImporter for trusted block import where only state correctness matters.
@@ -98,7 +100,7 @@ class BlockExecution(
       isProposer: Boolean = false
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockResult] =
     try
-      for {
+      for
         parentHeader <- blockchainReader
           .getBlockHeaderByHash(block.header.parentHash)
           .toRight(MissingParentError) // Should not never occur because validated earlier
@@ -120,17 +122,15 @@ class BlockExecution(
         // backing MPT storage is read-only, so persistState computes the trie hash in-memory without
         // writing to RocksDB — exactly what we want for a speculative payload.
         worldPersisted = InMemoryWorldStateProxy.persistState(worldAfterSystemCalls)
-      } yield execResult.copy(
+      yield execResult.copy(
         worldState = worldPersisted,
         executionRequests = depositRequest.toSeq ++ systemRequests
       )
-    catch {
-      case e: MPTException => Left(BlockExecutionError.MPTError(e))
-    }
+    catch case e: MPTException => Left(BlockExecutionError.MPTError(e))
 
   protected def buildInitialWorld(block: Block, parentHeader: BlockHeader, isProposer: Boolean = false)(implicit
       blockchainConfig: BlockchainConfig
-  ): InMemoryWorldStateProxy = {
+  ): InMemoryWorldStateProxy =
     // `isProposer` originally switched to `getReadOnlyMptStorage()` to keep proposer-mode tx
     // state from leaking into the canonical DB. That did not actually work: ReadOnlyNodeStorage
     // buffers writes but its `persist()` still flushes them to the wrapped storage, which is
@@ -143,13 +143,12 @@ class BlockExecution(
     InMemoryWorldStateProxy(
       evmCodeStorage = evmCodeStorage,
       blockchain.getBackingMptStorage(block.header.number),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       accountStartNonce = blockchainConfig.accountStartNonce,
-      stateRootHash = parentHeader.stateRoot,
+      stateRootHash = parentHeader.stateRoot.value,
       noEmptyAccounts = EvmConfig.forBlock(block.header.number, blockchainConfig).noEmptyAccounts,
       ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
     )
-  }
 
   /** This function runs transactions
     *
@@ -159,21 +158,19 @@ class BlockExecution(
   protected[ledger] def executeBlockTransactions(
       block: Block,
       initialWorld: InMemoryWorldStateProxy
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockResult] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockResult] =
     val blockHeaderNumber = block.header.number
     executeBlockTransactions(block, blockHeaderNumber, initialWorld)
-  }
 
   protected def executeBlockTransactions(
       block: Block,
       blockHeaderNumber: BigInt,
       initialWorld: InMemoryWorldStateProxy
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError.TxsExecutionError, BlockResult] = {
-    val worldAfterDao = blockchainConfig.daoForkConfig match {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError.TxsExecutionError, BlockResult] =
+    val worldAfterDao = blockchainConfig.daoForkConfig match
       case Some(daoForkConfig) if daoForkConfig.isDaoForkBlock(blockHeaderNumber) =>
         drainDaoForkAccounts(initialWorld, daoForkConfig)
       case _ => initialWorld
-    }
 
     // EIP-4788: Store parent beacon block root in system contract (post-Cancun)
     val worldAfterBeaconRoot = applyEip4788(block, worldAfterDao)
@@ -187,13 +184,11 @@ class BlockExecution(
       s"About to execute ${transactionList.size} txs from block $blockHeaderNumber (with hash: $hashAsHexString)"
     )
     val blockTxsExecResult = blockPreparator.executeTransactions(transactionList, inputWorld, block.header)
-    blockTxsExecResult match {
+    blockTxsExecResult match
       case Right(_) => log.debug(s"All txs from block $hashAsHexString were executed successfully")
       case Left(error) =>
-        log.debug(s"Not all txs from block $hashAsHexString were executed correctly, due to ${error.reason}")
-    }
+        log.debug(s"Not all txs from block $hashAsHexString were executed correctly, due to ${error.describe}")
     blockTxsExecResult
-  }
 
   /** EIP-4788: Store the parent beacon block root in the beacon root system contract.
     *
@@ -205,32 +200,34 @@ class BlockExecution(
   private def applyEip4788(
       block: Block,
       world: InMemoryWorldStateProxy
-  )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy = {
-    import BlockExecution._
+  )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy =
+    import BlockExecution.*
     // Only apply post-Cancun (when parentBeaconBlockRoot is present)
-    block.header.parentBeaconBlockRoot match {
+    block.header.parentBeaconBlockRoot match
       case Some(beaconRoot) if blockchainConfig.isCancunTimestamp(block.header.unixTimestamp) =>
         val timestamp = UInt256(block.header.unixTimestamp)
         val timestampIdx = timestamp.mod(UInt256(BeaconRootHistoryBufferLength))
         val rootIdx = timestampIdx + UInt256(BeaconRootHistoryBufferLength)
 
-        // Ensure the contract account exists
-        val account = world
-          .getAccount(BeaconRootContractAddress)
-          .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
-
-        val w1 = if (!world.getAccount(BeaconRootContractAddress).isDefined) {
-          world.saveAccount(BeaconRootContractAddress, account)
-        } else world
+        // Deploy contract bytecode and set nonce=1 on the first Cancun block (mirror EIP-2935 pattern).
+        // The Sepolia genesis does NOT pre-allocate this account; it is seeded here during block processing.
+        // go-ethereum achieves this by executing a real EVM call; Fukuii sets code + nonce directly.
+        val w1 = if world.getCode(BeaconRootContractAddress).isEmpty then
+          val account = world
+            .getAccount(BeaconRootContractAddress)
+            .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
+            .copy(nonce = UInt256(1))
+          world
+            .saveAccount(BeaconRootContractAddress, account)
+            .saveCode(BeaconRootContractAddress, BeaconRootsCode)
+        else world
 
         val storage = w1.getStorage(BeaconRootContractAddress)
         val s1 = storage.store(timestampIdx.toBigInt, timestamp.toBigInt)
-        val s2 = s1.store(rootIdx.toBigInt, UInt256(beaconRoot).toBigInt)
+        val s2 = s1.store(rootIdx.toBigInt, UInt256(beaconRoot.value).toBigInt)
         w1.saveStorage(BeaconRootContractAddress, s2)
 
       case _ => world
-    }
-  }
 
   /** EIP-2935: Deploy history storage contract at fork block and store parent block hash.
     *
@@ -240,26 +237,20 @@ class BlockExecution(
   private def applyEip2935(
       block: Block,
       world: InMemoryWorldStateProxy
-  )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy = {
-    import BlockExecution._
+  )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy =
+    import BlockExecution.*
     val blockNumber = block.header.number
     // EIP-2935 activates at Prague on ETH chains (timestamp fork), or at Olympia on ETC chains (block number fork).
     val pragueActive = blockchainConfig.isPragueTimestamp(block.header.unixTimestamp)
     val etcOlympiaActive = blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC &&
       blockNumber >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-    if (!pragueActive && !etcOlympiaActive) return world
-    // Only deploy at the FIRST block where it activates
-    val isActivationBlock = if (pragueActive) {
-      blockchainReader
-        .getBlockHeaderByHash(block.header.parentHash)
-        .exists(parent => !blockchainConfig.isPragueTimestamp(parent.unixTimestamp))
-    } else {
-      blockNumber == blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-    }
+    if !pragueActive && !etcOlympiaActive then return world
 
-    // At the fork block, deploy the history storage contract
-    // Deploy history storage contract only if not already deployed (genesis may pre-deploy it)
-    val w1 = if (isActivationBlock && world.getCode(HistoryStorageAddress).isEmpty) {
+    // Deploy history storage contract only if not already deployed (genesis may pre-deploy it).
+    // Use code presence as the sole guard — identical to applyEip4788's account-existence guard.
+    // Tying deployment to isActivationBlock caused IllegalStateException when processing a
+    // post-activation block on a fresh world: the account was absent so getStorage threw.
+    val w1 = if world.getCode(HistoryStorageAddress).isEmpty then
       val account = world
         .getAccount(HistoryStorageAddress)
         .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
@@ -267,17 +258,14 @@ class BlockExecution(
       world
         .saveAccount(HistoryStorageAddress, account)
         .saveCode(HistoryStorageAddress, HistoryStorageCode)
-    } else {
-      world
-    }
+    else world
 
     // Store parent hash at slot (blockNumber - 1) % HistoryServeWindow
-    val parentHashValue = UInt256(block.header.parentHash)
+    val parentHashValue = UInt256(block.header.parentHash.value)
     val slot = (blockNumber - 1) % HistoryServeWindow
     val storage = w1.getStorage(HistoryStorageAddress)
     val updatedStorage = storage.store(slot, parentHashValue.toBigInt)
     w1.saveStorage(HistoryStorageAddress, updatedStorage)
-  }
 
   /** This function updates worldState transferring balance from drainList accounts to refundContract address
     *
@@ -292,7 +280,7 @@ class BlockExecution(
       worldState: InMemoryWorldStateProxy,
       daoForkConfig: DaoForkConfig
   ): InMemoryWorldStateProxy =
-    daoForkConfig.refundContract match {
+    daoForkConfig.refundContract match
       case Some(refundContractAddress) =>
         daoForkConfig.drainList.foldLeft(worldState) { (ws, address) =>
           ws.getAccount(address)
@@ -300,7 +288,6 @@ class BlockExecution(
             .getOrElse(ws)
         }
       case None => worldState
-    }
 
   /** Executes and validates a list of blocks, storing the results in the blockchain.
     *
@@ -316,18 +303,17 @@ class BlockExecution(
   def executeAndValidateBlocks(
       blocks: List[Block],
       parentChainWeight: ChainWeight
-  )(implicit blockchainConfig: BlockchainConfig): (List[BlockData], Option[BlockExecutionError]) = {
+  )(implicit blockchainConfig: BlockchainConfig): (List[BlockData], Option[BlockExecutionError]) =
     @tailrec
     def go(
         executedBlocksDecOrder: List[BlockData],
         remainingBlocksIncOrder: List[Block],
         parentWeight: ChainWeight
     ): (List[BlockData], Option[BlockExecutionError]) =
-      if (remainingBlocksIncOrder.isEmpty) {
-        (executedBlocksDecOrder.reverse, None)
-      } else {
+      if remainingBlocksIncOrder.isEmpty then (executedBlocksDecOrder.reverse, None)
+      else
         val blockToExecute = remainingBlocksIncOrder.head
-        executeAndValidateBlock(blockToExecute, alreadyValidated = true) match {
+        executeAndValidateBlock(blockToExecute, alreadyValidated = true) match
           case Right(receipts) =>
             val newWeight = parentWeight.increase(blockToExecute.header)
             val newBlockData = BlockData(blockToExecute, receipts, newWeight)
@@ -338,14 +324,12 @@ class BlockExecution(
               saveAsBestBlock = false
             )
             blockchain.saveBlockState(blockToExecute.header.number)
+            blockchainReader.recordBlockDifficulty(blockToExecute.header.difficulty)
             go(newBlockData :: executedBlocksDecOrder, remainingBlocksIncOrder.tail, newWeight)
           case Left(executionError) =>
             (executedBlocksDecOrder.reverse, Some(executionError))
-        }
-      }
 
     go(List.empty[BlockData], blocks, parentChainWeight)
-  }
 
   /** EIP-4895: Process beacon chain withdrawals (Shanghai+). Each withdrawal credits `amount * 1 Gwei` to the target
     * address. No gas is charged. Creates the account if it doesn't exist.
@@ -354,23 +338,21 @@ class BlockExecution(
       block: Block,
       world: InMemoryWorldStateProxy
   ): InMemoryWorldStateProxy =
-    block.body.withdrawals match {
+    block.body.withdrawals match
       case Some(withdrawals) if withdrawals.nonEmpty =>
         val GweiToWei = BigInt("1000000000")
         withdrawals.foldLeft(world) { (w, withdrawal) =>
           // EIP-4895: amount-0 withdrawals must NOT touch the target account —
           // creating/saving an empty account here diverges from every other EL
           // client's state root for any block containing a zero-amount withdrawal.
-          if (withdrawal.amount == 0) w
-          else {
+          if withdrawal.amount == 0 then w
+          else
             val weiAmount = UInt256(withdrawal.amount * GweiToWei)
             val address = withdrawal.address
             val account = w.getAccount(address).getOrElse(w.getEmptyAccount)
             w.saveAccount(address, account.increaseBalance(weiAmount))
-          }
         }
       case _ => world
-    }
 
   /** Prague: Execute system calls for withdrawal and consolidation request processing. Per EIP-7002 and EIP-7251, the
     * system makes calls to the withdrawal queue and consolidation queue contracts after all transactions in the block.
@@ -382,10 +364,10 @@ class BlockExecution(
   private def processPragueSystemCalls(
       block: Block,
       world: InMemoryWorldStateProxy
-  )(implicit blockchainConfig: BlockchainConfig): (InMemoryWorldStateProxy, Seq[ByteString]) = {
-    if (!blockchainConfig.isPragueTimestamp(block.header.unixTimestamp)) return (world, Nil)
+  )(implicit blockchainConfig: BlockchainConfig): (InMemoryWorldStateProxy, Seq[ByteString]) =
+    if !blockchainConfig.isPragueTimestamp(block.header.unixTimestamp) then return (world, Nil)
 
-    import BlockExecution._
+    import BlockExecution.*
     val evmConfig = EvmConfig.forBlock(block.header.number, block.header.unixTimestamp, blockchainConfig)
     var w = world
     val outputs = scala.collection.mutable.ListBuffer.empty[ByteString]
@@ -393,14 +375,13 @@ class BlockExecution(
     // EIP-7685: Execute system calls to request contracts and collect output.
     // EIP-6110 DEPOSIT contract has no system call — deposits are parsed from logs.
     // Only EIP-7002 (withdrawals) and EIP-7251 (consolidations) do a SYSTEM_ADDRESS call.
-    for (
-      (queueAddr, requestType) <- Seq(
+    for (queueAddr, requestType) <- Seq(
         (WithdrawalQueueAddress, WithdrawalRequestType),
         (ConsolidationQueueAddress, ConsolidationRequestType)
       )
-    ) {
+    do
       val code = w.getCode(queueAddr)
-      if (code.nonEmpty) {
+      if code.nonEmpty then
         val context = ProgramContext[InMemoryWorldStateProxy, InMemoryWorldStateProxyStorage](
           callerAddr = SystemAddress,
           originAddr = SystemAddress,
@@ -425,13 +406,8 @@ class BlockExecution(
         w = InMemoryWorldStateProxy.persistState(result.world)
         // EIP-7685 request bytes = single-byte type prefix || raw system-call returndata.
         // Empty returndata (no queued requests) means no bytes are emitted for this type.
-        if (result.returnData.nonEmpty) {
-          outputs += ByteString(Array(requestType.toByte)) ++ result.returnData
-        }
-      }
-    }
+        if result.returnData.nonEmpty then outputs += ByteString(Array(requestType.toByte)) ++ result.returnData
     (w, outputs.toSeq)
-  }
 
   /** EIP-6110: Parse `DepositEvent(bytes,bytes,bytes,bytes,bytes)` logs emitted by the beacon deposit contract during
     * block execution and return one request entry per deposit. Event ABI: [pubkey(48)->64,
@@ -440,15 +416,15 @@ class BlockExecution(
     * prefix (0x00) that's 193 bytes per deposit. Returns a single ByteString = 0x00 || concatenated_deposit_data (or
     * empty if none).
     */
-  def collectDepositRequests(receipts: Seq[Receipt]): Option[ByteString] = {
-    import BlockExecution._
+  def collectDepositRequests(receipts: Seq[Receipt]): Option[ByteString] =
+    import BlockExecution.*
     val buf = scala.collection.mutable.ArrayBuffer.empty[Byte]
-    for {
+    for
       receipt <- receipts
       log <- receipt.logs
       if log.loggerAddress == DepositContractAddress
       if log.logTopics.headOption.contains(DepositEventSignature)
-    } {
+    do
       // Deposit event data layout (offsets + 32-byte length prefix + padded body):
       //   offsets: 5 * 32 bytes = 160 bytes of ABI offsets [160, 256, 352, 416, 576]
       //   pubkey: 32-byte length (=48) + 48-byte body + 16-byte pad     = 96 bytes
@@ -458,7 +434,7 @@ class BlockExecution(
       //   index:  32-byte length (=8)  + 8-byte body + 24-byte pad       = 64 bytes
       // Total = 160 + 96 + 64 + 64 + 160 + 64 = 608 bytes. We slice the raw bodies.
       val d = log.data
-      if (d.length >= 608) {
+      if d.length >= 608 then
         // skip 5x32 offsets = 160
         val pubkey = d.slice(160 + 32, 160 + 32 + 48) // 48
         val wc = d.slice(160 + 96 + 32, 160 + 96 + 32 + 32) // 32
@@ -466,31 +442,25 @@ class BlockExecution(
         val signature = d.slice(160 + 96 + 64 + 64 + 32, 160 + 96 + 64 + 64 + 32 + 96) // 96
         val indexLE = d.slice(160 + 96 + 64 + 64 + 160 + 32, 160 + 96 + 64 + 64 + 160 + 32 + 8) // 8
         buf ++= pubkey ++= wc ++= amountLE ++= signature ++= indexLE
-      }
-    }
-    if (buf.isEmpty) None
+    if buf.isEmpty then None
     else Some(ByteString(Array(DepositRequestType.toByte)) ++ ByteString(buf.toArray))
-  }
 
   /** EIP-7685: Concatenate per-type request bytes (each = type_byte || data) and compute sha256(sha256(deposits) ++
     * sha256(withdrawals) ++ sha256(consolidations)). Missing types contribute sha256("").
     */
-  def computeRequestsHash(deposits: Option[ByteString], systemRequests: Seq[ByteString]): ByteString = {
+  def computeRequestsHash(deposits: Option[ByteString], systemRequests: Seq[ByteString]): ByteString =
     import java.security.MessageDigest
     val sha = MessageDigest.getInstance("SHA-256")
-    def digest(bs: ByteString): Array[Byte] = {
+    def digest(bs: ByteString): Array[Byte] =
       val d = MessageDigest.getInstance("SHA-256")
       d.update(bs.toArray)
       d.digest()
-    }
     val depositsHash = digest(deposits.getOrElse(ByteString.empty))
     sha.update(depositsHash)
     systemRequests.foreach(r => sha.update(digest(r)))
     ByteString(sha.digest())
-  }
-}
 
-object BlockExecution {
+object BlockExecution:
 
   val SystemAddress: Address = Address("0xfffffffffffffffffffffffffffffffffffffffe")
 
@@ -520,6 +490,11 @@ object BlockExecution {
   /** EIP-4788: History buffer length for beacon root storage (8191 slots) */
   val BeaconRootHistoryBufferLength: BigInt = BigInt(8191)
 
+  /** EIP-4788: Deployed bytecode for the beacon roots system contract */
+  val BeaconRootsCode: ByteString = ByteStringUtils.string2hash(
+    "3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"
+  )
+
   /** EIP-2935: Address of the history storage contract */
   val HistoryStorageAddress: Address = Address("0x0000F90827F1C53a10cb7A02335B175320002935")
 
@@ -530,29 +505,31 @@ object BlockExecution {
   val HistoryStorageCode: ByteString = ByteStringUtils.string2hash(
     "3373fffffffffffffffffffffffffffffffffffffffe14604657602036036042575f35600143038111604257611fff81430311604257611fff9006545f5260205ff35b5f5ffd5b5f35611fff60014303065500"
   )
-}
 
-sealed trait BlockExecutionError {
-  val reason: Any
-}
+sealed trait BlockExecutionError:
+  def describe: String
+
+type ValidationError = BlockHeaderError | BlockError | OmmersError
 
 sealed trait BlockExecutionSuccess
 
 case object BlockExecutionSuccess extends BlockExecutionSuccess
 
-object BlockExecutionError {
-  final case class ValidationBeforeExecError(reason: Any) extends BlockExecutionError
+object BlockExecutionError:
+  final case class ValidationBeforeExecError(error: ValidationError) extends BlockExecutionError:
+    def describe: String = error.toString
 
   final case class StateBeforeFailure(worldState: InMemoryWorldStateProxy, acumGas: BigInt, acumReceipts: Seq[Receipt])
 
   final case class TxsExecutionError(stx: SignedTransaction, stateBeforeError: StateBeforeFailure, reason: String)
-      extends BlockExecutionError
+      extends BlockExecutionError:
+    def describe: String = reason
 
-  final case class ValidationAfterExecError(reason: String) extends BlockExecutionError
+  final case class ValidationAfterExecError(reason: String) extends BlockExecutionError:
+    def describe: String = reason
 
-  case object MissingParentError extends BlockExecutionError {
-    override val reason: Any = "Cannot find parent"
-  }
+  case object MissingParentError extends BlockExecutionError:
+    override def describe: String = "Cannot find parent"
 
-  final case class MPTError(reason: MPTException) extends BlockExecutionError
-}
+  final case class MPTError(error: MPTException) extends BlockExecutionError:
+    def describe: String = error.toString

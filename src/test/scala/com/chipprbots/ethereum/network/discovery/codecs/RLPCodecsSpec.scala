@@ -11,6 +11,12 @@ import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 import com.chipprbots.scalanet.discovery.ethereum.Node
 import com.chipprbots.scalanet.discovery.ethereum.v4.Packet
 import com.chipprbots.scalanet.discovery.ethereum.v4.Payload
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRRequest
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRResponse
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.FindNode
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Neighbors
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Ping
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Pong
 import com.chipprbots.scalanet.discovery.hash.Hash
 import org.scalactic.Equality
 import org.scalatest.Assertion
@@ -25,16 +31,10 @@ import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPEncoder
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Ping
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Pong
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.FindNode
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Neighbors
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRRequest
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRResponse
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class RLPCodecsSpec extends AnyFlatSpec with Matchers {
-  import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+class RLPCodecsSpec extends AnyFlatSpec with Matchers:
+  import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
   import com.chipprbots.ethereum.rlp.RLPImplicits.given
   import RLPCodecs.given
 
@@ -45,12 +45,11 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
 
   val localhost: InetAddress = InetAddress.getByName("127.0.0.1")
 
-  def randomBytes(n: Int): BitVector = {
+  def randomBytes(n: Int): BitVector =
     val size = Random.nextInt(n)
     val bytes = Array.ofDim[Byte](size)
     Random.nextBytes(bytes)
     BitVector(bytes)
-  }
 
   behavior.of("RLPCodecs")
 
@@ -65,13 +64,12 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
 
     val rlp = RLPEncoder.encode(ping)
 
-    rlp match {
+    rlp match
       case list: RLPList =>
         list.items should have size 5
         list.items.last shouldBe an[RLPValue]
       case other =>
         fail(s"Expected RLPList; got $other")
-    }
 
     RLPDecoder.decode[Payload.Ping](rlp) shouldBe ping
   }
@@ -87,12 +85,11 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
 
     val rlp = RLPEncoder.encode(ping)
 
-    rlp match {
+    rlp match
       case list: RLPList =>
         list.items should have size 4
       case other =>
         fail(s"Expected RLPList; got $other")
-    }
 
     RLPDecoder.decode[Payload.Ping](rlp) shouldBe ping
   }
@@ -126,13 +123,13 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
 
   // The following tests demonstrate what each payload looks like when encoded to RLP,
   // because the auto-derivation makes it opaque.
-  abstract class RLPFixture[T <: Payload: RLPEncoder: RLPDecoder: ClassTag] {
+  abstract class RLPFixture[T <: Payload: RLPEncoder: RLPDecoder: ClassTag]:
     // Structrual equality checker for RLPEncodeable.
     // It has different wrappers for items based on whether it was hand crafted or generated
     // by codecs, and the RLPValue has mutable arrays inside.
-    implicit val eqRLPList: Equality[RLPEncodeable] = new Equality[RLPEncodeable] {
+    implicit val eqRLPList: Equality[RLPEncodeable] = new Equality[RLPEncodeable]:
       override def areEqual(a: RLPEncodeable, b: Any): Boolean =
-        (a, b) match {
+        (a, b) match
           case (a: RLPList, b: RLPList) =>
             a.items.size == b.items.size && a.items.zip(b.items).forall { case (a, b) =>
               areEqual(a, b)
@@ -141,8 +138,6 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
             a.bytes.sameElements(b.bytes)
           case _ =>
             false
-        }
-    }
 
     def name: String = implicitly[ClassTag[T]].runtimeClass.getSimpleName
 
@@ -151,10 +146,9 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
 
     def testEncode: Assertion = RLPEncoder.encode(p) should equal(e)
     def testDecode: Assertion = RLPDecoder.decode[T](e) should equal(p)
-  }
 
-  val examples: List[RLPFixture[_ <: Payload]] = List(
-    new RLPFixture[Payload.Ping] {
+  val examples: List[RLPFixture[? <: Payload]] = List(
+    new RLPFixture[Payload.Ping]:
       override val p: Ping = Payload.Ping(
         version = 4,
         from = Node.Address(localhost, 30000, 40000),
@@ -170,8 +164,8 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
         p.expiration,
         p.enrSeq.get
       )
-    },
-    new RLPFixture[Payload.Pong] {
+    ,
+    new RLPFixture[Payload.Pong]:
       override val p: Pong = Payload.Pong(
         to = Node.Address(localhost, 30001, 0),
         pingHash = Hash(randomBytes(32)),
@@ -189,16 +183,16 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
         p.expiration,
         p.enrSeq.get
       )
-    },
-    new RLPFixture[Payload.FindNode] {
+    ,
+    new RLPFixture[Payload.FindNode]:
       override val p: FindNode = Payload.FindNode(
         target = PublicKey(randomBytes(64)),
         expiration = System.currentTimeMillis
       )
 
       override val e: RLPEncodeable = RLPList(p.target, p.expiration)
-    },
-    new RLPFixture[Payload.Neighbors] {
+    ,
+    new RLPFixture[Payload.Neighbors]:
       override val p: Neighbors = Payload.Neighbors(
         nodes = List(
           Node(id = PublicKey(randomBytes(64)), address = Node.Address(localhost, 30001, 40001)),
@@ -214,8 +208,8 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
         ),
         p.expiration
       )
-    },
-    new RLPFixture[Payload.ENRRequest] {
+    ,
+    new RLPFixture[Payload.ENRRequest]:
       override val p: ENRRequest = Payload.ENRRequest(
         expiration = System.currentTimeMillis
       )
@@ -223,8 +217,8 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
       override val e: RLPEncodeable = RLPList(
         p.expiration
       )
-    },
-    new RLPFixture[Payload.ENRResponse] {
+    ,
+    new RLPFixture[Payload.ENRResponse]:
       val (publicKey, privateKey) = sigalg.newKeyPair
       val node: Node = Node(
         id = publicKey,
@@ -256,7 +250,6 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
           p.enr.content.attrs(Keys.udp)
         )
       )
-    }
   )
 
   examples.foreach { example =>
@@ -268,4 +261,3 @@ class RLPCodecsSpec extends AnyFlatSpec with Matchers {
       example.testDecode
     }
   }
-}

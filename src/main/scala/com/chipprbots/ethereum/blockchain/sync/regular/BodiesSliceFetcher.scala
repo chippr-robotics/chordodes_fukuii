@@ -2,10 +2,10 @@ package com.chipprbots.ethereum.blockchain.sync.regular
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -13,6 +13,7 @@ import cats.effect.unsafe.IORuntime
 import scala.util.Failure
 import scala.util.Success
 
+import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestPeer
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.ExcludingPeers
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
@@ -33,23 +34,24 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   *   prior (aborted) batches.
   */
 class BodiesSliceFetcher(
-    val peersClient: ClassicActorRef,
+    val peersClient: ActorRef[PeersClient.Command],
     val syncConfig: SyncConfig,
     coordinator: ActorRef[BodiesFetcher.BodiesFetcherCommand],
     batchGen: Long,
     context: ActorContext[BodiesSliceFetcher.SliceCommand]
 ) extends AbstractBehavior[BodiesSliceFetcher.SliceCommand](context)
-    with FetchRequest[BodiesSliceFetcher.SliceCommand] {
+    with FetchRequest[BodiesSliceFetcher.SliceCommand]:
 
-  import BodiesSliceFetcher._
+  import BodiesSliceFetcher.*
 
   val log = context.log
-  implicit val runtime: IORuntime = IORuntime.global
+  given scheduler: Scheduler = context.system.scheduler
+  given runtime: IORuntime = IORuntime.global
 
   override def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): SliceCommand = AdaptedMessage(peer, msg)
 
   override def onMessage(message: SliceCommand): Behavior[SliceCommand] =
-    message match {
+    message match
       case FetchSlice(hashes, triedPeers, retryCount) =>
         requestSlice(hashes, triedPeers, retryCount)
         Behaviors.same
@@ -71,11 +73,10 @@ class BodiesSliceFetcher(
       case other =>
         log.warn("[RegularSync][slice] unhandled message: {}", other.getClass.getSimpleName)
         Behaviors.unhandled
-    }
 
-  private def requestSlice(hashes: Seq[ByteString], triedPeers: Set[PeerId], retryCount: Int): Unit = {
+  private def requestSlice(hashes: Seq[ByteString], triedPeers: Set[PeerId], retryCount: Int): Unit =
     val msg = ETHPackets.GetBlockBodies(ETHPackets.nextRequestId, hashes)
-    val peerSelector = if (triedPeers.nonEmpty) ExcludingPeers(triedPeers) else BestPeer
+    val peerSelector = if triedPeers.nonEmpty then ExcludingPeers(triedPeers) else BestPeer
     val fallback: SliceCommand = RetrySliceRequest(None, hashes, triedPeers, retryCount)
     val resp = makeRequest(Request.create(msg, peerSelector), fallback, triedPeers, retryCount)
     context.pipeToSelf(resp.unsafeToFuture()) {
@@ -84,13 +85,11 @@ class BodiesSliceFetcher(
         log.warn("[RegularSync][slice] request threw: {}", ex.getMessage)
         RetrySliceRequest(None, hashes, triedPeers, retryCount)
     }
-  }
-}
 
-object BodiesSliceFetcher {
+object BodiesSliceFetcher:
 
   def apply(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       syncConfig: SyncConfig,
       coordinator: ActorRef[BodiesFetcher.BodiesFetcherCommand],
       batchGen: Long
@@ -110,4 +109,3 @@ object BodiesSliceFetcher {
       retryCount: Int
   ) extends SliceCommand
   final private[regular] case class AdaptedMessage[T <: Message](peer: Peer, msg: T) extends SliceCommand
-}

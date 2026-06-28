@@ -1,7 +1,11 @@
 package com.chipprbots.ethereum.utils
 
+import scala.compiletime.uninitialized
+
 import ch.qos.logback.core.PropertyDefinerBase
-import com.typesafe.config.{Config, ConfigException, ConfigFactory}
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigException
+import com.typesafe.config.ConfigFactory
 
 /** PropertyDefiner for logback that loads values from TypeSafe Config.
   *
@@ -22,10 +26,10 @@ import com.typesafe.config.{Config, ConfigException, ConfigFactory}
   *   - logging.logs-dir (default: "./logs") → LOGSDIR
   *   - logging.logs-file (default: "fukuii") → LOGSFILENAME
   */
-class ConfigPropertyDefiner extends PropertyDefinerBase {
+class ConfigPropertyDefiner extends PropertyDefinerBase:
 
-  private var key: String = _
-  private var defaultValue: String = _
+  private var key: String = uninitialized
+  private var defaultValue: String = uninitialized
 
   /** Set the configuration key to load (called by logback via reflection) */
   def setKey(key: String): Unit =
@@ -37,34 +41,29 @@ class ConfigPropertyDefiner extends PropertyDefinerBase {
 
   /** Return the property value from config, or default if not found */
   override def getPropertyValue(): String =
-    Option(key).filter(_.nonEmpty) match {
+    Option(key).filter(_.nonEmpty) match
       case None =>
         addError("ConfigPropertyDefiner: 'key' property must be set")
         Option(defaultValue).getOrElse("")
       case Some(configKey) =>
-        try {
+        try
           val value = ConfigPropertyDefiner.config.getString(configKey)
           addInfo(s"ConfigPropertyDefiner: Loaded '$configKey' = '$value'")
           value
-        } catch {
+        catch
           case _: ConfigException.Missing =>
-            Option(defaultValue).filter(_.nonEmpty) match {
+            Option(defaultValue).filter(_.nonEmpty) match
               case Some(default) =>
                 addWarn(s"ConfigPropertyDefiner: Key '$configKey' not found, using default: $default")
                 default
               case None =>
                 addError(s"ConfigPropertyDefiner: Key '$configKey' not found and no default value provided")
                 ""
-            }
           case e: Exception =>
             addError(s"ConfigPropertyDefiner: Error loading key '$configKey': ${e.getMessage}")
             Option(defaultValue).getOrElse("")
-        }
-    }
-}
 
-object ConfigPropertyDefiner {
+object ConfigPropertyDefiner:
 
   /** Shared configuration instance to avoid reloading on each PropertyDefiner instantiation */
   private lazy val config: Config = ConfigFactory.load()
-}

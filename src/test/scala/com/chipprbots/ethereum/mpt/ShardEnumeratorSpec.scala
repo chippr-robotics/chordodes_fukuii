@@ -10,11 +10,11 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
-import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
 import com.chipprbots.ethereum.mpt.MptVisitors.LeafWalkVisitor
 import com.chipprbots.ethereum.mpt.MptVisitors.PathTrackingLeafWalkVisitor
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** ShardEnumerator must split the state trie into DISJOINT and EXHAUSTIVE shards: every account leaf belongs to exactly
   * one shard, and the union of all shard subtrees is the whole trie. This is the correctness foundation for the
@@ -25,30 +25,27 @@ import com.chipprbots.ethereum.testing.Tags._
   * across shards equals the full-trie leaf set. A separate test seeds PathTrackingLeafWalkVisitor with each shard's
   * prefix and asserts the reconstructed account keys (prefix + subtree path) exactly match the originals.
   */
-class ShardEnumeratorSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
+class ShardEnumeratorSpec extends AnyFunSuite with ScalaCheckPropertyChecks:
 
-  private def freshStorage(): MptStorage = {
+  private def freshStorage(): MptStorage =
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(EphemDataSource())
     stateStorage.getBackingStorage(0)
-  }
   private def freshTrie(s: MptStorage): MerklePatriciaTrie[Array[Byte], Array[Byte]] =
     MerklePatriciaTrie[Array[Byte], Array[Byte]](s)
 
-  private def build(entries: Seq[(Array[Byte], Array[Byte])]): (ByteString, MptStorage) = {
+  private def build(entries: Seq[(Array[Byte], Array[Byte])]): (ByteString, MptStorage) =
     val storage = freshStorage()
     val trie = entries.foldLeft(freshTrie(storage)) { case (t, (k, v)) => t.put(k, v) }
     (ByteString(trie.getRootHash), storage)
-  }
 
   /** All leaf values reachable from a (possibly inline) shard root, in any order. */
-  private def shardLeafValues(root: MptNode, storage: MptStorage): Seq[String] = {
+  private def shardLeafValues(root: MptNode, storage: MptStorage): Seq[String] =
     val acc = mutable.ArrayBuffer.empty[String]
     MptTraversals.dispatch(root, new LeafWalkVisitor(storage, leaf => acc += leaf.value.toArray.mkString(",")))
     acc.toSeq
-  }
 
   /** Full account keys (prefix + subtree path) reconstructed across all shards. */
-  private def shardKeys(shards: Vector[ShardEnumerator.Shard], storage: MptStorage): Seq[Seq[Byte]] = {
+  private def shardKeys(shards: Vector[ShardEnumerator.Shard], storage: MptStorage): Seq[Seq[Byte]] =
     val acc = mutable.ArrayBuffer.empty[Seq[Byte]]
     shards.foreach { s =>
       MptTraversals.dispatch(
@@ -57,9 +54,8 @@ class ShardEnumeratorSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
       )
     }
     acc.toSeq
-  }
 
-  private def assertPartition(entries: Seq[(Array[Byte], Array[Byte])], depth: Int = 1): Unit = {
+  private def assertPartition(entries: Seq[(Array[Byte], Array[Byte])], depth: Int = 1): Unit =
     val (root, storage) = build(entries)
     val shards = ShardEnumerator.enumShards(root, storage, depth)
     val acrossShards = shards.flatMap(s => shardLeafValues(s.root, storage))
@@ -69,7 +65,6 @@ class ShardEnumeratorSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
       acrossShards.sorted == expected.sorted,
       s"partition mismatch (depth=$depth): ${acrossShards.size} shard leaves vs ${expected.size} expected"
     )
-  }
 
   test("16-way branch root → up to 16 disjoint, exhaustive shards", UnitTest, MPTTest) {
     assertPartition((0 until 16).map(i => (Array[Byte]((i << 4).toByte), Array[Byte](i.toByte))))
@@ -120,10 +115,10 @@ class ShardEnumeratorSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
 
   test("property: shard partition leaf-count equals insert count for random key sets", UnitTest, MPTTest) {
     val gen: Gen[Map[Seq[Byte], Seq[Byte]]] = Gen
-      .mapOf(for {
+      .mapOf(for
         k <- Gen.listOfN(3, Arbitrary.arbitrary[Byte])
         v <- Gen.nonEmptyListOf(Arbitrary.arbitrary[Byte])
-      } yield (k, v))
+      yield (k, v))
       .suchThat(_.nonEmpty)
     forAll(gen) { pairs =>
       val entries = pairs.toSeq.map { case (k, v) => (k.toArray, v.toArray) }
@@ -133,4 +128,3 @@ class ShardEnumeratorSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
       assert(total == pairs.size, s"expected ${pairs.size} leaves across shards, got $total")
     }
   }
-}

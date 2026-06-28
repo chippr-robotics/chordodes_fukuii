@@ -13,10 +13,9 @@ import com.chipprbots.ethereum.nodebuilder.StorageBuilder
 import com.chipprbots.ethereum.nodebuilder.VmBuilder
 import com.chipprbots.ethereum.utils.Logger
 
-trait MiningBuilder {
+trait MiningBuilder:
   def mining: Mining
   def coinbaseProvider: CoinbaseProvider
-}
 
 /** A mining builder is responsible to instantiate the consensus protocol. This is done dynamically when Fukuii boots,
   * based on its configuration.
@@ -24,15 +23,9 @@ trait MiningBuilder {
   * @see
   *   [[Mining]], [[com.chipprbots.ethereum.consensus.pow.PoWMining PoWConsensus]],
   */
-trait StdMiningBuilder extends MiningBuilder {
-  self: VmBuilder
-    with StorageBuilder
-    with BlockchainBuilder
-    with BlockchainConfigBuilder
-    with MiningConfigBuilder
-    with NodeKeyBuilder
-    with com.chipprbots.ethereum.utils.InstanceConfigProvider
-    with Logger =>
+trait StdMiningBuilder extends MiningBuilder:
+  self: VmBuilder & StorageBuilder & BlockchainBuilder & BlockchainConfigBuilder & MiningConfigBuilder &
+    NodeKeyBuilder & com.chipprbots.ethereum.utils.InstanceConfigProvider & Logger =>
 
   private lazy val fukuiiConfig = instanceConfig.config
 
@@ -41,17 +34,16 @@ trait StdMiningBuilder extends MiningBuilder {
   private def newConfig[C <: AnyRef](c: C): FullMiningConfig[C] =
     FullMiningConfig(miningConfig, c)
 
-  protected def buildPoWMining(): PoWMining = {
+  protected def buildPoWMining(): PoWMining =
     val specificConfig = EthashConfig(fukuiiConfig)
 
     val fullConfig = newConfig(specificConfig)
 
     val validators = ValidatorsExecutor(miningConfig.protocol)
 
-    val additionalPoWData: AdditionalPoWProtocolData = miningConfig.protocol match {
+    val additionalPoWData: AdditionalPoWProtocolData = miningConfig.protocol match
       case Protocol.PoW | Protocol.MockedPow | Protocol.EngineApi => NoAdditionalPoWData
       case Protocol.RestrictedPoW                                 => RestrictedPoWMinerData(nodeKey)
-    }
 
     val mining =
       PoWMining(
@@ -65,25 +57,21 @@ trait StdMiningBuilder extends MiningBuilder {
       )
 
     mining
-  }
 
-  protected def buildMining(): Mining = {
+  protected def buildMining(): Mining =
     val config = miningConfig
     val protocol = config.protocol
 
     val mining =
-      config.protocol match {
+      config.protocol match
         case Protocol.PoW | Protocol.MockedPow | Protocol.RestrictedPoW => buildPoWMining()
         case Protocol.EngineApi                                         =>
           // Engine API mode reuses PoW mining infrastructure for block building
           // but skips Ethash sealing (blocks come from CL)
           buildPoWMining()
-      }
 
     log.info(s"Using '${protocol.name}' mining protocol [${mining.getClass.getName}]")
 
     mining
-  }
 
   lazy val mining: Mining = buildMining()
-}

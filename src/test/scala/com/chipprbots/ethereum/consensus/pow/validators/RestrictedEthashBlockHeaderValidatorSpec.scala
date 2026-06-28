@@ -2,60 +2,61 @@ package com.chipprbots.ethereum.consensus.pow.validators
 
 import org.apache.pekko.util.ByteString
 
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.consensus.pow.RestrictedPoWSigner
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderPoWError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.RestrictedPoWHeaderExtraDataError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.security.SecureRandomBuilder
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
-import org.bouncycastle.crypto.AsymmetricCipherKeyPair
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
-import com.chipprbots.ethereum.testing.Tags._
 
 class RestrictedEthashBlockHeaderValidatorSpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with SecureRandomBuilder {
+    with SecureRandomBuilder:
 
   "RestrictedEthashBlockHeaderValidatorSpec" should "correctly validate header if allowed list is empty" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val validationResult: Either[BlockHeaderError, BlockHeaderValid] =
       RestrictedEthashBlockHeaderValidator.validate(validHeader, validParent)(createBlockchainConfig(Set()))
     assert(validationResult == Right(BlockHeaderValid))
-  }
 
   it should "fail validation of header with too long extra data field" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val tooLongExtraData: BlockHeader = validHeader.copy(extraData =
       ByteString.fromArrayUnsafe(new Array[Byte](RestrictedEthashBlockHeaderValidator.ExtraDataMaxSize + 1))
     )
     val validationResult: Either[BlockHeaderError, BlockHeaderValid] =
       RestrictedEthashBlockHeaderValidator.validate(tooLongExtraData, validParent)(createBlockchainConfig(Set()))
     assert(validationResult == Left(RestrictedPoWHeaderExtraDataError))
-  }
 
-  it should "correctly validate header with valid key" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+  it should "correctly validate header with valid key" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
     val validationResult: Either[BlockHeaderError, BlockHeaderValid] =
       RestrictedEthashBlockHeaderValidator.validate(validHeader, validParent)(createBlockchainConfig(Set(validKey)))
     assert(validationResult == Right(BlockHeaderValid))
-  }
 
-  it should "fail to validate header with invalid key" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+  it should "fail to validate header with invalid key" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
     val allowedKey: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
     val keyBytes: ByteString = crypto.keyPairToByteStrings(allowedKey)._2
 
@@ -63,9 +64,8 @@ class RestrictedEthashBlockHeaderValidatorSpec
     val validationResult: Either[BlockHeaderError, BlockHeaderValid] =
       RestrictedEthashBlockHeaderValidator.validate(validHeader, validParent)(createBlockchainConfig(Set(keyBytes)))
     assert(validationResult == Left(RestrictedPoWHeaderExtraDataError))
-  }
 
-  it should "fail to validate header re-signed by valid signer" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+  it should "fail to validate header re-signed by valid signer" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
     val allowedKey: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
     val keyBytes: ByteString = crypto.keyPairToByteStrings(allowedKey)._2
 
@@ -78,9 +78,8 @@ class RestrictedEthashBlockHeaderValidatorSpec
         createBlockchainConfig(Set(keyBytes, validKey))
       )
     assert(validationResult == Left(HeaderPoWError))
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val validKey: ByteString = ByteStringUtils.string2hash(
       "69f6b54223c0d699c91f1f649e11dc52cb05910896b80c50137cd74a54d90782b69128d3ad5a9ba8c26e338891e33a46e317a3eeaabbf62e70a6b33ec57e00e6"
     )
@@ -116,15 +115,19 @@ class RestrictedEthashBlockHeaderValidatorSpec
       * RestrictedEthashBlockHeaderValidator
       */
     val validParent: BlockHeader = BlockHeader(
-      parentHash = ByteStringUtils.string2hash("c12a822d0c9a1a777cd1023172ec304aca76e403355e4eb56592d299e4b86503"),
-      ommersHash = ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"),
+      parentHash =
+        BlockHash(ByteStringUtils.string2hash("c12a822d0c9a1a777cd1023172ec304aca76e403355e4eb56592d299e4b86503")),
+      ommersHash =
+        BlockHash(ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
       beneficiary = ByteStringUtils.string2hash("0011223344556677889900112233445566778899"),
-      stateRoot = ByteStringUtils.string2hash("e3a3e62598cdb02a3551f9e932ed248a741ca174c00d977a56d9bb2c6473dd34"),
+      stateRoot =
+        TrieRoot(ByteStringUtils.string2hash("e3a3e62598cdb02a3551f9e932ed248a741ca174c00d977a56d9bb2c6473dd34")),
       transactionsRoot =
-        ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"),
-      receiptsRoot = ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"),
-      logsBloom = ByteStringUtils.string2hash("00" * 256),
-      difficulty = BigInt("131520"),
+        TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      receiptsRoot =
+        TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      logsBloom = BloomFilter(ByteStringUtils.string2hash("00" * 256)),
+      difficulty = Difficulty(BigInt("131520")),
       number = 10,
       gasLimit = 5030,
       gasUsed = 0,
@@ -132,20 +135,25 @@ class RestrictedEthashBlockHeaderValidatorSpec
       extraData = ByteStringUtils.string2hash(
         "6d616e746973808fc245b89183f28ac985019992f202a73c7ab600b0aefa18dcba71a8f3576129280d56f4f499e7a8a53a047e91d73d881745b7a6ac7ca9449fc2b3bb1608921c"
       ),
-      mixHash = ByteStringUtils.string2hash("2db10efede75cfe87b6f378d9b03e712098e8cd3759784db56d65cc9e9911675"),
+      mixHash =
+        BlockHash(ByteStringUtils.string2hash("2db10efede75cfe87b6f378d9b03e712098e8cd3759784db56d65cc9e9911675")),
       nonce = ByteStringUtils.string2hash("a57246871d5c8bcc")
     )
 
     val validHeader: BlockHeader = BlockHeader(
-      parentHash = ByteStringUtils.string2hash("28aad5edd02d139bf4fcf15d04ec04c93f12e382c64983fa271a9084189b3b23"),
-      ommersHash = ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"),
+      parentHash =
+        BlockHash(ByteStringUtils.string2hash("28aad5edd02d139bf4fcf15d04ec04c93f12e382c64983fa271a9084189b3b23")),
+      ommersHash =
+        BlockHash(ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
       beneficiary = ByteStringUtils.string2hash("0011223344556677889900112233445566778899"),
-      stateRoot = ByteStringUtils.string2hash("a485afd5bfcef9da8df9c0fe4315e1f4bc2c96eb34920eeaddf534b807cd71e6"),
+      stateRoot =
+        TrieRoot(ByteStringUtils.string2hash("a485afd5bfcef9da8df9c0fe4315e1f4bc2c96eb34920eeaddf534b807cd71e6")),
       transactionsRoot =
-        ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"),
-      receiptsRoot = ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"),
-      logsBloom = ByteStringUtils.string2hash("00" * 256),
-      difficulty = BigInt("131584"),
+        TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      receiptsRoot =
+        TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      logsBloom = BloomFilter(ByteStringUtils.string2hash("00" * 256)),
+      difficulty = Difficulty(BigInt("131584")),
       number = 11,
       gasLimit = 5033,
       gasUsed = 0,
@@ -153,8 +161,7 @@ class RestrictedEthashBlockHeaderValidatorSpec
       extraData = ByteStringUtils.string2hash(
         "6d616e746973dccb0bbbfb07910cf745bde048bd0887d03e2ac790575b7cad36bf44d83e55877ea832719c978d2336b64c2200d0ced5777cd98e2d74d2cd5c0608c8a91067ae1b"
       ),
-      mixHash = ByteStringUtils.string2hash("311575b0d0550f5c8858636621c66172c2633f0a6d6d7f7a254c5be9fcc998a5"),
+      mixHash =
+        BlockHash(ByteStringUtils.string2hash("311575b0d0550f5c8858636621c66172c2633f0a6d6d7f7a254c5be9fcc998a5")),
       nonce = ByteStringUtils.string2hash("b841838f136f2bed")
     )
-  }
-}

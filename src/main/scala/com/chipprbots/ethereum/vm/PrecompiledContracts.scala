@@ -4,7 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.util.Try
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.crypto.Secp256r1
 import com.chipprbots.ethereum.crypto.zksnark.BN128.BN128G1
 import com.chipprbots.ethereum.crypto.zksnark.BN128.BN128G2
@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.crypto.zksnark.BN128Fp
 import com.chipprbots.ethereum.crypto.zksnark.PairingCheck
 import com.chipprbots.ethereum.crypto.zksnark.PairingCheck.G1G2Pair
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.utils.ByteStringUtils._
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.EtcFork
@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks.EthFork
 
 // scalastyle:off magic.number
-object PrecompiledContracts {
+object PrecompiledContracts:
 
   val EcDsaRecAddr: Address = Address(1)
   val Sha256Addr: Address = Address(2)
@@ -88,7 +88,7 @@ object PrecompiledContracts {
 
   /** Checks whether `ProgramContext#recipientAddr` points to a precompiled contract
     */
-  def isDefinedAt(context: ProgramContext[_, _]): Boolean =
+  def isDefinedAt(context: ProgramContext[?, ?]): Boolean =
     getContract(context).isDefined
 
   /** Runs a contract for address provided in `ProgramContext#recipientAddr` Will throw an exception if the address does
@@ -101,30 +101,27 @@ object PrecompiledContracts {
       )
       .run(context)
 
-  private def getContract(context: ProgramContext[_, _]): Option[PrecompiledContract] =
+  private def getContract(context: ProgramContext[?, ?]): Option[PrecompiledContract] =
     context.recipientAddr.flatMap { addr =>
       val baseContracts = getContracts(context)
       val relocations = context.precompileRelocations
-      if (relocations.isEmpty) {
-        baseContracts.get(addr)
-      } else if (relocations.contains(addr)) {
+      if relocations.isEmpty then baseContracts.get(addr)
+      else if relocations.contains(addr) then
         // Address was a precompile source (moved away) — no longer a precompile
         None
-      } else {
+      else
         // Check if this address is a relocation target
         val reverseMap = relocations.map(_.swap)
-        reverseMap.get(addr) match {
+        reverseMap.get(addr) match
           case Some(originalAddr) => baseContracts.get(originalAddr) // Precompile relocated here
           case None               => baseContracts.get(addr) // Normal precompile check
-        }
-      }
     }
 
   /** Check if an address is a known precompile address (without relocation) */
-  def isPrecompileAddress(addr: Address, context: ProgramContext[_, _]): Boolean =
+  def isPrecompileAddress(addr: Address, context: ProgramContext[?, ?]): Boolean =
     getContracts(context).contains(addr)
 
-  def getContracts(context: ProgramContext[_, _]): Map[Address, PrecompiledContract] = {
+  def getContracts(context: ProgramContext[?, ?]): Map[Address, PrecompiledContract] =
     val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number)
     val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number)
     // Post-Cancun detection: check if block header has blob gas fields
@@ -134,30 +131,25 @@ object PrecompiledContracts {
     // EIP-7951 P256VERIFY activates at Osaka timestamp on ETH chains
     val isOsaka = context.evmConfig.blockchainConfig.isOsakaTimestamp(context.blockHeader.unixTimestamp)
 
-    if (isOsaka) {
-      osakaContracts
-    } else if (etcFork >= EtcForks.Olympia) {
+    if isOsaka then osakaContracts
+    else if etcFork >= EtcForks.Olympia then
       // ETC Olympia activates BLS12-381 + P256VERIFY (ECIP-1121). Same set as ETH Osaka.
       osakaContracts
-    } else if (isPrague) {
+    else if isPrague then
       // ETH Prague activates BLS12-381 (EIP-2537) but NOT P256VERIFY (that is Osaka-only).
       olympiaContracts
-    } else if (isCancun) {
-      cancunContracts
-    } else if (ethFork >= EthForks.Istanbul || etcFork >= EtcForks.Phoenix) {
-      istanbulPhoenixContracts
-    } else if (ethFork >= EthForks.Byzantium || etcFork >= EtcForks.Atlantis) {
+    else if isCancun then cancunContracts
+    else if ethFork >= EthForks.Istanbul || etcFork >= EtcForks.Phoenix then istanbulPhoenixContracts
+    else if ethFork >= EthForks.Byzantium || etcFork >= EtcForks.Atlantis then
       // byzantium and atlantis hard fork introduce the same set of precompiled contracts
       byzantiumAtlantisContracts
-    } else
-      contracts
-  }
+    else contracts
 
-  sealed trait PrecompiledContract {
+  sealed trait PrecompiledContract:
     protected def exec(inputData: ByteString): Option[ByteString]
     protected def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt
 
-    def run[W <: WorldStateProxy[W, S], S <: Storage[S]](context: ProgramContext[W, S]): ProgramResult[W, S] = {
+    def run[W <: WorldStateProxy[W, S], S <: Storage[S]](context: ProgramContext[W, S]): ProgramResult[W, S] =
 
       val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number)
       val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number)
@@ -165,13 +157,11 @@ object PrecompiledContracts {
       val g = gas(context.inputData, etcFork, ethFork)
 
       val (result, error, gasRemaining): (ByteString, Option[ProgramError], BigInt) = (
-        if (g <= context.startGas)
-          exec(context.inputData) match {
+        if g <= context.startGas then
+          exec(context.inputData) match
             case Some(returnData) => (returnData, None, context.startGas - g)
             case None             => (ByteString.empty, Some(PreCompiledContractFail), BigInt(0))
-          }
-        else
-          (ByteString.empty, Some(OutOfGas), BigInt(0))
+        else (ByteString.empty, Some(OutOfGas), BigInt(0))
       ): @unchecked
 
       ProgramResult(
@@ -186,18 +176,16 @@ object PrecompiledContracts {
         Set.empty,
         Set.empty
       )
-    }
-  }
 
-  object EllipticCurveRecovery extends PrecompiledContract {
-    def exec(inputData: ByteString): Option[ByteString] = {
+  object EllipticCurveRecovery extends PrecompiledContract:
+    def exec(inputData: ByteString): Option[ByteString] =
       val data: ByteString = inputData.padToByteString(128, 0.toByte)
       val h = data.slice(0, 32)
       val v = data.slice(32, 64)
       val r = data.slice(64, 96)
       val s = data.slice(96, 128)
 
-      if (hasOnlyLastByteSet(v)) {
+      if hasOnlyLastByteSet(v) then
         val recovered = Try(ECDSASignature(r, s, v.last).publicKey(h)).getOrElse(None)
         Some(
           recovered
@@ -207,43 +195,36 @@ object PrecompiledContracts {
             }
             .getOrElse(ByteString.empty)
         )
-      } else
-        Some(ByteString.empty)
-
-    }
+      else Some(ByteString.empty)
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = BigInt(3000)
 
     private def hasOnlyLastByteSet(v: ByteString): Boolean =
       v.dropWhile(_ == 0).size == 1
-  }
 
-  object Sha256 extends PrecompiledContract {
+  object Sha256 extends PrecompiledContract:
     def exec(inputData: ByteString): Option[ByteString] =
       Some(sha256(inputData))
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
       BigInt(60) + BigInt(12) * wordsForBytes(inputData.size)
-  }
 
-  object Ripemp160 extends PrecompiledContract {
+  object Ripemp160 extends PrecompiledContract:
     def exec(inputData: ByteString): Option[ByteString] =
       Some(ByteUtils.padLeft(ripemd160(inputData), 32))
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
       BigInt(600) + BigInt(120) * wordsForBytes(inputData.size)
-  }
 
-  object Identity extends PrecompiledContract {
+  object Identity extends PrecompiledContract:
     def exec(inputData: ByteString): Option[ByteString] =
       Some(inputData)
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
       BigInt(15) + BigInt(3) * wordsForBytes(inputData.size)
-  }
 
   // Spec: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-198.md
-  object ModExp extends PrecompiledContract {
+  object ModExp extends PrecompiledContract:
 
     private val lengthBytes = 32
     private val totalLengthBytes = 3 * lengthBytes
@@ -253,7 +234,7 @@ object PrecompiledContracts {
 
     override def run[W <: WorldStateProxy[W, S], S <: Storage[S]](
         context: ProgramContext[W, S]
-    ): ProgramResult[W, S] = {
+    ): ProgramResult[W, S] =
       val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number)
       val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number)
       val isOsaka = context.evmConfig.blockchainConfig.isOsakaTimestamp(context.blockHeader.unixTimestamp)
@@ -266,12 +247,16 @@ object PrecompiledContracts {
       val useEip7823 = isOsaka || (etcFork >= EtcForks.Olympia && !isEthereum)
 
       // EIP-7823: reject inputs with operand lengths > 1024 bytes
-      if (useEip7823) {
+      if useEip7823 then
         val baseLength = getLength(context.inputData, 0)
         val expLength = getLength(context.inputData, 1)
         val modLength = getLength(context.inputData, 2)
-        if (baseLength > maxOperandLength || expLength > maxOperandLength || modLength > maxOperandLength) {
-          return ProgramResult(
+        if baseLength > maxOperandLength || expLength > maxOperandLength || modLength > maxOperandLength then
+          // DEFER: nested guard inside the EIP-7823 (Unit-typed) validation block; the method
+          // value (ProgramResult / MODEXP output) is produced below. An expression rewrite would
+          // require restructuring the validation into a separate boolean and is byte-level risky
+          // for a precompile result that feeds state. Keep the short-circuit.
+          return ProgramResult( // scalafix:ok DisableSyntax.return
             ByteString.empty,
             BigInt(0),
             context.world,
@@ -283,8 +268,6 @@ object PrecompiledContracts {
             Set.empty,
             Set.empty
           )
-        }
-      }
 
       // EIP-7883: gas cost routing. On ETH chains, EIP-7883 activates at Osaka timestamp
       // (Prague keeps EIP-2565 per execution-specs); on ETC, it activates at Olympia.
@@ -292,13 +275,11 @@ object PrecompiledContracts {
       // EIP-7883 pre-Osaka.
       val g = gasWithOsaka(context.inputData, etcFork, ethFork, isOsaka, isEthereum)
       val (result, error, gasRemaining): (ByteString, Option[ProgramError], BigInt) = (
-        if (g <= context.startGas)
-          exec(context.inputData) match {
+        if g <= context.startGas then
+          exec(context.inputData) match
             case Some(returnData) => (returnData, None, context.startGas - g)
             case None             => (ByteString.empty, Some(PreCompiledContractFail), BigInt(0))
-          }
-        else
-          (ByteString.empty, Some(OutOfGas), BigInt(0))
+        else (ByteString.empty, Some(OutOfGas), BigInt(0))
       ): @unchecked
 
       ProgramResult(
@@ -313,30 +294,24 @@ object PrecompiledContracts {
         Set.empty,
         Set.empty
       )
-    }
 
-    def exec(inputData: ByteString): Option[ByteString] = {
+    def exec(inputData: ByteString): Option[ByteString] =
       val baseLength = getLength(inputData, 0)
       val expLength = getLength(inputData, 1)
       val modLength = getLength(inputData, 2)
 
       val result =
-        if (baseLength == 0 && modLength == 0)
-          BigInt(0)
-        else {
+        if baseLength == 0 && modLength == 0 then BigInt(0)
+        else
           val mod = getNumber(inputData, safeAdd(totalLengthBytes, safeAdd(baseLength, expLength)), modLength)
 
-          if (mod == 0) {
-            BigInt(0)
-          } else {
+          if mod == 0 then BigInt(0)
+          else
             val base = getNumber(inputData, totalLengthBytes, baseLength)
             val exp = getNumber(inputData, safeAdd(totalLengthBytes, baseLength), expLength)
 
             base.modPow(exp, mod)
-          }
-        }
       Some(ByteString(ByteUtils.bigIntegerToBytes(result.bigInteger, modLength)))
-    }
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
       gasWithOsaka(inputData, etcFork, ethFork, eip7883Active = false, isEthereum = false)
@@ -352,7 +327,7 @@ object PrecompiledContracts {
         ethFork: EthFork,
         eip7883Active: Boolean,
         isEthereum: Boolean
-    ): BigInt = {
+    ): BigInt =
       val baseLength = getLength(inputData, 0)
       val expLength = getLength(inputData, 1)
       val modLength = getLength(inputData, 2)
@@ -365,197 +340,159 @@ object PrecompiledContracts {
 
       val useEip7883 = eip7883Active || (etcFork >= EtcForks.Olympia && !isEthereum)
 
-      if (useEip7883)
-        PostEIP7883Cost.calculate(baseLength, modLength, expLength, expBytes)
-      else if (ethFork >= EthForks.Berlin || etcFork >= EtcForks.Magneto)
+      if useEip7883 then PostEIP7883Cost.calculate(baseLength, modLength, expLength, expBytes)
+      else if ethFork >= EthForks.Berlin || etcFork >= EtcForks.Magneto then
         PostEIP2565Cost.calculate(baseLength, modLength, expLength, expBytes)
-      else
-        PostEIP198Cost.calculate(baseLength, modLength, expLength, expBytes)
-    }
+      else PostEIP198Cost.calculate(baseLength, modLength, expLength, expBytes)
 
     // Spec: https://eips.ethereum.org/EIPS/eip-198
-    object PostEIP198Cost {
+    object PostEIP198Cost:
       private val GQUADDIVISOR = 20
 
-      def calculate(baseLength: Int, modLength: Int, expLength: Int, expBytes: ByteString): BigInt = {
+      def calculate(baseLength: Int, modLength: Int, expLength: Int, expBytes: ByteString): BigInt =
         val multComplexity = getMultComplexity(math.max(baseLength, modLength))
         val adjusted = adjustExpLength(expBytes, expLength)
         multComplexity * math.max(adjusted, 1) / GQUADDIVISOR
-      }
 
-      private def getMultComplexity(x: BigInt): BigInt = {
+      private def getMultComplexity(x: BigInt): BigInt =
         val x2 = x * x
-        if (x <= 64)
-          x2
-        else if (x <= 1024)
-          x2 / 4 + 96 * x - 3072
-        else
-          x2 / 16 + 480 * x - 199680
-      }
-    }
+        if x <= 64 then x2
+        else if x <= 1024 then x2 / 4 + 96 * x - 3072
+        else x2 / 16 + 480 * x - 199680
 
     // Spec: https://eips.ethereum.org/EIPS/eip-2565
-    object PostEIP2565Cost {
+    object PostEIP2565Cost:
       private val GQUADDIVISOR = 3
 
-      def calculate(baseLength: Int, modLength: Int, expLength: Int, expBytes: ByteString): BigInt = {
+      def calculate(baseLength: Int, modLength: Int, expLength: Int, expBytes: ByteString): BigInt =
         val multComplexity = getMultComplexity(math.max(baseLength, modLength))
         val adjusted = adjustExpLength(expBytes, expLength)
         val r = multComplexity * math.max(adjusted, 1) / GQUADDIVISOR
-        if (r <= 200) 200
+        if r <= 200 then 200
         else r
-      }
 
       // ceiling(x/8)^2
       private def getMultComplexity(x: BigInt): BigInt =
         ((x + 7) / 8).pow(2)
-    }
 
     // Spec: https://eips.ethereum.org/EIPS/eip-7883
     // EIP-7883: ModExp gas cost increase — higher multiplication complexity, no divisor, min 500
-    object PostEIP7883Cost {
+    object PostEIP7883Cost:
 
-      def calculate(baseLength: Int, modLength: Int, expLength: Int, expBytes: ByteString): BigInt = {
+      def calculate(baseLength: Int, modLength: Int, expLength: Int, expBytes: ByteString): BigInt =
         val multComplexity = getMultComplexity(math.max(baseLength, modLength))
         val adjusted = adjustExpLength7883(expBytes, expLength)
         val r = multComplexity * math.max(adjusted, 1)
-        if (r < 500) 500
+        if r < 500 then 500
         else r
-      }
 
       // EIP-7883 multiplication complexity:
       // For maxLen <= 32: 16 (flat constant)
       // For maxLen > 32: 2 * ceiling(maxLen/8)^2
       private def getMultComplexity(x: BigInt): BigInt =
-        if (x <= 32) BigInt(16)
-        else {
+        if x <= 32 then BigInt(16)
+        else
           val words = (x + 7) / 8
           2 * words.pow(2)
-        }
 
       // EIP-7883 adjusted exponent length uses multiplier 16 (not 8 like EIP-2565)
-      private def adjustExpLength7883(expBytes: ByteString, expLength: Int): Long = {
+      private def adjustExpLength7883(expBytes: ByteString, expLength: Int): Long =
         val expHead =
-          if (expLength <= lengthBytes)
-            expBytes.padToByteString(expLength, 0.toByte)
-          else
-            expBytes.take(lengthBytes).padToByteString(lengthBytes, 0.toByte)
+          if expLength <= lengthBytes then expBytes.padToByteString(expLength, 0.toByte)
+          else expBytes.take(lengthBytes).padToByteString(lengthBytes, 0.toByte)
 
         val highestBitIndex = math.max(ByteUtils.toBigInt(expHead).bitLength - 1, 0)
 
-        if (expLength <= lengthBytes) {
-          highestBitIndex
-        } else {
-          16L * (expLength - lengthBytes) + highestBitIndex
-        }
-      }
-    }
+        if expLength <= lengthBytes then highestBitIndex
+        else 16L * (expLength - lengthBytes) + highestBitIndex
 
-    private def getNumber(bytes: ByteString, offset: Int, length: Int): BigInt = {
+    private def getNumber(bytes: ByteString, offset: Int, length: Int): BigInt =
       val number = bytes.slice(offset, safeAdd(offset, length)).padToByteString(length, 0.toByte)
       ByteUtils.toBigInt(number)
-    }
 
     private def safeAdd(a: Int, b: Int): Int =
       safeInt(BigInt(a) + BigInt(b))
 
     private def safeInt(value: BigInt): Int =
-      if (value.isValidInt)
-        value.toInt
-      else
-        Integer.MAX_VALUE
+      if value.isValidInt then value.toInt
+      else Integer.MAX_VALUE
 
-    private def getLength(bytes: ByteString, position: Int): Int = {
+    private def getLength(bytes: ByteString, position: Int): Int =
       val start = position * lengthBytes
       safeInt(ByteUtils.toBigInt(bytes.slice(start, start + lengthBytes)))
-    }
 
-    private def adjustExpLength(expBytes: ByteString, expLength: Int): Long = {
+    private def adjustExpLength(expBytes: ByteString, expLength: Int): Long =
       val expHead =
-        if (expLength <= lengthBytes)
-          expBytes.padToByteString(expLength, 0.toByte)
-        else
-          expBytes.take(lengthBytes).padToByteString(lengthBytes, 0.toByte)
+        if expLength <= lengthBytes then expBytes.padToByteString(expLength, 0.toByte)
+        else expBytes.take(lengthBytes).padToByteString(lengthBytes, 0.toByte)
 
       val highestBitIndex = math.max(ByteUtils.toBigInt(expHead).bitLength - 1, 0)
 
-      if (expLength <= lengthBytes) {
-        highestBitIndex
-      } else {
-        8L * (expLength - lengthBytes) + highestBitIndex
-      }
-    }
-  }
+      if expLength <= lengthBytes then highestBitIndex
+      else 8L * (expLength - lengthBytes) + highestBitIndex
 
   // Spec: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-196.md
-  object Bn128Add extends PrecompiledContract {
+  object Bn128Add extends PrecompiledContract:
     val expectedBytes: Int = 4 * 32
 
-    def exec(inputData: ByteString): Option[ByteString] = {
+    def exec(inputData: ByteString): Option[ByteString] =
       val paddedInput = inputData.padToByteString(expectedBytes, 0.toByte)
       val (x1, y1, x2, y2) = getCurvePointsBytes(paddedInput)
 
-      val result = for {
+      val result = for
         p1 <- BN128Fp.createPoint(x1, y1)
         p2 <- BN128Fp.createPoint(x2, y2)
         p3 = BN128Fp.toEthNotation(BN128Fp.add(p1, p2))
-      } yield p3
+      yield p3
 
       result.map { point =>
         val xBytes = ByteUtils.bigIntegerToBytes(point.x.inner.bigInteger, 32)
         val yBytes = ByteUtils.bigIntegerToBytes(point.y.inner.bigInteger, 32)
         ByteString(xBytes ++ yBytes)
       }
-    }
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
-      if (etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul)
+      if etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul then
         BigInt(150) // https://eips.ethereum.org/EIPS/eip-1108
-      else
-        BigInt(500)
+      else BigInt(500)
 
     private def getCurvePointsBytes(input: ByteString): (ByteString, ByteString, ByteString, ByteString) =
       (input.slice(0, 32), input.slice(32, 64), input.slice(64, 96), input.slice(96, 128))
 
-  }
-
   // Spec: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-196.md
-  object Bn128Mul extends PrecompiledContract {
+  object Bn128Mul extends PrecompiledContract:
     val expectedBytes: Int = 3 * 32
     val maxScalar: BigInt = BigInt(2).pow(256) - 1
 
-    def exec(inputData: ByteString): Option[ByteString] = {
+    def exec(inputData: ByteString): Option[ByteString] =
       val paddedInput = inputData.padToByteString(expectedBytes, 0.toByte)
       val (x1, y1, scalarBytes) = getCurvePointsBytes(paddedInput)
 
       val scalar = ByteUtils.toBigInt(scalarBytes)
 
-      val result = for {
+      val result = for
         p <- BN128Fp.createPoint(x1, y1)
-        s <- if (scalar <= maxScalar) Some(scalar) else None
+        s <- if scalar <= maxScalar then Some(scalar) else None
         p3 = BN128Fp.toEthNotation(BN128Fp.mul(p, s))
-      } yield p3
+      yield p3
 
       result.map { point =>
         val xBytes = ByteUtils.bigIntegerToBytes(point.x.inner.bigInteger, 32)
         val yBytes = ByteUtils.bigIntegerToBytes(point.y.inner.bigInteger, 32)
         ByteString(xBytes ++ yBytes)
       }
-    }
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
-      if (etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul)
+      if etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul then
         BigInt(6000) // https://eips.ethereum.org/EIPS/eip-1108
-      else
-        BigInt(40000)
+      else BigInt(40000)
 
     private def getCurvePointsBytes(input: ByteString): (ByteString, ByteString, ByteString) =
       (input.slice(0, 32), input.slice(32, 64), input.slice(64, 96))
-  }
 
   // Spec: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-197.md
   // scalastyle: off
-  object Bn128Pairing extends PrecompiledContract {
+  object Bn128Pairing extends PrecompiledContract:
     private val wordLength = 32
     private val inputLength = 6 * wordLength
 
@@ -563,40 +500,31 @@ object PrecompiledContracts {
     val negativeResult: ByteString = ByteString(Seq.fill(wordLength)(0.toByte).toArray)
 
     def exec(inputData: ByteString): Option[ByteString] =
-      if (inputData.length % inputLength != 0) {
-        None
-      } else {
+      if inputData.length % inputLength != 0 then None
+      else
         getPairs(inputData.grouped(inputLength)).map { pairs =>
-          if (PairingCheck.pairingCheck(pairs))
-            positiveResult
-          else
-            negativeResult
+          if PairingCheck.pairingCheck(pairs) then positiveResult
+          else negativeResult
         }
-      }
 
-    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = {
+    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
       val k = inputData.length / inputLength
-      if (etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul) { // https://eips.ethereum.org/EIPS/eip-1108
+      if etcFork >= EtcForks.Phoenix || ethFork >= EthForks.Istanbul then // https://eips.ethereum.org/EIPS/eip-1108
         BigInt(34000) * k + BigInt(45000)
-      } else {
-        BigInt(80000) * k + BigInt(100000)
-      }
-    }
+      else BigInt(80000) * k + BigInt(100000)
 
     // Method which stops reading another points if one of earlier ones failed (had invalid coordinates, or was not on
     // BN128 curve
-    private def getPairs(bytes: Iterator[ByteString]): Option[Seq[G1G2Pair]] = {
+    private def getPairs(bytes: Iterator[ByteString]): Option[Seq[G1G2Pair]] =
       var accum = List.empty[G1G2Pair]
-      while (bytes.hasNext)
-        getPair(bytes.next()) match {
+      while bytes.hasNext do
+        getPair(bytes.next()) match
           case Some(part) => accum = part :: accum
           case None       => return None // scalafix:ok DisableSyntax.return
-        }
       Some(accum)
-    }
 
     private def getPair(input: ByteString): Option[G1G2Pair] =
-      for {
+      for
         g1 <- BN128G1(getBytesOnPosition(input, 0), getBytesOnPosition(input, 1))
         g2 <- BN128G2(
           getBytesOnPosition(input, 3),
@@ -604,58 +532,49 @@ object PrecompiledContracts {
           getBytesOnPosition(input, 5),
           getBytesOnPosition(input, 4)
         )
-      } yield G1G2Pair(g1, g2)
+      yield G1G2Pair(g1, g2)
 
-    private def getBytesOnPosition(input: ByteString, pos: Int): ByteString = {
+    private def getBytesOnPosition(input: ByteString, pos: Int): ByteString =
       val from = pos * wordLength
       input.slice(from, from + wordLength)
-    }
-  }
 
   // Spec: https://eips.ethereum.org/EIPS/eip-152
   // scalastyle: off
-  object Blake2bCompress extends PrecompiledContract {
+  object Blake2bCompress extends PrecompiledContract:
     def exec(inputData: ByteString): Option[ByteString] =
       Blake2bCompression.blake2bCompress(inputData.toArray).map(ByteString.fromArrayUnsafe)
 
-    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = {
+    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
       val inputArray = inputData.toArray
-      if (Blake2bCompression.isValidInput(inputArray)) {
+      if Blake2bCompression.isValidInput(inputArray) then
         // Each round costs 1gas
         BigInt(Blake2bCompression.parseNumberOfRounds(inputArray))
-      } else {
+      else
         // bad input to contract, contract will not execute, set price to zero
         BigInt(0)
-      }
-    }
-  }
 
   // Spec: https://eips.ethereum.org/EIPS/eip-7951
   // EIP-7951: P256VERIFY — secp256r1 (P-256) signature verification
-  object P256Verify extends PrecompiledContract {
+  object P256Verify extends PrecompiledContract:
     private val expectedInputLength = 160 // hash(32) + r(32) + s(32) + x(32) + y(32)
 
     def exec(inputData: ByteString): Option[ByteString] =
-      if (inputData.length < expectedInputLength) {
-        Some(ByteString.empty) // Invalid input — return empty (failure)
-      } else {
+      if inputData.length < expectedInputLength then Some(ByteString.empty) // Invalid input — return empty (failure)
+      else
         val hash = inputData.slice(0, 32).toArray
         val r = inputData.slice(32, 64).toArray
         val s = inputData.slice(64, 96).toArray
         val x = inputData.slice(96, 128).toArray
         val y = inputData.slice(128, 160).toArray
 
-        if (Secp256r1.verify(hash, r, s, x, y)) {
+        if Secp256r1.verify(hash, r, s, x, y) then
           // Valid signature: return 0x01 left-padded to 32 bytes
           Some(ByteUtils.padLeft(ByteString(1), 32))
-        } else {
+        else
           // Invalid signature: return 0x00 left-padded to 32 bytes
           Some(ByteString(new Array[Byte](32)))
-        }
-      }
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = BigInt(6900)
-  }
 
   // ===== EIP-2537: BLS12-381 Precompiles (final spec: 7 precompiles at 0x0b-0x11) =====
   // Uses org.hyperledger.besu:bls12-381 native library (gnark/Constantine backends via JNA).
@@ -664,10 +583,12 @@ object PrecompiledContracts {
   /** Execute a BLS12-381 operation via the Besu native library. Returns Some(result) on success, None on error (invalid
     * point, wrong input size, etc.)
     */
-  private def blsNativeOp(opByte: Byte, inputData: ByteString): Option[ByteString] = {
+  private def blsNativeOp(opByte: Byte, inputData: ByteString): Option[ByteString] =
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
-    if (!LibEthPairings.ENABLED) return None
-    try {
+    // DEFER: guard in the BLS12-381 native precompile path (crypto primitive). Keep the
+    // short-circuit; an expression rewrite is byte-level risky for consensus crypto.
+    if !LibEthPairings.ENABLED then return None // scalafix:ok DisableSyntax.return
+    try
       val resultBuf = new Array[Byte](LibEthPairings.EIP2537_PREALLOCATE_FOR_RESULT_BYTES)
       val errorBuf = new Array[Byte](LibEthPairings.EIP2537_PREALLOCATE_FOR_ERROR_BYTES)
       val resultLen = new com.sun.jna.ptr.IntByReference(resultBuf.length)
@@ -682,83 +603,70 @@ object PrecompiledContracts {
         errorBuf,
         errorLen
       )
-      if (ret == 0) Some(ByteString(resultBuf.take(resultLen.getValue)))
+      if ret == 0 then Some(ByteString(resultBuf.take(resultLen.getValue)))
       else None
-    } catch {
-      case _: Exception => None
-    }
-  }
+    catch case _: Exception => None
 
   sealed trait BlsPrecompile extends PrecompiledContract
 
-  object BlsG1Add extends BlsPrecompile {
+  object BlsG1Add extends BlsPrecompile:
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
     def exec(inputData: ByteString): Option[ByteString] =
       blsNativeOp(LibEthPairings.BLS12_G1ADD_OPERATION_RAW_VALUE, inputData)
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = BigInt(375)
-  }
 
-  object BlsG1MultiExp extends BlsPrecompile {
+  object BlsG1MultiExp extends BlsPrecompile:
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
     private val pairSize = 160 // 128-byte G1 point + 32-byte scalar
     def exec(inputData: ByteString): Option[ByteString] =
       blsNativeOp(LibEthPairings.BLS12_G1MULTIEXP_OPERATION_RAW_VALUE, inputData)
-    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = {
+    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
       val k = math.max(1, inputData.length / pairSize)
       val discount = blsG1MsmDiscount(k)
       BigInt(12000) * k * discount / 1000
-    }
-  }
 
-  object BlsG2Add extends BlsPrecompile {
+  object BlsG2Add extends BlsPrecompile:
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
     def exec(inputData: ByteString): Option[ByteString] =
       blsNativeOp(LibEthPairings.BLS12_G2ADD_OPERATION_RAW_VALUE, inputData)
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = BigInt(600)
-  }
 
-  object BlsG2MultiExp extends BlsPrecompile {
+  object BlsG2MultiExp extends BlsPrecompile:
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
     private val pairSize = 288 // 256-byte G2 point + 32-byte scalar
     def exec(inputData: ByteString): Option[ByteString] =
       blsNativeOp(LibEthPairings.BLS12_G2MULTIEXP_OPERATION_RAW_VALUE, inputData)
-    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = {
+    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
       val k = math.max(1, inputData.length / pairSize)
       val discount = blsG2MsmDiscount(k)
       BigInt(22500) * k * discount / 1000
-    }
-  }
 
-  object BlsPairing extends BlsPrecompile {
+  object BlsPairing extends BlsPrecompile:
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
     private val pairSize = 384 // 128-byte G1 + 256-byte G2
     def exec(inputData: ByteString): Option[ByteString] =
       blsNativeOp(LibEthPairings.BLS12_PAIR_OPERATION_RAW_VALUE, inputData)
-    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = {
+    def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt =
       val k = math.max(1, inputData.length / pairSize)
       BigInt(32600) * k + BigInt(37700)
-    }
-  }
 
-  object BlsMapG1 extends BlsPrecompile {
+  object BlsMapG1 extends BlsPrecompile:
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
     def exec(inputData: ByteString): Option[ByteString] =
       blsNativeOp(LibEthPairings.BLS12_MAP_FP_TO_G1_OPERATION_RAW_VALUE, inputData)
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = BigInt(5500)
-  }
 
-  object BlsMapG2 extends BlsPrecompile {
+  object BlsMapG2 extends BlsPrecompile:
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
     def exec(inputData: ByteString): Option[ByteString] =
       blsNativeOp(LibEthPairings.BLS12_MAP_FP2_TO_G2_OPERATION_RAW_VALUE, inputData)
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = BigInt(23800)
-  }
 
   /** EIP-4844: KZG point evaluation precompile at address 0x0A. Input: versioned_hash (32) ++ z (32) ++ y (32) ++
     * commitment (48) ++ proof (48) = 192 bytes Output: FIELD_ELEMENTS_PER_BLOB (32) ++ BLS_MODULUS (32) = 64 bytes Gas:
     * 50000
     */
-  object KzgPointEvaluation extends PrecompiledContract {
+  object KzgPointEvaluation extends PrecompiledContract:
     private val KZG_GAS = BigInt(50000)
     private val VERSIONED_HASH_VERSION_KZG: Byte = 0x01
 
@@ -769,8 +677,12 @@ object PrecompiledContracts {
 
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = KZG_GAS
 
-    def exec(inputData: ByteString): Option[ByteString] = {
-      if (inputData.length != 192) return None
+    def exec(inputData: ByteString): Option[ByteString] =
+      // DEFER (all returns in this method): EIP-4844 KZG point-evaluation crypto primitive.
+      // These are sequential validation guards feeding a precompile result; the return inside
+      // the try block below (line ~786) also has try/catch-sensitive control flow. Keep the
+      // short-circuits — expression rewrites are byte-level risky for consensus crypto.
+      if inputData.length != 192 then return None // scalafix:ok DisableSyntax.return
 
       val versionedHash = inputData.slice(0, 32)
       val z = inputData.slice(32, 64)
@@ -779,46 +691,39 @@ object PrecompiledContracts {
       val proof = inputData.slice(144, 192)
 
       // Verify the versioned hash matches commitment via SHA256
-      if (versionedHash(0) != VERSIONED_HASH_VERSION_KZG) return None
+      if versionedHash(0) != VERSIONED_HASH_VERSION_KZG then return None // scalafix:ok DisableSyntax.return
 
       // Verify z < BLS_MODULUS and y < BLS_MODULUS
       val zBigInt = BigInt(1, z.toArray)
       val yBigInt = BigInt(1, y.toArray)
-      if (zBigInt >= BLS_MODULUS || yBigInt >= BLS_MODULUS) return None
+      if zBigInt >= BLS_MODULUS || yBigInt >= BLS_MODULUS then return None // scalafix:ok DisableSyntax.return
 
       // Verify the versioned hash matches SHA256(commitment)[1:] with version prefix
       val commitmentHash = java.security.MessageDigest.getInstance("SHA-256").digest(commitment.toArray)
       commitmentHash(0) = VERSIONED_HASH_VERSION_KZG
-      if (ByteString(commitmentHash) != versionedHash) return None
+      if ByteString(commitmentHash) != versionedHash then return None // scalafix:ok DisableSyntax.return
 
       // Verify the KZG proof using c-kzg-4844
-      try {
+      try
         val isValid = ethereum.ckzg4844.CKZG4844JNI.verifyKzgProof(
           commitment.toArray,
           z.toArray,
           y.toArray,
           proof.toArray
         )
-        if (!isValid) return None
-      } catch {
-        case _: Exception =>
-        // If KZG library not loaded or verification fails, try without native library
-        // For now, if the hash and field checks pass, accept the proof
-        // Full KZG verification requires the trusted setup to be loaded
-        // KZG native library not loaded or verification failed — accept if hash checks passed
-      }
+        if !isValid then return None // scalafix:ok DisableSyntax.return
+      catch
+        case _: Exception => return None // scalafix:ok DisableSyntax.return
 
-      // Return FIELD_ELEMENTS_PER_BLOB ++ BLS_MODULUS as 32-byte big-endian
+        // Return FIELD_ELEMENTS_PER_BLOB ++ BLS_MODULUS as 32-byte big-endian
       val result = ByteString(
         com.chipprbots.ethereum.utils.ByteUtils.padLeft(ByteString(FIELD_ELEMENTS_PER_BLOB.toByteArray), 32).toArray ++
           com.chipprbots.ethereum.utils.ByteUtils.padLeft(ByteString(BLS_MODULUS.toByteArray), 32).toArray
       )
       Some(result)
-    }
-  }
 
   /** EIP-2537 G1 MSM discount table (128 entries). max_discount=519 at k>=128. */
-  private def blsG1MsmDiscount(k: Int): Int = {
+  private def blsG1MsmDiscount(k: Int): Int =
     val table = Array(
       1000, 949, 848, 797, 764, 740, 721, 707, 695, 685, 677, 670, 664, 659, 654, 650, 646, 643, 640, 637, 634, 632,
       630, 627, 625, 624, 622, 620, 618, 617, 615, 614, 613, 611, 610, 609, 608, 607, 606, 605, 604, 603, 602, 601, 600,
@@ -827,13 +732,12 @@ object PrecompiledContracts {
       553, 552, 551, 550, 549, 548, 547, 546, 545, 544, 543, 542, 541, 540, 539, 538, 537, 536, 535, 534, 533, 532, 531,
       530, 529, 528, 527, 526, 525, 524, 523, 522, 521, 520, 519, 519, 519
     )
-    if (k <= 0) 1000
-    else if (k <= table.length) table(k - 1)
+    if k <= 0 then 1000
+    else if k <= table.length then table(k - 1)
     else 519 // for k > 128
-  }
 
   /** EIP-2537 G2 MSM discount table (128 entries). max_discount=524 at k>=128. */
-  private def blsG2MsmDiscount(k: Int): Int = {
+  private def blsG2MsmDiscount(k: Int): Int =
     val table = Array(
       1000, 1000, 923, 884, 855, 832, 812, 796, 782, 770, 759, 750, 742, 734, 727, 721, 715, 709, 704, 699, 694, 689,
       685, 681, 677, 673, 669, 666, 662, 659, 656, 653, 650, 647, 644, 641, 639, 636, 634, 631, 629, 627, 624, 622, 620,
@@ -842,8 +746,6 @@ object PrecompiledContracts {
       554, 553, 552, 551, 550, 549, 548, 547, 547, 546, 545, 544, 543, 543, 542, 541, 540, 540, 539, 538, 537, 537, 536,
       535, 535, 534, 533, 533, 532, 531, 531, 530, 530, 529, 528, 528, 527
     )
-    if (k <= 0) 1000
-    else if (k <= table.length) table(k - 1)
+    if k <= 0 then 1000
+    else if k <= table.length then table(k - 1)
     else 524 // for k > 128
-  }
-}

@@ -4,15 +4,18 @@ import scala.util.Try
 
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 import com.chipprbots.scalanet.discovery.ethereum.v5.Payload
-
-import scodec.{Attempt, Codec, DecodeResult, Err}
-import scodec.bits.{BitVector, ByteVector}
+import scodec.Attempt
+import scodec.Codec
+import scodec.DecodeResult
+import scodec.Err
+import scodec.bits.BitVector
+import scodec.bits.ByteVector
 
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPCodec
 import com.chipprbots.ethereum.rlp.RLPCodec.Ops
 import com.chipprbots.ethereum.rlp.RLPEncoder
-import com.chipprbots.ethereum.rlp.RLPImplicitDerivations._
+import com.chipprbots.ethereum.rlp.RLPImplicitDerivations.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 
@@ -25,23 +28,21 @@ import com.chipprbots.ethereum.rlp.RLPList
   * The codec lives in fukuii main rather than scalanet because RLP is part of the fukuii ethereum dependency tree —
   * same split as v4.
   */
-object V5RLPCodecs extends V5ContentCodecs with V5PayloadCodecs {
+object V5RLPCodecs extends V5ContentCodecs with V5PayloadCodecs:
 
   /** Adapter so we can summon `Codec[Payload]` from any `RLPCodec[Payload]`. */
   given codecFromRLPCodec[T: RLPCodec]: Codec[T] =
     Codec[T](
-      (value: T) => {
+      (value: T) =>
         val bytes = rlp.encode(value)
         Attempt.successful(BitVector(bytes))
-      },
-      (bits: BitVector) => {
+      ,
+      (bits: BitVector) =>
         val tryDecode = Try(rlp.decode[T](bits.toByteArray))
         Attempt.fromTry(tryDecode.map(DecodeResult(_, BitVector.empty)))
-      }
     )
-}
 
-trait V5ContentCodecs {
+trait V5ContentCodecs:
 
   /** RLP codec for a `ByteVector`. v5 packs `recipientIp` (raw 4 or 16 bytes) and `requestId` (raw 1–8 bytes) directly
     * as RLP byte strings.
@@ -52,9 +53,9 @@ trait V5ContentCodecs {
   /** Re-export the v4 ENR codec — discv5 uses the same RLP form. */
   given enrRLPCodec: RLPCodec[EthereumNodeRecord] =
     RLPCodecs.enrRLPCodec
-}
 
-trait V5PayloadCodecs { self: V5ContentCodecs =>
+trait V5PayloadCodecs:
+  self: V5ContentCodecs =>
 
   given payloadDerivationPolicy: DerivationPolicy =
     DerivationPolicy.default.copy(omitTrailingOptionals = true)
@@ -69,12 +70,12 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 2 =>
+      case RLPList(items*) if items.length >= 2 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
         // Reject reqId > 8 bytes per spec (geth ErrInvalidReqID).
         // The case-class `require` would also catch this, but failing in the
         // codec gives a cleaner error and lets the caller short-circuit.
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val enrSeq = items(1).decodeAs[Long]("enrSeq")
         Payload.Ping(requestId, enrSeq)
@@ -93,9 +94,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 4 =>
+      case RLPList(items*) if items.length >= 4 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val enrSeq = items(1).decodeAs[Long]("enrSeq")
         val recipientIp = items(2).decodeAs[ByteVector]("recipientIp")
@@ -114,9 +115,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 2 =>
+      case RLPList(items*) if items.length >= 2 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val distances = items(1).decodeAs[List[Int]]("distances")
         Payload.FindNode(requestId, distances)
@@ -134,9 +135,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 3 =>
+      case RLPList(items*) if items.length >= 3 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val total = items(1).decodeAs[Int]("total")
         val enrs = items(2).decodeAs[List[EthereumNodeRecord]]("enrs")
@@ -155,9 +156,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 3 =>
+      case RLPList(items*) if items.length >= 3 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val protocol = items(1).decodeAs[ByteVector]("protocol")
         val message = items(2).decodeAs[ByteVector]("message")
@@ -175,9 +176,9 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
       )
     },
     {
-      case RLPList(items @ _*) if items.length >= 2 =>
+      case RLPList(items*) if items.length >= 2 =>
         val requestId = items(0).decodeAs[ByteVector]("requestId")
-        if (requestId.size > Payload.MaxRequestIdSize.toLong)
+        if requestId.size > Payload.MaxRequestIdSize.toLong then
           throw new RuntimeException(s"requestId too long: ${requestId.size} > ${Payload.MaxRequestIdSize}")
         val message = items(1).decodeAs[ByteVector]("message")
         Payload.TalkResponse(requestId, message)
@@ -190,26 +191,25 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
     * this lives) and scalanet (where Payload itself is defined).
     */
   given payloadCodec: Codec[Payload] = Codec[Payload](
-    (payload: Payload) => {
-      val (msgType, body) = payload match {
+    (payload: Payload) =>
+      val (msgType, body) = payload match
         case x: Payload.Ping         => Payload.MessageType.Ping -> rlp.encode(x)
         case x: Payload.Pong         => Payload.MessageType.Pong -> rlp.encode(x)
         case x: Payload.FindNode     => Payload.MessageType.FindNode -> rlp.encode(x)
         case x: Payload.Nodes        => Payload.MessageType.Nodes -> rlp.encode(x)
         case x: Payload.TalkRequest  => Payload.MessageType.TalkReq -> rlp.encode(x)
         case x: Payload.TalkResponse => Payload.MessageType.TalkResp -> rlp.encode(x)
-      }
       Attempt.successful(BitVector(msgType +: body))
-    },
+    ,
     (bits: BitVector) =>
       bits.consumeThen(8)(
         err => Attempt.failure(Err(err)),
-        (head, tail) => {
+        (head, tail) =>
           val msgType: Byte = head.toByte()
           val body: Array[Byte] = tail.toByteArray
 
           val attempt: Try[Payload] = Try {
-            msgType match {
+            msgType match
               case Payload.MessageType.Ping     => rlp.decode[Payload.Ping](body)
               case Payload.MessageType.Pong     => rlp.decode[Payload.Pong](body)
               case Payload.MessageType.FindNode => rlp.decode[Payload.FindNode](body)
@@ -218,10 +218,7 @@ trait V5PayloadCodecs { self: V5ContentCodecs =>
               case Payload.MessageType.TalkResp => rlp.decode[Payload.TalkResponse](body)
               case other =>
                 throw new RuntimeException(s"unknown discv5 message type: 0x${(other & 0xff).toHexString}")
-            }
           }
           Attempt.fromTry(attempt.map(DecodeResult(_, BitVector.empty)))
-        }
       )
   )
-}

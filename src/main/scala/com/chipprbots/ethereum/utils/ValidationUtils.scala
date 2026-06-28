@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.utils
 
-object ValidationUtils {
+object ValidationUtils:
 
   /** This function combines multiple validations on object.
     *
@@ -11,8 +11,6 @@ object ValidationUtils {
     * @return
     *   object if all validations pass, else non-empty set of errors.
     */
-  def combineValidations[A, B](obj: B, eithers: Either[A, B]*): Either[Set[A], B] = {
+  def combineValidations[A, B](obj: B, eithers: Either[A, B]*): Either[Set[A], B] =
     val errors = eithers.collect { case Left(e) => e }
-    if (errors.isEmpty) Right(obj) else Left(errors.toSet)
-  }
-}
+    if errors.isEmpty then Right(obj) else Left(errors.toSet)

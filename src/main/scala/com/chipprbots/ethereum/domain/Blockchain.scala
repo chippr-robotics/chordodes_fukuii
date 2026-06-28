@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.domain
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.db.dataSource.DataSourceBatchUpdate
-import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.domain
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.jsonrpc.ProofService.StorageProof
@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.vm.WorldStateProxy
 
 /** Entity to be used to persist and query Blockchain related objects (blocks, transactions, ommers)
   */
-trait Blockchain {
+trait Blockchain:
 
   type S <: Storage[S]
   type WS <: WorldStateProxy[WS, S]
@@ -59,7 +59,7 @@ trait Blockchain {
     */
   def getReadOnlyMptStorage(): MptStorage
 
-  def removeBlock(hash: ByteString): Unit
+  def removeBlock(hash: BlockHash): Unit
 
   /** Flush all in-memory MPT trie nodes written during block execution to RocksDB.
     *
@@ -68,7 +68,6 @@ trait Blockchain {
     * were never part of a persisted state root.
     */
   def saveBlockState(bn: BigInt): Unit
-}
 
 class BlockchainImpl(
     protected val blockHeadersStorage: BlockHeadersStorage,
@@ -81,16 +80,16 @@ class BlockchainImpl(
     protected val stateStorage: StateStorage,
     blockchainReader: BlockchainReader
 ) extends Blockchain
-    with Logger {
+    with Logger:
 
   override def getAccountStorageAt(
       rootHash: ByteString,
       position: BigInt,
       ethCompatibleStorage: Boolean
-  ): ByteString = {
+  ): ByteString =
     val storage = stateStorage.getBackingStorage(0)
     val mpt =
-      if (ethCompatibleStorage) domain.EthereumUInt256Mpt.storageMpt(rootHash, storage)
+      if ethCompatibleStorage then domain.EthereumUInt256Mpt.storageMpt(rootHash, storage)
       else domain.ArbitraryIntegerMpt.storageMpt(rootHash, storage)
 
     val bigIntValue = mpt.get(position).getOrElse(BigInt(0))
@@ -99,25 +98,21 @@ class BlockchainImpl(
     // BigInt.toArray actually might return one more byte than necessary because it adds a sign bit, which in our case
     // will always be 0. This would add unwanted 0 bytes and might cause the value to be 33 byte long while an EVM
     // word is 32 byte long.
-    if (bigIntValue != 0)
-      ByteString(byteArrayValue.dropWhile(_ == 0))
-    else
-      ByteString(byteArrayValue)
-  }
+    if bigIntValue != 0 then ByteString(byteArrayValue.dropWhile(_ == 0))
+    else ByteString(byteArrayValue)
 
   override def getStorageProofAt(
       rootHash: ByteString,
       position: BigInt,
       ethCompatibleStorage: Boolean
-  ): StorageProof = {
+  ): StorageProof =
     val storage: MptStorage = stateStorage.getBackingStorage(0)
     val mpt: MerklePatriciaTrie[BigInt, BigInt] =
-      if (ethCompatibleStorage) domain.EthereumUInt256Mpt.storageMpt(rootHash, storage)
+      if ethCompatibleStorage then domain.EthereumUInt256Mpt.storageMpt(rootHash, storage)
       else domain.ArbitraryIntegerMpt.storageMpt(rootHash, storage)
     val value: Option[BigInt] = mpt.get(position)
     val proof: Option[Vector[MptNode]] = mpt.getProof(position)
     StorageProof(position, value, proof)
-  }
 
   def getBackingMptStorage(blockNumber: BigInt): MptStorage = stateStorage.getBackingStorage(blockNumber)
 
@@ -129,17 +124,17 @@ class BlockchainImpl(
   private def removeBlockNumberMapping(number: BigInt): DataSourceBatchUpdate =
     blockNumberMappingStorage.remove(number)
 
-  override def removeBlock(blockHash: ByteString): Unit = {
+  override def removeBlock(blockHash: BlockHash): Unit =
     val maybeBlock = blockchainReader.getBlockByHash(blockHash)
 
-    maybeBlock match {
+    maybeBlock match
       case Some(block) => removeBlock(block)
       case None =>
-        log.warn(s"Attempted removing block with hash ${ByteStringUtils.hash2string(blockHash)} that we don't have")
-    }
-  }
+        log.warn(
+          s"Attempted removing block with hash ${ByteStringUtils.hash2string(blockHash.value)} that we don't have"
+        )
 
-  private def removeBlock(block: Block): Unit = {
+  private def removeBlock(block: Block): Unit =
     val blockHash = block.hash
 
     log.debug(s"Trying to remove block ${block.idTag}")
@@ -147,23 +142,23 @@ class BlockchainImpl(
     val txList = block.body.transactionList
 
     val blockNumberMappingUpdates =
-      if (blockchainReader.getHashByBlockNumber(blockchainReader.getBestBranch(), block.number).contains(blockHash))
+      if blockchainReader.getHashByBlockNumber(blockchainReader.getBestBranch, block.number).contains(blockHash) then
         removeBlockNumberMapping(block.number)
       else blockNumberMappingStorage.emptyBatchUpdate
 
     val potentialNewBestBlockNumber: BigInt = (block.number - 1).max(0)
-    val potentialNewBestBlockHash: ByteString = block.header.parentHash
+    val potentialNewBestBlockHash: ByteString = block.header.parentHash.value
 
     val bestBlockNumberUpdates =
-      if (appStateStorage.getBestBlockNumber() > potentialNewBestBlockNumber)
+      if appStateStorage.getBestBlockNumber() > potentialNewBestBlockNumber then
         appStateStorage.putBestBlockInfo(BlockInfo(potentialNewBestBlockHash, potentialNewBestBlockNumber))
       else appStateStorage.emptyBatchUpdate
 
     blockHeadersStorage
-      .remove(blockHash)
-      .and(blockBodiesStorage.remove(blockHash))
-      .and(chainWeightStorage.remove(blockHash))
-      .and(receiptStorage.remove(blockHash))
+      .remove(blockHash.value)
+      .and(blockBodiesStorage.remove(blockHash.value))
+      .and(chainWeightStorage.remove(blockHash.value))
+      .and(receiptStorage.remove(blockHash.value))
       .and(removeTxsLocations(txList))
       .and(blockNumberMappingUpdates)
       .and(bestBlockNumberUpdates)
@@ -171,21 +166,19 @@ class BlockchainImpl(
 
     log.debug(
       "Removed block with hash {}. New best block number - {}",
-      ByteStringUtils.hash2string(blockHash),
+      ByteStringUtils.hash2string(blockHash.value),
       potentialNewBestBlockNumber
     )
-  }
 
   private def removeTxsLocations(stxs: Seq[SignedTransaction]): DataSourceBatchUpdate =
-    stxs.map(_.hash).foldLeft(transactionMappingStorage.emptyBatchUpdate) { case (updates, hash) =>
+    stxs.map(_.hash.value).foldLeft(transactionMappingStorage.emptyBatchUpdate) { case (updates, hash) =>
       updates.and(transactionMappingStorage.remove(hash))
     }
 
   override type S = InMemoryWorldStateProxyStorage
   override type WS = InMemoryWorldStateProxy
-}
 
-trait BlockchainStorages {
+trait BlockchainStorages:
   val blockHeadersStorage: BlockHeadersStorage
   val blockBodiesStorage: BlockBodiesStorage
   val blockNumberMappingStorage: BlockNumberMappingStorage
@@ -195,9 +188,8 @@ trait BlockchainStorages {
   val transactionMappingStorage: TransactionMappingStorage
   val appStateStorage: AppStateStorage
   val stateStorage: StateStorage
-}
 
-object BlockchainImpl {
+object BlockchainImpl:
   def apply(
       storages: BlockchainStorages,
       blockchainReader: BlockchainReader
@@ -213,4 +205,3 @@ object BlockchainImpl {
       stateStorage = storages.stateStorage,
       blockchainReader = blockchainReader
     )
-}

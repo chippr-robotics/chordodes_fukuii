@@ -5,12 +5,12 @@ import java.nio.ByteBuffer
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class ExternalIPDetectorSpec extends AnyFlatSpec with Matchers {
+class ExternalIPDetectorSpec extends AnyFlatSpec with Matchers:
 
   // Access the private method via reflection for white-box testing
-  private def parseXorMappedAddress(buf: Array[Byte], len: Int, txId: Array[Byte]) = {
+  private def parseXorMappedAddress(buf: Array[Byte], len: Int, txId: Array[Byte]) =
     val method = ExternalIPDetector.getClass.getDeclaredMethod(
       "parseXorMappedAddress",
       classOf[Array[Byte]],
@@ -19,13 +19,12 @@ class ExternalIPDetectorSpec extends AnyFlatSpec with Matchers {
     )
     method.setAccessible(true)
     method.invoke(ExternalIPDetector, buf, Int.box(len), txId)
-  }
 
   private def buildStunResponse(
       msgType: Short = 0x0101,
       txId: Array[Byte],
       xorIp: Int = 0
-  ): (Array[Byte], Int) = {
+  ): (Array[Byte], Int) =
     // Attribute: XOR-MAPPED-ADDRESS (type=0x0020, len=8): reserved + family + port + ip
     val attrLen = 8
     val totalLen = 20 + 4 + attrLen // header(20) + attr-type(2)+attr-len(2)+value(8)
@@ -43,7 +42,6 @@ class ExternalIPDetectorSpec extends AnyFlatSpec with Matchers {
     bb.putShort(0.toShort) // xor-port (unused in our parser)
     bb.putInt(xorIp ^ 0x2112a442) // xorAddr (XOR with magic cookie gives the real IP)
     (buf, totalLen)
-  }
 
   "parseXorMappedAddress" should "accept a response whose transaction ID matches" taggedAs (UnitTest, NetworkTest) in {
     val txId = Array.tabulate[Byte](12)(i => (i + 1).toByte)
@@ -85,4 +83,3 @@ class ExternalIPDetectorSpec extends AnyFlatSpec with Matchers {
     new java.security.SecureRandom().nextBytes(id)
     id.exists(_ != 0) shouldBe true
   }
-}

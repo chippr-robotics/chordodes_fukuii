@@ -6,12 +6,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Tests for EIP-1559 fee market semantics at the Olympia fork boundary.
@@ -30,7 +30,7 @@ class OlympiaFeeMarketSpec
     extends AnyWordSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val olympiaBlock: BigInt = BigInt(100)
 
@@ -213,11 +213,10 @@ class OlympiaFeeMarketSpec
         OlympiaTest
       ) in {
         var fee = InitialBaseFee
-        for (_ <- 1 to 100) {
+        for _ <- 1 to 100 do
           val emptyParent = olympiaParent(gasLimit = BigInt(30_000_000), gasUsed = 0, baseFee = fee)
           fee = BaseFeeCalculator.calcBaseFee(emptyParent, config)
           fee should be >= InitialBaseFee
-        }
       }
     }
 
@@ -278,5 +277,4 @@ class OlympiaFeeMarketSpec
       }
     }
   }
-}
 // scalastyle:on magic.number

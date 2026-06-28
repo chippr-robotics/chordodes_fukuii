@@ -1,10 +1,12 @@
 package com.chipprbots.ethereum.ethtest
 
-import io.circe.parser._
 import java.io.File
+
 import scala.io.Source
 
-import com.chipprbots.ethereum.testing.Tags._
+import io.circe.parser.*
+
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Comprehensive test suite that runs multiple tests from ethereum/tests repository
   *
@@ -12,10 +14,10 @@ import com.chipprbots.ethereum.testing.Tags._
   *
   * Tests are filtered to only run pre-Spiral fork tests (Berlin and earlier).
   */
-class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
+class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec:
 
   // Supported networks (pre-Spiral fork only)
-  val supportedNetworks = Set(
+  val supportedNetworks: Set[String] = Set(
     "Frontier",
     "Homestead",
     "EIP150", // Tangerine Whistle
@@ -33,17 +35,16 @@ class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
     * @return
     *   Parsed and filtered test suite
     */
-  def loadTestSuiteFromFile(filePath: String): BlockchainTestSuite = {
+  def loadTestSuiteFromFile(filePath: String): BlockchainTestSuite =
     val file = new File(filePath)
-    if (!file.exists()) {
-      BlockchainTestSuite(Map.empty)
-    } else {
+    if !file.exists() then BlockchainTestSuite(Map.empty)
+    else
       val source = Source.fromFile(file)
-      try {
+      try
         val jsonString = source.mkString
-        parse(jsonString) match {
+        parse(jsonString) match
           case Right(json) =>
-            json.as[BlockchainTestSuite] match {
+            json.as[BlockchainTestSuite] match
               case Right(suite) =>
                 // Filter to only supported networks
                 val filteredTests = suite.tests.filter { case (_, test) =>
@@ -51,12 +52,8 @@ class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
                 }
                 BlockchainTestSuite(filteredTests)
               case Left(error) => throw new RuntimeException(s"Failed to decode test suite: $error")
-            }
           case Left(error) => throw new RuntimeException(s"Failed to parse JSON: $error")
-        }
-      } finally source.close()
-    }
-  }
+      finally source.close()
 
   /** Discover and run all tests in a directory
     *
@@ -67,12 +64,11 @@ class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
     * @return
     *   (passed, failed, skipped) - failed includes gas calculation errors
     */
-  def runTestsInDirectory(testDir: String, maxTests: Int = Int.MaxValue): (Int, Int, Int) = {
+  def runTestsInDirectory(testDir: String, maxTests: Int = Int.MaxValue): (Int, Int, Int) =
     val dir = new File(testDir)
-    if (!dir.exists() || !dir.isDirectory) {
+    if !dir.exists() || !dir.isDirectory then
       info(s"Directory not found: $testDir")
       return (0, 0, 0)
-    }
 
     val testFiles = dir.listFiles().filter(_.getName.endsWith(".json")).take(maxTests)
     var passed = 0
@@ -82,33 +78,28 @@ class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
     testFiles.foreach { file =>
       val suite = loadTestSuiteFromFile(file.getAbsolutePath)
 
-      if (suite.tests.isEmpty) {
-        skipped += 1
-      } else {
+      if suite.tests.isEmpty then skipped += 1
+      else
         suite.tests.foreach { case (testName, test) =>
           val result = executeTest(test)
-          result match {
+          result match
             case Right(_) =>
               passed += 1
             case Left(error) =>
               // Log failure but don't spam console for known gas issues
-              if (error.contains("invalid gas used")) {
+              if error.contains("invalid gas used") then
                 // Known gas calculation issue - see GAS_CALCULATION_ISSUES.md
                 failed += 1
-              } else if (error.contains("invalid state root")) {
+              else if error.contains("invalid state root") then
                 // State root mismatch - may be related to gas or other issues
                 failed += 1
-              } else {
+              else
                 info(s"  ✗ Test failed: $testName - $error")
                 failed += 1
-              }
-          }
         }
-      }
     }
 
     (passed, failed, skipped)
-  }
 
   "ComprehensiveBlockchainTests" should "run multiple tests from ValidBlocks/bcValidBlockTest" taggedAs (
     IntegrationTest,
@@ -184,4 +175,3 @@ class ComprehensiveBlockchainTestsSpec extends EthereumTestsSpec {
     // Goal: At least 50 tests passing
     totalPassed should be >= 50
   }
-}

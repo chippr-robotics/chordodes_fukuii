@@ -2,11 +2,12 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 
 import java.net.InetSocketAddress
 
-import scala.io.Source
-
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
+
+import scala.io.Source
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -15,6 +16,7 @@ import com.chipprbots.ethereum.blockchain.sync.BodiesFetcherQueue
 import com.chipprbots.ethereum.blockchain.sync.ConcurrentFetch
 import com.chipprbots.ethereum.blockchain.sync.DeliveryResult
 import com.chipprbots.ethereum.blockchain.sync.HeadersFetcherQueue
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.blockchain.sync.ReceiptsFetcherQueue
@@ -26,17 +28,16 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Queue-level regression and isolation tests for FastSync's three concurrent fetch pipelines (ARCH-002 / [11b]).
   *
   * Verifies that headersFetcherQueue, bodiesFetcherQueue, and receiptsFetcherQueue operate independently. No actor
   * choreography — all assertions deterministic.
   */
-class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
+class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers:
 
-  import Helpers._
+  import Helpers.*
 
   private val fastSyncSourcePath =
     "src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala"
@@ -81,11 +82,17 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
     receiptsQ.enqueue((1 to 10).map(i => ByteString(i.toByte)))
 
     val hAssign =
-      ConcurrentFetch.dispatchTo(headersQ, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+      ConcurrentFetch.dispatchTo(headersQ, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
     val bAssign =
-      ConcurrentFetch.dispatchTo(bodiesQ, Seq(peer1, peer2), 2000L, "bodies", org.apache.pekko.event.NoLogging)
+      ConcurrentFetch.dispatchTo(bodiesQ, Seq(peer1, peer2), 2000L, "bodies", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
     val rAssign =
-      ConcurrentFetch.dispatchTo(receiptsQ, Seq(peer1, peer2), 2000L, "receipts", org.apache.pekko.event.NoLogging)
+      ConcurrentFetch.dispatchTo(
+        receiptsQ,
+        Seq(peer1, peer2),
+        2000L,
+        "receipts",
+        org.slf4j.helpers.NOPLogger.NOP_LOGGER
+      )
 
     hAssign should not be empty
     bAssign should not be empty
@@ -138,16 +145,16 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  private object Helpers {
+  private object Helpers:
     implicit val system: ActorSystem = ActorSystem("FastSyncPipeline_System")
 
     val peer1: PeerWithInfo = mkPeer("peer-1")
     val peer2: PeerWithInfo = mkPeer("peer-2")
 
     val hash32: ByteString = ByteString(Array.fill(32)(0.toByte))
-    private val bloom256 = ByteString(Array.fill(256)(0.toByte))
-    private val beneficiary = ByteString(Array.fill(20)(0.toByte))
-    private val nonce8 = ByteString(Array.fill(8)(0.toByte))
+    ByteString(Array.fill(256)(0.toByte))
+    ByteString(Array.fill(20)(0.toByte))
+    ByteString(Array.fill(8)(0.toByte))
 
     private val remoteStatus = RemoteStatus(
       capability = Capability.ETH69,
@@ -157,16 +164,14 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
       genesisHash = hash32
     )
 
-    def mkPeer(id: String): PeerWithInfo = {
-      val peer = Peer(PeerId(id), new InetSocketAddress("127.0.0.1", 30303), TestProbe().ref, false)
+    def mkPeer(id: String): PeerWithInfo =
+      val peer =
+        Peer(PeerId(id), new InetSocketAddress("127.0.0.1", 30303), TestProbe().ref.toTyped[PeerActor.Command], false)
       val peerInfo = PeerInfo(
         remoteStatus,
-        ChainWeight(BigInt(1000)),
+        ChainWeight.totalDifficultyOnly(BigInt(1000)),
         forkAccepted = true,
         maxBlockNumber = 1000,
         bestBlockHash = hash32
       )
       PeerWithInfo(peer, peerInfo)
-    }
-  }
-}

@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.Padding
   * @param code
   *   the EVM bytecode as bytes
   */
-case class Program(code: ByteString) {
+case class Program(code: ByteString):
 
   def getByte(pc: Int): Byte =
     code.lift(pc).getOrElse(0)
@@ -34,20 +34,16 @@ case class Program(code: ByteString) {
     */
   @tailrec
   private def validJumpDestinationsAfterPosition(pos: Int, accum: Set[Int] = Set.empty): Set[Int] =
-    if (pos < 0 || pos >= length) accum
-    else {
+    if pos < 0 || pos >= length then accum
+    else
       val byte = code(pos)
       val opCode = EvmConfig.FrontierOpCodes.byteToOpCode.get(
         byte
       ) // we only need to check PushOp and JUMPDEST, they are both present in Frontier
-      opCode match {
+      opCode match
         case Some(pushOp: PushOp) => validJumpDestinationsAfterPosition(pos + pushOp.i + 2, accum)
         case Some(JUMPDEST)       => validJumpDestinationsAfterPosition(pos + 1, accum + pos)
         case _                    => validJumpDestinationsAfterPosition(pos + 1, accum)
-      }
-    }
 
   lazy val codeHash: ByteString =
     kec256(code)
-
-}

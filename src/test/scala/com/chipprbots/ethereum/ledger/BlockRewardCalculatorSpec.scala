@@ -4,12 +4,12 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps._
+import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
-import com.chipprbots.ethereum.testing.Tags._
 
 // scalastyle:off magic.number
-class BlockRewardCalculatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+class BlockRewardCalculatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
 
   "BlockRewardCalculator" should "correctly calculate block and ommer rewards" taggedAs (UnitTest, StateTest) in {
     val standardMP =
@@ -522,4 +522,3 @@ class BlockRewardCalculatorSpec extends AnyFlatSpec with Matchers with ScalaChec
     val reductionRatio = era4FirstReward.toDouble / era3LastReward.toDouble
     reductionRatio shouldBe (0.8 +- 0.001)
   }
-}

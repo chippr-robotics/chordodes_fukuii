@@ -1,29 +1,37 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem}
-import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
+import java.io.File
+import java.nio.file.Files
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
+import org.apache.pekko.actor.testkit.typed.scaladsl.FishingOutcomes
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
-import com.chipprbots.ethereum.db.storage.{HealingFrontierStorage, Namespaces}
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
+import com.chipprbots.ethereum.db.storage.HealingFrontierStorage
+import com.chipprbots.ethereum.db.storage.Namespaces
 import com.chipprbots.ethereum.metrics.Metrics
-import com.chipprbots.ethereum.mpt.{LeafNode, MptTraversals}
+import com.chipprbots.ethereum.mpt.LeafNode
+import com.chipprbots.ethereum.mpt.MptTraversals
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.testing.{PeerTestHelpers, TestMptStorage}
-
-import java.io.File
-import java.nio.file.Files
-import java.util.concurrent.{Executors, TimeUnit}
+import com.chipprbots.ethereum.testing.PeerTestHelpers
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** T009 (US1, V1 / FR-001): scope-capture completeness for spec 003 scoped post-heal verification.
   *
@@ -35,24 +43,23 @@ import java.util.concurrent.{Executors, TimeUnit}
   * duplicate hash and asserting the count is unchanged proves dedup.
   */
 class TrieNodeHealingScopeCaptureSpec
-    extends TestKit(ActorSystem("TrieNodeHealingScopeCaptureSpec"))
-    with ImplicitSender
+    extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfterAll {
+    with Eventually:
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
-    if (gauge == null) Double.NaN else gauge.value()
-  }
+    if gauge == null then Double.NaN else gauge.value()
 
   /** Build a storage-trie leaf so the heal site's `discoverMissingChildren` takes the no-children `case _` arm
     * (`pathset.size > 1`), keeping `isComplete` true after the response. Returns the (storage-trie pathset, hash, raw
     * encoded bytes) such that `kec256(encoded) == hash`, exactly what `handleResponse` matches on.
     */
-  private def healableNode(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def healableNode(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val value = ByteString(kec256(ByteString(s"scope-capture-value-$seed")).toArray)
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), value)
     val encoded = MptTraversals.encodeNode(leaf)
@@ -60,28 +67,27 @@ class TrieNodeHealingScopeCaptureSpec
     val accountHash = kec256(ByteString(s"scope-capture-account-$seed"))
     val compactStoragePath = ByteString(Array[Byte](0x20, seed.toByte))
     (Seq(accountHash, compactStoragePath), hash, ByteString(encoded))
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
-  private def pendingTasks(coordinator: ActorRef): Int = {
-    val probe = TestProbe()
-    coordinator.tell(Messages.HealingGetProgress, probe.ref)
-    probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
-  }
+  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
+    val probe = testKit.createTestProbe[HealingStatistics]()
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
+    probe.expectMessageType[HealingStatistics].pendingTasks
 
   /** Wait for StateHealingComplete, ignoring the interleaved ProgressNodesHealed progress messages the controller probe
     * also receives from `handleResponse`.
     */
-  private def awaitStateHealingComplete(controller: TestProbe): Unit =
+  private def awaitStateHealingComplete(
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ): Unit =
     controller.fishForMessage(10.seconds) {
-      case SNAPSyncController.StateHealingComplete   => true
-      case _: SNAPSyncController.ProgressNodesHealed => false
-      case _                                         => false
+      case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+      case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+      case _                                         => FishingOutcomes.continueAndIgnore
     }
 
   /** Real RocksDB-backed HealingFrontierStorage with the completeness marker pre-set (the scoped precondition), wired
@@ -90,12 +96,18 @@ class TrieNodeHealingScopeCaptureSpec
   private def withMarkerCompleteFixture(
       stateRoot: ByteString,
       storage: TestMptStorage
-  )(body: (ActorRef, HealingFrontierStorage, TestProbe) => Unit): Unit = {
+  )(
+      body: (
+          ActorRef[TrieNodeHealingCoordinator.Command],
+          HealingFrontierStorage,
+          org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+      ) => Unit
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scope-capture-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -105,37 +117,30 @@ class TrieNodeHealingScopeCaptureSpec
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
     store.markComplete() // simulate a prior full-trie clean walk against this root (E3 precondition)
 
-    val controllerProbe = TestProbe()
-    val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controllerProbe.ref,
-        healingFrontierStorage = Some(store),
-        healingWriterEcOverride = Some(ec)
-      )
+    val controllerProbe = testKit.createTestProbe[SNAPSyncController.Command]()
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = stateRoot,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controllerProbe.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec)
     )
-    val death = TestProbe()
-    death.watch(coordinator)
     try body(coordinator, store, controllerProbe)
-    finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+    finally
+      testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   "Scoped heal verification scope capture" should
     "capture exactly the N healed nodes as scoped seeds (no skip)" taggedAs UnitTest in {
@@ -145,14 +150,15 @@ class TrieNodeHealingScopeCaptureSpec
       val nodes = (0 until n).map(healableNode)
 
       withMarkerCompleteFixture(stateRoot, storage) { (coordinator, _, controller) =>
-        val peer = PeerTestHelpers.createTestPeer("scope-capture-peer-A", TestProbe().ref)
-        val networkProbe = TestProbe()
+        val peer = PeerTestHelpers.createTestPeer("scope-capture-peer-A", testKit.createTestProbe[Any]().ref.toClassic)
         // Queue the N healable nodes and make a peer available so they dispatch as one request (reqId=1).
-        coordinator ! Messages.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-        coordinator.tell(Messages.HealingPeerAvailable(peer), networkProbe.ref)
+        coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
+        coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
         // Heal all N in a single TrieNodes response (the first generated requestId is 1).
-        coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
+        coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+          SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
+        )
 
         // The healed nodes are storage-trie leaves with no children, so the round drains clean and the
         // completion gate engages the scoped path, seeding exactly the N captured subtrees.
@@ -169,15 +175,16 @@ class TrieNodeHealingScopeCaptureSpec
     val nodes = (0 until n).map(healableNode)
 
     withMarkerCompleteFixture(stateRoot, storage) { (coordinator, _, controller) =>
-      val peer = PeerTestHelpers.createTestPeer("scope-capture-peer-B", TestProbe().ref)
-      val networkProbe = TestProbe()
-      coordinator ! Messages.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-      coordinator.tell(Messages.HealingPeerAvailable(peer), networkProbe.ref)
+      val peer = PeerTestHelpers.createTestPeer("scope-capture-peer-B", testKit.createTestProbe[Any]().ref.toClassic)
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
       // Respond with the N node bodies PLUS a duplicate of the first — the duplicate matches the same
       // task hash (already captured), so the dedup-by-hash guard must NOT grow the captured set.
       val withDuplicate = nodes.map(_._3) :+ nodes.head._3
-      coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = withDuplicate))
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = 1, nodes = withDuplicate)
+      )
 
       awaitStateHealingComplete(controller)
       gaugeValue("snapsync.healing.scoped_verification.gauge") shouldBe 1.0 +- 1e-9
@@ -192,12 +199,12 @@ class TrieNodeHealingScopeCaptureSpec
     val nodes = (0 until 2).map(healableNode)
 
     withMarkerCompleteFixture(stateRoot, storage) { (coordinator, _, _) =>
-      val peer = PeerTestHelpers.createTestPeer("scope-capture-peer-C", TestProbe().ref)
-      val networkProbe = TestProbe()
-      coordinator ! Messages.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-      coordinator.tell(Messages.HealingPeerAvailable(peer), networkProbe.ref)
-      coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
-      awaitAssert(pendingTasks(coordinator) shouldBe 0, 5.seconds, 100.millis)
+      val peer = PeerTestHelpers.createTestPeer("scope-capture-peer-C", testKit.createTestProbe[Any]().ref.toClassic)
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
+      )
+      eventually(timeout(5.seconds), interval(100.millis))(pendingTasks(coordinator) shouldBe 0)
     }
   }
-}

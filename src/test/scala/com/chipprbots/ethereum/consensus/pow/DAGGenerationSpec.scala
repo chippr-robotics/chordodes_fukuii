@@ -1,11 +1,12 @@
 package com.chipprbots.ethereum.consensus.pow
 
 import org.apache.pekko.util.ByteString
+
 import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** SlowTest: verifies Ethash cache and DAG parameter generation for Mordor (ECIP-1099).
   *
@@ -13,9 +14,9 @@ import com.chipprbots.ethereum.testing.Tags._
   * determinism, ECIP-1099 epoch halving at the Mordor boundary, and end-to-end cache correctness via block 100 cross-
   * verification.
   */
-class DAGGenerationSpec extends AnyFlatSpec with Matchers {
+class DAGGenerationSpec extends AnyFlatSpec with Matchers:
 
-  import EthashUtils._
+  import EthashUtils.*
 
   private val ecip1099Block: Long = 2_520_000L
   private val epoch0Seed = EthashUtils.seed(0L, ecip1099Block)
@@ -59,4 +60,3 @@ class DAGGenerationSpec extends AnyFlatSpec with Matchers {
     val pow = EthashUtils.hashimotoLight(hash, nonce, fullSize, epoch0Cache)
     pow.mixHash shouldBe ByteString(Hex.decode("5bb43c0772e58084b221c8e0c859a45950c103c712c5b8f11d9566ee078a4501"))
   }
-}

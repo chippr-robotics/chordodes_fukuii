@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.db.storage.MptStorage
   * [[com.chipprbots.ethereum.mpt.MptVisitors.PathTrackingLeafWalkVisitor]] with it reconstructs full account hashes
   * during the shard walk.
   */
-object ShardEnumerator {
+object ShardEnumerator:
 
   /** A disjoint subtree of the state trie. `root` is already resolved (never a bare [[HashNode]]); its children may
     * still be HashNodes that the walk resolves on demand.
@@ -33,16 +33,15 @@ object ShardEnumerator {
     * empty trie (`EmptyRootHash`, never stored) yields no shards.
     */
   def enumShards(rootHash: ByteString, storage: MptStorage, depth: Int = 1): Vector[Shard] =
-    if (java.util.Arrays.equals(rootHash.toArray, MerklePatriciaTrie.EmptyRootHash)) Vector.empty
+    if java.util.Arrays.equals(rootHash.toArray, MerklePatriciaTrie.EmptyRootHash) then Vector.empty
     else expand(ByteString.empty, resolve(HashNode(rootHash.toArray), storage), storage, depth)
 
-  private def resolve(node: MptNode, storage: MptStorage): MptNode = node match {
+  private def resolve(node: MptNode, storage: MptStorage): MptNode = node match
     case h: HashNode => storage.get(h.hashNode)
     case other       => other
-  }
 
   private def expand(prefix: ByteString, node: MptNode, storage: MptStorage, depth: Int): Vector[Shard] =
-    node match {
+    node match
       case NullNode           => Vector.empty
       case _ if depth <= 0    => Vector(Shard(prefix, node))
       case _: LeafNode        => Vector(Shard(prefix, node)) // a single account — can't split further
@@ -51,11 +50,8 @@ object ShardEnumerator {
         expand(prefix ++ ext.sharedKey, resolve(ext.next, storage), storage, depth)
       case br: BranchNode =>
         (0 until BranchNode.numberOfChildren).iterator.flatMap { i =>
-          br.children(i) match {
+          br.children(i) match
             case NullNode => Iterator.empty
             case child    => expand(prefix ++ ByteString(i.toByte), resolve(child, storage), storage, depth - 1)
-          }
         }.toVector
       case h: HashNode => expand(prefix, storage.get(h.hashNode), storage, depth)
-    }
-}

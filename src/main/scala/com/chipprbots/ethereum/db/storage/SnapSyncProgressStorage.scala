@@ -2,13 +2,13 @@ package com.chipprbots.ethereum.db.storage
 
 import org.apache.pekko.util.ByteString
 
-import scala.collection.immutable.ArraySeq
-
 import cats.effect.unsafe.IORuntime
 
-import io.circe._
-import io.circe.parser.{decode => circeDecoder}
-import io.circe.syntax._
+import scala.collection.immutable.ArraySeq
+
+import io.circe.*
+import io.circe.parser.decode as circeDecoder
+import io.circe.syntax.*
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
@@ -29,8 +29,8 @@ case class SnapSyncProgress(
     storageCursors: Map[String, String] // accountHash.toHex -> nextSlotKey.toHex
 )
 
-object SnapSyncProgress {
-  implicit val encoder: Encoder[SnapSyncProgress] = Encoder.instance { sp =>
+object SnapSyncProgress:
+  given encoder: Encoder[SnapSyncProgress] = Encoder.instance { sp =>
     Json.obj(
       "pivotBlock" -> sp.pivotBlock.asJson,
       "accountCursors" -> sp.accountCursors.asJson,
@@ -38,17 +38,16 @@ object SnapSyncProgress {
     )
   }
 
-  implicit val decoder: Decoder[SnapSyncProgress] = Decoder.instance { c =>
-    for {
+  given decoder: Decoder[SnapSyncProgress] = Decoder.instance { c =>
+    for
       pivotBlock <- c.downField("pivotBlock").as[Long]
       accountCursors <- c.downField("accountCursors").as[Map[String, String]]
       storageCursors <- c.downField("storageCursors").as[Map[String, String]]
-    } yield SnapSyncProgress(pivotBlock, accountCursors, storageCursors)
+    yield SnapSyncProgress(pivotBlock, accountCursors, storageCursors)
   }
-}
 
 class SnapSyncProgressStorage(val dataSource: DataSource)
-    extends TransactionalKeyValueStorage[ByteString, SnapSyncProgress] {
+    extends TransactionalKeyValueStorage[ByteString, SnapSyncProgress]:
 
   val namespace: IndexedSeq[Byte] = Namespaces.SnapSyncProgressNamespace
 
@@ -59,10 +58,9 @@ class SnapSyncProgressStorage(val dataSource: DataSource)
     ArraySeq.unsafeWrapArray(progress.asJson.noSpaces.getBytes("UTF-8"))
 
   def valueDeserializer: IndexedSeq[Byte] => SnapSyncProgress = bytes =>
-    circeDecoder[SnapSyncProgress](new String(bytes.toArray, "UTF-8")) match {
+    circeDecoder[SnapSyncProgress](new String(bytes.toArray, "UTF-8")) match
       case Right(p)  => p
       case Left(err) => throw new RuntimeException(s"Failed to deserialize SnapSyncProgress: $err")
-    }
 
   def readProgress(stateRoot: ByteString): Option[SnapSyncProgress] = get(stateRoot)
 
@@ -78,13 +76,12 @@ class SnapSyncProgressStorage(val dataSource: DataSource)
       stateRoot: ByteString,
       accountHash: ByteString,
       nextSlotKey: ByteString
-  ): Unit = {
+  ): Unit =
     val current = readProgress(stateRoot).getOrElse(SnapSyncProgress(0L, Map.empty, Map.empty))
     val updated = current.copy(
       storageCursors = current.storageCursors + (accountHash.toHex -> nextSlotKey.toHex)
     )
     writeProgress(stateRoot, updated)
-  }
 
   /** Read-modify-write account cursors and pivot block while preserving any storage cursors written concurrently by
     * StorageRangeCoordinator.
@@ -93,17 +90,14 @@ class SnapSyncProgressStorage(val dataSource: DataSource)
       stateRoot: ByteString,
       pivotBlock: Long,
       accountCursors: Map[String, String]
-  ): Unit = {
+  ): Unit =
     val current = readProgress(stateRoot).getOrElse(SnapSyncProgress(0L, Map.empty, Map.empty))
     val updated = current.copy(pivotBlock = pivotBlock, accountCursors = accountCursors)
     writeProgress(stateRoot, updated)
-  }
 
   /** Remove all SNAP progress entries across all state roots. Called on --snap-clear or full restart. */
-  def clearAll(): Unit = {
+  def clearAll(): Unit =
     val keys = storageContent.compile.toList
       .unsafeRunSync()(IORuntime.global)
       .collect { case Right((k, _)) => k }
-    if (keys.nonEmpty) update(keys, Nil).commit()
-  }
-}
+    if keys.nonEmpty then update(keys, Nil).commit()

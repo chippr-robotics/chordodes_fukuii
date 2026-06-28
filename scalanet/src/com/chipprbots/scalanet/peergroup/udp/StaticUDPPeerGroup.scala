@@ -8,7 +8,7 @@ import cats.effect.Ref
 import cats.effect.Resource
 import cats.effect.std.Semaphore
 import cats.effect.unsafe.implicits.global
-import cats.implicits._
+import cats.implicits.*
 
 import scala.util.control.NonFatal
 
@@ -573,7 +573,7 @@ object StaticUDPPeerGroup extends StrictLogging {
 
       peerGroupResource.flatMap { peerGroup =>
         // Create the server channel as a Resource
-        peerGroup.createServerChannel.flatMap { channel =>
+        peerGroup.createServerChannel.flatMap { _ =>
           Resource.make {
             IO(logger.debug("UDP server channel Resource is now active and will remain so until shutdown"))
               .as(peerGroup)
@@ -674,7 +674,7 @@ object StaticUDPPeerGroup extends StrictLogging {
         maybeMessage match {
           case Attempt.Successful(message) =>
             publish(MessageReceived(message))
-          case Attempt.Failure(err) =>
+          case Attempt.Failure(_) =>
             publish(DecodingError)
         }
       )

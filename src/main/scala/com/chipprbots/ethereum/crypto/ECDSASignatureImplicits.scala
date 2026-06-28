@@ -1,20 +1,20 @@
 package com.chipprbots.ethereum.crypto
 
-object ECDSASignatureImplicits {
+object ECDSASignatureImplicits:
 
-  import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+  import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
   import com.chipprbots.ethereum.rlp.RLPImplicits.given
-  import com.chipprbots.ethereum.rlp._
+  import com.chipprbots.ethereum.rlp.*
 
-  implicit val ecdsaSignatureDec: RLPDecoder[ECDSASignature] = new RLPDecoder[ECDSASignature] {
-    override def decode(rlp: RLPEncodeable): ECDSASignature = rlp match {
+  implicit val ecdsaSignatureDec: RLPDecoder[ECDSASignature] = new RLPDecoder[ECDSASignature]:
+    override def decode(rlp: RLPEncodeable): ECDSASignature = rlp match
       case RLPList(RLPValue(r), RLPValue(s), RLPValue(v)) if v.nonEmpty =>
         ECDSASignature(BigInt(1, r.toArray), BigInt(1, s.toArray), BigInt(1, v.toArray))
       case RLPList(RLPValue(r), RLPValue(s), RLPValue(v)) if v.isEmpty =>
         // Empty v component represents yParity=0 in EIP-2930 transaction RLP encoding
         // In RLP, the integer 0 is encoded as an empty byte string (0x80)
         ECDSASignature(BigInt(1, r.toArray), BigInt(1, s.toArray), BigInt(0))
-      case RLPList(items @ _*) =>
+      case RLPList(items*) =>
         throw new RuntimeException(
           s"Cannot decode ECDSASignature: expected 3 RLPValue items (r, s, v), got ${items.length} items"
         )
@@ -22,13 +22,9 @@ object ECDSASignatureImplicits {
         throw new RuntimeException(
           s"Cannot decode ECDSASignature: expected RLPList, got ${other.getClass.getSimpleName}"
         )
-    }
-  }
 
-  implicit class ECDSASignatureEnc(ecdsaSignature: ECDSASignature) extends RLPSerializable {
+  implicit class ECDSASignatureEnc(ecdsaSignature: ECDSASignature) extends RLPSerializable:
     override def toRLPEncodable: RLPEncodeable =
       RLPList(ecdsaSignature.r, ecdsaSignature.s, ecdsaSignature.v)
-  }
 
   implicit val ECDSASignatureOrdering: Ordering[ECDSASignature] = Ordering.by(sig => (sig.r, sig.s, sig.v))
-}

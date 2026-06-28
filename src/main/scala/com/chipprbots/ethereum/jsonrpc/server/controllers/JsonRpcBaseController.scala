@@ -8,7 +8,7 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 import org.json4s.DefaultFormats
 import org.json4s.JNull
 import org.json4s.native
@@ -28,27 +28,26 @@ import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcWsServer.JsonRpcWsServ
 import com.chipprbots.ethereum.jsonrpc.server.ipc.JsonRpcIpcServer.JsonRpcIpcServerConfig
 import com.chipprbots.ethereum.utils.Logger
 
-trait ApisBase {
+trait ApisBase:
   def available: List[String]
-}
 
-trait JsonRpcBaseController {
-  self: ApisBase with Logger =>
+trait JsonRpcBaseController:
+  self: ApisBase & Logger =>
 
-  import JsonRpcBaseController._
+  import JsonRpcBaseController.*
 
   val config: JsonRpcConfig
-  implicit def executionContext: ExecutionContext = scala.concurrent.ExecutionContext.global
+  implicit def executionContext: ExecutionContext
 
   def apisHandleFns: Map[String, PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]]]
 
   def enabledApis: Seq[String]
 
-  implicit val formats: DefaultFormats.type = DefaultFormats
+  given formats: DefaultFormats.type = DefaultFormats
 
-  implicit val serialization: Serialization.type = native.Serialization
+  given serialization: Serialization.type = native.Serialization
 
-  def handleRequest(request: JsonRpcRequest): IO[JsonRpcResponse] = {
+  def handleRequest(request: JsonRpcRequest): IO[JsonRpcResponse] =
     val startTimeNanos = System.nanoTime()
 
     log.debug(s"received request ${request.inspect}")
@@ -86,13 +85,12 @@ trait JsonRpcBaseController {
           log.error(s"Error serving request: ${request.toStringWithSensitiveInformation}", t)
         } *> IO.raiseError(t)
       }
-  }
 
   def handle[Req, Res](
       fn: Req => IO[Either[JsonRpcError, Res]],
       rpcReq: JsonRpcRequest
   )(implicit dec: JsonMethodDecoder[Req], enc: JsonEncoder[Res]): IO[JsonRpcResponse] =
-    dec.decodeJson(rpcReq.params) match {
+    dec.decodeJson(rpcReq.params) match
       case Right(req) =>
         fn(req)
           .map {
@@ -105,7 +103,6 @@ trait JsonRpcBaseController {
           }
       case Left(error) =>
         IO.pure(errorResponse(rpcReq, error))
-    }
 
   private def successResponse[T](req: JsonRpcRequest, result: T)(implicit enc: JsonEncoder[T]): JsonRpcResponse =
     JsonRpcResponse(req.jsonrpc, Some(enc.encodeJson(result)), None, req.id.getOrElse(JNull))
@@ -113,11 +110,9 @@ trait JsonRpcBaseController {
   def errorResponse[T](req: JsonRpcRequest, error: JsonRpcError): JsonRpcResponse =
     JsonRpcResponse(req.jsonrpc, None, Some(error), req.id.getOrElse(JNull))
 
-}
+object JsonRpcBaseController:
 
-object JsonRpcBaseController {
-
-  trait JsonRpcConfig {
+  trait JsonRpcConfig:
     def apis: Seq[String]
     def accountTransactionsMaxBlocks: Int
     def minerActiveTimeout: FiniteDuration
@@ -125,15 +120,14 @@ object JsonRpcBaseController {
     def wsServerConfig: JsonRpcWsServerConfig
     def ipcServerConfig: JsonRpcIpcServerConfig
     def healthConfig: JsonRpcHealthConfig
-  }
 
-  object JsonRpcConfig {
-    def apply(fukuiiConfig: TypesafeConfig, availableApis: List[String]): JsonRpcConfig = {
-      import scala.concurrent.duration._
+  object JsonRpcConfig:
+    def apply(fukuiiConfig: TypesafeConfig, availableApis: List[String]): JsonRpcConfig =
+      import scala.concurrent.duration.*
       val rpcConfig = fukuiiConfig.getConfig("network.rpc")
 
-      new JsonRpcConfig {
-        override val apis: Seq[String] = {
+      new JsonRpcConfig:
+        override val apis: Seq[String] =
           val providedApis = rpcConfig.getString("apis").split(",").map(_.trim.toLowerCase)
           val invalidApis = providedApis.diff(availableApis)
           require(
@@ -141,7 +135,6 @@ object JsonRpcBaseController {
             s"Invalid RPC APIs specified: ${invalidApis.mkString(",")}. Availables are ${availableApis.mkString(",")}"
           )
           ArraySeq.unsafeWrapArray(providedApis)
-        }
 
         override def accountTransactionsMaxBlocks: Int = rpcConfig.getInt("account-transactions-max-blocks")
         override def minerActiveTimeout: FiniteDuration = rpcConfig.getDuration("miner-active-timeout").toMillis.millis
@@ -150,7 +143,3 @@ object JsonRpcBaseController {
         override val wsServerConfig: JsonRpcWsServerConfig = JsonRpcWsServerConfig(fukuiiConfig)
         override val ipcServerConfig: JsonRpcIpcServerConfig = JsonRpcIpcServerConfig(fukuiiConfig)
         override val healthConfig: JsonRpcHealthConfig = JsonRpcHealthConfig(rpcConfig)
-      }
-    }
-  }
-}

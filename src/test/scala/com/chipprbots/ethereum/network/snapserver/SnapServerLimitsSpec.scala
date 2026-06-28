@@ -7,8 +7,8 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 // ── K7: SNAP server byte-budget and time-budget limits (regression for commit 50cfb7ca8) ─────
@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
 //
 // These tests lock those invariants so a refactor cannot silently revert them.
 
-class SnapServerLimitsSpec extends AnyFlatSpec with Matchers {
+class SnapServerLimitsSpec extends AnyFlatSpec with Matchers:
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -33,13 +33,12 @@ class SnapServerLimitsSpec extends AnyFlatSpec with Matchers {
 
   private def buildAccountTrie(
       accounts: Seq[(ByteString, Account)]
-  ): (ByteString, TestMptStorage) = {
+  ): (ByteString, TestMptStorage) =
     val storage = new TestMptStorage()
     val trie = accounts.foldLeft(MerklePatriciaTrie[ByteString, Account](storage)) { case (t, (key, account)) =>
       t.put(key, account)
     }
     (ByteString(trie.getRootHash), storage)
-  }
 
   private def simpleAccount(nonce: Int, balance: Int): Account =
     Account(nonce = nonce, balance = balance)
@@ -84,9 +83,10 @@ class SnapServerLimitsSpec extends AnyFlatSpec with Matchers {
   it should "set a deadline approximately 4 seconds in the future" taggedAs UnitTest in {
     val before = System.currentTimeMillis()
     val deadline = System.currentTimeMillis() + 4000
-    val after = System.currentTimeMillis()
+    // Lower bound is trivially true; upper bound is non-trivial: requires the two consecutive
+    // millis() calls to differ by ≤1 ms (true on any modern JVM with ≤1 ms timer resolution).
     deadline should be >= before + 4000L
-    deadline should be <= after + 4001L // tiny slack for two clock reads
+    deadline should be <= before + 4001L
   }
 
   // ── serveAccountRange: first-item guarantee ───────────────────────────────
@@ -268,4 +268,3 @@ class SnapServerLimitsSpec extends AnyFlatSpec with Matchers {
     )
     result.nodes shouldBe empty
   }
-}

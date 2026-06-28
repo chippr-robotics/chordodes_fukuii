@@ -2,29 +2,24 @@ package com.chipprbots.ethereum.utils
 
 import scala.util.control.NonFatal
 
-object TryWithResources {
+object TryWithResources:
 
   // try-with-resources, source: https://github.com/dkomanov/stuff/blob/master/src/com/komanov/io/package.scala
-  def withResources[R <: AutoCloseable, T](r: => R)(f: R => T): T = {
+  def withResources[R <: AutoCloseable, T](r: => R)(f: R => T): T =
     val resource: R = r
     require(resource != null, "resource is null")
     var exception: Throwable = null
     try f(resource)
-    catch {
+    catch
       case NonFatal(e) =>
         exception = e
         throw e
-    } finally closeAndAddSuppressed(exception, resource)
-  }
+    finally closeAndAddSuppressed(exception, resource)
 
   private def closeAndAddSuppressed(e: Throwable, resource: AutoCloseable): Unit =
-    if (e != null) {
+    if e != null then
       try resource.close()
-      catch {
+      catch
         case NonFatal(suppressed) =>
           e.addSuppressed(suppressed)
-      }
-    } else {
-      resource.close()
-    }
-}
+    else resource.close()

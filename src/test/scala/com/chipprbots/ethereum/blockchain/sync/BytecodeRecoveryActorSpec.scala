@@ -1,20 +1,18 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.Props
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
-import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.AppStateStorage
@@ -25,7 +23,7 @@ import com.chipprbots.ethereum.db.storage.NodeStorage
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 /** Unit tests for BytecodeRecoveryActor covering all recovery paths:
@@ -35,12 +33,9 @@ import com.chipprbots.ethereum.utils.Config
   * T4: Coordinator crashes mid-download → Terminated handler commits flag and fires RecoveryComplete. T5: No
   * peer/progress arrives within timeout → abandon fires, RecoveryComplete emitted.
   */
-class BytecodeRecoveryActorSpec
-    extends TestKit(ActorSystem("BytecodeRecoveryActorSpec_System"))
-    with AnyFlatSpecLike
-    with WithActorSystemShutDown
-    with Matchers
-    with Eventually {
+class BytecodeRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   private val fakeStateRoot: ByteString = ByteString(Array.fill[Byte](32)(0x11))
   private val fakeCodeHash: ByteString = ByteString(Array.fill[Byte](32)(0xaa.toByte))
@@ -49,7 +44,7 @@ class BytecodeRecoveryActorSpec
   private def newConfig(abandonAfter: FiniteDuration = 10.minutes): SNAPSyncConfig =
     SNAPSyncConfig(storageRecoveryAbandonTimeout = abandonAfter)
 
-  private def newStorages(): (StateStorage, AppStateStorage, EvmCodeStorage) = {
+  private def newStorages(): (StateStorage, AppStateStorage, EvmCodeStorage) =
     val ds = EphemDataSource()
     val nodeStorage = new NodeStorage(ds)
     val appStateStorage = new AppStateStorage(ds)
@@ -63,7 +58,6 @@ class BytecodeRecoveryActorSpec
       )
     )
     (stateStorage, appStateStorage, evmCodeStorage)
-  }
 
   "BytecodeRecoveryActor" should
     "emit RecoveryComplete immediately and commit flag when no bytecodes are missing" taggedAs (
@@ -74,26 +68,26 @@ class BytecodeRecoveryActorSpec
       val networkPeerManager = TestProbe("networkPeerManager_t1")
       val (stateStorage, appStateStorage, evmCodeStorage) = newStorages()
 
-      val actor = system.actorOf(
-        Props(
-          new BytecodeRecoveryActor(
+      val actor: TypedActorRef[BytecodeRecoveryActor.Command] = testKit
+        .spawn(
+          BytecodeRecoveryActor.testApply(
             stateRoot = fakeStateRoot,
             stateStorage = stateStorage,
             evmCodeStorage = evmCodeStorage,
             appStateStorage = appStateStorage,
             networkPeerManager = networkPeerManager.ref,
-            syncController = syncController.ref,
+            syncController = syncController.ref.toTyped[Any],
             pivotBlockNumber = BigInt(100),
             snapSyncConfig = newConfig(),
-            preloadedMissingForTesting = Some(Seq.empty)
-          )
+            preloaded = Some(Seq.empty)
+          ),
+          "bytecode-recovery-spec-t1"
         )
-      )
 
       syncController.expectMsg(3.seconds, BytecodeRecoveryActor.RecoveryComplete)
       appStateStorage.isBytecodeRecoveryDone() shouldBe true
 
-      system.stop(actor)
+      testKit.stop(actor)
     }
 
   it should
@@ -106,31 +100,31 @@ class BytecodeRecoveryActorSpec
       val coordinatorProbe = TestProbe("coordinator_t2")
       val (stateStorage, appStateStorage, evmCodeStorage) = newStorages()
 
-      val actor = system.actorOf(
-        Props(
-          new BytecodeRecoveryActor(
+      val actor: TypedActorRef[BytecodeRecoveryActor.Command] = testKit
+        .spawn(
+          BytecodeRecoveryActor.testApply(
             stateRoot = fakeStateRoot,
             stateStorage = stateStorage,
             evmCodeStorage = evmCodeStorage,
             appStateStorage = appStateStorage,
             networkPeerManager = networkPeerManager.ref,
-            syncController = syncController.ref,
+            syncController = syncController.ref.toTyped[Any],
             pivotBlockNumber = BigInt(100),
             snapSyncConfig = newConfig(),
-            preloadedMissingForTesting = Some(missingOne),
+            preloaded = Some(missingOne),
             coordinatorForTesting = Some(coordinatorProbe.ref)
-          )
+          ),
+          "bytecode-recovery-spec-t2"
         )
-      )
 
-      coordinatorProbe.expectMsgType[snap.actors.Messages.StartByteCodeSync](2.seconds)
+      coordinatorProbe.expectMsgType[snap.actors.ByteCodeCoordinator.StartByteCodeSync](2.seconds)
 
-      actor ! SNAPSyncController.ByteCodeSyncComplete
+      actor ! BytecodeRecoveryActor.ByteCodeDownloadComplete
 
       syncController.expectMsg(3.seconds, BytecodeRecoveryActor.RecoveryComplete)
       appStateStorage.isBytecodeRecoveryDone() shouldBe true
 
-      system.stop(actor)
+      testKit.stop(actor)
     }
 
   it should
@@ -143,27 +137,27 @@ class BytecodeRecoveryActorSpec
       // Empty storages: stateRoot not present in MPT → mptStorage.get throws → Future Failure
       val (stateStorage, appStateStorage, evmCodeStorage) = newStorages()
 
-      val actor = system.actorOf(
-        Props(
-          new BytecodeRecoveryActor(
+      val actor: TypedActorRef[BytecodeRecoveryActor.Command] = testKit
+        .spawn(
+          BytecodeRecoveryActor.testApply(
             stateRoot = fakeStateRoot,
             stateStorage = stateStorage,
             evmCodeStorage = evmCodeStorage,
             appStateStorage = appStateStorage,
             networkPeerManager = networkPeerManager.ref,
-            syncController = syncController.ref,
+            syncController = syncController.ref.toTyped[Any],
             pivotBlockNumber = BigInt(100),
             snapSyncConfig = newConfig()
-            // preloadedMissingForTesting = None → real scan path → throws
-          )
+            // preloaded = None → real scan path → throws
+          ),
+          "bytecode-recovery-spec-t3"
         )
-      )
 
       // Future Failure → ScanResult(Seq.empty) → RecoveryComplete (graceful resilience)
       syncController.expectMsg(8.seconds, BytecodeRecoveryActor.RecoveryComplete)
       appStateStorage.isBytecodeRecoveryDone() shouldBe true
 
-      system.stop(actor)
+      testKit.stop(actor)
     }
 
   it should
@@ -176,32 +170,32 @@ class BytecodeRecoveryActorSpec
       val coordinatorProbe = TestProbe("coordinator_t4")
       val (stateStorage, appStateStorage, evmCodeStorage) = newStorages()
 
-      val actor = system.actorOf(
-        Props(
-          new BytecodeRecoveryActor(
+      val actor: TypedActorRef[BytecodeRecoveryActor.Command] = testKit
+        .spawn(
+          BytecodeRecoveryActor.testApply(
             stateRoot = fakeStateRoot,
             stateStorage = stateStorage,
             evmCodeStorage = evmCodeStorage,
             appStateStorage = appStateStorage,
             networkPeerManager = networkPeerManager.ref,
-            syncController = syncController.ref,
+            syncController = syncController.ref.toTyped[Any],
             pivotBlockNumber = BigInt(100),
             snapSyncConfig = newConfig(),
-            preloadedMissingForTesting = Some(missingOne),
+            preloaded = Some(missingOne),
             coordinatorForTesting = Some(coordinatorProbe.ref)
-          )
+          ),
+          "bytecode-recovery-spec-t4"
         )
-      )
 
-      coordinatorProbe.expectMsgType[snap.actors.Messages.StartByteCodeSync](2.seconds)
+      coordinatorProbe.expectMsgType[snap.actors.ByteCodeCoordinator.StartByteCodeSync](2.seconds)
 
-      // Kill the coordinator — recovery actor watches it and should handle Terminated
-      system.stop(coordinatorProbe.ref)
+      // Kill the coordinator — recovery actor watches it and should handle CoordinatorTerminated
+      classicSystem.stop(coordinatorProbe.ref)
 
       syncController.expectMsg(5.seconds, BytecodeRecoveryActor.RecoveryComplete)
       appStateStorage.isBytecodeRecoveryDone() shouldBe true
 
-      system.stop(actor)
+      testKit.stop(actor)
     }
 
   it should
@@ -216,29 +210,28 @@ class BytecodeRecoveryActorSpec
 
       val abandonAfter = 400.millis
 
-      val actor = system.actorOf(
-        Props(
-          new BytecodeRecoveryActor(
+      val actor: TypedActorRef[BytecodeRecoveryActor.Command] = testKit
+        .spawn(
+          BytecodeRecoveryActor.testApply(
             stateRoot = fakeStateRoot,
             stateStorage = stateStorage,
             evmCodeStorage = evmCodeStorage,
             appStateStorage = appStateStorage,
             networkPeerManager = networkPeerManager.ref,
-            syncController = syncController.ref,
+            syncController = syncController.ref.toTyped[Any],
             pivotBlockNumber = BigInt(100),
             snapSyncConfig = newConfig(abandonAfter),
-            preloadedMissingForTesting = Some(missingOne),
+            preloaded = Some(missingOne),
             coordinatorForTesting = Some(coordinatorProbe.ref)
-          )
+          ),
+          "bytecode-recovery-spec-t5"
         )
-      )
 
-      coordinatorProbe.expectMsgType[snap.actors.Messages.StartByteCodeSync](2.seconds)
+      coordinatorProbe.expectMsgType[snap.actors.ByteCodeCoordinator.StartByteCodeSync](2.seconds)
 
       // No ProgressBytecodesDownloaded → progressSeq stays 0 → CheckAbandon(0) fires and abandons
       syncController.expectMsg(abandonAfter * 4, BytecodeRecoveryActor.RecoveryComplete)
       appStateStorage.isBytecodeRecoveryDone() shouldBe true
 
-      system.stop(actor)
+      testKit.stop(actor)
     }
-}

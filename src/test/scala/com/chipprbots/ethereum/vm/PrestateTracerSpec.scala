@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 import org.json4s.MonadicJValue.jvalueToMonadic
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
 
-class PrestateTracerSpec extends AnyFreeSpec with Matchers {
+class PrestateTracerSpec extends AnyFreeSpec with Matchers:
 
   private val from = Address(0x1234)
   private val to = Address(0x5678)
@@ -120,4 +120,3 @@ class PrestateTracerSpec extends AnyFreeSpec with Matchers {
       (postObj \ toHex) should not be JNothing
     }
   }
-}

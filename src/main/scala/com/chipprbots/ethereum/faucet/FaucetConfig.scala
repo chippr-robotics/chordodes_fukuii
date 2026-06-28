@@ -1,30 +1,28 @@
 package com.chipprbots.ethereum.faucet
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
 import com.chipprbots.ethereum.domain.Address
 
-trait FaucetConfigBuilder {
+trait FaucetConfigBuilder:
   lazy val rawConfig: Config = ConfigFactory.load()
   lazy val rawFukuiiConfig: Config = rawConfig.getConfig("fukuii")
   lazy val faucetConfig: FaucetConfig = FaucetConfig(rawConfig)
-}
 
 case class RpcClientConfig(
     address: String,
     timeout: FiniteDuration
 )
 
-object RpcClientConfig {
+object RpcClientConfig:
   def apply(rpcClientConfig: Config): RpcClientConfig =
     RpcClientConfig(
       address = rpcClientConfig.getString("rpc-address"),
       timeout = rpcClientConfig.getDuration("timeout").toMillis.millis
     )
-}
 
 case class FaucetConfig(
     walletAddress: Address,
@@ -40,8 +38,8 @@ case class FaucetConfig(
     shutdownTimeout: FiniteDuration
 )
 
-object FaucetConfig {
-  def apply(typesafeConfig: Config): FaucetConfig = {
+object FaucetConfig:
+  def apply(typesafeConfig: Config): FaucetConfig =
     val faucetConfig = typesafeConfig.getConfig("faucet")
     FaucetConfig(
       walletAddress = Address(faucetConfig.getString("wallet-address")),
@@ -56,5 +54,3 @@ object FaucetConfig {
       supervisor = SupervisorConfig(faucetConfig),
       shutdownTimeout = faucetConfig.getDuration("shutdown-timeout").toMillis.millis
     )
-  }
-}

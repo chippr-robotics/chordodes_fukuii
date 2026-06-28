@@ -1,9 +1,8 @@
 package com.chipprbots.ethereum.ommers
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
+import org.apache.pekko.actor.typed.ActorRef
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.freespec.AnyFreeSpecLike
@@ -11,28 +10,24 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures.Blocks.Block3125369
 import com.chipprbots.ethereum.Timeouts
-import com.chipprbots.ethereum.WithActorSystemShutDown
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.ommers.OmmersPool.AddOmmers
+import com.chipprbots.ethereum.ommers.OmmersPool.Command
 import com.chipprbots.ethereum.ommers.OmmersPool.GetOmmers
+import com.chipprbots.ethereum.ommers.OmmersPool.Ommers
 
-class OmmersPoolSpec
-    extends TestKit(ActorSystem("OmmersPoolSpec_System"))
-    with AnyFreeSpecLike
-    with ImplicitSender
-    with WithActorSystemShutDown
-    with Matchers
-    with MockFactory {
+class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with Matchers with MockFactory:
 
   "OmmersPool" - {
 
-    "should not return ommers if there is no any" in new TestSetup {
+    "should not return ommers if there is no any" in new TestSetup:
 
       /** 00 --> 11 --> 21 --> [31] (chain1) \-> 14 (chain4) [] new block, reference! () ommer given the new block
         */
-      (blockchainReader.getBlockHeaderByHash _).expects(block2Chain1.hash).returns(Some(block2Chain1))
-      (blockchainReader.getBlockHeaderByHash _).expects(block1Chain1.hash).returns(Some(block1Chain1))
+      blockchainReader.getBlockHeaderByHash.expects(block2Chain1.hash).returns(Some(block2Chain1))
+      blockchainReader.getBlockHeaderByHash.expects(block1Chain1.hash).returns(Some(block1Chain1))
 
       ommersPool ! AddOmmers(
         block0,
@@ -41,19 +36,18 @@ class OmmersPoolSpec
         block2Chain1
       )
 
-      ommersPool ! GetOmmers(block3Chain1.parentHash)
-      expectMsg(Timeouts.normalTimeout, OmmersPool.Ommers(Seq.empty))
-    }
+      ommersPool ! GetOmmers(block3Chain1.parentHash.value, ommersProbe.ref)
+      ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq.empty))
 
     "should return ommers properly" - {
 
-      "in case of a chain with less length than the generation limit" in new TestSetup {
+      "in case of a chain with less length than the generation limit" in new TestSetup:
 
         /** 00 --> (11) --> 21 --> 31 (chain1) \ \ \-> 33 (chain3) \ \--> 22 --> 32 (chain2) \-> [14] (chain4) [] new
           * block, reference! () ommer given the new block
           */
-        (blockchainReader.getBlockHeaderByHash _).expects(block0.hash).returns(Some(block0))
-        (blockchainReader.getBlockHeaderByHash _).expects(block0.parentHash).returns(None)
+        blockchainReader.getBlockHeaderByHash.expects(block0.hash).returns(Some(block0))
+        blockchainReader.getBlockHeaderByHash.expects(block0.parentHash).returns(None)
 
         ommersPool ! AddOmmers(
           block0,
@@ -65,17 +59,16 @@ class OmmersPoolSpec
           block3Chain3
         )
 
-        ommersPool ! GetOmmers(block1Chain4.parentHash)
-        expectMsg(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain1)))
-      }
+        ommersPool ! GetOmmers(block1Chain4.parentHash.value, ommersProbe.ref)
+        ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain1)))
 
-      "despite of start losing older ommers candidates" in new TestSetup {
+      "despite of start losing older ommers candidates" in new TestSetup:
 
         /** XX --> (11) --> 21 --> 31 (chain1) \ \ \-> 33 (chain3) \ \--> 22 --> 32 (chain2) \--> 14 ---> [24] (chain4)
           * \-> (15) (chain5) [] new block, reference! () ommer given the new block XX removed block
           */
-        (blockchainReader.getBlockHeaderByHash _).expects(block1Chain4.hash).returns(Some(block1Chain4)).once()
-        (blockchainReader.getBlockHeaderByHash _).expects(block0.hash).returns(Some(block0)).once()
+        blockchainReader.getBlockHeaderByHash.expects(block1Chain4.hash).returns(Some(block1Chain4)).once()
+        blockchainReader.getBlockHeaderByHash.expects(block0.hash).returns(Some(block0)).once()
 
         ommersPool ! AddOmmers(
           block0,
@@ -92,17 +85,16 @@ class OmmersPoolSpec
         // Notice that in terms of additions, current pool implementation is behaving as a queue with a fixed size!
         ommersPool ! AddOmmers(block1Chain5)
 
-        ommersPool ! GetOmmers(block2Chain4.parentHash)
-        expectMsg(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain5, block1Chain1)))
-      }
+        ommersPool ! GetOmmers(block2Chain4.parentHash.value, ommersProbe.ref)
+        ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain5, block1Chain1)))
 
-      "by respecting size and generation limits" in new TestSetup {
+      "by respecting size and generation limits" in new TestSetup:
 
         /** 00 --> 11 --> 21 --> [31] (chain1) \ \ \-> (33) (chain3) \ \--> (22) --> 32 (chain2) \-> 14 (chain4) [] new
           * block, reference! () ommer given the new block
           */
-        (blockchainReader.getBlockHeaderByHash _).expects(block2Chain1.hash).returns(Some(block2Chain1))
-        (blockchainReader.getBlockHeaderByHash _).expects(block1Chain1.hash).returns(Some(block1Chain1))
+        blockchainReader.getBlockHeaderByHash.expects(block2Chain1.hash).returns(Some(block2Chain1))
+        blockchainReader.getBlockHeaderByHash.expects(block1Chain1.hash).returns(Some(block1Chain1))
 
         ommersPool ! AddOmmers(
           block0,
@@ -114,16 +106,15 @@ class OmmersPoolSpec
           block3Chain3
         )
 
-        ommersPool ! GetOmmers(block3Chain1.parentHash)
-        expectMsg(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block2Chain2, block3Chain3)))
-      }
+        ommersPool ! GetOmmers(block3Chain1.parentHash.value, ommersProbe.ref)
+        ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block2Chain2, block3Chain3)))
 
     }
   }
 
   // SCALA 3 MIGRATION: Cannot use self-type constraint with `new TestSetup` in Scala 3.
   // Using lazy val for mock ensures it's created when accessed within MockFactory context.
-  trait TestSetup {
+  trait TestSetup:
 
     // In order to support all the blocks for the given scenarios
     val ommersPoolSize: Int = 8
@@ -136,33 +127,35 @@ class OmmersPoolSpec
     /** 00 ---> 11 --> 21 --> 31 (chain1) \ \ \--> 33 (chain3) \ \--> 22 --> 32 (chain2) \--> 14 --> 24 (chain4) \-> 15
       * (chain5)
       */
-    val block0: BlockHeader = Block3125369.header.copy(number = 0, difficulty = 0)
+    val block0: BlockHeader = Block3125369.header.copy(number = 0, difficulty = Difficulty.Zero)
 
-    val block1Chain1: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = 11)
+    val block1Chain1: BlockHeader =
+      Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(11))
     val block2Chain1: BlockHeader =
-      Block3125369.header.copy(number = 2, parentHash = block1Chain1.hash, difficulty = 21)
+      Block3125369.header.copy(number = 2, parentHash = block1Chain1.hash, difficulty = Difficulty(21))
     val block3Chain1: BlockHeader =
-      Block3125369.header.copy(number = 3, parentHash = block2Chain1.hash, difficulty = 31)
+      Block3125369.header.copy(number = 3, parentHash = block2Chain1.hash, difficulty = Difficulty(31))
 
     val block2Chain2: BlockHeader =
-      Block3125369.header.copy(number = 2, parentHash = block1Chain1.hash, difficulty = 22)
+      Block3125369.header.copy(number = 2, parentHash = block1Chain1.hash, difficulty = Difficulty(22))
     val block3Chain2: BlockHeader =
-      Block3125369.header.copy(number = 2, parentHash = block2Chain2.hash, difficulty = 32)
+      Block3125369.header.copy(number = 2, parentHash = block2Chain2.hash, difficulty = Difficulty(32))
 
     val block3Chain3: BlockHeader =
-      Block3125369.header.copy(number = 3, parentHash = block2Chain1.hash, difficulty = 33)
+      Block3125369.header.copy(number = 3, parentHash = block2Chain1.hash, difficulty = Difficulty(33))
 
-    val block1Chain4: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = 14)
+    val block1Chain4: BlockHeader =
+      Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(14))
     val block2Chain4: BlockHeader =
-      Block3125369.header.copy(number = 2, parentHash = block1Chain4.hash, difficulty = 24)
+      Block3125369.header.copy(number = 2, parentHash = block1Chain4.hash, difficulty = Difficulty(24))
 
-    val block1Chain5: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = 15)
+    val block1Chain5: BlockHeader =
+      Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(15))
 
     // Mock created lazily so it's initialized when accessed within the MockFactory context
     lazy val blockchainReader: BlockchainReader = mock[BlockchainReader]
-    lazy val ommersPool: ActorRef =
-      system.actorOf(
-        OmmersPool.props(blockchainReader, ommersPoolSize, ommerGenerationLimit, returnedOmmerSizeLimit)
+    lazy val ommersProbe: TestProbe[Ommers] = testKit.createTestProbe[Ommers]()
+    lazy val ommersPool: ActorRef[Command] =
+      testKit.spawn(
+        OmmersPool(blockchainReader, ommersPoolSize, ommerGenerationLimit, returnedOmmerSizeLimit)
       )
-  }
-}

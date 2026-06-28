@@ -8,7 +8,7 @@ final case class JsonRpcHealthcheck[Response](
     name: String,
     healthCheck: Either[String, Response],
     info: Option[String] = None
-) {
+):
 
   def toResult: HealthcheckResult =
     healthCheck
@@ -28,9 +28,8 @@ final case class JsonRpcHealthcheck[Response](
 
   def withInfo(getInfo: Response => String): JsonRpcHealthcheck[Response] =
     copy(info = healthCheck.toOption.map(getInfo))
-}
 
-object JsonRpcHealthcheck {
+object JsonRpcHealthcheck:
 
   def fromServiceResponse[Response](name: String, f: ServiceResponse[Response]): IO[JsonRpcHealthcheck[Response]] =
     f.map(result =>
@@ -47,5 +46,3 @@ object JsonRpcHealthcheck {
         Right(result)
       )
     ).handleError(t => JsonRpcHealthcheck(name, Left(t.getMessage())))
-
-}

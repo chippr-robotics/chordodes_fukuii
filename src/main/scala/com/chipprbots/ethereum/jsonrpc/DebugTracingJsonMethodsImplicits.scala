@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 
-import com.chipprbots.ethereum.jsonrpc.DebugTracingService._
+import com.chipprbots.ethereum.jsonrpc.DebugTracingService.*
 import com.chipprbots.ethereum.jsonrpc.EthJsonMethodsImplicits.extractCall
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodCodec
 
@@ -20,135 +20,120 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodCodec
   * traceConfig]) debug_traceCallMany([{callObj, traceConfig},...], blockParam) debug_traceBlockByHash(blockHash [,
   * traceConfig]) debug_traceBlockByNumber(blockParam [, traceConfig])
   */
-object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
+object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits:
 
-  implicit val debug_traceTransaction: JsonMethodCodec[TraceTransactionRequest, TraceTransactionResponse] =
-    new JsonMethodCodec[TraceTransactionRequest, TraceTransactionResponse] {
+  given debug_traceTransaction: JsonMethodCodec[TraceTransactionRequest, TraceTransactionResponse] =
+    new JsonMethodCodec[TraceTransactionRequest, TraceTransactionResponse]:
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceTransactionRequest] =
-        params match {
+        params match
           case Some(JArray(JString(hash) :: rest)) =>
-            for {
+            for
               txHash <- extractBytes(hash)
               config <- extractTraceConfig(rest.headOption)
-            } yield TraceTransactionRequest(txHash, config)
+            yield TraceTransactionRequest(txHash, config)
           case _ =>
             Left(JsonRpcError.InvalidParams())
-        }
 
       override def encodeJson(t: TraceTransactionResponse): JValue = t.result
-    }
 
-  implicit val debug_traceCall: JsonMethodCodec[TraceCallRequest, TraceCallResponse] =
-    new JsonMethodCodec[TraceCallRequest, TraceCallResponse] {
+  given debug_traceCall: JsonMethodCodec[TraceCallRequest, TraceCallResponse] =
+    new JsonMethodCodec[TraceCallRequest, TraceCallResponse]:
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceCallRequest] =
-        params match {
+        params match
           case Some(JArray((txObj: JObject) :: blockParam :: rest)) =>
-            for {
+            for
               tx <- extractCall(txObj)
               block <- extractBlockParam(blockParam)
               config <- extractTraceConfig(rest.headOption)
-            } yield TraceCallRequest(tx, block, config)
+            yield TraceCallRequest(tx, block, config)
           case Some(JArray((txObj: JObject) :: Nil)) =>
-            for {
-              tx <- extractCall(txObj)
-            } yield TraceCallRequest(tx, BlockParam.Latest)
+            for tx <- extractCall(txObj)
+            yield TraceCallRequest(tx, BlockParam.Latest)
           case _ =>
             Left(JsonRpcError.InvalidParams())
-        }
 
       override def encodeJson(t: TraceCallResponse): JValue = t.result
-    }
 
-  implicit val debug_traceCallMany: JsonMethodCodec[TraceCallManyRequest, TraceCallManyResponse] =
-    new JsonMethodCodec[TraceCallManyRequest, TraceCallManyResponse] {
+  given debug_traceCallMany: JsonMethodCodec[TraceCallManyRequest, TraceCallManyResponse] =
+    new JsonMethodCodec[TraceCallManyRequest, TraceCallManyResponse]:
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceCallManyRequest] =
-        params match {
+        params match
           case Some(JArray(JArray(callList) :: blockParam :: _)) =>
-            for {
+            for
               block <- extractBlockParam(blockParam)
-              calls <- {
+              calls <-
                 val decoded = callList.map {
                   case JArray((txObj: JObject) :: rest) =>
-                    for {
+                    for
                       tx <- extractCall(txObj)
                       config <- extractTraceConfig(rest.headOption)
-                    } yield (tx, config)
+                    yield (tx, config)
                   case _ =>
                     Left(JsonRpcError.InvalidParams("Each call must be [callObj, traceConfig]"))
                 }
                 decoded.foldRight[Either[JsonRpcError, List[(EthInfoService.CallTx, TraceConfig)]]](Right(Nil)) {
-                  (e, acc) => for { h <- e; t <- acc } yield h :: t
+                  (e, acc) => for h <- e; t <- acc yield h :: t
                 }
-              }
-            } yield TraceCallManyRequest(calls, block)
+            yield TraceCallManyRequest(calls, block)
           case _ =>
             Left(JsonRpcError.InvalidParams())
-        }
 
       override def encodeJson(t: TraceCallManyResponse): JValue = JArray(t.results.toList)
-    }
 
-  implicit val debug_traceBlockByHash: JsonMethodCodec[TraceBlockByHashRequest, TraceBlockByHashResponse] =
-    new JsonMethodCodec[TraceBlockByHashRequest, TraceBlockByHashResponse] {
+  given debug_traceBlockByHash: JsonMethodCodec[TraceBlockByHashRequest, TraceBlockByHashResponse] =
+    new JsonMethodCodec[TraceBlockByHashRequest, TraceBlockByHashResponse]:
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceBlockByHashRequest] =
-        params match {
+        params match
           case Some(JArray(JString(hash) :: rest)) =>
-            for {
+            for
               blockHash <- extractBytes(hash)
               config <- extractTraceConfig(rest.headOption)
-            } yield TraceBlockByHashRequest(blockHash, config)
+            yield TraceBlockByHashRequest(blockHash, config)
           case _ =>
             Left(JsonRpcError.InvalidParams())
-        }
 
       override def encodeJson(t: TraceBlockByHashResponse): JValue =
         JArray(t.results.toList)
-    }
 
-  implicit val debug_traceBlockByNumber: JsonMethodCodec[TraceBlockByNumberRequest, TraceBlockByNumberResponse] =
-    new JsonMethodCodec[TraceBlockByNumberRequest, TraceBlockByNumberResponse] {
+  given debug_traceBlockByNumber: JsonMethodCodec[TraceBlockByNumberRequest, TraceBlockByNumberResponse] =
+    new JsonMethodCodec[TraceBlockByNumberRequest, TraceBlockByNumberResponse]:
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceBlockByNumberRequest] =
-        params match {
+        params match
           case Some(JArray(blockParam :: rest)) =>
-            for {
+            for
               block <- extractBlockParam(blockParam)
               config <- extractTraceConfig(rest.headOption)
-            } yield TraceBlockByNumberRequest(block, config)
+            yield TraceBlockByNumberRequest(block, config)
           case _ =>
             Left(JsonRpcError.InvalidParams())
-        }
 
       override def encodeJson(t: TraceBlockByNumberResponse): JValue =
         JArray(t.results.toList)
-    }
 
-  implicit val debug_intermediateRoots: JsonMethodCodec[IntermediateRootsRequest, IntermediateRootsResponse] =
-    new JsonMethodCodec[IntermediateRootsRequest, IntermediateRootsResponse] {
+  given debug_intermediateRoots: JsonMethodCodec[IntermediateRootsRequest, IntermediateRootsResponse] =
+    new JsonMethodCodec[IntermediateRootsRequest, IntermediateRootsResponse]:
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, IntermediateRootsRequest] =
-        params match {
+        params match
           case Some(JArray(JString(hash) :: _)) =>
             extractBytes(hash).map(IntermediateRootsRequest(_))
           case _ =>
             Left(JsonRpcError.InvalidParams())
-        }
 
       override def encodeJson(t: IntermediateRootsResponse): JValue =
         JArray(t.roots.map(h => JString("0x" + org.bouncycastle.util.encoders.Hex.toHexString(h.toArray))).toList)
-    }
 
-  implicit val debug_traceChain: JsonMethodCodec[TraceChainRequest, Seq[TraceChainBlockResult]] =
-    new JsonMethodCodec[TraceChainRequest, Seq[TraceChainBlockResult]] {
+  given debug_traceChain: JsonMethodCodec[TraceChainRequest, Seq[TraceChainBlockResult]] =
+    new JsonMethodCodec[TraceChainRequest, Seq[TraceChainBlockResult]]:
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceChainRequest] =
-        params match {
+        params match
           case Some(JArray(fromParam :: toParam :: rest)) =>
-            for {
+            for
               from <- extractBlockParam(fromParam)
               to <- extractBlockParam(toParam)
               config <- extractTraceConfig(rest.headOption)
-            } yield TraceChainRequest(from, to, config)
+            yield TraceChainRequest(from, to, config)
           case _ =>
             Left(JsonRpcError.InvalidParams())
-        }
 
       override def encodeJson(t: Seq[TraceChainBlockResult]): JValue =
         JArray(t.map { r =>
@@ -158,7 +143,6 @@ object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
             "traces" -> JArray(r.traces.toList)
           )
         }.toList)
-    }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -168,7 +152,7 @@ object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
     * disableMemory: boolean disableStack: boolean
     */
   def extractTraceConfig(param: Option[JValue]): Either[JsonRpcError, TraceConfig] =
-    param match {
+    param match
       case None | Some(JNull) | Some(JNothing) =>
         Right(TraceConfig())
       case Some(JObject(fields)) =>
@@ -180,5 +164,3 @@ object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
         Right(TraceConfig(tracer, disableStorage, disableMemory, disableStack))
       case _ =>
         Right(TraceConfig()) // ignore unknown forms
-    }
-}

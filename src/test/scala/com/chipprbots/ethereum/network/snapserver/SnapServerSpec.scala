@@ -8,8 +8,10 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.CodeHash
+import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 // ── K8: SNAP server correctness — range semantics, Merkle proofs, multi-account storage,
@@ -18,7 +20,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
 // Companion to SnapServerLimitsSpec (K7), which covers the byte-budget and time-budget
 // invariants. This spec covers WHAT is returned, not HOW MUCH.
 
-class SnapServerSpec extends AnyFlatSpec with Matchers {
+class SnapServerSpec extends AnyFlatSpec with Matchers:
 
   // ── shared constants ────────────────────────────────────────────────────────
   private val zeroHash = ByteString(new Array[Byte](32))
@@ -31,12 +33,11 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
   private def buildAccountTrie(
       accounts: Seq[(ByteString, Account)],
       storage: TestMptStorage = new TestMptStorage()
-  ): (ByteString, TestMptStorage) = {
+  ): (ByteString, TestMptStorage) =
     val trie = accounts.foldLeft(MerklePatriciaTrie[ByteString, Account](storage)) { case (t, (k, v)) =>
       t.put(k, v)
     }
     (ByteString(trie.getRootHash), storage)
-  }
 
   /** Build a storage trie from (slotHash, value) pairs, reusing an existing TestMptStorage. Because MPT is
     * content-addressed, account and storage nodes can coexist safely.
@@ -44,12 +45,11 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
   private def buildStorageTrie(
       slots: Seq[(ByteString, ByteString)],
       storage: TestMptStorage
-  ): ByteString = {
+  ): ByteString =
     val trie = slots.foldLeft(MerklePatriciaTrie[ByteString, ByteString](storage)) { case (t, (k, v)) =>
       t.put(k, v)
     }
     ByteString(trie.getRootHash)
-  }
 
   /** 10 deterministic account keys spread across the keyspace. */
   private def sampleKeys(n: Int): Seq[ByteString] =
@@ -61,7 +61,7 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
 
   /** Account with a given storage root. */
   private def accountWithStorage(storageRoot: ByteString): Account =
-    Account(nonce = 1, balance = 500, storageRoot = storageRoot)
+    Account(nonce = 1, balance = 500, storageRoot = TrieRoot(storageRoot))
 
   /** HP-encoded empty path — asks serveTrieNodes for the root node of the trie. */
   private val hpRootPath: ByteString = ByteString(Array(0x00.toByte))
@@ -69,12 +69,10 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
   // ── serveByteCodes — stub code storage ─────────────────────────────────────
 
   /** Stub EvmCodeStorage backed by a Map — no disk I/O. */
-  private def codeStorage(entries: (ByteString, ByteString)*): EvmCodeStorage = {
+  private def codeStorage(entries: (ByteString, ByteString)*): EvmCodeStorage =
     val map = entries.toMap
-    new EvmCodeStorage(null) {
+    new EvmCodeStorage(null):
       override def get(key: ByteString): Option[ByteString] = map.get(key)
-    }
-  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // serveAccountRange — range semantics and Merkle proof correctness
@@ -173,32 +171,29 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
     val slim = SnapServer.toSlimAccountRlp(account)
     val fields = slim.items
     // Field 2 (storageRoot) and 3 (codeHash) should be empty byte arrays.
-    fields(2) match {
+    fields(2) match
       case com.chipprbots.ethereum.rlp.RLPValue(b) => b shouldBe empty
       case other                                   => fail(s"expected RLPValue, got $other")
-    }
-    fields(3) match {
+    fields(3) match
       case com.chipprbots.ethereum.rlp.RLPValue(b) => b shouldBe empty
       case other                                   => fail(s"expected RLPValue, got $other")
-    }
   }
 
   it should "not slim-encode accounts that have non-default storageRoot or codeHash" taggedAs UnitTest in {
     val fakeStorageRoot = kec256(ByteString("some storage"))
     val fakeCodeHash = kec256(ByteString("some code"))
-    val account = Account(nonce = 1, balance = 0, storageRoot = fakeStorageRoot, codeHash = fakeCodeHash)
+    val account =
+      Account(nonce = 1, balance = 0, storageRoot = TrieRoot(fakeStorageRoot), codeHash = CodeHash(fakeCodeHash))
 
     val slim = SnapServer.toSlimAccountRlp(account)
     val fields = slim.items
     // Both fields must be full 32-byte arrays.
-    fields(2) match {
+    fields(2) match
       case com.chipprbots.ethereum.rlp.RLPValue(b) => b.length shouldEqual 32
       case other                                   => fail(s"expected RLPValue, got $other")
-    }
-    fields(3) match {
+    fields(3) match
       case com.chipprbots.ethereum.rlp.RLPValue(b) => b.length shouldEqual 32
       case other                                   => fail(s"expected RLPValue, got $other")
-    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -500,7 +495,7 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
     // hash without touching the DB (handlers.go:360-361). Bug 3 fix.
     val storage = codeStorage() // empty storage — would miss on any DB lookup
 
-    val result = SnapServer.serveByteCodes(1, Seq(Account.EmptyCodeHash), bigBudget, storage)
+    val result = SnapServer.serveByteCodes(1, Seq(Account.EmptyCodeHash.value), bigBudget, storage)
 
     result.codes should have size 1
     result.codes.head shouldBe empty
@@ -545,4 +540,3 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
 
     result.codes shouldBe empty
   }
-}

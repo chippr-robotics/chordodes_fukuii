@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpec
@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.db.cache.MapCache
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeEncoded
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.NodeCacheConfig
 
 class CachedNodeStorageSpec
@@ -27,10 +27,10 @@ class CachedNodeStorageSpec
     with ScalaCheckPropertyChecks
     with ObjectGenerators
     with Eventually
-    with NormalPatience {
+    with NormalPatience:
   val iterations = 10
 
-  "CachedNodeStorage" should "not update dataSource until persist" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  "CachedNodeStorage" should "not update dataSource until persist" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     forAll(keyValueByteStringGen(kvSize)) { keyvalues =>
       cachedNodeStorage.update(Nil, keyvalues)
     }
@@ -38,29 +38,24 @@ class CachedNodeStorageSpec
 
     val cachedValuesSize = cachedNodeStorage.cache.getValues.size
 
-    if (cachedNodeStorage.persist()) {
+    if cachedNodeStorage.persist() then
       cachedNodeStorage.cache.getValues shouldBe empty
       dataSource.storage.size shouldEqual cachedValuesSize
-    } else {
-      dataSource.storage shouldBe empty
-    }
-  }
+    else dataSource.storage shouldBe empty
 
-  it should "persist elements to underlying data source when full" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  it should "persist elements to underlying data source when full" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     forAll(keyValueByteStringGen(kvSize)) { keyvalues =>
       cachedNodeStorage.update(Nil, keyvalues)
 
-      if (underLying.size > testCapacityCacheConfig.maxSize)
-        assert(cachedNodeStorage.persist())
+      if underLying.size > testCapacityCacheConfig.maxSize then assert(cachedNodeStorage.persist())
 
       keyvalues.foreach(elem => assert(cachedNodeStorage.get(elem._1).get.sameElements(elem._2)))
     }
-  }
 
   it should "persist elements to underlying data source when not cleared for long time" taggedAs (
     UnitTest,
     DatabaseTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val key: ByteString = ByteString(1)
     val value: Array[Byte] = Array(1.toByte)
     val cachedNodeStorageTiming = new CachedNodeStorage(nodeStorage, mapCacheTime)
@@ -69,9 +64,8 @@ class CachedNodeStorageSpec
       cachedNodeStorageTiming.persist() shouldEqual true
       dataSource.storage.nonEmpty shouldBe true
     }
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val dataSource: EphemDataSource = EphemDataSource()
     val nodeStorage = new NodeStorage(dataSource)
     val underLying: mutable.Map[NodeHash, NodeEncoded] = MapCache.getMap[NodeHash, NodeEncoded]
@@ -83,15 +77,10 @@ class CachedNodeStorageSpec
 
     val kvSize = 64
 
-    object testCapacityCacheConfig extends NodeCacheConfig {
+    object testCapacityCacheConfig extends NodeCacheConfig:
       override val maxSize = 30
       override val maxHoldTime: FiniteDuration = FiniteDuration(10, TimeUnit.MINUTES)
-    }
 
-    object testTimeCacheConfig extends NodeCacheConfig {
+    object testTimeCacheConfig extends NodeCacheConfig:
       override val maxSize = 30
       override val maxHoldTime: FiniteDuration = FiniteDuration(1, TimeUnit.SECONDS)
-    }
-
-  }
-}

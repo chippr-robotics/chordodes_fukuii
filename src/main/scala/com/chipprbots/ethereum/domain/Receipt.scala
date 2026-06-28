@@ -6,53 +6,47 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
 
-sealed trait Receipt {
+sealed trait Receipt:
   def postTransactionStateHash: TransactionOutcome
   def cumulativeGasUsed: BigInt
-  def logsBloomFilter: ByteString
+  def logsBloomFilter: BloomFilter
   def logs: Seq[TxLogEntry]
-}
 
 // shared structure for EIP-2930, EIP-1559
 abstract class TypedLegacyReceipt(@annotation.unused _transactionTypeId: Byte, val delegateReceipt: LegacyReceipt)
-    extends Receipt {
+    extends Receipt:
   def postTransactionStateHash: TransactionOutcome = delegateReceipt.postTransactionStateHash
   def cumulativeGasUsed: BigInt = delegateReceipt.cumulativeGasUsed
-  def logsBloomFilter: ByteString = delegateReceipt.logsBloomFilter
+  def logsBloomFilter: BloomFilter = delegateReceipt.logsBloomFilter
   def logs: Seq[TxLogEntry] = delegateReceipt.logs
-}
 
-object Receipt {
+object Receipt:
 
-  val byteArraySerializable: ByteArraySerializable[Receipt] = new ByteArraySerializable[Receipt] {
+  val byteArraySerializable: ByteArraySerializable[Receipt] = new ByteArraySerializable[Receipt]:
 
-    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
+    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 
     override def fromBytes(bytes: Array[Byte]): Receipt = bytes.toReceipt
 
     override def toBytes(input: Receipt): Array[Byte] = input.toBytes
-  }
-}
 
-object LegacyReceipt {
+object LegacyReceipt:
   def withHashOutcome(
       postTransactionStateHash: ByteString,
       cumulativeGasUsed: BigInt,
-      logsBloomFilter: ByteString,
+      logsBloomFilter: BloomFilter,
       logs: Seq[TxLogEntry]
   ): LegacyReceipt =
     LegacyReceipt(HashOutcome(postTransactionStateHash), cumulativeGasUsed, logsBloomFilter, logs)
-}
 
-object Type01Receipt {
+object Type01Receipt:
   def withHashOutcome(
       postTransactionStateHash: ByteString,
       cumulativeGasUsed: BigInt,
-      logsBloomFilter: ByteString,
+      logsBloomFilter: BloomFilter,
       logs: Seq[TxLogEntry]
   ): Type01Receipt =
     Type01Receipt(LegacyReceipt.withHashOutcome(postTransactionStateHash, cumulativeGasUsed, logsBloomFilter, logs))
-}
 
 /** @param postTransactionStateHash
   *   For blocks where block.number >= byzantium-block-number (from config), the intermediate state root is replaced by
@@ -65,55 +59,47 @@ object Type01Receipt {
 case class LegacyReceipt(
     postTransactionStateHash: TransactionOutcome,
     cumulativeGasUsed: BigInt,
-    logsBloomFilter: ByteString,
+    logsBloomFilter: BloomFilter,
     logs: Seq[TxLogEntry]
-) extends Receipt {
-  def toPrettyString(prefix: String): String = {
-    val stateHash = postTransactionStateHash match {
+) extends Receipt:
+  def toPrettyString(prefix: String): String =
+    val stateHash = postTransactionStateHash match
       case HashOutcome(hash) => hash.toArray[Byte]
       case SuccessOutcome    => Array(1.toByte)
       case _                 => Array(0.toByte)
-    }
 
     s"${prefix}{ " +
       s"postTransactionStateHash: ${Hex.toHexString(stateHash)}, " +
       s"cumulativeGasUsed: $cumulativeGasUsed, " +
-      s"logsBloomFilter: ${Hex.toHexString(logsBloomFilter.toArray[Byte])}, " +
+      s"logsBloomFilter: ${Hex.toHexString(logsBloomFilter.toArray)}, " +
       s"logs: $logs" +
       s"}"
-  }
 
   override def toString: String = toPrettyString("LegacyReceipt")
-}
 
 /** EIP-2930 receipt for Transaction type 1
   * @param legacyReceipt
   */
-case class Type01Receipt(legacyReceipt: LegacyReceipt) extends TypedLegacyReceipt(Transaction.Type01, legacyReceipt) {
+case class Type01Receipt(legacyReceipt: LegacyReceipt) extends TypedLegacyReceipt(Transaction.Type01, legacyReceipt):
   override def toString: String = legacyReceipt.toPrettyString("Type01Receipt")
-}
 
-object Type02Receipt {
+object Type02Receipt:
   def withHashOutcome(
       postTransactionStateHash: ByteString,
       cumulativeGasUsed: BigInt,
-      logsBloomFilter: ByteString,
+      logsBloomFilter: BloomFilter,
       logs: Seq[TxLogEntry]
   ): Type02Receipt =
     Type02Receipt(LegacyReceipt.withHashOutcome(postTransactionStateHash, cumulativeGasUsed, logsBloomFilter, logs))
-}
 
 /** EIP-1559 receipt for Transaction type 2 */
-case class Type02Receipt(legacyReceipt: LegacyReceipt) extends TypedLegacyReceipt(Transaction.Type02, legacyReceipt) {
+case class Type02Receipt(legacyReceipt: LegacyReceipt) extends TypedLegacyReceipt(Transaction.Type02, legacyReceipt):
   override def toString: String = legacyReceipt.toPrettyString("Type02Receipt")
-}
 
 /** EIP-4844 receipt for Transaction type 3 (blob) */
-case class Type03Receipt(legacyReceipt: LegacyReceipt) extends TypedLegacyReceipt(Transaction.Type03, legacyReceipt) {
+case class Type03Receipt(legacyReceipt: LegacyReceipt) extends TypedLegacyReceipt(Transaction.Type03, legacyReceipt):
   override def toString: String = legacyReceipt.toPrettyString("Type03Receipt")
-}
 
 /** EIP-7702 receipt for Transaction type 4 */
-case class Type04Receipt(legacyReceipt: LegacyReceipt) extends TypedLegacyReceipt(Transaction.Type04, legacyReceipt) {
+case class Type04Receipt(legacyReceipt: LegacyReceipt) extends TypedLegacyReceipt(Transaction.Type04, legacyReceipt):
   override def toString: String = legacyReceipt.toPrettyString("Type04Receipt")
-}

@@ -9,14 +9,14 @@ import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.p2p.EthereumMessageDecoder
 import com.chipprbots.ethereum.network.p2p.NetworkMessageDecoder
 
-class ETH68MessagesSpec extends AnyWordSpec with Matchers {
+class ETH68MessagesSpec extends AnyWordSpec with Matchers:
 
   "ETH68" when {
     val version = Capability.ETH68
 
     "encoding and decoding Status" should {
       "return same result" in {
-        import ETHPackets.Status68.Status68._
+        import ETHPackets.Status68.Status68.*
         val msg = ETHPackets.Status68.Status68(1, 2, 3, ByteString("HASH"), ByteString("HASH2"), ForkId(1L, None))
         verify(msg, (m: ETHPackets.Status68.Status68) => m.toBytes, Codes.StatusCode, version)
       }
@@ -24,7 +24,7 @@ class ETH68MessagesSpec extends AnyWordSpec with Matchers {
 
     "encoding and decoding NewPooledTransactionHashes with types and sizes" should {
       "return same result" in {
-        import ETHPackets.NewPooledTransactionHashes._
+        import ETHPackets.NewPooledTransactionHashes.*
         val types = Seq[Byte](0, 1, 2)
         val sizes = Seq[BigInt](100, 200, 300)
         val hashes = Seq(ByteString("hash1"), ByteString("hash2"), ByteString("hash3"))
@@ -40,10 +40,10 @@ class ETH68MessagesSpec extends AnyWordSpec with Matchers {
 
     "decoding NewPooledTransactionHashes in legacy ETH65 format" should {
       "successfully decode and set default types and sizes" in {
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         import com.chipprbots.ethereum.rlp.RLPImplicits.given
-        import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
-        import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewPooledTransactionHashes._
+        import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
+        import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewPooledTransactionHashes.*
 
         val hashes = Seq(ByteString("hash1"), ByteString("hash2"), ByteString("hash3"))
         val legacyEncoded = encode(toRlpList(hashes))
@@ -75,12 +75,10 @@ class ETH68MessagesSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  def verify[T](msg: T, encode: T => Array[Byte], code: Int, version: Capability): Unit = {
+  def verify[T](msg: T, encode: T => Array[Byte], code: Int, version: Capability): Unit =
     val encoded = encode(msg)
     val decoded = messageDecoder(version).fromBytes(code, encoded)
     decoded shouldEqual Right(msg)
-  }
 
   private def messageDecoder(version: Capability) =
     NetworkMessageDecoder.orElse(EthereumMessageDecoder.ethMessageDecoder(version))
-}

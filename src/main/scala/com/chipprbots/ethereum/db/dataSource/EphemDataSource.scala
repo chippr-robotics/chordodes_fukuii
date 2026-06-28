@@ -6,10 +6,10 @@ import cats.effect.IO
 
 import fs2.Stream
 
-import com.chipprbots.ethereum.db.dataSource.DataSource._
+import com.chipprbots.ethereum.db.dataSource.DataSource.*
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 
-class EphemDataSource(var storage: Map[ByteBuffer, Array[Byte]]) extends DataSource {
+class EphemDataSource(var storage: Map[ByteBuffer, Array[Byte]]) extends DataSource:
 
   /** key.drop to remove namespace prefix from the key
     * @return
@@ -27,25 +27,22 @@ class EphemDataSource(var storage: Map[ByteBuffer, Array[Byte]]) extends DataSou
 
   override def deleteRange(namespace: Namespace, fromKey: Array[Byte], toKeyExclusive: Array[Byte]): Unit =
     synchronized {
-      def cmp(a: Array[Byte], b: Array[Byte]): Int = {
+      def cmp(a: Array[Byte], b: Array[Byte]): Int =
         val n = math.min(a.length, b.length)
         var i = 0
         var d = 0
-        while (i < n && d == 0) {
+        while i < n && d == 0 do
           d = (a(i) & 0xff) - (b(i) & 0xff)
           i += 1
-        }
-        if (d != 0) d else a.length - b.length
-      }
+        if d != 0 then d else a.length - b.length
       val ns = namespace.toArray
       storage = storage.filter { case (k, _) =>
         val raw = k.array()
         val inNamespace = raw.length >= ns.length && raw.take(ns.length).sameElements(ns)
-        if (!inNamespace) true
-        else {
+        if !inNamespace then true
+        else
           val suffix = raw.drop(ns.length)
           !(cmp(suffix, fromKey) >= 0 && cmp(suffix, toKeyExclusive) < 0)
-        }
       }
     }
 
@@ -54,16 +51,14 @@ class EphemDataSource(var storage: Map[ByteBuffer, Array[Byte]]) extends DataSou
       fromKey: Array[Byte],
       toKeyExclusive: Array[Byte]
   ): Iterator[(Array[Byte], Array[Byte])] = synchronized {
-    def cmp(a: Array[Byte], b: Array[Byte]): Int = {
+    def cmp(a: Array[Byte], b: Array[Byte]): Int =
       val n = math.min(a.length, b.length)
       var i = 0
       var d = 0
-      while (i < n && d == 0) {
+      while i < n && d == 0 do
         d = (a(i) & 0xff) - (b(i) & 0xff)
         i += 1
-      }
-      if (d != 0) d else a.length - b.length
-    }
+      if d != 0 then d else a.length - b.length
     val ns = namespace.toArray
     // Emit in ascending unsigned-suffix order to match the RocksDB iterator (and the prior
     // increasing-key multiGet order). Window is half-open [fromKey, toKeyExclusive).
@@ -115,15 +110,12 @@ class EphemDataSource(var storage: Map[ByteBuffer, Array[Byte]]) extends DataSou
   override def iterate(): Stream[IO, Either[IterationError, (Array[Byte], Array[Byte])]] =
     Stream.emits(storage.toList.map { case (key, value) => Right((key.array(), value)) })
 
-  override def iterate(namespace: Namespace): Stream[IO, Either[IterationError, (Array[Byte], Array[Byte])]] = {
+  override def iterate(namespace: Namespace): Stream[IO, Either[IterationError, (Array[Byte], Array[Byte])]] =
     val namespaceVals = storage.collect {
       case (buffer, bytes) if buffer.array().startsWith(namespace) => Right((buffer.array(), bytes))
     }
 
     Stream.emits(namespaceVals.toSeq)
-  }
-}
 
-object EphemDataSource {
+object EphemDataSource:
   def apply(): EphemDataSource = new EphemDataSource(Map())
-}

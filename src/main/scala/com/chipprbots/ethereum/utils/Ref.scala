@@ -5,8 +5,8 @@ import java.util.concurrent.atomic.AtomicReference
 /** An [[https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/atomic/AtomicReference.html AtomicReference]]
   * that can be set once.
   */
-class Ref[T <: AnyRef] {
-  final private[this] val ref = new AtomicReference[Option[T]](None)
+class Ref[T <: AnyRef]:
+  final private val ref = new AtomicReference[Option[T]](None)
 
   // set once (but not necessarily compute once)
   final def setOnce(t: => T): Boolean = ref.get().isEmpty && ref.compareAndSet(None, Some(t))
@@ -16,4 +16,3 @@ class Ref[T <: AnyRef] {
 
   final def map[U](f: T => U): Option[U] = ref.get().map(f)
   final def foreach[U](f: T => U): Unit = map(f)
-}

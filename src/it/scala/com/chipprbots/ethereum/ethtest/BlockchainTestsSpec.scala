@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.ethtest
 
 import java.io.File
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite for ethereum/tests BlockchainTests category
   *
@@ -18,10 +18,10 @@ import com.chipprbots.ethereum.testing.Tags._
   *
   * See https://github.com/ethereum/tests/tree/develop/BlockchainTests See ADR-015 for implementation details
   */
-class BlockchainTestsSpec extends EthereumTestsSpec {
+class BlockchainTestsSpec extends EthereumTestsSpec:
 
   // Supported networks — all forks through Prague
-  val supportedNetworks = Set(
+  val supportedNetworks: Set[String] = Set(
     "Frontier",
     "Homestead",
     "EIP150", // Tangerine Whistle
@@ -47,20 +47,17 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     * @return
     *   List of test file paths
     */
-  def discoverTests(testCategory: String): Seq[String] = {
+  def discoverTests(testCategory: String): Seq[String] =
     val basePath = "/home/runner/work/fukuii/fukuii/ets/tests/BlockchainTests"
     val categoryPath = new File(s"$basePath/$testCategory")
 
-    if (!categoryPath.exists() || !categoryPath.isDirectory) {
-      Seq.empty
-    } else {
+    if !categoryPath.exists() || !categoryPath.isDirectory then Seq.empty
+    else
       categoryPath
         .listFiles()
         .filter(_.getName.endsWith(".json"))
         .map(f => s"/BlockchainTests/$testCategory/${f.getName}")
         .toSeq
-    }
-  }
 
   /** Load and filter test suite to only include supported networks
     *
@@ -69,13 +66,12 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     * @return
     *   Filtered test suite with only supported networks
     */
-  def loadAndFilterTestSuite(resourcePath: String): BlockchainTestSuite = {
+  def loadAndFilterTestSuite(resourcePath: String): BlockchainTestSuite =
     val fullPath = s"/home/runner/work/fukuii/fukuii/ets/tests$resourcePath"
     val file = new File(fullPath)
 
-    if (!file.exists()) {
-      BlockchainTestSuite(Map.empty)
-    } else {
+    if !file.exists() then BlockchainTestSuite(Map.empty)
+    else
       val suite = EthereumTestsAdapter.loadTestSuite(resourcePath).unsafeRunSync()
 
       // Filter to only supported networks
@@ -84,8 +80,6 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
       }
 
       BlockchainTestSuite(filteredTests)
-    }
-  }
 
   "BlockchainTests" should "pass SimpleTx from ValidBlocks" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     info("Running SimpleTx test from ValidBlocks/bcValidBlockTest...")
@@ -99,13 +93,12 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
       info(s"  Network: ${test.network}")
 
       val result = executeTest(test)
-      result match {
+      result match
         case Right(executionResult) =>
           info(s"  ✓ Test passed")
           info(s"  Blocks executed: ${executionResult.blocksExecuted}")
         case Left(error) =>
           fail(s"Test failed: $error")
-      }
     }
   }
 
@@ -116,12 +109,11 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     suite.tests.foreach { case (testName, test) =>
       info(s"Running test: $testName, Network: ${test.network}")
       val result = executeTest(test)
-      result match {
+      result match
         case Right(executionResult) =>
           info(s"  ✓ Test passed - Blocks executed: ${executionResult.blocksExecuted}")
         case Left(error) =>
           fail(s"Test failed: $error")
-      }
     }
   }
 
@@ -132,12 +124,11 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     suite.tests.foreach { case (testName, test) =>
       info(s"Running test: $testName, Network: ${test.network}")
       val result = executeTest(test)
-      result match {
+      result match
         case Right(executionResult) =>
           info(s"  ✓ Test passed - Blocks executed: ${executionResult.blocksExecuted}")
         case Left(error) =>
           fail(s"Test failed: $error")
-      }
     }
   }
 
@@ -145,30 +136,28 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     val basePath = "/home/runner/work/fukuii/fukuii/ets/tests/BlockchainTests"
     val baseDir = new File(basePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $basePath")
       info("Run 'git submodule init && git submodule update' to initialize")
       pending
-    } else {
+    else
       val tests = discoverTests("ValidBlocks/bcValidBlockTest")
       info(s"Discovered ${tests.size} test files in ValidBlocks/bcValidBlockTest")
       tests.size should be > 0
-    }
   }
 
   it should "discover tests in ValidBlocks/bcStateTests" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val basePath = "/home/runner/work/fukuii/fukuii/ets/tests/BlockchainTests"
     val baseDir = new File(basePath)
 
-    if (!baseDir.exists()) {
+    if !baseDir.exists() then
       info(s"Skipping test - ethereum/tests submodule not initialized at $basePath")
       info("Run 'git submodule init && git submodule update' to initialize")
       pending
-    } else {
+    else
       val tests = discoverTests("ValidBlocks/bcStateTests")
       info(s"Discovered ${tests.size} test files in ValidBlocks/bcStateTests")
       tests.size should be > 0
-    }
   }
 
   it should "filter out unsupported networks" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
@@ -200,4 +189,3 @@ class BlockchainTestsSpec extends EthereumTestsSpec {
     (filtered should contain).key("Berlin_Test")
     (filtered should contain).key("London_Test")
   }
-}

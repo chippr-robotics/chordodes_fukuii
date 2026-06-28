@@ -14,42 +14,39 @@ import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.testing.Tags._
 
-class DeleteAccountsSpec extends AnyFlatSpec with Matchers with MockFactory {
+class DeleteAccountsSpec extends AnyFlatSpec with Matchers with MockFactory:
 
   val blockchainConfig = Config.blockchains.blockchainConfig
   val syncConfig: SyncConfig = SyncConfig(Config.config)
 
   val blockchain: BlockchainImpl = mock[BlockchainImpl]
 
-  it should "delete no accounts when none of them should be deleted" taggedAs (UnitTest, StateTest) in new TestSetup {
+  it should "delete no accounts when none of them should be deleted" taggedAs (UnitTest, StateTest) in new TestSetup:
     val newWorld: InMemoryWorldStateProxy =
       InMemoryWorldStateProxy.persistState(mining.blockPreparator.deleteAccounts(Set.empty)(worldState))
     accountAddresses.foreach(a => assert(newWorld.getAccount(a).isDefined))
     newWorld.stateRootHash shouldBe worldState.stateRootHash
-  }
 
-  it should "delete the accounts listed for deletion" taggedAs (UnitTest, StateTest) in new TestSetup {
+  it should "delete the accounts listed for deletion" taggedAs (UnitTest, StateTest) in new TestSetup:
     val newWorld: InMemoryWorldStateProxy = mining.blockPreparator.deleteAccounts(accountAddresses.tail)(worldState)
     accountAddresses.tail.foreach(a => assert(newWorld.getAccount(a).isEmpty))
     assert(newWorld.getAccount(accountAddresses.head).isDefined)
-  }
 
   it should "delete all the accounts if they are all listed for deletion" taggedAs (
     UnitTest,
     StateTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val newWorld: InMemoryWorldStateProxy =
       InMemoryWorldStateProxy.persistState(mining.blockPreparator.deleteAccounts(accountAddresses)(worldState))
     accountAddresses.foreach(a => assert(newWorld.getAccount(a).isEmpty))
-    newWorld.stateRootHash shouldBe Account.EmptyStorageRootHash
-  }
+    newWorld.stateRootHash shouldBe Account.EmptyStorageRootHash.value
 
   // scalastyle:off magic.number
-  it should "delete account that had storage updated before" taggedAs (UnitTest, StateTest) in new TestSetup {
+  it should "delete account that had storage updated before" taggedAs (UnitTest, StateTest) in new TestSetup:
     val worldStateWithStorage: InMemoryWorldStateProxy = worldState.saveStorage(
       validAccountAddress,
       worldState.getStorage(validAccountAddress).store(UInt256(1), UInt256(123))
@@ -60,10 +57,9 @@ class DeleteAccountsSpec extends AnyFlatSpec with Matchers with MockFactory {
 
     val newWorld: InMemoryWorldStateProxy = InMemoryWorldStateProxy.persistState(updatedWorldState)
     assert(newWorld.getAccount(validAccountAddress).isEmpty)
-  }
 
   // scalastyle:off magic.number
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     // + cake overrides
     override lazy val vm: VMImpl = new MockVM()
 
@@ -76,7 +72,7 @@ class DeleteAccountsSpec extends AnyFlatSpec with Matchers with MockFactory {
     val accountAddresses: Set[Address] = Set(validAccountAddress, validAccountAddress2, validAccountAddress3)
 
     // Mock the getBackingMptStorage call
-    (DeleteAccountsSpec.this.blockchain.getBackingMptStorage _)
+    DeleteAccountsSpec.this.blockchain.getBackingMptStorage
       .expects(BigInt(-1))
       .returning(storagesInstance.storages.stateStorage.getBackingStorage(0))
       .anyNumberOfTimes()
@@ -84,7 +80,7 @@ class DeleteAccountsSpec extends AnyFlatSpec with Matchers with MockFactory {
     val worldStateWithoutPersist: InMemoryWorldStateProxy = InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       DeleteAccountsSpec.this.blockchain.getBackingMptStorage(-1),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       UInt256.Zero,
       ByteString(MerklePatriciaTrie.EmptyRootHash),
       noEmptyAccounts = false,
@@ -94,6 +90,3 @@ class DeleteAccountsSpec extends AnyFlatSpec with Matchers with MockFactory {
       .saveAccount(validAccountAddress2, Account(balance = 20))
       .saveAccount(validAccountAddress3, Account(balance = 30))
     val worldState: InMemoryWorldStateProxy = InMemoryWorldStateProxy.persistState(worldStateWithoutPersist)
-  }
-
-}

@@ -3,40 +3,35 @@ package com.chipprbots.ethereum
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class AppSpec extends AnyFlatSpec with Matchers {
+class AppSpec extends AnyFlatSpec with Matchers:
 
   // Helper methods to reduce reflection code duplication
-  private def getIsModifierMethod = {
+  private def getIsModifierMethod =
     val method = App.getClass.getDeclaredMethod("isModifier", classOf[String])
     method.setAccessible(true)
     method
-  }
 
-  private def getIsNetworkMethod = {
+  private def getIsNetworkMethod =
     val method = App.getClass.getDeclaredMethod("isNetwork", classOf[String])
     method.setAccessible(true)
     method
-  }
 
-  private def getIsOptionFlagMethod = {
+  private def getIsOptionFlagMethod =
     val method = App.getClass.getDeclaredMethod("isOptionFlag", classOf[String])
     method.setAccessible(true)
     method
-  }
 
-  private def getApplyModifiersMethod = {
+  private def getApplyModifiersMethod =
     val method = App.getClass.getDeclaredMethod("applyModifiers", classOf[Set[String]])
     method.setAccessible(true)
     method
-  }
 
-  private def getDetermineNetworkArgMethod = {
+  private def getDetermineNetworkArgMethod =
     val method = App.getClass.getDeclaredMethod("determineNetworkArg", classOf[Array[String]])
     method.setAccessible(true)
     method
-  }
 
   private def determineNetworkArg(args: Array[String]): Option[String] =
     getDetermineNetworkArgMethod
@@ -191,4 +186,3 @@ class AppSpec extends AnyFlatSpec with Matchers {
     val args = Array("cli", "gorgoroth")
     determineNetworkArg(args) shouldBe empty
   }
-}

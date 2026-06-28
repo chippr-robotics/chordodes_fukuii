@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.jsonrpc.graphql
 import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
-
 import sangria.ast
 import sangria.schema.ScalarType
 import sangria.validation.ValueCoercionViolation
@@ -14,7 +13,7 @@ import sangria.validation.ValueCoercionViolation
   * decimal string, or 0x-hex string; outputs are always 0x-hex. Long inputs accept number, decimal string, or 0x-hex;
   * output is 0x-hex.
   */
-object GraphQLScalars {
+object GraphQLScalars:
 
   // ---- Violation types ----
   private case object Bytes32Violation extends ValueCoercionViolation("Expected 0x-prefixed 32-byte hex string")
@@ -25,25 +24,24 @@ object GraphQLScalars {
 
   // ---- Hex helpers ----
   private def stripHex(s: String): Option[String] =
-    if (s.startsWith("0x") || s.startsWith("0X")) Some(s.substring(2))
+    if s.startsWith("0x") || s.startsWith("0X") then Some(s.substring(2))
     else None
 
   def toHex(bs: ByteString): String =
     "0x" + Hex.toHexString(bs.toArray[Byte])
 
   def toHexEmptyOk(bs: ByteString): String =
-    if (bs.isEmpty) "0x" else toHex(bs)
+    if bs.isEmpty then "0x" else toHex(bs)
 
-  def toHexBigInt(n: BigInt): String = {
+  def toHexBigInt(n: BigInt): String =
     // EIP-1767 canonical: no leading zeroes, with "0x0" for zero.
     val raw = n.toString(16)
-    "0x" + (if (raw == "0") "0"
+    "0x" + (if raw == "0" then "0"
             else
-              raw.dropWhile(_ == '0') match {
+              raw.dropWhile(_ == '0') match
                 case ""    => "0"
                 case other => other
-              })
-  }
+    )
 
   def toHexLong(n: Long): String = toHexBigInt(BigInt(n))
 
@@ -52,13 +50,11 @@ object GraphQLScalars {
       scala.util.Try(ByteString(Hex.decode(h))).toOption.filter(b => expectLen.forall(_ == b.length))
     }
 
-  private def parseBigInt(s: String): Option[BigInt] = {
+  private def parseBigInt(s: String): Option[BigInt] =
     val trimmed = s.trim
-    stripHex(trimmed) match {
-      case Some(hex) => scala.util.Try(BigInt(if (hex.isEmpty) "0" else hex, 16)).toOption
+    stripHex(trimmed) match
+      case Some(hex) => scala.util.Try(BigInt(if hex.isEmpty then "0" else hex, 16)).toOption
       case None      => scala.util.Try(BigInt(trimmed)).toOption
-    }
-  }
 
   // ---- Bytes32 ----
   val Bytes32Type: ScalarType[ByteString] = ScalarType[ByteString](
@@ -147,4 +143,3 @@ object GraphQLScalars {
     },
     coerceOutput = (n, _) => toHexLong(n)
   )
-}

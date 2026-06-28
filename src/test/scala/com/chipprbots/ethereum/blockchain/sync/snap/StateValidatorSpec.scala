@@ -2,18 +2,20 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 
 import org.apache.pekko.util.ByteString
 
+import scala.collection.mutable
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain.{Account, UInt256}
-import com.chipprbots.ethereum.mpt._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.testing.Tags.*
 
-import scala.collection.mutable
-
-class StateValidatorSpec extends AnyFlatSpec with Matchers {
+class StateValidatorSpec extends AnyFlatSpec with Matchers:
 
   "StateValidator" should "validate a complete account trie with no missing nodes" taggedAs UnitTest in {
     // Create a simple in-memory storage
@@ -54,14 +56,13 @@ class StateValidatorSpec extends AnyFlatSpec with Matchers {
     val validator = new StateValidator(incompleteStorage)
     val result = validator.validateAccountTrie(stateRoot)
 
-    result match {
+    result match
       case Right(_) =>
         // Should detect the root node as missing
         fail("Expected error for missing root, but got Right with nodes")
       case Left(error) =>
         // Expected - root node is missing
         error should (include("Missing").or(include("Failed")))
-    }
   }
 
   it should "validate storage tries for all accounts" taggedAs UnitTest in {
@@ -70,7 +71,7 @@ class StateValidatorSpec extends AnyFlatSpec with Matchers {
     // Create storage trie first
     val storageTrie = MerklePatriciaTrie[ByteString, ByteString](storage)
       .put(ByteString("slot1"), ByteString("value1"))
-    val storageRoot = ByteString(storageTrie.getRootHash)
+    val storageRoot = TrieRoot(ByteString(storageTrie.getRootHash))
 
     // Create account with matching storage root
     val account = Account(
@@ -168,14 +169,14 @@ class StateValidatorSpec extends AnyFlatSpec with Matchers {
     val account1 = Account(
       nonce = 1,
       balance = 100,
-      storageRoot = storage1Root,
+      storageRoot = TrieRoot(storage1Root),
       codeHash = Account.EmptyCodeHash
     )
 
     val account2 = Account(
       nonce = 2,
       balance = 200,
-      storageRoot = missingStorageRoot,
+      storageRoot = TrieRoot(missingStorageRoot),
       codeHash = Account.EmptyCodeHash
     )
 
@@ -189,46 +190,42 @@ class StateValidatorSpec extends AnyFlatSpec with Matchers {
     val result = validator.validateAllStorageTries(stateRoot)
 
     // Should detect the missing storage root for account2
-    result match {
+    result match
       case Right(foundMissingNodes) =>
         foundMissingNodes should not be empty
         foundMissingNodes should contain(missingStorageRoot)
       case Left(foundError) =>
         fail(s"Expected to detect missing storage root, but got error: $foundError")
-    }
   }
 
   /** Simple in-memory test storage for MPT nodes */
-  private class TestMptStorage extends MptStorage {
+  private class TestMptStorage extends MptStorage:
     private val nodes = mutable.Map[ByteString, MptNode]()
 
-    override def get(key: Array[Byte]): MptNode = {
+    override def get(key: Array[Byte]): MptNode =
       val keyStr = ByteString(key)
       nodes
         .get(keyStr)
         .getOrElse {
           throw new MerklePatriciaTrie.MissingNodeException(keyStr)
         }
-    }
 
-    def putNode(node: MptNode): Unit = {
+    def putNode(node: MptNode): Unit =
       val hash = ByteString(node.hash)
       nodes(hash) = node
-    }
 
     override def updateNodesInStorage(
         newRoot: Option[MptNode],
         toRemove: Seq[MptNode]
-    ): Option[MptNode] = {
+    ): Option[MptNode] =
       // Store the new root and related nodes
       newRoot.foreach { root =>
         storeNodeRecursively(root)
       }
       newRoot
-    }
 
     private def storeNodeRecursively(node: MptNode): Unit =
-      node match {
+      node match
         case leaf: LeafNode =>
           putNode(leaf)
         case ext: ExtensionNode =>
@@ -241,10 +238,7 @@ class StateValidatorSpec extends AnyFlatSpec with Matchers {
           putNode(hash)
         case NullNode =>
         // Nothing to store
-      }
 
     override def persist(): Unit = {
       // No-op for in-memory storage
     }
-  }
-}

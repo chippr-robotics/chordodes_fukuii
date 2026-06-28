@@ -1,15 +1,16 @@
 package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
+
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 import Fixtures.blockchainConfig
 
@@ -18,12 +19,12 @@ import Fixtures.blockchainConfig
   * MCOPY copies memory within the EVM memory space. Parameters: dst (destination), src (source), size (bytes to copy)
   * Handles overlapping regions safely (load-then-store pattern).
   */
-class OlympiaMcopySpec extends AnyWordSpec with Matchers {
+class OlympiaMcopySpec extends AnyWordSpec with Matchers:
 
   val configPreOlympia: EvmConfig = EvmConfig.SpiralConfigBuilder(blockchainConfig)
   val configOlympia: EvmConfig = EvmConfig.OlympiaConfigBuilder(blockchainConfig)
 
-  object fxt {
+  object fxt:
     val ownerAddr: Address = Address(0xcafe)
     val callerAddr: Address = Address(0xca11)
 
@@ -132,7 +133,7 @@ class OlympiaMcopySpec extends AnyWordSpec with Matchers {
         header: BlockHeader,
         config: EvmConfig,
         startGas: BigInt = 1000000
-    ): ProgramContext[MockWorldState, MockStorage] = {
+    ): ProgramContext[MockWorldState, MockStorage] =
       val world = MockWorldState()
         .saveAccount(ownerAddr, Account(balance = UInt256(1000), nonce = 1))
         .saveCode(ownerAddr, code)
@@ -156,10 +157,8 @@ class OlympiaMcopySpec extends AnyWordSpec with Matchers {
         warmAddresses = Set(ownerAddr),
         warmStorage = Set.empty
       )
-    }
-  }
 
-  import fxt._
+  import fxt.*
 
   "MCOPY opcode (EIP-5656)" when {
 
@@ -226,4 +225,3 @@ class OlympiaMcopySpec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

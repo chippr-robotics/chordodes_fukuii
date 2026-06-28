@@ -1,160 +1,176 @@
 package com.chipprbots.ethereum.transactions
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Props
-import org.apache.pekko.dispatch.BoundedMessageQueueSemantics
-import org.apache.pekko.dispatch.RequiresMessageQueue
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions
 import com.chipprbots.ethereum.network.p2p.messages.Codes
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.AnnounceTransactions
-import com.chipprbots.ethereum.transactions.SignedTransactionsFilterActor.ProperSignedTransactions
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager.ProperSignedTransactions
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
-class SignedTransactionsFilterActor(pendingTransactionsManager: ActorRef, peerEventBus: ActorRef)
-    extends Actor
-    with ActorLogging
-    with RequiresMessageQueue[BoundedMessageQueueSemantics] {
+object SignedTransactionsFilterActor:
 
-  implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
-  implicit private val ioRuntime: IORuntime = IORuntime.global
+  sealed trait Command
 
-  private val chunkedRecoveryThreshold = 256
-  private val recoveryChunkSize = SignedTransaction.batchSize
-  private var nextRecoveryId: Long = 0L
-  private var recoveries: Map[Long, SignedTransactionsFilterActor.RecoveryState] = Map.empty
+  // Inbound: a signed-transactions wire message from a peer, translated from PeerEvent by the message adapter
+  private[transactions] case class PeerSignedTransactions(txs: SignedTransactions, peerId: PeerId) extends Command
 
-  peerEventBus ! Subscribe(MessageClassifier(Set(Codes.SignedTransactionsCode), PeerSelector.AllPeers))
-
-  override def receive: Receive = {
-    case MessageFromPeer(SignedTransactions(newTransactions), peerId) =>
-      if (newTransactions.size >= chunkedRecoveryThreshold) {
-        val statelessValid = SignedTransactionWithSender.getStatelessValidTransactions(newTransactions)
-        if (statelessValid.nonEmpty)
-          pendingTransactionsManager ! AnnounceTransactions(statelessValid, peerId)
-        recoverLargeBatch(statelessValid, peerId)
-      } else {
-        recoverSmallBatch(newTransactions, peerId)
-      }
-
-    case SignedTransactionsFilterActor.RecoveredChunk(recoveryId, chunkIndex, transactions) =>
-      val updated = recoveries.get(recoveryId).map { state =>
-        state.copy(bufferedChunks = state.bufferedChunks.updated(chunkIndex, transactions))
-      }
-      updated.foreach { state =>
-        recoveries = recoveries.updated(recoveryId, state)
-        flushRecoveredChunks(recoveryId)
-      }
-
-    case SignedTransactionsFilterActor.RecoveryFailed(recoveryId, chunkIndex, reason) =>
-      log.debug("Failed to recover sender batch {} chunk {}: {}", recoveryId, chunkIndex, reason.toString)
-      self ! SignedTransactionsFilterActor.RecoveredChunk(recoveryId, chunkIndex, Set.empty)
-  }
-
-  private def recoverSmallBatch(
-      newTransactions: Seq[com.chipprbots.ethereum.domain.SignedTransaction],
-      peerId: PeerId
-  ): Unit =
-    IO {
-      SignedTransactionWithSender.getSignedTransactions(newTransactions).toSet
-    }.attempt
-      .map {
-        case Right(correctTransactions) =>
-          if (correctTransactions.nonEmpty)
-            pendingTransactionsManager ! ProperSignedTransactions(correctTransactions, peerId)
-        case Left(reason) =>
-          log.debug(
-            "Failed to recover {} signed transactions from peer {}: {}",
-            newTransactions.size,
-            peerId,
-            reason.toString
-          )
-      }
-      .unsafeRunAndForget()
-
-  private def recoverLargeBatch(
-      newTransactions: Seq[com.chipprbots.ethereum.domain.SignedTransaction],
-      peerId: PeerId
-  ): Unit = {
-    val chunks = newTransactions
-      .grouped(recoveryChunkSize)
-      .zipWithIndex
-      .map { case (chunk, index) =>
-        index -> chunk.toVector
-      }
-      .toVector
-    val recoveryId = nextRecoveryId
-    nextRecoveryId += 1
-    recoveries = recoveries.updated(
-      recoveryId,
-      SignedTransactionsFilterActor.RecoveryState(
-        peerId,
-        nextChunkToEmit = 0,
-        totalChunks = chunks.size,
-        Map.empty
-      )
-    )
-
-    val parallelism = math.min(Runtime.getRuntime.availableProcessors, chunks.size).max(1)
-    IO.parTraverseN(parallelism)(chunks) { case (chunkIndex, chunk) =>
-      IO {
-        val recovered = SignedTransactionWithSender.getSignedTransactionsSequential(chunk).toSet
-        self ! SignedTransactionsFilterActor.RecoveredChunk(recoveryId, chunkIndex, recovered)
-      }.handleErrorWith { reason =>
-        IO(self ! SignedTransactionsFilterActor.RecoveryFailed(recoveryId, chunkIndex, reason))
-      }
-    }.void
-      .unsafeRunAndForget()
-  }
-
-  private def flushRecoveredChunks(recoveryId: Long): Unit =
-    recoveries.get(recoveryId).foreach { initialState =>
-      var state = initialState
-      var keepGoing = true
-      while (keepGoing)
-        state.bufferedChunks.get(state.nextChunkToEmit) match {
-          case Some(transactions) =>
-            if (transactions.nonEmpty) pendingTransactionsManager ! ProperSignedTransactions(transactions, state.peerId)
-            state = state.copy(
-              nextChunkToEmit = state.nextChunkToEmit + 1,
-              bufferedChunks = state.bufferedChunks - state.nextChunkToEmit
-            )
-          case None =>
-            keepGoing = false
-        }
-
-      if (state.nextChunkToEmit >= state.totalChunks) recoveries -= recoveryId
-      else recoveries = recoveries.updated(recoveryId, state)
-    }
-}
-
-object SignedTransactionsFilterActor {
-  def props(pendingTransactionsManager: ActorRef, peerEventBus: ActorRef): Props =
-    Props(new SignedTransactionsFilterActor(pendingTransactionsManager, peerEventBus))
-
-  case class ProperSignedTransactions(signedTransactions: Set[SignedTransactionWithSender], peerId: PeerId)
-  private case class RecoveredChunk(
+  // Self-sends for chunked async recovery
+  private[transactions] case class RecoveredChunk(
       recoveryId: Long,
       chunkIndex: Int,
       transactions: Set[SignedTransactionWithSender]
-  )
-  private case class RecoveryFailed(recoveryId: Long, chunkIndex: Int, reason: Throwable)
-  private case class RecoveryState(
+  ) extends Command
+
+  private[transactions] case class RecoveryFailed(
+      recoveryId: Long,
+      chunkIndex: Int,
+      reason: Throwable
+  ) extends Command
+
+  case class RecoveryState(
       peerId: PeerId,
       nextChunkToEmit: Int,
       totalChunks: Int,
       bufferedChunks: Map[Int, Set[SignedTransactionWithSender]]
   )
-}
+
+  def apply(
+      pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
+      peerEventBus: ActorRef[PeerEventBusCommand]
+  ): Behavior[Command] = Behaviors.setup { context =>
+
+    given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+    given ioRuntime: IORuntime = IORuntime.global
+
+    val chunkedRecoveryThreshold = 256
+    val recoveryChunkSize = SignedTransaction.batchSize
+
+    var nextRecoveryId: Long = 0L
+    var recoveries: Map[Long, RecoveryState] = Map.empty
+
+    // Message adapter: bridges PeerEvent.MessageFromPeer → Typed Command.
+    // The Typed peerEventBus registers the subscriber as a TypedActorRef[PeerEvent].
+    val peerMsgAdapter: ActorRef[PeerEvent] =
+      context.messageAdapter[PeerEvent] {
+        case msg: MessageFromPeer =>
+          msg.message match
+            case txs: SignedTransactions => PeerSignedTransactions(txs, msg.peerId)
+            case _                       => PeerSignedTransactions(SignedTransactions(Nil), msg.peerId)
+        case e => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+      }
+
+    peerEventBus ! SubscribeCmd(
+      MessageClassifier(Set(Codes.SignedTransactionsCode), PeerSelector.AllPeers),
+      peerMsgAdapter
+    )
+
+    def recoverSmallBatch(newTransactions: Seq[SignedTransaction], peerId: PeerId): Unit =
+      IO {
+        SignedTransactionWithSender.getSignedTransactions(newTransactions).toSet
+      }.attempt
+        .map {
+          case Right(correctTransactions) =>
+            if correctTransactions.nonEmpty then
+              pendingTransactionsManager ! ProperSignedTransactions(correctTransactions, peerId)
+          case Left(reason) =>
+            context.log.debug(
+              "Failed to recover {} signed transactions from peer {}: {}",
+              newTransactions.size,
+              peerId,
+              reason.toString
+            )
+        }
+        .unsafeRunAndForget()
+
+    def recoverLargeBatch(newTransactions: Seq[SignedTransaction], peerId: PeerId): Unit =
+      val chunks = newTransactions
+        .grouped(recoveryChunkSize)
+        .zipWithIndex
+        .map { case (chunk, index) =>
+          index -> chunk.toVector
+        }
+        .toVector
+      val recoveryId = nextRecoveryId
+      nextRecoveryId += 1
+      recoveries = recoveries.updated(
+        recoveryId,
+        RecoveryState(
+          peerId,
+          nextChunkToEmit = 0,
+          totalChunks = chunks.size,
+          Map.empty
+        )
+      )
+
+      val parallelism = math.min(Runtime.getRuntime.availableProcessors, chunks.size).max(1)
+      IO.parTraverseN(parallelism)(chunks) { case (chunkIndex, chunk) =>
+        IO {
+          val recovered = SignedTransactionWithSender.getSignedTransactionsSequential(chunk).toSet
+          context.self ! RecoveredChunk(recoveryId, chunkIndex, recovered)
+        }.handleErrorWith { reason =>
+          IO(context.self ! RecoveryFailed(recoveryId, chunkIndex, reason))
+        }
+      }.void
+        .unsafeRunAndForget()
+
+    def flushRecoveredChunks(recoveryId: Long): Unit =
+      recoveries.get(recoveryId).foreach { initialState =>
+        var state = initialState
+        var keepGoing = true
+        while keepGoing do
+          state.bufferedChunks.get(state.nextChunkToEmit) match
+            case Some(transactions) =>
+              if transactions.nonEmpty then
+                pendingTransactionsManager ! ProperSignedTransactions(transactions, state.peerId)
+              state = state.copy(
+                nextChunkToEmit = state.nextChunkToEmit + 1,
+                bufferedChunks = state.bufferedChunks - state.nextChunkToEmit
+              )
+            case None =>
+              keepGoing = false
+
+        if state.nextChunkToEmit >= state.totalChunks then recoveries -= recoveryId
+        else recoveries = recoveries.updated(recoveryId, state)
+      }
+
+    Behaviors.receiveMessage {
+      case PeerSignedTransactions(SignedTransactions(newTransactions), peerId) =>
+        if newTransactions.size >= chunkedRecoveryThreshold then
+          val statelessValid = SignedTransactionWithSender.getStatelessValidTransactions(newTransactions)
+          if statelessValid.nonEmpty then pendingTransactionsManager ! AnnounceTransactions(statelessValid, peerId)
+          recoverLargeBatch(statelessValid, peerId)
+        else recoverSmallBatch(newTransactions, peerId)
+        Behaviors.same
+
+      case RecoveredChunk(recoveryId, chunkIndex, transactions) =>
+        val updated = recoveries.get(recoveryId).map { state =>
+          state.copy(bufferedChunks = state.bufferedChunks.updated(chunkIndex, transactions))
+        }
+        updated.foreach { state =>
+          recoveries = recoveries.updated(recoveryId, state)
+          flushRecoveredChunks(recoveryId)
+        }
+        Behaviors.same
+
+      case RecoveryFailed(recoveryId, chunkIndex, reason) =>
+        context.log.debug("Failed to recover sender batch {} chunk {}: {}", recoveryId, chunkIndex, reason.toString)
+        context.self ! RecoveredChunk(recoveryId, chunkIndex, Set.empty)
+        Behaviors.same
+    }
+  }

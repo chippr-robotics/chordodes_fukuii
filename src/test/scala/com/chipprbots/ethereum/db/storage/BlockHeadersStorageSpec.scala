@@ -7,9 +7,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class BlockHeadersStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with ObjectGenerators {
+class BlockHeadersStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with ObjectGenerators:
 
   "BlockHeadersStorage" should {
 
@@ -18,7 +18,7 @@ class BlockHeadersStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
         val storage = new BlockHeadersStorage(EphemDataSource())
         val headers = blockHeaders.distinct
         val storagesUpdates = blockHeaders.foldLeft(storage.emptyBatchUpdate) { case (updates, blockHeader) =>
-          updates.and(storage.put(blockHeader.hash, blockHeader))
+          updates.and(storage.put(blockHeader.hash.value, blockHeader))
         }
         storagesUpdates.commit()
 
@@ -31,7 +31,7 @@ class BlockHeadersStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
         val storage = new BlockHeadersStorage(EphemDataSource())
         val headers = blockHeaders.distinct
         val storageInsertions = blockHeaders.foldLeft(storage.emptyBatchUpdate) { case (updates, blockHeader) =>
-          updates.and(storage.put(blockHeader.hash, blockHeader))
+          updates.and(storage.put(blockHeader.hash.value, blockHeader))
         }
         storageInsertions.commit()
 
@@ -42,17 +42,15 @@ class BlockHeadersStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
         val (toDelete, toLeave) = headers.splitAt(Gen.choose(0, headers.size).sample.get)
 
         val storageDeletions = toDelete.foldLeft(storage.emptyBatchUpdate) { case (updates, blockHeader) =>
-          updates.and(storage.remove(blockHeader.hash))
+          updates.and(storage.remove(blockHeader.hash.value))
         }
         storageDeletions.commit()
 
         checkIfIsInStorage(toLeave, storage)
-        toDelete.foreach(header => assert(storage.get(header.hash).isEmpty))
+        toDelete.foreach(header => assert(storage.get(header.hash.value).isEmpty))
       }
     }
   }
 
   def checkIfIsInStorage(headers: List[BlockHeader], totalStorage: BlockHeadersStorage): Unit =
-    headers.foreach(header => assert(totalStorage.get(header.hash).contains(header)))
-
-}
+    headers.foreach(header => assert(totalStorage.get(header.hash.value).contains(header)))

@@ -6,10 +6,10 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks
-import com.chipprbots.ethereum.vm.PrecompiledContracts._
+import com.chipprbots.ethereum.vm.PrecompiledContracts.*
 
 /** EIP-2537: BLS12-381 precompile execution behavioral tests.
   *
@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.vm.PrecompiledContracts._
   * `libeth_pairings` shared library is absent from the JVM.
   */
 // scalastyle:off line.size.limit
-class BLS12381PrecompileSpec extends AnyFlatSpec with Matchers {
+class BLS12381PrecompileSpec extends AnyFlatSpec with Matchers:
 
   import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
 
@@ -143,5 +143,4 @@ class BLS12381PrecompileSpec extends AnyFlatSpec with Matchers {
     BlsMapG1.gas(in, etc, eth) shouldBe BigInt(5500)
     BlsMapG2.gas(in, etc, eth) shouldBe BigInt(23800)
   }
-}
 // scalastyle:on line.size.limit

@@ -6,12 +6,12 @@ import cats.effect.IO
 
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 
-object EthUserService {
+object EthUserService:
   case class GetStorageAtRequest(address: Address, position: BigInt, block: BlockParam)
   case class GetStorageAtResponse(value: ByteString)
   case class GetCodeRequest(address: Address, block: BlockParam)
@@ -22,7 +22,6 @@ object EthUserService {
   case class GetTransactionCountResponse(value: BigInt)
   case class GetStorageRootRequest(address: Address, block: BlockParam)
   case class GetStorageRootResponse(storageRoot: ByteString)
-}
 
 class EthUserService(
     val blockchain: Blockchain,
@@ -30,9 +29,9 @@ class EthUserService(
     val mining: Mining,
     evmCodeStorage: EvmCodeStorage,
     configBuilder: BlockchainConfigBuilder
-) extends ResolveBlock {
-  import configBuilder._
-  import EthUserService._
+) extends ResolveBlock:
+  import configBuilder.*
+  import EthUserService.*
 
   def getCode(req: GetCodeRequest): ServiceResponse[GetCodeResponse] =
     IO {
@@ -40,9 +39,9 @@ class EthUserService(
         val world = InMemoryWorldStateProxy(
           evmCodeStorage,
           blockchain.getBackingMptStorage(block.header.number),
-          (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+          (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
           blockchainConfig.accountStartNonce,
-          block.header.stateRoot,
+          block.header.stateRoot.value,
           noEmptyAccounts = false,
           ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
         )
@@ -60,7 +59,7 @@ class EthUserService(
   def getStorageAt(req: GetStorageAtRequest): ServiceResponse[GetStorageAtResponse] =
     withAccount(req.address, req.block) { account =>
       GetStorageAtResponse(
-        blockchain.getAccountStorageAt(account.storageRoot, req.position, blockchainConfig.ethCompatibleStorage)
+        blockchain.getAccountStorageAt(account.storageRoot.value, req.position, blockchainConfig.ethCompatibleStorage)
       )
     }
 
@@ -71,7 +70,7 @@ class EthUserService(
 
   def getStorageRoot(req: GetStorageRootRequest): ServiceResponse[GetStorageRootResponse] =
     withAccount(req.address, req.block) { account =>
-      GetStorageRootResponse(account.storageRoot)
+      GetStorageRootResponse(account.storageRoot.value)
     }
 
   private def withAccount[T](address: Address, blockParam: BlockParam)(makeResponse: Account => T): ServiceResponse[T] =
@@ -79,12 +78,10 @@ class EthUserService(
       resolveBlock(blockParam)
         .map { case ResolvedBlock(block, _) =>
           blockchainReader
-            .getAccount(blockchainReader.getBestBranch(), address, block.header.number)
+            .getAccount(blockchainReader.getBestBranch, address, block.header.number)
             .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
         }
         .map(makeResponse)
     }.recover { case _: MissingNodeException =>
       Left(JsonRpcError.NodeNotFound)
     }
-
-}

@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.consensus.blocks
 
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -14,16 +14,18 @@ import com.chipprbots.ethereum.consensus.mining.MiningConfig
 import com.chipprbots.ethereum.consensus.mining.Protocol
 import com.chipprbots.ethereum.consensus.pow.blocks.Ommers
 import com.chipprbots.ethereum.consensus.pow.validators.MockedPowBlockHeaderValidator
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderGasLimitError
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.SignedTransaction
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Simulates the Spiral → Olympia gas limit transition for operators running the legacy 8M gasLimitTarget setting (e.g.
@@ -44,7 +46,7 @@ class SpiralToOlympiaGasTransitionSpec
     extends AnyWordSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val olympiaBlock: BigInt = BigInt(100)
 
@@ -74,7 +76,7 @@ class SpiralToOlympiaGasTransitionSpec
       gasLimit = gasLimit,
       gasUsed = 0,
       unixTimestamp = timestamp,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefEmpty
     )
@@ -87,12 +89,12 @@ class SpiralToOlympiaGasTransitionSpec
       timestamp: Long
   ): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      parentHash = parentHash,
+      parentHash = BlockHash(parentHash),
       number = number,
       gasLimit = gasLimit,
       gasUsed = 0,
       unixTimestamp = timestamp,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefPostOlympia(baseFee)
     )
@@ -110,12 +112,11 @@ class SpiralToOlympiaGasTransitionSpec
           staleThreshold = 7,
           recommitInterval = 0.seconds
         ),
-        new DifficultyCalculator {
+        new DifficultyCalculator:
           def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
               blockchainConfig: BlockchainConfig
-          ): BigInt = BigInt(1)
-        }
-      ) {
+          ): Difficulty = Difficulty(BigInt(1))
+      ):
     type X = Ommers
     override protected def newBlockBody(transactions: Seq[SignedTransaction], x: Ommers): BlockBody =
       BlockBody(transactions, Nil)
@@ -141,14 +142,13 @@ class SpiralToOlympiaGasTransitionSpec
 
     def calcGasLimit(parentGas: BigInt, blockNumber: BigInt)(implicit bc: BlockchainConfig): BigInt =
       calculateGasLimit(parentGas, blockNumber)
-  }
 
   "Spiral-to-Olympia gas transition (EIP-7935)" when {
 
     "operator has gasLimitTarget = 8M (legacy Spiral node config)" should {
 
       "keep gas flat at 8M for all pre-Olympia Spiral blocks" taggedAs (UnitTest, OlympiaTest, ConsensusTest) in {
-        for (blockNum <- Seq(BigInt(0), olympiaBlock - 10, olympiaBlock - 2, olympiaBlock - 1))
+        for blockNum <- Seq(BigInt(0), olympiaBlock - 10, olympiaBlock - 2, olympiaBlock - 1) do
           withClue(s"block $blockNum: ") {
             legacyMiner.calcGasLimit(SpiralGasLimit, blockNum) shouldBe SpiralGasLimit
           }
@@ -172,10 +172,9 @@ class SpiralToOlympiaGasTransitionSpec
         val threshold = OlympiaGasTarget * 99 / 100
         var gas = SpiralGasLimit
         var blocks = 0
-        while (gas < threshold && blocks < 10_000) {
+        while gas < threshold && blocks < 10_000 do
           gas = legacyMiner.calcGasLimit(gas, olympiaBlock + blocks)
           blocks += 1
-        }
         gas should be >= threshold
         blocks shouldBe 2055
         info(s"legacy 8M config → 99% of 60M in $blocks blocks (~${blocks * 13.0 / 3600.0}h at 13s/block)")
@@ -218,7 +217,7 @@ class SpiralToOlympiaGasTransitionSpec
           number = olympiaBlock,
           gasLimit = generatedGas,
           baseFee = InitialBaseFee,
-          parentHash = parent.hash,
+          parentHash = parent.hash.value,
           timestamp = 2000L
         )
         validate(child, parent) shouldBe Right(BlockHeaderValid)
@@ -234,7 +233,7 @@ class SpiralToOlympiaGasTransitionSpec
           number = olympiaBlock,
           gasLimit = StepOneGasLimit,
           baseFee = InitialBaseFee,
-          parentHash = spiralParent.hash,
+          parentHash = spiralParent.hash.value,
           timestamp = 2000L
         )
         val secondGas = legacyMiner.calcGasLimit(StepOneGasLimit, olympiaBlock + 1)
@@ -243,7 +242,7 @@ class SpiralToOlympiaGasTransitionSpec
           number = olympiaBlock + 1,
           gasLimit = secondGas,
           baseFee = expectedBaseFee,
-          parentHash = firstOlympia.hash,
+          parentHash = firstOlympia.hash.value,
           timestamp = 3000L
         )
         validate(secondOlympia, firstOlympia) shouldBe Right(BlockHeaderValid)
@@ -259,7 +258,7 @@ class SpiralToOlympiaGasTransitionSpec
           number = olympiaBlock,
           gasLimit = SpiralGasLimit * 2,
           baseFee = InitialBaseFee,
-          parentHash = parent.hash,
+          parentHash = parent.hash.value,
           timestamp = 2000L
         )
         validate(doubledGas, parent) shouldBe Left(HeaderGasLimitError)
@@ -306,5 +305,4 @@ class SpiralToOlympiaGasTransitionSpec
       }
     }
   }
-}
 // scalastyle:on magic.number

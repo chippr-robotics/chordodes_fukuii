@@ -8,19 +8,19 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.ECDSASignature
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.Block.BlockDec
-import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
-import com.chipprbots.ethereum.utils._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.*
 
-class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
+class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger:
 
   "StxLedger" should "correctly estimate minimum gasLimit to run transaction which throws" taggedAs (
     UnitTest,
     StateTest
-  ) in new ScenarioSetup {
+  ) in new ScenarioSetup:
 
     /** Transaction requires gasLimit equal to 121825, but actual gas used due to refund is equal 42907. Our
       * simulateTransaction properly estimates gas usage to 42907, but requires at least 121825 gas to make that
@@ -59,12 +59,11 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
 
     // Check if running with gasLimit < estimatedMinimum return error
     errorExecResult.vmError shouldBe defined
-  }
 
   it should "correctly estimate gasLimit for value transfer transaction" taggedAs (
     UnitTest,
     StateTest
-  ) in new ScenarioSetup {
+  ) in new ScenarioSetup:
     val transferValue = 2
 
     val tx: LegacyTransaction =
@@ -78,12 +77,11 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
       stxLedger.binarySearchGasEstimation(SignedTransactionWithSender(stx, fromAddress), genesisHeader, None)
 
     estimationResult shouldEqual executionResult.gasUsed
-  }
 
   it should "correctly simulate transaction on pending block when supplied prepared world" taggedAs (
     UnitTest,
     StateTest
-  ) in new ScenarioSetup {
+  ) in new ScenarioSetup:
     val transferValue = 2
 
     val tx: LegacyTransaction =
@@ -92,7 +90,7 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
     val stxFromAddress: SignedTransactionWithSender =
       SignedTransactionWithSender(SignedTransaction(tx, fakeSignature), fromAddress)
 
-    val newBlock: Block = genesisBlock.copy(header = block.header.copy(number = 1, parentHash = genesisHash))
+    val newBlock: Block = genesisBlock.copy(header = block.header.copy(number = 1, parentHash = BlockHash(genesisHash)))
 
     val preparedBlock: PreparedBlock =
       mining.blockPreparator.prepareBlock(
@@ -102,7 +100,8 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
         None
       )
     val preparedWorld: InMemoryWorldStateProxy = preparedBlock.updatedWorld
-    val header: BlockHeader = preparedBlock.block.header.copy(number = 1, stateRoot = preparedBlock.stateRootHash)
+    val header: BlockHeader =
+      preparedBlock.block.header.copy(number = 1, stateRoot = TrieRoot(preparedBlock.stateRootHash))
 
     /** All operations in `ledger.prepareBlock` are performed on ReadOnlyWorldStateProxy so there are no updates in
       * underlying storages, but StateRootHash returned by it `expect` this updates to be in storages. It leads to
@@ -118,20 +117,17 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
       stxLedger.simulateTransaction(stxFromAddress, header, Some(preparedWorld))
 
     result.vmError shouldBe None
-  }
 
   // migrated from old LedgerSpec
-  "binaryChop" should "properly find minimal required gas limit to execute transaction" in new BinarySimulationChopSetup {
+  "binaryChop" should "properly find minimal required gas limit to execute transaction" in new BinarySimulationChopSetup:
     testGasValues.foreach { minimumRequiredGas =>
       StxLedger.binaryChop[TxError](minimalGas, maximalGas)(
         mockTransaction(minimumRequiredGas)
       ) shouldEqual minimumRequiredGas
     }
-  }
-}
 
 // scalastyle:off magic.number line.size.limit
-trait ScenarioSetup extends EphemBlockchainTestSetup {
+trait ScenarioSetup extends EphemBlockchainTestSetup:
 
   implicit override lazy val blockchainConfig: BlockchainConfig = BlockchainConfig(
     forkBlockNumbers = ForkBlockNumbers.Empty.copy(
@@ -178,7 +174,7 @@ trait ScenarioSetup extends EphemBlockchainTestSetup {
     InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       blockchain.getBackingMptStorage(-1),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       UInt256.Zero,
       ByteString(MerklePatriciaTrie.EmptyRootHash),
       noEmptyAccounts = false,
@@ -231,15 +227,14 @@ trait ScenarioSetup extends EphemBlockchainTestSetup {
 
   val block: Block = someGenesisBlock.toBlock
   val genesisBlock: Block =
-    block.copy(header = block.header.copy(stateRoot = worldWithAccount.stateRootHash, gasLimit = 1000000))
-  val genesisHash: ByteString = genesisBlock.header.hash
+    block.copy(header = block.header.copy(stateRoot = TrieRoot(worldWithAccount.stateRootHash), gasLimit = 1000000))
+  val genesisHash: ByteString = genesisBlock.header.hash.value
   val genesisHeader: BlockHeader = genesisBlock.header
   val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesisHeader)
   val lastBlockGasLimit: BigInt = genesisBlock.header.gasLimit
 
   blockchainWriter
     .storeBlock(genesisBlock)
-    .and(blockchainWriter.storeReceipts(genesisHash, Nil))
-    .and(blockchainWriter.storeChainWeight(genesisHash, genesisWeight))
+    .and(blockchainWriter.storeReceipts(BlockHash(genesisHash), Nil))
+    .and(blockchainWriter.storeChainWeight(BlockHash(genesisHash), genesisWeight))
     .commit()
-}

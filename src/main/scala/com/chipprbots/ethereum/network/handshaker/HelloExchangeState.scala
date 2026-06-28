@@ -15,17 +15,16 @@ import com.chipprbots.ethereum.utils.ServerStatus
 
 case class HelloExchangeState(handshakerConfiguration: NetworkHandshakerConfiguration)
     extends InProgressState[PeerInfo]
-    with Logger {
+    with Logger:
 
-  import handshakerConfiguration._
+  import handshakerConfiguration.*
 
-  override def nextMessage: NextMessage = {
+  override def nextMessage: NextMessage =
     log.debug("RLPx connection established, sending Hello")
     NextMessage(
       messageToSend = createHelloMsg(),
       timeout = peerConfiguration.waitForHelloTimeout
     )
-  }
 
   override def applyResponseMessage: PartialFunction[Message, HandshakerState[PeerInfo]] = { case hello: Hello =>
     log.debug("Protocol handshake finished with peer ({})", hello)
@@ -70,7 +69,7 @@ case class HelloExchangeState(handshakerConfiguration: NetworkHandshakerConfigur
       negotiationResult.map(_.toString).getOrElse("NONE")
     )
 
-    negotiationResult match {
+    negotiationResult match
 
       case Some(Capability.ETH69) =>
         log.debug(
@@ -106,17 +105,15 @@ case class HelloExchangeState(handshakerConfiguration: NetworkHandshakerConfigur
           Config.supportedCapabilities.mkString(", ")
         )
         DisconnectedState(Disconnect.Reasons.IncompatibleP2pProtocolVersion)
-    }
   }
 
-  override def processTimeout: HandshakerState[PeerInfo] = {
+  override def processTimeout: HandshakerState[PeerInfo] =
     log.debug("Timeout while waiting for Hello")
     DisconnectedState(Disconnect.Reasons.TimeoutOnReceivingAMessage)
-  }
 
-  private def createHelloMsg(): Hello = {
+  private def createHelloMsg(): Hello =
     val nodeStatus = nodeStatusHolder.get()
-    val listenPort = nodeStatus.serverStatus match {
+    val listenPort = nodeStatus.serverStatus match
       case ServerStatus.Listening(address) => address.getPort
       case ServerStatus.NotListening =>
         log.debug(
@@ -124,7 +121,6 @@ case class HelloExchangeState(handshakerConfiguration: NetworkHandshakerConfigur
           Config.Network.Server.port
         )
         Config.Network.Server.port
-    }
     Hello(
       p2pVersion = HelloExchangeState.P2pVersion,
       clientId = Config.clientId,
@@ -132,11 +128,8 @@ case class HelloExchangeState(handshakerConfiguration: NetworkHandshakerConfigur
       listenPort = listenPort,
       nodeId = ByteString(nodeStatus.nodeId)
     )
-  }
-}
 
-object HelloExchangeState {
+object HelloExchangeState:
   // Allow p2pVersion to be configured via fukuii.network.peer.p2p-version.
   // Default remains 5 (Snappy-capable), but can be overridden per environment for investigations.
   lazy val P2pVersion: Int = Config.Network.peer.p2pVersion
-}

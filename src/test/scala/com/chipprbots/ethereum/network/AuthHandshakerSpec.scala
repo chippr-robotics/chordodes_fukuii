@@ -12,15 +12,15 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.network.rlpx.AuthHandshakeSuccess
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.network.rlpx.AuthResponseMessage
 import com.chipprbots.ethereum.network.rlpx.Secrets
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class AuthHandshakerSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
+class AuthHandshakerSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder:
 
   val remoteNodeKey = new AsymmetricCipherKeyPair(
     new ECPublicKeyParameters(
@@ -131,5 +131,3 @@ class AuthHandshakerSpec extends AnyFlatSpec with Matchers with SecureRandomBuil
     remoteSecrets.aes shouldBe thisSecrets.aes
     remoteSecrets.mac shouldBe thisSecrets.mac
   }
-
-}

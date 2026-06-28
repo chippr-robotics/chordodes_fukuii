@@ -1,8 +1,9 @@
 package com.chipprbots.ethereum.blockchain.data
 
-import java.io.{File, FileInputStream}
+import java.io.File
+import java.io.FileInputStream
 
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.Block.BlockDec
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockValidation
@@ -22,7 +23,7 @@ class ChainImporter(
     blockchainWriter: BlockchainWriter,
     blockExecution: BlockExecution,
     blockValidation: BlockValidation
-) extends Logger {
+) extends Logger:
 
   /** Import all blocks from an RLP chain file.
     *
@@ -31,100 +32,96 @@ class ChainImporter(
     * @return
     *   (imported, skipped, failed) counts
     */
-  def importChainFile(filePath: String)(implicit blockchainConfig: BlockchainConfig): (Int, Int, Int) = {
+  def importChainFile(filePath: String)(implicit blockchainConfig: BlockchainConfig): (Int, Int, Int) =
     val file = new File(filePath)
-    if (!file.exists()) {
+    if !file.exists() then
       log.warn(s"Chain import file not found: $filePath")
-      return (0, 0, 0)
-    }
+      (0, 0, 0)
+    else
+      val bytes = readFile(file)
+      log.info(s"Chain import: reading ${bytes.length} bytes from $filePath")
 
-    val bytes = readFile(file)
-    log.info(s"Chain import: reading ${bytes.length} bytes from $filePath")
+      val blocks = decodeBlocks(bytes)
+      log.info(s"Chain import: decoded ${blocks.size} blocks")
 
-    val blocks = decodeBlocks(bytes)
-    log.info(s"Chain import: decoded ${blocks.size} blocks")
+      if blocks.isEmpty then (0, 0, 0)
+      else
 
-    if (blocks.isEmpty) return (0, 0, 0)
-
-    // Log genesis vs first block's expected parent for debugging genesis mismatches
-    val genesisOpt = blockchainReader.getBlockHeaderByNumber(0)
-    genesisOpt.foreach { genesis =>
-      log.error(s"Chain import: genesis hash=${genesis.hashAsHexString}")
-      log.error(
-        s"Chain import: genesis stateRoot=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(genesis.stateRoot)}"
-      )
-      log.error(
-        s"Chain import: genesis difficulty=${genesis.difficulty}, gasLimit=${genesis.gasLimit}, extraData=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(genesis.extraData)}"
-      )
-    }
-    val firstBlock = blocks.head
-    log.error(
-      s"Chain import: block ${firstBlock.header.number} expects parent=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(firstBlock.header.parentHash)}"
-    )
-
-    var imported = 0
-    var skipped = 0
-    var failed = 0
-
-    for (block <- blocks) {
-      val blockNum = block.header.number
-      val blockHash = block.header.hash
-
-      // Skip if already imported
-      val alreadyExists = blockchainReader.getBlockHeaderByNumber(blockNum) match {
-        case Some(existing) if existing.hash == blockHash => true
-        case Some(existing) =>
-          log.warn(
-            s"Chain import: block $blockNum hash mismatch — " +
-              s"existing=${existing.hashAsHexString}, importing=${block.header.hashAsHexString}"
+        // Log genesis vs first block's expected parent for debugging genesis mismatches
+        val genesisOpt = blockchainReader.getBlockHeaderByNumber(0)
+        genesisOpt.foreach { genesis =>
+          log.error(s"Chain import: genesis hash=${genesis.hashAsHexString}")
+          log.error(
+            s"Chain import: genesis stateRoot=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(genesis.stateRoot.value)}"
           )
-          false
-        case None => false
-      }
-
-      if (alreadyExists) {
-        skipped += 1
-      } else {
-        importBlock(block) match {
-          case Right(receipts) =>
-            val parentWeight = blockchainReader
-              .getChainWeightByHash(block.header.parentHash)
-              .getOrElse(ChainWeight.zero)
-            val newWeight = parentWeight.increase(block.header)
-
-            // Block was fully validated and executed, including all transactions (blob ones
-            // included). Sidecars don't participate in the consensus state transition — they
-            // are network-layer attachments verified separately at gossip time. The hive
-            // consensus / consume-engine fixtures expect head to advance over blob blocks;
-            // mainnet ingestion uses Engine API + sidecar verification, not chain.rlp.
-            blockchainWriter.save(block, receipts, newWeight, saveAsBestBlock = true)
-            imported += 1
-
-            if (imported % 10 == 0 || blockNum == blocks.last.header.number) {
-              log.info(s"Chain import: block $blockNum imported ($imported/${blocks.size})")
-            }
-
-          case Left(error) =>
-            log.error(s"Chain import: block $blockNum failed — $error")
-            failed += 1
+          log.error(
+            s"Chain import: genesis difficulty=${genesis.difficulty}, gasLimit=${genesis.gasLimit}, extraData=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(genesis.extraData)}"
+          )
         }
-      }
-    }
+        val firstBlock = blocks.head
+        log.error(
+          s"Chain import: block ${firstBlock.header.number} expects parent=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(firstBlock.header.parentHash.value)}"
+        )
 
-    log.info(s"Chain import complete: $imported imported, $skipped skipped, $failed failed")
-    (imported, skipped, failed)
-  }
+        var imported = 0
+        var skipped = 0
+        var failed = 0
+
+        for block <- blocks do
+          val blockNum = block.header.number
+          val blockHash = block.header.hash
+
+          // Skip if already imported
+          val alreadyExists = blockchainReader.getBlockHeaderByNumber(blockNum) match
+            case Some(existing) if existing.hash == blockHash => true
+            case Some(existing) =>
+              log.warn(
+                s"Chain import: block $blockNum hash mismatch — " +
+                  s"existing=${existing.hashAsHexString}, importing=${block.header.hashAsHexString}"
+              )
+              false
+            case None => false
+
+          if alreadyExists then skipped += 1
+          else
+            importBlock(block) match
+              case Right(receipts) =>
+                val parentWeight = blockchainReader
+                  .getChainWeightByHash(block.header.parentHash)
+                  .getOrElse(ChainWeight.zero)
+                val newWeight = parentWeight.increase(block.header)
+
+                // Block was fully validated and executed, including all transactions (blob ones
+                // included). Sidecars don't participate in the consensus state transition — they
+                // are network-layer attachments verified separately at gossip time. The hive
+                // consensus / consume-engine fixtures expect head to advance over blob blocks;
+                // mainnet ingestion uses Engine API + sidecar verification, not chain.rlp.
+                blockchainWriter.save(block, receipts, newWeight, saveAsBestBlock = true)
+                blockchainReader.recordBlockDifficulty(block.header.difficulty)
+                imported += 1
+
+                if imported % 10 == 0 || blockNum == blocks.last.header.number then
+                  log.info(s"Chain import: block $blockNum imported ($imported/${blocks.size})")
+
+              case Left(error) =>
+                log.error(s"Chain import: block $blockNum failed — $error")
+                failed += 1
+
+        log.info(s"Chain import complete: $imported imported, $skipped skipped, $failed failed")
+        (imported, skipped, failed)
+      // else blocks.nonEmpty
+    // else file.exists
 
   private def importBlock(block: Block)(implicit blockchainConfig: BlockchainConfig): Either[Any, Seq[Receipt]] =
     // Validate header/body pre-execution (ommers, difficulty, nonce, withdrawals/blob fields, etc.),
     // then execute, then validate post-execution (gasUsed, receiptsRoot, stateRoot).
     // Invalid blocks are rejected and the previous chain head is preserved.
-    blockValidation.validateBlockBeforeExecution(block) match {
+    blockValidation.validateBlockBeforeExecution(block) match
       case Left(err) =>
         Left(s"pre-execution validation failed: $err")
       case Right(_) =>
         blockExecution.executeBlockNoValidation(block).flatMap { case (receipts, gasUsed, stateRootHash) =>
-          blockValidation.validateBlockAfterExecution(block, stateRootHash, receipts, gasUsed) match {
+          blockValidation.validateBlockAfterExecution(block, stateRootHash, receipts, gasUsed) match
             case Left(err) =>
               receipts.zipWithIndex.foreach { case (r, i) =>
                 log.error(s"Chain import: block ${block.header.number} tx[$i] cumulativeGas=${r.cumulativeGasUsed}")
@@ -132,37 +129,32 @@ class ChainImporter(
               Left(s"post-execution validation failed: $err")
             case Right(_) =>
               Right(receipts)
-          }
         }
-    }
 
   /** Decode concatenated RLP-encoded blocks from a byte array. */
-  private def decodeBlocks(data: Array[Byte]): Seq[Block] = {
+  private def decodeBlocks(data: Array[Byte]): Seq[Block] =
     val blocks = scala.collection.mutable.ArrayBuffer.empty[Block]
     var pos = 0
+    var aborted = false
 
-    while (pos < data.length)
-      try {
+    while pos < data.length && !aborted do
+      try
         val nextPos = nextElementIndex(data, pos)
         val blockBytes = data.slice(pos, nextPos)
         val block = blockBytes.toBlock
         blocks += block
         pos = nextPos
-      } catch {
+      catch
         case e: Exception =>
           log.error(s"Chain import: RLP decode error at byte offset $pos", e)
-          return blocks.toSeq // return what we decoded so far
-      }
+          aborted = true // stop the loop; return what we decoded so far
 
     blocks.toSeq
-  }
 
-  private def readFile(file: File): Array[Byte] = {
+  private def readFile(file: File): Array[Byte] =
     val fis = new FileInputStream(file)
-    try {
+    try
       val bytes = new Array[Byte](file.length().toInt)
       fis.read(bytes)
       bytes
-    } finally fis.close()
-  }
-}
+    finally fis.close()

@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
@@ -9,10 +9,13 @@ import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.blockchain.sync.snap.actors.Messages
+import com.chipprbots.ethereum.blockchain.sync.snap.actors.AccountRangeCoordinator
+import com.chipprbots.ethereum.blockchain.sync.snap.actors.ByteCodeCoordinator
+import com.chipprbots.ethereum.blockchain.sync.snap.actors.StorageRangeCoordinator
+import com.chipprbots.ethereum.blockchain.sync.snap.actors.TrieNodeHealingCoordinator
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.testing.PeerTestHelpers
 
 /** A controllable fake SNAP peer for unit and integration tests.
@@ -35,48 +38,45 @@ class SNAPFakePeer(
     storageRangesHandler: GetStorageRanges => Option[StorageRanges],
     byteCodesHandler: GetByteCodes => Option[ByteCodes],
     trieNodesHandler: GetTrieNodes => Option[TrieNodes]
-)(implicit system: ActorSystem) {
+)(implicit system: ActorSystem):
 
   val served: AtomicLong = new AtomicLong(0)
   val dropped: AtomicBoolean = new AtomicBoolean(false)
 
-  val probe: TestProbe = {
+  val probe: TestProbe =
     val p = TestProbe(peer.id.value + "-network-peer-manager")
-    p.setAutoPilot(new AutoPilot {
-      def run(sender: ActorRef, msg: Any): AutoPilot = {
-        if (dropped.get()) return this
-        msg match {
-          case NetworkPeerManagerActor.SendMessage(rawMsg, _) =>
-            rawMsg.underlyingMsg match {
-              case req: GetAccountRange =>
-                accountRangeHandler(req).foreach { resp =>
-                  sender ! Messages.AccountRangeResponseMsg(resp)
-                  served.incrementAndGet()
-                }
-              case req: GetStorageRanges =>
-                storageRangesHandler(req).foreach { resp =>
-                  sender ! Messages.StorageRangesResponseMsg(resp)
-                  served.incrementAndGet()
-                }
-              case req: GetByteCodes =>
-                byteCodesHandler(req).foreach { resp =>
-                  sender ! Messages.ByteCodesResponseMsg(resp)
-                  served.incrementAndGet()
-                }
-              case req: GetTrieNodes =>
-                trieNodesHandler(req).foreach { resp =>
-                  sender ! Messages.TrieNodesResponseMsg(resp)
-                  served.incrementAndGet()
-                }
-              case _ => // ignore unknown messages
-            }
-          case _ => // ignore non-SendMessage messages
-        }
-        this
-      }
-    })
+    p.setAutoPilot(
+      new AutoPilot:
+        def run(sender: ActorRef, msg: Any): AutoPilot =
+          if dropped.get() then return this
+          msg match
+            case NetworkPeerManagerActor.SendMessageCmd(rawMsg, _) =>
+              rawMsg.underlyingMsg match
+                case req: GetAccountRange =>
+                  accountRangeHandler(req).foreach { resp =>
+                    sender ! AccountRangeCoordinator.AccountRangeResponseMsg(resp)
+                    served.incrementAndGet()
+                  }
+                case req: GetStorageRanges =>
+                  storageRangesHandler(req).foreach { resp =>
+                    sender ! StorageRangeCoordinator.StorageRangesResponseMsg(resp)
+                    served.incrementAndGet()
+                  }
+                case req: GetByteCodes =>
+                  byteCodesHandler(req).foreach { resp =>
+                    sender ! ByteCodeCoordinator.ByteCodesResponseMsg(resp)
+                    served.incrementAndGet()
+                  }
+                case req: GetTrieNodes =>
+                  trieNodesHandler(req).foreach { resp =>
+                    sender ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(resp)
+                    served.incrementAndGet()
+                  }
+                case _ => // ignore unknown messages
+            case _ => // ignore non-SendMessage messages
+          this
+    )
     p
-  }
 
   def ref: ActorRef = probe.ref
 
@@ -85,9 +85,8 @@ class SNAPFakePeer(
 
   /** Reset drop state — allow peer to respond again (simulates reconnect). */
   def reconnect(): Unit = dropped.set(false)
-}
 
-object SNAPFakePeer {
+object SNAPFakePeer:
 
   /** Empty AccountRange with a boundary proof — indicates the range is complete (no accounts). */
   private val emptyBoundaryProof: Seq[ByteString] = Seq(ByteString(Array.fill(32)(0xab.toByte)))
@@ -143,8 +142,6 @@ object SNAPFakePeer {
       trieNodesHandler = trieNodesHandler
     )(system)
 
-  private def makePeer(id: String, system: ActorSystem): Peer = {
+  private def makePeer(id: String, system: ActorSystem): Peer =
     val probe = TestProbe(s"$id-peer-ref")(system)
     PeerTestHelpers.createTestPeer(id, probe.ref)
-  }
-}

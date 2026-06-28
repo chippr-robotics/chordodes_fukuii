@@ -18,18 +18,17 @@ import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
 import com.chipprbots.ethereum.db.storage.StateStorage.GenesisDataLoad
 import com.chipprbots.ethereum.db.storage.pruning.InMemoryPruning
 import com.chipprbots.ethereum.mpt.LeafNode
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.NodeCacheConfig
 
-class ReadOnlyNodeStorageSpec extends AnyFlatSpec with Matchers {
+class ReadOnlyNodeStorageSpec extends AnyFlatSpec with Matchers:
 
-  "ReadOnlyNodeStorage" should "not update dataSource" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  "ReadOnlyNodeStorage" should "not update dataSource" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     val readOnlyNodeStorage = archiveStateStorage.getReadOnlyStorage
     readOnlyNodeStorage.updateNodesInStorage(Some(newLeaf), Nil)
     dataSource.storage.size shouldEqual 0
-  }
 
-  it should "be able to persist to underlying storage when needed" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  it should "be able to persist to underlying storage when needed" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     val (nodeKey, _) = MptStorage.collapseNode(Some(newLeaf))._2.head
     val readOnlyNodeStorage = archiveStateStorage.getReadOnlyStorage
 
@@ -43,9 +42,8 @@ class ReadOnlyNodeStorageSpec extends AnyFlatSpec with Matchers {
     readOnlyNodeStorage.persist()
 
     dataSource.storage.size shouldEqual 1
-  }
 
-  it should "be able to persist to underlying storage when Genesis loading" in new TestSetup {
+  it should "be able to persist to underlying storage when Genesis loading" in new TestSetup:
     val (nodeKey, _) = MptStorage.collapseNode(Some(newLeaf))._2.head
     val readOnlyNodeStorage = cachedStateStorage.getReadOnlyStorage
 
@@ -60,22 +58,18 @@ class ReadOnlyNodeStorageSpec extends AnyFlatSpec with Matchers {
 
     cachedStateStorage.forcePersist(GenesisDataLoad) shouldEqual true
     dataSource.storage.size shouldEqual 1
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val newLeaf: LeafNode = LeafNode(ByteString(1), ByteString(1))
     val dataSource: EphemDataSource = EphemDataSource()
     val (archiveStateStorage, nodeStorage, cachedStorage) = StateStorage.createTestStateStorage(dataSource)
 
-    object TestCacheConfig extends NodeCacheConfig {
+    object TestCacheConfig extends NodeCacheConfig:
       override val maxSize: Long = 100
       override val maxHoldTime: FiniteDuration = FiniteDuration(10, TimeUnit.MINUTES)
-    }
     val lruCache = new LruCache[NodeHash, HeapEntry](TestCacheConfig)
     val newNodeStorage = new NodeStorage(dataSource)
     val testCache: Cache[NodeHash, NodeEncoded] = MapCache.createTestCache[NodeHash, NodeEncoded](10)
     val newCachedNodeStorage = new CachedNodeStorage(newNodeStorage, testCache)
 
     val cachedStateStorage: StateStorage = StateStorage(InMemoryPruning(10), newNodeStorage, lruCache)
-  }
-}

@@ -7,25 +7,26 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
 
-import MockWorldState._
+import MockWorldState.*
 import Fixtures.blockchainConfig
 
 // scalastyle:off method.length
-class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks {
+class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks:
 
   val config: EvmConfig = EvmConfig.ByzantiumConfigBuilder(blockchainConfig)
 
-  import config.feeSchedule._
+  import config.feeSchedule.*
 
   // scalastyle:off
-  object fxt {
+  object fxt:
     val fakeHeader: BlockHeader =
       BlockFixtures.ValidBlock.header.copy(number = blockchainConfig.constantinopleBlockNumber - 1)
     val addresWithRevert: Address = Address(10)
@@ -139,7 +140,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       REVERT
     )
 
-    val accountWithCode: ByteString => Account = code => Account.empty().withCode(kec256(code))
+    val accountWithCode: ByteString => Account = code => Account.empty().withCode(CodeHash(kec256(code)))
 
     val endowment: UInt256 = 123
     val initWorld: MockWorldState =
@@ -150,14 +151,14 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       .saveAccount(addresWithRevert, accountWithCode(revertProgram.code))
       .saveCode(addresWithRevert, revertProgram.code)
 
-    val createCode: Assembly = Assembly(initPart(contractCode.code.size).byteCode ++ contractCode.byteCode: _*)
+    val createCode: Assembly = Assembly(initPart(contractCode.code.size).byteCode ++ contractCode.byteCode*)
 
     val copyCodeGas: BigInt =
       G_copy * wordsForBytes(contractCode.code.size) + config.calcMemCost(0, 0, contractCode.code.size)
     val storeGas = G_sset
     def gasRequiredForInit(withHashCost: Boolean): BigInt = initPart(contractCode.code.size).linearConstGas(
       config
-    ) + copyCodeGas + storeGas + (if (withHashCost) G_sha3word * wordsForBytes(contractCode.code.size) else 0)
+    ) + copyCodeGas + storeGas + (if withHashCost then G_sha3word * wordsForBytes(contractCode.code.size) else 0)
     val depositGas: BigInt = config.calcCodeDepositCost(contractCode.code)
     def gasRequiredForCreation(withHashCost: Boolean): BigInt = gasRequiredForInit(withHashCost) + depositGas + G_create
 
@@ -180,7 +181,6 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       warmAddresses = Set.empty,
       warmStorage = Set.empty
     )
-  }
 
   case class CreateResult(
       context: PC = fxt.context,
@@ -189,32 +189,28 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       opcode: CreateOp,
       salt: UInt256 = UInt256.Zero,
       ownerAddress: Address = fxt.creatorAddr
-  ) {
+  ):
     val vm = new TestVM
     val env: ExecEnv = ExecEnv(context, ByteString.empty, ownerAddress)
 
     val mem: Memory = Memory.empty.store(0, createCode)
-    val stack: Stack = opcode match {
+    val stack: Stack = opcode match
       case CREATE  => Stack.empty().push(Seq[UInt256](createCode.size, 0, value))
       case CREATE2 => Stack.empty().push(Seq[UInt256](salt, createCode.size, 0, value))
-    }
     val stateIn: PS = ProgramState(vm, context, env).withStack(stack).withMemory(mem)
     val stateOut: PS = opcode.execute(stateIn)
 
     val world = stateOut.world
     val returnValue: UInt256 = stateOut.stack.pop()._1
-  }
 
-  def commonBehaviour(opcode: CreateOp): Unit = {
-    def newAccountAddress(code: ByteString = fxt.createCode.code) = opcode match {
+  def commonBehaviour(opcode: CreateOp): Unit =
+    def newAccountAddress(code: ByteString = fxt.createCode.code) = opcode match
       case CREATE  => fxt.initWorld.increaseNonce(fxt.creatorAddr).createAddress(fxt.creatorAddr)
       case CREATE2 => fxt.initWorld.create2Address(fxt.creatorAddr, fxt.salt, code)
-    }
 
-    val withHashCost = opcode match {
+    val withHashCost = opcode match
       case CREATE  => false
       case CREATE2 => true
-    }
 
     "initialization code executes normally" should {
       val result = CreateResult(opcode = opcode)
@@ -332,7 +328,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       }
 
       "consume correct gas" in {
-        result.stateOut.gasUsed shouldEqual G_create + (if (withHashCost)
+        result.stateOut.gasUsed shouldEqual G_create + (if withHashCost then
                                                           G_sha3word * wordsForBytes(fxt.contractCode.code.size)
                                                         else 0)
       }
@@ -350,7 +346,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       }
 
       "consume correct gas" in {
-        result.stateOut.gasUsed shouldEqual G_create + (if (withHashCost)
+        result.stateOut.gasUsed shouldEqual G_create + (if withHashCost then
                                                           G_sha3word * wordsForBytes(fxt.contractCode.code.size)
                                                         else 0)
       }
@@ -380,7 +376,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       val expectedGas = 61261
       val gasRequiredForInit = fxt.initWithSelfDestruct.linearConstGas(config) + G_newaccount
       val gasRequiredForCreation =
-        gasRequiredForInit + G_create + (if (withHashCost) G_sha3word * wordsForBytes(fxt.contractCode.code.size)
+        gasRequiredForInit + G_create + (if withHashCost then G_sha3word * wordsForBytes(fxt.contractCode.code.size)
                                          else 0)
 
       val context: PC = fxt.context.copy(startGas = 2 * gasRequiredForCreation, world = fxt.worldWithRevertProgram)
@@ -437,9 +433,9 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
 
       "result in an out of gas if the code is larger than the limit" in {
         val codeSize = maxCodeSize + 1
-        val largeContractCode = Assembly((0 until codeSize).map(_ => Assembly.OpCodeAsByteCode(STOP)): _*)
+        val largeContractCode = Assembly((0 until codeSize).map(_ => Assembly.OpCodeAsByteCode(STOP))*)
         val createCode =
-          Assembly(fxt.initPart(largeContractCode.code.size).byteCode ++ largeContractCode.byteCode: _*).code
+          Assembly(fxt.initPart(largeContractCode.code.size).byteCode ++ largeContractCode.byteCode*).code
         val call = CreateResult(context = context, createCode = createCode, opcode = opcode)
 
         call.stateOut.error shouldBe None
@@ -448,9 +444,9 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
 
       "not result in an out of gas if the code is smaller than the limit" in {
         val codeSize = maxCodeSize - 1
-        val largeContractCode = Assembly((0 until codeSize).map(_ => Assembly.OpCodeAsByteCode(STOP)): _*)
+        val largeContractCode = Assembly((0 until codeSize).map(_ => Assembly.OpCodeAsByteCode(STOP))*)
         val createCode =
-          Assembly(fxt.initPart(largeContractCode.code.size).byteCode ++ largeContractCode.byteCode: _*).code
+          Assembly(fxt.initPart(largeContractCode.code.size).byteCode ++ largeContractCode.byteCode*).code
         val call = CreateResult(context = context, createCode = createCode, opcode = opcode)
 
         call.stateOut.error shouldBe None
@@ -462,14 +458,19 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
     "account with non-empty code already exists" should {
 
       "fail to create contract" in {
-        val accountNonEmptyCode = Account(codeHash = ByteString("abc"))
+        val accountNonEmptyCode = Account(codeHash = CodeHash(ByteString("abc")))
 
-        val newAddress = newAccountAddress(accountNonEmptyCode.codeHash)
+        val newAddress = newAccountAddress(accountNonEmptyCode.codeHash.value)
 
         val world = fxt.initWorld.saveAccount(newAddress, accountNonEmptyCode)
         val context: PC = fxt.context.copy(world = world)
         val result =
-          CreateResult(context = context, opcode = opcode, salt = fxt.salt, createCode = accountNonEmptyCode.codeHash)
+          CreateResult(
+            context = context,
+            opcode = opcode,
+            salt = fxt.salt,
+            createCode = accountNonEmptyCode.codeHash.value
+          )
 
         result.returnValue shouldEqual UInt256.Zero
         result.world.getGuaranteedAccount(newAddress) shouldEqual accountNonEmptyCode
@@ -482,20 +483,23 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       "fail to create contract" in {
         val accountNonZeroNonce = Account(nonce = 1)
 
-        val newAddress = newAccountAddress(accountNonZeroNonce.codeHash)
+        val newAddress = newAccountAddress(accountNonZeroNonce.codeHash.value)
 
         val world = fxt.initWorld.saveAccount(newAddress, accountNonZeroNonce)
         val context: PC = fxt.context.copy(world = world)
         val result =
-          CreateResult(context = context, opcode = opcode, salt = fxt.salt, createCode = accountNonZeroNonce.codeHash)
+          CreateResult(
+            context = context,
+            opcode = opcode,
+            salt = fxt.salt,
+            createCode = accountNonZeroNonce.codeHash.value
+          )
 
         result.returnValue shouldEqual UInt256.Zero
         result.world.getGuaranteedAccount(newAddress) shouldEqual accountNonZeroNonce
         result.world.getCode(newAddress) shouldEqual ByteString.empty
       }
     }
-
-  }
 
   "CREATE" should {
     behave.like(commonBehaviour(CREATE))
@@ -574,5 +578,3 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       }
     }
   }
-
-}

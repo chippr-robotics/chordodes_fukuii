@@ -1,17 +1,18 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
+import org.apache.pekko.util.ByteString
+
 import scala.collection.mutable
 import scala.util.Random
-
-import org.apache.pekko.util.ByteString
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.mpt.{ByteArraySerializable, MerklePatriciaTrie}
+import com.chipprbots.ethereum.mpt.ByteArraySerializable
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
-import com.chipprbots.ethereum.testing.Tags._
 
 /** Tests for [[SnapHashTrie]] — the batching wrapper around [[StackTrie]].
   *
@@ -24,45 +25,41 @@ import com.chipprbots.ethereum.testing.Tags._
   *   - `reset` clears in-memory state cleanly,
   *   - root hashes still match the reference MPT for the same inputs.
   */
-class SnapHashTrieSpec extends AnyFlatSpec with Matchers {
+class SnapHashTrieSpec extends AnyFlatSpec with Matchers:
 
   // ---- helpers ----
 
   implicit private val byteArraySerializer: ByteArraySerializable[Array[Byte]] =
-    new ByteArraySerializable[Array[Byte]] {
+    new ByteArraySerializable[Array[Byte]]:
       def toBytes(input: Array[Byte]): Array[Byte] = input
       def fromBytes(bytes: Array[Byte]): Array[Byte] = bytes
-    }
 
   /** A recording `writeBatch` callback. Each invocation appends its batch to the list of recorded batches, and every
     * (hash, blob) pair is added to a cumulative map for later inspection.
     */
-  final private class RecordingWriter {
+  final private class RecordingWriter:
     val batches: mutable.ArrayBuffer[Seq[(ByteString, Array[Byte])]] = mutable.ArrayBuffer.empty
     val combined: mutable.LinkedHashMap[ByteString, Array[Byte]] = mutable.LinkedHashMap.empty
     var totalBytes: Long = 0L
 
-    val writeBatch: Seq[(ByteString, Array[Byte])] => Unit = { batch =>
+    val writeBatch: Seq[(ByteString, Array[Byte])] => Unit = batch =>
       batches += batch
       batch.foreach { case (h, b) =>
         combined += h -> b
         totalBytes += b.length
       }
-    }
-  }
 
   /** Build a reference MPT root for the given (key, value) pairs. */
-  private def referenceRoot(pairs: Seq[(Array[Byte], Array[Byte])]): Array[Byte] = {
+  private def referenceRoot(pairs: Seq[(Array[Byte], Array[Byte])]): Array[Byte] =
     var trie: MerklePatriciaTrie[Array[Byte], Array[Byte]] =
       MerklePatriciaTrie[Array[Byte], Array[Byte]](new TestMptStorage())
     pairs.foreach { case (k, v) => trie = trie.put(k, v) }
     trie.getRootHash
-  }
 
   private def sortByKey(pairs: Seq[(Array[Byte], Array[Byte])]): Seq[(Array[Byte], Array[Byte])] =
     pairs.sortWith { case ((a, _), (b, _)) => java.util.Arrays.compareUnsigned(a, b) < 0 }
 
-  private def generatedPairs(n: Int, seed: Long): Seq[(Array[Byte], Array[Byte])] = {
+  private def generatedPairs(n: Int, seed: Long): Seq[(Array[Byte], Array[Byte])] =
     val rng = new Random(seed)
     val raw = (0 until n).map { _ =>
       val k = new Array[Byte](32); rng.nextBytes(k)
@@ -70,7 +67,6 @@ class SnapHashTrieSpec extends AnyFlatSpec with Matchers {
       (k, v)
     }
     sortByKey(raw)
-  }
 
   // ---- empty trie ----
 
@@ -149,7 +145,8 @@ class SnapHashTrieSpec extends AnyFlatSpec with Matchers {
     w.pendingBatchCount shouldEqual 0
     // The bytes we observed before commit plus any already-flushed bytes must
     // equal the total bytes seen by the writer.
-    val alreadyFlushed = rec.batches.dropRight(if (rec.batches.nonEmpty) 1 else 0).flatten.map(_._2.length.toLong).sum
+    val alreadyFlushed =
+      rec.batches.dropRight(if rec.batches.nonEmpty then 1 else 0).flatten.map(_._2.length.toLong).sum
     val finalFlush = rec.batches.lastOption.map(_.map(_._2.length.toLong).sum).getOrElse(0L)
     (alreadyFlushed + finalFlush) shouldEqual rec.totalBytes
     beforeCommit should be <= rec.totalBytes
@@ -203,4 +200,3 @@ class SnapHashTrieSpec extends AnyFlatSpec with Matchers {
     an[IllegalArgumentException] should be thrownBy
       w.update(Array[Byte](0x10.toByte), "v2".getBytes)
   }
-}

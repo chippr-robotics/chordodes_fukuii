@@ -1,36 +1,30 @@
 package com.chipprbots.ethereum.utils
-
 import java.io.File
 import java.nio.file.Files
 
+import scala.compiletime.uninitialized
+
+import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.typesafe.config.ConfigFactory
+import com.chipprbots.ethereum.testing.Tags.*
 
-import com.chipprbots.ethereum.testing.Tags._
+class BlockchainsConfigSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach:
 
-class BlockchainsConfigSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach {
+  var tempDir: File = uninitialized
 
-  var tempDir: File = _
-
-  override def beforeEach(): Unit = {
+  override def beforeEach(): Unit =
     tempDir = Files.createTempDirectory("fukuii-test-chains").toFile
     tempDir.deleteOnExit()
-  }
 
   override def afterEach(): Unit =
-    if (tempDir != null && tempDir.exists()) {
-      deleteDirectory(tempDir)
-    }
+    if tempDir != null && tempDir.exists() then deleteDirectory(tempDir)
 
-  private def deleteDirectory(dir: File): Unit = {
-    if (dir.isDirectory) {
-      dir.listFiles().foreach(deleteDirectory)
-    }
+  private def deleteDirectory(dir: File): Unit =
+    if dir.isDirectory then dir.listFiles().foreach(deleteDirectory)
     dir.delete()
-  }
 
   "BlockchainsConfig" should "load built-in blockchain configurations" taggedAs (UnitTest) in {
     val config = ConfigFactory.parseString("""
@@ -343,4 +337,3 @@ class BlockchainsConfigSpec extends AnyFlatSpec with Matchers with BeforeAndAfte
     // Should not throw exception when directory doesn't exist
     noException should be thrownBy BlockchainsConfig(config)
   }
-}

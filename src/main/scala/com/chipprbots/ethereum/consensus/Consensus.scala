@@ -16,14 +16,12 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 /** This file documents the original interface that was designed at ETCM-1018 but implements a different one to be used
   * as a stepping stone to the new architecture still in progress
   */
-trait Consensus {
+trait Consensus:
   def evaluateBranch(
       block: NonEmptyList[Block]
   )(implicit blockExecutionScheduler: IORuntime, blockchainConfig: BlockchainConfig): IO[ConsensusResult]
 
-}
-
-object Consensus {
+object Consensus:
   /* This return type for consensus is probably overcomplicated for now because some information is needed
    * to keep the compatibility with the current code (particularly for the block queue handling), and be able
    * to translate the values to BlockImportResult.
@@ -62,4 +60,3 @@ object Consensus {
   case class ConsensusError(blockToEnqueue: List[Block], err: String) extends ConsensusResult
   case class ConsensusErrorDueToMissingNode(blockToEnqueue: List[Block], reason: MissingNodeException)
       extends ConsensusResult
-}

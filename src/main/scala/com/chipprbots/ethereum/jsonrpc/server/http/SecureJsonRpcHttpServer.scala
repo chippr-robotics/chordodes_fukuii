@@ -25,14 +25,14 @@ class SecureJsonRpcHttpServer(
     override val graphQLService: Option[GraphQLService] = None
 )(implicit val actorSystem: ActorSystem)
     extends JsonRpcHttpServer
-    with Logger {
+    with Logger:
 
-  def run(): Unit = {
-    implicit val ec: scala.concurrent.ExecutionContext = actorSystem.dispatcher
+  def run(): Unit =
+    given ec: scala.concurrent.ExecutionContext = actorSystem.dispatcher
 
     val maybeHttpsContext = getSSLContext().map(sslContext => ConnectionContext.httpsServer(sslContext))
 
-    maybeHttpsContext match {
+    maybeHttpsContext match
       case Right(httpsContext) =>
         val bindingResultF =
           Http(actorSystem).newServerAt(config.interface, config.port).enableHttps(httpsContext).bind(route)
@@ -44,8 +44,5 @@ class SecureJsonRpcHttpServer(
       case Left(error) =>
         log.error(s"Cannot start JSON HTTPS RPC server due to: $error")
         throw new IllegalStateException(error.reason)
-    }
-  }
 
   override def corsAllowedOrigins: HttpOriginMatcher = config.corsAllowedOrigins
-}

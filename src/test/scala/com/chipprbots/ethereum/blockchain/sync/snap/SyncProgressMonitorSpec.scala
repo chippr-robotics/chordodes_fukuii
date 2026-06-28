@@ -1,22 +1,15 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class SyncProgressMonitorSpec
-    extends TestKit(ActorSystem("SyncProgressMonitorSpec"))
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class SyncProgressMonitorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
-  override def afterAll(): Unit =
-    TestKit.shutdownActorSystem(system)
+  private val classicScheduler: org.apache.pekko.actor.Scheduler = system.classicSystem.scheduler
 
   // Regression for #1184 follow-up: SNAPSyncController never called
   // `updateEstimates(bytecodes = N)`, so `estimatedTotalBytecodes` stayed at 0 and the dashboard's
@@ -27,7 +20,7 @@ class SyncProgressMonitorSpec
   // `SyncProgressMonitor` side of that contract so a future refactor can't silently revert it.
   "SyncProgressMonitor.updateEstimates" should
     "set estimatedTotalBytecodes from the bytecodes argument" taggedAs UnitTest in {
-      val monitor = new SyncProgressMonitor(system.scheduler)
+      val monitor = new SyncProgressMonitor(classicScheduler)
 
       monitor.currentProgress.estimatedTotalBytecodes shouldBe 0L
       monitor.updateEstimates(bytecodes = 12_500L)
@@ -35,7 +28,7 @@ class SyncProgressMonitorSpec
     }
 
   it should "honour the running-total contract: a larger update overrides the previous estimate" taggedAs UnitTest in {
-    val monitor = new SyncProgressMonitor(system.scheduler)
+    val monitor = new SyncProgressMonitor(classicScheduler)
 
     monitor.updateEstimates(bytecodes = 1_000L)
     monitor.currentProgress.estimatedTotalBytecodes shouldBe 1_000L
@@ -48,7 +41,7 @@ class SyncProgressMonitorSpec
   }
 
   it should "ignore a zero-or-negative update so callers can pass `accounts = 0` while updating bytecodes" taggedAs UnitTest in {
-    val monitor = new SyncProgressMonitor(system.scheduler)
+    val monitor = new SyncProgressMonitor(classicScheduler)
 
     monitor.updateEstimates(accounts = 7_000L, bytecodes = 0L, slots = 0L)
     monitor.updateEstimates(bytecodes = 3_000L)
@@ -62,7 +55,7 @@ class SyncProgressMonitorSpec
     // The dashboard formula is `100 * downloaded / clamp_min(estimated, 1)`. Before the fix,
     // `estimated` was 0 → clamp_min picks 1 → `100 * 52395 / 1 = 5,239,500`. After the fix the
     // estimate is real, so the percentage stays sane.
-    val monitor = new SyncProgressMonitor(system.scheduler)
+    val monitor = new SyncProgressMonitor(classicScheduler)
     monitor.updateEstimates(bytecodes = 100_000L)
     monitor.incrementBytecodesDownloaded(52_395L)
 
@@ -71,4 +64,3 @@ class SyncProgressMonitorSpec
 
     percentDouble shouldBe 52.395 +- 0.01
   }
-}

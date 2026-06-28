@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.network.handshaker
 
 import cats.effect.SyncIO
 
-import com.chipprbots.ethereum.forkid.Connect
+import com.chipprbots.ethereum.forkid.ForkIdValidationResult.Connect
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.forkid.ForkIdValidator
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
@@ -30,10 +30,10 @@ case class EthNodeStatus69ExchangeState(
     supportsSnap: Boolean = false,
     peerCapabilities: List[Capability] = List.empty,
     clientId: String = ""
-) extends NodeStatusExchangeState[ETHPackets.Status69.Status69] {
+) extends NodeStatusExchangeState[ETHPackets.Status69.Status69]:
 
-  import ETHPackets.Status69.Status69._ // toBytes for createStatusMsg
-  import handshakerConfiguration._
+  import ETHPackets.Status69.Status69.* // toBytes for createStatusMsg
+  import handshakerConfiguration.*
 
   def applyResponseMessage: PartialFunction[Message, HandshakerState[PeerInfo]] = {
     // ETH69MessageDecoder path: ETHPackets.Status69 (Phase 2b)
@@ -69,7 +69,7 @@ case class EthNodeStatus69ExchangeState(
       earliestBlock: BigInt,
       latestBlock: BigInt,
       latestBlockHash: org.apache.pekko.util.ByteString
-  ): HandshakerState[PeerInfo] = {
+  ): HandshakerState[PeerInfo] =
     import ForkIdValidator.syncIoLogger
     log.debug(
       "ETH69_STATUS: Received - protocolVersion={}, networkId={}, genesis={}, forkId={}, earliest={}, latest={}, latestHash={}",
@@ -82,32 +82,31 @@ case class EthNodeStatus69ExchangeState(
       latestBlockHash
     )
 
-    val localGenesisHash = blockchainReader.genesisHeader.hash
+    val localGenesisHash = blockchainReader.genesisHeader.hash.value
 
-    if (networkId != peerConfiguration.networkId) {
+    if networkId != peerConfiguration.networkId then
       log.debug(
         "ETH69_STATUS: NetworkId mismatch! Local: {}, Remote: {} - disconnecting",
         peerConfiguration.networkId,
         networkId
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else if (genesisHash != localGenesisHash) {
+    else if genesisHash != localGenesisHash then
       log.debug(
         "ETH69_STATUS: Genesis hash mismatch! Local: {}, Remote: {} - disconnecting",
         localGenesisHash,
         genesisHash
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else {
-      (for {
-        validationResult <-
-          ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash, blockchainConfig)(
-            blockchainReader.getBestBlockNumber(),
+    else
+      (for validationResult <-
+          ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash.value, blockchainConfig)(
+            blockchainReader.getBestBlockNumber,
             forkId
           )
-      } yield {
+      yield
         log.debug("ETH69_STATUS: ForkId validation result: {}", validationResult)
-        validationResult match {
+        validationResult match
           case Connect =>
             log.info("ETH69_STATUS: ForkId validation passed - accepting peer")
             val (resolvedChainWeight, resolvedSource) = blockchainReader.resolveETH69ChainWeight(
@@ -139,19 +138,16 @@ case class EthNodeStatus69ExchangeState(
           case other =>
             log.debug("ETH69_STATUS: ForkId validation failed: {} - disconnecting", other)
             DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-        }
-      }).unsafeRunSync()
-    }
-  }
+      ).unsafeRunSync()
 
-  override protected def createStatusMsg(): MessageSerializable = {
+  override protected def createStatusMsg(): MessageSerializable =
     val bestBlockHeader = getBestBlockHeader()
-    val bestBlockNumber = blockchainReader.getBestBlockNumber()
-    val genesisHash = blockchainReader.genesisHeader.hash
+    val bestBlockNumber = blockchainReader.getBestBlockNumber
+    val genesisHash = blockchainReader.genesisHeader.hash.value
 
     // Compute ForkId from current block (same as ETH64-68)
     val forkIdTimestamp =
-      if (bestBlockHeader.unixTimestamp == 0L) System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
+      if bestBlockHeader.unixTimestamp == 0L then System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
     val forkId = ForkId.create(genesisHash, blockchainConfig)(bestBlockNumber, forkIdTimestamp)
 
     // ETH/69: no TD, use block range instead. Use ETHPackets.Status69.Status69 (canonical type).
@@ -162,7 +158,7 @@ case class EthNodeStatus69ExchangeState(
       forkId = forkId,
       earliestBlock = BigInt(0), // Full archive node
       latestBlock = bestBlockNumber,
-      latestBlockHash = bestBlockHeader.hash
+      latestBlockHash = bestBlockHeader.hash.value
     )
 
     log.debug(
@@ -176,5 +172,3 @@ case class EthNodeStatus69ExchangeState(
     )
 
     status
-  }
-}

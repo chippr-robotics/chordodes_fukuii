@@ -8,7 +8,8 @@ import scala.util.Success
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.domain.CodeHash
+import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.mpt.MptVisitors.PathTrackingLeafWalkVisitor
 
 /** Single-pass post-SNAP recovery scan: ONE walk of the account trie that checks BOTH the contract bytecode
@@ -29,7 +30,7 @@ final class CombinedRecoveryScan(
     // live scan-progress gauges; default no-op keeps the unit tests metric-free. Must be cheap + thread-safe (it runs
     // inside parallel shard walks).
     onAccount: Boolean => Unit = _ => ()
-) {
+):
 
   private val seenCodeHashes = mutable.HashSet.empty[ByteString]
   private val seenStorageRoots = mutable.HashSet.empty[ByteString]
@@ -40,24 +41,19 @@ final class CombinedRecoveryScan(
     * (keccak256(address)); `leaf` carries the RLP-encoded [[Account]].
     */
   def onLeaf(accountHash: ByteString, leaf: LeafNode): Unit =
-    Account(leaf.value) match {
+    Account(leaf.value) match
       case Success(account) =>
         // Bytecode: a contract whose code is referenced but absent from EvmCodeStorage.
-        if (account.codeHash != Account.EmptyCodeHash && seenCodeHashes.add(account.codeHash)) {
-          if (evmCodeStorage.get(account.codeHash).isEmpty) missingCode += account.codeHash
-        }
+        if account.codeHash != Account.EmptyCodeHash && seenCodeHashes.add(account.codeHash.value) then
+          if evmCodeStorage.get(account.codeHash.value).isEmpty then missingCode += account.codeHash.value
         // Storage: a contract whose storage-root node is referenced but absent from MptStorage.
         val isContract = account.storageRoot != Account.EmptyStorageRootHash
-        if (isContract && seenStorageRoots.add(account.storageRoot)) {
-          try {
+        if isContract && seenStorageRoots.add(account.storageRoot.value) then
+          try
             val _ = mptStorage.get(account.storageRoot.toArray)
-          } catch {
-            case _: MerklePatriciaTrie.MPTException => missingStorage += ((accountHash, account.storageRoot))
-          }
-        }
+          catch case _: MerklePatriciaTrie.MPTException => missingStorage += ((accountHash, account.storageRoot.value))
         onAccount(isContract)
       case _ => () // skip malformed account RLP, as both legacy scans do
-    }
 
   /** Walk the whole account trie at `rootHash` (resolving the root via storage). */
   def scanFrom(rootHash: ByteString): Unit =
@@ -73,4 +69,3 @@ final class CombinedRecoveryScan(
   def missingBytecodes: Seq[ByteString] = missingCode.toSeq
 
   def missingStorageTries: Seq[(ByteString, ByteString)] = missingStorage.toSeq
-}

@@ -1,3 +1,4 @@
+# loop: invoked_by=[discover] applicable_recipes=[warning-ratchet]
 ---
 name: fukuii-dependency-audit
 description: >-
@@ -60,6 +61,22 @@ Read `/media/dev/2tb/dev/claude-global-settings/rules/lts-versions.md`.
 Note any divergence between what Fukuii pins and what the global LTS file says
 is current. If lts-versions.md is stale, update it as a separate edit (not a
 Fukuii commit — it lives in a different repo).
+
+## Reference repos
+
+After running `sbt dependencyUpdates`, cross-reference the Scala 3 compiler changelog for deprecations not yet surfaced by sbt:
+
+```bash
+REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
+git -C "$REFS/scala3" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
+# Then review: ls "$REFS/scala3/changelogs/"
+```
+
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| scala3 | https://github.com/scala/scala3 | `changelogs/` for compiler-level deprecations that affect project dependencies — cross-reference against what `sbt dependencyUpdates` surfaces |
+
+Full index: [`.claude/skills/REFERENCES.md`](../REFERENCES.md)
 
 ## Decision guide
 

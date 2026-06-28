@@ -11,26 +11,31 @@ import org.json4s.JObject
 import org.json4s.JString
 import org.scalamock.scalatest.AsyncMockFactory
 
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.SpecFixtures
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsResponse
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
 import com.chipprbots.ethereum.utils.Config
 
-class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory with JRCMatchers {
+class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory with JRCMatchers:
   import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.formats
 
-  class Fixture extends ApisBuilder {
+  class Fixture extends ApisBuilder:
     def config: JsonRpcConfig = JsonRpcConfig(Config.config, available)
 
     val web3Service: Web3Service = mock[Web3Service]
     // MIGRATION: Scala 3 mock cannot infer AtomicReference type parameter - create real instance
     implicit val testSystem: org.apache.pekko.actor.ActorSystem =
       org.apache.pekko.actor.ActorSystem("FukuiiJRCSpec-test")
+    implicit val scheduler: typed.Scheduler = testSystem.toTyped.scheduler
     val netService: NetService = new NetService(
       new java.util.concurrent.atomic.AtomicReference(
         com.chipprbots.ethereum.utils.NodeStatus(
@@ -39,7 +44,7 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
           com.chipprbots.ethereum.utils.ServerStatus.NotListening
         )
       ),
-      org.apache.pekko.testkit.TestProbe().ref,
+      org.apache.pekko.testkit.TestProbe().ref.toTyped[PeerManagerActor.Command],
       com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist.empty(100),
       com.chipprbots.ethereum.jsonrpc.NetService.NetServiceConfig(scala.concurrent.duration.DurationInt(5).seconds)
     )
@@ -55,7 +60,7 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
     val qaService: QAService = mock[QAService]
     val fukuiiService: FukuiiService = mock[FukuiiService]
     val mcpService: McpService = new McpService(
-      org.apache.pekko.testkit.TestProbe().ref,
+      org.apache.pekko.testkit.TestProbe().ref.toTyped[PeerManagerActor.Command],
       org.apache.pekko.testkit.TestProbe().ref,
       null,
       null,
@@ -85,20 +90,20 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
         null: TxPoolService,
         null: DebugTracingService,
         null: TraceService,
-        config
+        config,
+        testSystem
       )
 
-  }
   def createFixture() = new Fixture
 
   "Fukuii JRC" - {
     "should handle fukuii_getAccountTransactions" in testCaseM[IO] { fixture =>
-      import fixture._
+      import fixture.*
       val block = Fixtures.Blocks.Block3125369
       val sentTx = block.body.transactionList.head
       val receivedTx = block.body.transactionList.last
 
-      (fukuiiService.getAccountTransactions _)
+      fukuiiService.getAccountTransactions
         .expects(*)
         .returning(
           IO.pure(
@@ -161,9 +166,7 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
         )
       )
 
-      for {
-        response <- jsonRpcController.handleRequest(request)
-      } yield response should haveObjectResult("transactions" -> JArray(expectedTxs.toList))
+      for response <- jsonRpcController.handleRequest(request)
+      yield response should haveObjectResult("transactions" -> JArray(expectedTxs.toList))
     }
   }
-}

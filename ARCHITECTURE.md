@@ -35,7 +35,7 @@ fukuii/
 blockchain/sync/
 ├── SyncController.scala              # Top-level sync orchestrator (SNAP → Fast → Regular fallback)
 ├── AdaptiveSyncStrategy.scala        # Strategy selection with fallback chain
-├── PeersClient.scala                 # Peer request routing (ETH63/66/68, SNAP)
+├── PeersClient.scala                 # Peer request routing (ETH68/69/70, SNAP)
 ├── BlockchainHostActor.scala         # Serves blocks/state to remote peers
 ├── StorageRecoveryActor.scala        # Post-SNAP storage recovery (Bug 20)
 │
@@ -104,7 +104,7 @@ network/
 ├── handshaker/                       # ETH protocol handshake (version negotiation)
 ├── p2p/
 │   └── messages/
-│       ├── ETH.scala                 # ETH protocol messages (63/66/68)
+│       ├── ETH.scala                 # ETH protocol messages (68/69/70)
 │       └── SNAP.scala                # SNAP protocol messages (GetAccountRange, GetStorageRanges, etc.)
 └── rlpx/                             # RLPx encrypted transport
 ```
@@ -171,7 +171,9 @@ conf/
 │   ├── db.conf                       # RocksDB tuning
 │   └── logging.conf                  # Logback levels
 ├── etc.conf                          # ETC mainnet overrides
-└── mordor.conf                       # Mordor testnet overrides
+├── mordor.conf                       # Mordor testnet overrides
+├── eth.conf                          # ETH mainnet overrides
+└── sepolia.conf                      # Sepolia testnet overrides
 ```
 
 ## Deployment Environments (`ops/`)
@@ -182,8 +184,14 @@ ops/
 │   ├── docker-compose.yml            # Primary (ETC) + Secondary (Mordor) + Kong + Prometheus + Grafana
 │   ├── fukuii-conf-1/                # Primary node config (ETC mainnet)
 │   ├── fukuii-conf-2/                # Secondary node config (Mordor testnet)
+│   ├── eth/                          # ETH mainnet EL (Fukuii) + CL (Lighthouse) via Engine API
+│   │   ├── docker-compose.yml        # fukuii-eth + lighthouse-eth services
+│   │   └── fukuii-conf/              # ETH mainnet node config
+│   ├── sepolia/                      # Sepolia EL (Fukuii) + CL (Lighthouse) via Engine API
+│   │   ├── docker-compose.yml        # fukuii-sepolia + lighthouse services
+│   │   └── fukuii-conf/              # Sepolia node config
 │   ├── grafana/dashboards/           # Olympia Sync, Dark Lands Network, SNAP Sync, Main
-│   └── prometheus/                   # Scrape configs for both nodes
+│   └── prometheus/                   # Scrape configs for ETC, Mordor, and Sepolia nodes
 │
 ├── cirith-ungol/                     # Testing: single Fukuii + Core-Geth on real network
 │   ├── docker-compose.yml

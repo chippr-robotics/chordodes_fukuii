@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.proof
 
 import org.apache.pekko.util.ByteString
 
-import cats.syntax.either._
+import cats.syntax.either.*
 
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.NodeStorage
@@ -17,31 +17,28 @@ import com.chipprbots.ethereum.proof.ProofVerifyResult.InvalidProof
 import com.chipprbots.ethereum.proof.ProofVerifyResult.ValidProof
 
 sealed trait ProofVerifyResult
-object ProofVerifyResult {
+object ProofVerifyResult:
   case object ValidProof extends ProofVerifyResult
   case class InvalidProof(reason: MptProofError) extends ProofVerifyResult
-}
 
-object MptProofVerifier {
+object MptProofVerifier:
 
   def verifyProof[K, V](
       rootHash: Array[Byte],
       key: K,
       proof: Vector[MptNode]
-  )(implicit kSer: ByteArrayEncoder[K], vSer: ByteArraySerializable[V]): ProofVerifyResult = {
+  )(implicit kSer: ByteArrayEncoder[K], vSer: ByteArraySerializable[V]): ProofVerifyResult =
     val mptStore = mkStorage(proof)
     rebuildMpt(rootHash, mptStore)(kSer, vSer)
       .flatMap(trie => getKey(key, trie))
       .fold(InvalidProof.apply, _ => ValidProof)
-  }
 
-  private def mkStorage[V, K](proof: Vector[MptNode]): SerializingMptStorage = {
+  private def mkStorage[V, K](proof: Vector[MptNode]): SerializingMptStorage =
     val emptyStorage = new NodeStorage(EphemDataSource())
     val nodeStorage = proof.foldLeft(emptyStorage) { case (storage, node) =>
       storage.put(ByteString(node.hash), node.encode)
     }
     StateStorage.mptStorageFromNodeStorage(nodeStorage)
-  }
 
   private def rebuildMpt[V, K](rootHash: Array[Byte], storage: SerializingMptStorage)(implicit
       kSer: ByteArrayEncoder[K],
@@ -60,4 +57,3 @@ object MptProofVerifier {
     Either
       .catchNonFatal(trie.get(key))
       .leftMap(_ => MptProofError.KeyNotFoundInRebuidMpt)
-}

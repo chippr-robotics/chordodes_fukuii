@@ -8,9 +8,9 @@ import cats.Show
 import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.Temporal
-import cats.implicits._
+import cats.implicits.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.control.NoStackTrace
 import scala.util.control.NonFatal
 
@@ -85,7 +85,7 @@ object DiscoveryNetwork {
     new DiscoveryNetwork[A] with LazyLogging {
 
       import DiscoveryRPC.ENRSeq
-      import Payload._
+      import Payload.*
 
       private val expirationSeconds = config.messageExpiration.toSeconds
       private val maxClockDriftSeconds = config.maxClockDrift.toSeconds
@@ -108,7 +108,7 @@ object DiscoveryNetwork {
                 handleChannel(handler, channel, cancelToken)
                   .guarantee(release)
                   .recover {
-                    case ex: TimeoutException =>
+                    case _: TimeoutException =>
                     case ex: PacketException =>
                       logger.debug(s"Discovery packet decode failure from ${channel.to}: ${ex.getMessage}")
                     case NonFatal(ex) =>
@@ -423,7 +423,7 @@ object DiscoveryNetwork {
           
           responses
             .evalScan[IO, Either[Option[(Z, Int)], Option[(Z, Int)]]](Left(Some((seed, 0)))) {
-              case (Left(Some((acc, count))), Left(ex: TimeoutException)) if count > 0 =>
+              case (Left(Some((acc, count))), Left(_: TimeoutException)) if count > 0 =>
                 // We have a timeout but we already accumulated some results, so return those.
                 IO.pure(Right(Some((acc, count))))
 

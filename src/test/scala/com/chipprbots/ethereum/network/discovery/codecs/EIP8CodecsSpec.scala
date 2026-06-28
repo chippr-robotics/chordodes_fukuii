@@ -10,12 +10,12 @@ import org.scalatest.compatible.Assertion
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scodec.Codec
-import scodec.bits._
+import scodec.bits.*
 
 import com.chipprbots.ethereum.network.discovery.Secp256k1SigAlg
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class EIP8CodecsSpec extends AnyFlatSpec with Matchers {
+class EIP8CodecsSpec extends AnyFlatSpec with Matchers:
 
   import RLPCodecs.given
 
@@ -43,10 +43,9 @@ class EIP8CodecsSpec extends AnyFlatSpec with Matchers {
       |4be2be5a685a80971ddcfa80cb422cdd0101ec04cb847f000001820cfa8215a8d790000000000000
       |000000000000000000018208ae820d058443b9a3550102
       """.stripMargin,
-      payload => {
+      payload =>
         payload shouldBe a[Payload.Ping]
         payload.asInstanceOf[Payload.Ping].version shouldBe 4
-      }
     ),
     EIP8TestVector(
       "ping packet with version 555, additional list elements and additional random data",
@@ -60,10 +59,9 @@ class EIP8CodecsSpec extends AnyFlatSpec with Matchers {
       |7084a95398b6a21eac920fe3dd1345ec0a7ef39367ee69ddf092cbfe5b93e5e568ebc491983c09c7
       |6d922dc3
       """.stripMargin,
-      payload => {
+      payload =>
         payload shouldBe a[Payload.Ping]
         payload.asInstanceOf[Payload.Ping].version shouldBe 555
-      }
     ),
     EIP8TestVector(
       "pong packet with additional list elements and additional random data",
@@ -152,4 +150,3 @@ class EIP8CodecsSpec extends AnyFlatSpec with Matchers {
       publicKey2 shouldBe publicKey
     }
   }
-}

@@ -7,9 +7,9 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.ObjectGenerators
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class EphemDataSourceSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class EphemDataSourceSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
 
   val KeySize: Int = 32
   val KeyNumberLimit: Int = 40
@@ -69,4 +69,3 @@ class EphemDataSourceSuite extends AnyFunSuite with ScalaCheckPropertyChecks wit
       }
     }
   }
-}

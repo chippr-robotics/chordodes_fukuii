@@ -2,9 +2,10 @@ package com.chipprbots.ethereum.utils
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import com.chipprbots.ethereum.testing.Tags._
 
-class VersionInfoSpec extends AnyFlatSpec with Matchers {
+import com.chipprbots.ethereum.testing.Tags.*
+
+class VersionInfoSpec extends AnyFlatSpec with Matchers:
   behavior.of("nodeName")
 
   it should "match ethstats expected structure and preserve major and minor Java version" taggedAs (UnitTest) in {
@@ -18,4 +19,3 @@ class VersionInfoSpec extends AnyFlatSpec with Matchers {
     name should startWith("fukuii/chipprbots/v")
     name.count(_ == '/') shouldBe 4
   }
-}

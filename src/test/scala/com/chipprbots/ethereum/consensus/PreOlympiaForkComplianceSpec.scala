@@ -1,15 +1,15 @@
 package com.chipprbots.ethereum.consensus
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.EvmConfig
 import com.chipprbots.ethereum.vm.FeeSchedule
 import com.chipprbots.ethereum.vm.PUSH0
-import com.chipprbots.ethereum.testing.Tags._
 
 // scalastyle:off magic.number
 /** Verifies that each pre-Olympia ETC fork selects the correct EVM configuration (fee schedule, opcode list, and EIP
@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.testing.Tags._
   *
   * Reference: Besu ClassicProtocolSpecsTest (15 tests validating fork dispatch)
   */
-class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   /** Helper: create a BlockchainConfigForEvm with all forks at Long.MaxValue (inactive), then selectively activate
     * specific forks.
@@ -64,20 +64,18 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
       label = "select FrontierFeeSchedule for Frontier blocks",
       blockNumber = 0,
       configFn = _.copy(frontierBlockNumber = 0),
-      assertFn = evm => {
+      assertFn = evm =>
         evm.feeSchedule shouldBe a[FeeSchedule.FrontierFeeSchedule]
         evm.opCodeList shouldBe EvmConfig.FrontierOpCodes
-      }
     ),
     ForkCase(
       label = "select HomesteadFeeSchedule for Homestead blocks",
       blockNumber = 10,
       configFn = _.copy(frontierBlockNumber = 0, homesteadBlockNumber = 10),
-      assertFn = evm => {
+      assertFn = evm =>
         evm.feeSchedule shouldBe a[FeeSchedule.HomesteadFeeSchedule]
         evm.opCodeList shouldBe EvmConfig.HomesteadOpCodes
         evm.exceptionalFailedCodeDeposit shouldBe true
-      }
     ),
     ForkCase(
       label = "select AtlantisFeeSchedule for Atlantis blocks",
@@ -89,11 +87,10 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
         eip160BlockNumber = 30,
         atlantisBlockNumber = 100
       ),
-      assertFn = evm => {
+      assertFn = evm =>
         evm.feeSchedule shouldBe a[FeeSchedule.AtlantisFeeSchedule]
         evm.opCodeList shouldBe EvmConfig.AtlantisOpCodes
         evm.noEmptyAccounts shouldBe true
-      }
     ),
     ForkCase(
       label = "prefer Atlantis over Byzantium when both activated at same height",
@@ -103,10 +100,9 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
         byzantiumBlockNumber = 0,
         atlantisBlockNumber = 0
       ),
-      assertFn = evm => {
+      assertFn = evm =>
         evm.feeSchedule shouldBe a[FeeSchedule.AtlantisFeeSchedule]
         evm.opCodeList shouldBe EvmConfig.AtlantisOpCodes
-      }
     ),
     ForkCase(
       label = "select ConstantionopleFeeSchedule for Agharta blocks",
@@ -116,10 +112,9 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
         atlantisBlockNumber = 10,
         aghartaBlockNumber = 100
       ),
-      assertFn = evm => {
+      assertFn = evm =>
         evm.feeSchedule shouldBe a[FeeSchedule.ConstantionopleFeeSchedule]
         evm.opCodeList shouldBe EvmConfig.AghartaOpCodes
-      }
     ),
     ForkCase(
       label = "select PhoenixFeeSchedule for Phoenix blocks",
@@ -130,10 +125,9 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
         aghartaBlockNumber = 20,
         phoenixBlockNumber = 100
       ),
-      assertFn = evm => {
+      assertFn = evm =>
         evm.feeSchedule shouldBe a[FeeSchedule.PhoenixFeeSchedule]
         evm.opCodeList shouldBe EvmConfig.PhoenixOpCodes
-      }
     ),
     ForkCase(
       label = "select MagnetoFeeSchedule for Magneto blocks",
@@ -145,10 +139,9 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
         phoenixBlockNumber = 30,
         magnetoBlockNumber = 100
       ),
-      assertFn = evm => {
+      assertFn = evm =>
         evm.feeSchedule shouldBe a[FeeSchedule.MagnetoFeeSchedule]
         evm.opCodeList shouldBe EvmConfig.MagnetoOpCodes
-      }
     ),
     ForkCase(
       label = "select MystiqueFeeSchedule for Mystique blocks",
@@ -161,10 +154,9 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
         magnetoBlockNumber = 40,
         mystiqueBlockNumber = 100
       ),
-      assertFn = evm => {
+      assertFn = evm =>
         evm.feeSchedule shouldBe a[FeeSchedule.MystiqueFeeSchedule]
         evm.eip3541Enabled shouldBe true
-      }
     ),
     ForkCase(
       label = "select MystiqueFeeSchedule with Spiral opcodes for Spiral blocks",
@@ -178,14 +170,13 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
         mystiqueBlockNumber = 50,
         spiralBlockNumber = 100
       ),
-      assertFn = evm => {
+      assertFn = evm =>
         // Spiral uses MystiqueFeeSchedule (no new fee schedule class)
         evm.feeSchedule shouldBe a[FeeSchedule.MystiqueFeeSchedule]
         evm.opCodeList shouldBe EvmConfig.SpiralOpCodes
         evm.eip3651Enabled shouldBe true
         evm.eip3860Enabled shouldBe true
         evm.eip6049DeprecationEnabled shouldBe true
-      }
     )
   )
 
@@ -258,5 +249,4 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
     BlockchainConfigForEvm.isEip3855Enabled(EtcForks.Mystique) shouldBe false
     BlockchainConfigForEvm.isEip3855Enabled(EtcForks.Spiral) shouldBe true
   }
-}
 // scalastyle:on magic.number

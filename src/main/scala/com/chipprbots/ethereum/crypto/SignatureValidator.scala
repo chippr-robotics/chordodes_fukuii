@@ -12,16 +12,16 @@ import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
 // scalastyle:off regex
-object SignatureValidator extends App with SecureRandomBuilder with JsonMethodsImplicits {
+object SignatureValidator extends App with SecureRandomBuilder with JsonMethodsImplicits:
 
-  args match {
+  args match
     case Array(pk, sig, msgHash) =>
       Try {
         val signature = ECDSASignature.fromBytes(ByteStringUtils.string2hash(sig))
         val msg = ByteStringUtils.string2hash(msgHash)
 
         signature.flatMap(_.publicKey(msg))
-      } match {
+      } match
         case Failure(exception) =>
           System.err.println(
             s"Can't recover public key from signature [$sig] and msg [$msgHash]: ERROR: ${exception.getMessage}"
@@ -29,22 +29,19 @@ object SignatureValidator extends App with SecureRandomBuilder with JsonMethodsI
           sys.exit(1)
         case Success(recoveredPk) =>
           val publicKey = ByteStringUtils.string2hash(pk)
-          recoveredPk match {
+          recoveredPk match
             case Some(recoveredKey) =>
-              if (recoveredKey == publicKey) {
+              if recoveredKey == publicKey then
                 System.err.println(
                   s"Recovered public key [${ByteStringUtils.hash2string(recoveredKey)}] is the same as given one"
                 )
-              } else {
+              else
                 System.err.println(s"Recovered public key [${ByteStringUtils
                     .hash2string(recoveredKey)}] is different than given [${ByteStringUtils.hash2string(publicKey)}]")
                 sys.exit(1)
-              }
             case None =>
               System.err.println(s"Can't recover public key from signature [$sig] and msg [$msgHash]")
               sys.exit(1)
-          }
-      }
     case _ =>
       val keyPair = crypto.generateKeyPair(secureRandom)
       val pkStr = ByteStringUtils.hash2string(ByteString(crypto.pubKeyFromKeyPair(keyPair)))
@@ -56,5 +53,3 @@ object SignatureValidator extends App with SecureRandomBuilder with JsonMethodsI
         s"Bad Input. Example usage: [signature-validator publicKey signature message_hash]. Example: [signature-validator $pkStr $sigStr $hashStr]"
       )
       sys.exit(1)
-  }
-}

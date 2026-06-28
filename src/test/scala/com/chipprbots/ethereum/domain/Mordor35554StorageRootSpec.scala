@@ -6,7 +6,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.StateStorage
 
-class Mordor35554StorageRootSpec extends AnyFunSuite {
+class Mordor35554StorageRootSpec extends AnyFunSuite:
 
   test("EthereumUInt256Mpt storage root matches Core-Geth for Mordor block 35554") {
     // From Core-Geth (Mordor) eth_getProof at block 0x8ae2 for contract 0x2fae8a...fdb2e:
@@ -21,9 +21,8 @@ class Mordor35554StorageRootSpec extends AnyFunSuite {
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(dataSource)
     val mptStorage = stateStorage.getBackingStorage(0)
 
-    val storageTrie = EthereumUInt256Mpt.storageMpt(Account.EmptyStorageRootHash, mptStorage)
+    val storageTrie = EthereumUInt256Mpt.storageMpt(Account.EmptyStorageRootHash.value, mptStorage)
     val updated = storageTrie.put(key, value)
 
     assert(updated.getRootHash.sameElements(expectedStorageRoot))
   }
-}

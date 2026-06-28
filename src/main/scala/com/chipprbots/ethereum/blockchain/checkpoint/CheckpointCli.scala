@@ -3,15 +3,16 @@ package com.chipprbots.ethereum.blockchain.checkpoint
 import java.nio.file.Path
 import java.nio.file.Paths
 
-import scala.collection.immutable.ArraySeq
+import cats.implicits.*
 
-import cats.implicits._
+import scala.collection.immutable.ArraySeq
 
 import com.monovore.decline.Command
 import com.monovore.decline.Opts
 
 import com.chipprbots.ethereum.db.components.RocksDbDataSourceComponent
 import com.chipprbots.ethereum.db.components.Storages
+import com.chipprbots.ethereum.db.components.Storages.DefaultStorages
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.PruningConfigBuilder
@@ -31,7 +32,7 @@ import com.chipprbots.ethereum.utils.Logger
   * Without arguments or with `--block 0` the current best block is used. The chain is selected the same way the
   * launcher selects it for the node (positional argument, e.g. `etc` / `sepolia`).
   */
-object CheckpointCli extends Logger {
+object CheckpointCli extends Logger:
 
   private val blockOpt: Opts[Option[BigInt]] = Opts
     .option[BigInt]("block", "Block number to export. Defaults to the current best block.")
@@ -57,14 +58,14 @@ object CheckpointCli extends Logger {
     Opts.subcommand(exportCommand).map(Action.Export(_))
   )
 
-  def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit =
     val parsed = rootCommand.parse(ArraySeq.unsafeWrapArray(args), sys.env)
-    parsed match {
+    parsed match
       case Left(help) =>
-        System.err.println(help)
+        log.warn(help.toString)
         sys.exit(2)
       case Right(Action.Export(args)) =>
-        runExport(args) match {
+        runExport(args) match
           case Right(r) =>
             log.info(
               s"Exported block ${r.blockNumber} (nodes=${r.nodesExported}, bytecodes=${r.bytecodesExported}, elapsed=${r.elapsedMs / 1000}s)"
@@ -72,11 +73,8 @@ object CheckpointCli extends Logger {
           case Left(err) =>
             log.error(s"Export failed: $err")
             sys.exit(1)
-        }
-    }
-  }
 
-  private def runExport(args: ExportArgs): Either[CheckpointExporter.ExportError, CheckpointExporter.ExportResult] = {
+  private def runExport(args: ExportArgs): Either[CheckpointExporter.ExportError, CheckpointExporter.ExportResult] =
     val builder = new ExportBuilder
     val storages = builder.storagesInstance.storages
     val reader = BlockchainReader(storages)
@@ -96,32 +94,27 @@ object CheckpointCli extends Logger {
     // The CheckpointImporter also magic-byte-sniffs, but the conventional extension
     // makes the file self-describing for ops tooling.
     val output =
-      if (args.gzip && !args.output.toString.endsWith(".gz"))
+      if args.gzip && !args.output.toString.endsWith(".gz") then
         args.output.resolveSibling(args.output.getFileName.toString + ".gz")
       else args.output
-    if (output != args.output)
-      log.info(s"--gzip set, appending .gz: writing to $output")
+    if output != args.output then log.info(s"--gzip set, appending .gz: writing to $output")
     exporter.exportArchive(blockNumber, output, gzip = args.gzip)
-  }
 
   /** Minimal cake mix for read-only state access. No actors, no validators, no sync — just storage and
     * BlockchainConfig.
     */
-  final private class ExportBuilder extends InstanceConfigProvider with BlockchainConfigBuilder {
+  final private class ExportBuilder extends InstanceConfigProvider with BlockchainConfigBuilder:
     override def instanceConfig: InstanceConfig = Config
-    lazy val storagesInstance =
+    lazy val storagesInstance: RocksDbDataSourceComponent & InstanceConfigProvider & (PruningConfigBuilder &
+      DefaultStorages) =
       new RocksDbDataSourceComponent
         with PruningConfigBuilder
         with Storages.DefaultStorages
-        with InstanceConfigProvider {
+        with InstanceConfigProvider:
         override def instanceConfig: InstanceConfig = Config
-      }
-  }
 
   final private case class ExportArgs(block: Option[BigInt], output: Path, gzip: Boolean)
 
   sealed private trait Action
-  private object Action {
+  private object Action:
     final case class Export(args: ExportArgs) extends Action
-  }
-}

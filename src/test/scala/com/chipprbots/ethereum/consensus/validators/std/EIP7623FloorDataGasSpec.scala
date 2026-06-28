@@ -6,10 +6,10 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.ledger.BlockPreparator
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** EIP-7623: Verify floor data gas calculation. */
-class EIP7623FloorDataGasSpec extends AnyFlatSpec with Matchers {
+class EIP7623FloorDataGasSpec extends AnyFlatSpec with Matchers:
 
   "calcFloorDataGas" should "return 21000 for empty payload" taggedAs (OlympiaTest, ConsensusTest) in {
     BlockPreparator.calcFloorDataGas(ByteString.empty) shouldBe BigInt(21000)
@@ -38,4 +38,3 @@ class EIP7623FloorDataGasSpec extends AnyFlatSpec with Matchers {
     val payload = ByteString(new Array[Byte](1))
     BlockPreparator.calcFloorDataGas(payload) shouldBe BigInt(21010)
   }
-}

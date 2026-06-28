@@ -15,8 +15,8 @@ import com.chipprbots.ethereum.nodebuilder.TestNode
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Logger
 
-object Fukuii extends Logger {
-  def main(args: Array[String]): Unit = {
+object Fukuii extends Logger:
+  def main(args: Array[String]): Unit =
     LogManager.getLogManager().reset(); // disable java.util.logging, ie. in legacy parts of jupnp
 
     // Redirect all JVM temp files to the configured tmpdir (defaults to <datadir>/tmp).
@@ -35,22 +35,16 @@ object Fukuii extends Logger {
     val enableConsoleUI = args.contains("--tui")
 
     // Initialize TUI if enabled (using new TUI module)
-    val tui = if (enableConsoleUI) {
+    val tui = if enableConsoleUI then
       val tuiInstance = Tui.getInstance(TuiConfig.default)
-      if (tuiInstance.initialize()) {
-        Some(tuiInstance)
-      } else {
-        None
-      }
-    } else {
+      if tuiInstance.initialize() then Some(tuiInstance)
+      else None
+    else
       log.info("TUI disabled (use --tui flag to enable)")
       None
-    }
 
     // Display Fukuii ASCII art on startup (only if TUI is not enabled)
-    if (tui.isEmpty) {
-      printBanner()
-    }
+    if tui.isEmpty then printBanner()
 
     log.info("Fukuii app {}", Config.clientVersion)
     log.info("Using network {}", Config.blockchains.network)
@@ -59,17 +53,33 @@ object Fukuii extends Logger {
     MilestoneLog.logMilestones(Config.blockchains.blockchainConfig.forkBlockNumbers)
 
     val configErrors = ConfigValidator.validate(Config.config)
-    if (configErrors.nonEmpty) {
+    if configErrors.nonEmpty then
       configErrors.foreach(err => log.error("Configuration error: {}", err))
       System.exit(1)
-    }
+
+    if Config.blockchains.blockchainConfig.forkTimestamps.cancunTimestamp.isDefined then
+      log.info("Cancun fork detected — loading KZG trusted setup for EIP-4844 point-evaluation precompile")
+      try
+        ethereum.ckzg4844.CKZG4844JNI.loadNativeLibrary()
+        ethereum.ckzg4844.CKZG4844JNI.loadTrustedSetupFromResource(
+          "/trusted_setup.txt",
+          classOf[ethereum.ckzg4844.CKZG4844JNI],
+          0L
+        )
+        log.info("KZG trusted setup loaded successfully")
+      catch
+        case e: Exception =>
+          log.error(
+            "Failed to load KZG trusted setup — point-evaluation precompile (0x0A) will revert all calls: {}",
+            e.getMessage
+          )
 
     val node =
-      if (Config.testmode) {
+      if Config.testmode then
         log.info("Starting Fukuii in test mode")
         deleteRocksDBFiles()
         new TestNode
-      } else new StdNode
+      else new StdNode
 
     // Update TUI with network info
     tui.foreach { ui =>
@@ -82,9 +92,8 @@ object Fukuii extends Logger {
     Runtime.getRuntime.addShutdownHook(new Thread(() => tui.foreach(_.shutdown())))
 
     node.start()
-  }
 
-  private def truncateLogs(): Unit = {
+  private def truncateLogs(): Unit =
     import scala.util.Try
     val fullConfig = ConfigFactory.load()
     val logsDir = Try(fullConfig.getString("logging.logs-dir")).getOrElse("./logs")
@@ -96,21 +105,18 @@ object Fukuii extends Logger {
     )
 
     paths.foreach { path =>
-      if (Files.exists(path)) {
+      if Files.exists(path) then
         Try(Files.write(path, Array.emptyByteArray, StandardOpenOption.TRUNCATE_EXISTING)).failed.foreach(e =>
           log.warn("Failed to truncate log file {}: {}", path, e.getMessage)
         )
-      }
     }
     log.info("Log files truncated on startup")
-  }
 
-  private def deleteRocksDBFiles(): Unit = {
+  private def deleteRocksDBFiles(): Unit =
     log.warn("Deleting previous database {}", Config.Db.RocksDb.path)
     rocksdb.RocksDB.destroyDB(Config.Db.RocksDb.path, new rocksdb.Options())
-  }
 
-  private def printBanner(): Unit = {
+  private def printBanner(): Unit =
     val banner = """
                                                                                                                                  
                                                                                                                                  
@@ -183,6 +189,4 @@ object Fukuii extends Logger {
                                                                                                                                  
                                                                                                                                  """
 
-    println(banner)
-  }
-}
+    log.info(banner)

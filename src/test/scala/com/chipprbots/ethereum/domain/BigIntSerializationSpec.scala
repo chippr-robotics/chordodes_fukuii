@@ -5,12 +5,12 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.rlp // Package object for encode/decode methods
+import com.chipprbots.ethereum.rlp
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class BigIntSerializationSpec extends AnyFlatSpec with Matchers {
+class BigIntSerializationSpec extends AnyFlatSpec with Matchers:
 
   "ArbitraryIntegerMpt.bigIntSerializer" should "handle empty byte arrays" taggedAs (UnitTest) in {
     val emptyBytes = Array.empty[Byte]
@@ -202,4 +202,3 @@ class BigIntSerializationSpec extends AnyFlatSpec with Matchers {
       }
     }
   }
-}

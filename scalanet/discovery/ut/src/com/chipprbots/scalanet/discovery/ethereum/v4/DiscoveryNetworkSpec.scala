@@ -1,6 +1,6 @@
 package com.chipprbots.scalanet.discovery.ethereum.v4
 
-import cats.implicits._
+import cats.implicits.*
 import com.chipprbots.scalanet.discovery.hash.Hash
 import com.chipprbots.scalanet.discovery.crypto.{PrivateKey, PublicKey, SigAlg, Signature}
 import com.chipprbots.scalanet.discovery.ethereum.{Node, EthereumNodeRecord}
@@ -10,7 +10,7 @@ import com.chipprbots.scalanet.discovery.ethereum.{Node, EthereumNodeRecord}
 import com.chipprbots.scalanet.discovery.ethereum.codecs.DefaultCodecs.{given, *}
 import com.chipprbots.scalanet.discovery.ethereum.v4.DiscoveryNetwork.Peer
 import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Ping
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload._
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.*
 import com.chipprbots.scalanet.discovery.ethereum.v4.mocks.{MockSigAlg, MockPeerGroup, MockChannel}
 import com.chipprbots.scalanet.peergroup.Channel.ChannelEvent
 import com.chipprbots.scalanet.peergroup.Channel.MessageReceived
@@ -24,7 +24,7 @@ import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.Inspectors
 import fs2.Stream
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
 import scala.util.control.NoStackTrace
 import scala.collection.SortedMap
@@ -32,7 +32,7 @@ import scodec.bits.{BitVector, ByteVector}
 import java.net.InetAddress
 
 class DiscoveryNetworkSpec extends AsyncFlatSpec with Matchers {
-  import DiscoveryNetworkSpec._
+  import DiscoveryNetworkSpec.*
 
   def test(fixture: Fixture) = {
     fixture.test.unsafeToFuture()

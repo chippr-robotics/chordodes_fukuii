@@ -17,7 +17,7 @@ import org.apache.pekko.util.ByteString
   * Callers in the SNAP coordinator actors ([[actors.AccountRangeCoordinator]], [[actors.StorageRangeCoordinator]])
   * interact only through this trait, so scheme selection is a configuration concern isolated to the constructor site.
   */
-trait SnapTrie {
+trait SnapTrie:
 
   /** Insert `value` under `key`. Keys must arrive in strictly-ascending nibble order. */
   def update(key: Array[Byte], value: Array[Byte]): Unit
@@ -29,4 +29,3 @@ trait SnapTrie {
     * state healing is not disrupted.
     */
   def reset(): Unit
-}

@@ -6,9 +6,9 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class EncryptedKeySpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
+class EncryptedKeySpec extends AnyFlatSpec with Matchers with SecureRandomBuilder:
 
   val gethKey: String =
     """{
@@ -83,4 +83,3 @@ class EncryptedKeySpec extends AnyFlatSpec with Matchers with SecureRandomBuilde
     val address = prvKey.map(k => Address(crypto.kec256(crypto.pubKeyFromPrvKey(k))))
     address shouldEqual Right(Address("04fecb5c49ee66fdbda1f196c120225bdd1ac35c"))
   }
-}

@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
 
-class RlpExtensionVisitor(extensionNode: ExtensionNode) extends ExtensionVisitor[RLPEncodeable] {
+class RlpExtensionVisitor(extensionNode: ExtensionNode) extends ExtensionVisitor[RLPEncodeable]:
   val array: Array[RLPEncodeable] = new Array[RLPEncodeable](2)
 
   array(0) = RLPValue(HexPrefix.encode(nibbles = extensionNode.sharedKey.toArray[Byte], isLeaf = false))
@@ -24,13 +24,11 @@ class RlpExtensionVisitor(extensionNode: ExtensionNode) extends ExtensionVisitor
   override def visitNext(value: => RLPEncodeable): Unit =
     array(1) = value
 
-  override def done(): RLPEncodeable = {
+  override def done(): RLPEncodeable =
     val copy = util.Arrays.copyOf[RLPEncodeable](array, 2)
-    RLPList(ArraySeq.unsafeWrapArray(copy): _*)
-  }
-}
+    RLPList(ArraySeq.unsafeWrapArray(copy)*)
 
-class RlpBranchVisitor(@annotation.unused _branchNode: BranchNode) extends BranchVisitor[RLPEncodeable] {
+class RlpBranchVisitor(@annotation.unused _branchNode: BranchNode) extends BranchVisitor[RLPEncodeable]:
 
   var list: List[RLPEncodeable] = List.empty[RLPEncodeable]
 
@@ -43,10 +41,9 @@ class RlpBranchVisitor(@annotation.unused _branchNode: BranchNode) extends Branc
     list = RLPValue(term.map(_.toArray[Byte]).getOrElse(Array.empty[Byte])) :: list
 
   override def done(): RLPEncodeable =
-    RLPList(list.reverse: _*)
-}
+    RLPList(list.reverse*)
 
-class RlpEncVisitor extends MptVisitor[RLPEncodeable] {
+class RlpEncVisitor extends MptVisitor[RLPEncodeable]:
 
   def visitLeaf(leaf: LeafNode): RLPEncodeable =
     RLPList(
@@ -64,4 +61,3 @@ class RlpEncVisitor extends MptVisitor[RLPEncodeable] {
   )
 
   override def visitBranch(value: BranchNode): BranchVisitor[RLPEncodeable] = new RlpBranchVisitor(value)
-}

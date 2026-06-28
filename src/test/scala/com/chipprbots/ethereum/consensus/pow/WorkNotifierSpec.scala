@@ -2,16 +2,15 @@ package com.chipprbots.ethereum.consensus.pow
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -19,16 +18,11 @@ import org.scalatest.time.Millis
 import org.scalatest.time.Seconds
 import org.scalatest.time.Span
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class WorkNotifierSpec
-    extends TestKit(ActorSystem("WorkNotifierSpec"))
-    with AnyFlatSpecLike
-    with WithActorSystemShutDown
-    with Matchers
-    with Eventually
-    with BeforeAndAfterAll {
+class WorkNotifierSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with Eventually:
+
+  implicit private val classicActorSystem: org.apache.pekko.actor.ActorSystem = system.toClassic
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(5, Seconds), interval = Span(100, Millis))
@@ -120,4 +114,3 @@ class WorkNotifierSpec
     // If we reach here without exception, the test passes
     succeed
   }
-}

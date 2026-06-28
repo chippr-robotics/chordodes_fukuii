@@ -2,14 +2,14 @@ package com.chipprbots.ethereum.vm.utils
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransaction
 
-object MockVmInput {
+object MockVmInput:
 
   class MockTransaction(
       tx: LegacyTransaction,
@@ -36,5 +36,3 @@ object MockVmInput {
     new MockTransaction(LegacyTransaction(nonce, gasPrice, gasLimit, receivingAddress, value, payload), senderAddress)
 
   def blockHeader: BlockHeader = BlockFixtures.ValidBlock.header
-
-}

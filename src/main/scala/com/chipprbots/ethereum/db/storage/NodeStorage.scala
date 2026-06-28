@@ -13,19 +13,18 @@ import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeEncoded
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
 
-sealed trait NodesStorage {
+sealed trait NodesStorage:
   def get(key: NodeHash): Option[NodeEncoded]
   def update(toRemove: Seq[NodeHash], toUpsert: Seq[(NodeHash, NodeEncoded)]): NodesStorage
   def updateCond(toRemove: Seq[NodeHash], toUpsert: Seq[(NodeHash, NodeEncoded)], inMemory: Boolean): NodesStorage
   def multiGet(keys: Seq[NodeHash]): Seq[Option[NodeEncoded]] = keys.map(get)
-}
 
 /** This class is used to store Nodes (defined in mpt/Node.scala), by using: Key: hash of the RLP encoded node Value:
   * the RLP encoded node
   */
 class NodeStorage(val dataSource: DataSource)
     extends KeyValueStorage[NodeHash, NodeEncoded, NodeStorage]
-    with NodesStorage {
+    with NodesStorage:
 
   val namespace: IndexedSeq[Byte] = Namespaces.NodeNamespace
   def keySerializer: NodeHash => IndexedSeq[Byte] = _.toIndexedSeq
@@ -49,7 +48,7 @@ class NodeStorage(val dataSource: DataSource)
     * @return
     *   the new KeyValueStorage after the removals and insertions were done.
     */
-  override def update(toRemove: Seq[NodeHash], toUpsert: Seq[(NodeHash, NodeEncoded)]): NodeStorage = {
+  override def update(toRemove: Seq[NodeHash], toUpsert: Seq[(NodeHash, NodeEncoded)]): NodeStorage =
     dataSource.update(
       Seq(
         DataSourceUpdateOptimized(
@@ -60,7 +59,6 @@ class NodeStorage(val dataSource: DataSource)
       )
     )
     apply(dataSource)
-  }
 
   override def storageContent: Stream[IO, Either[IterationError, (NodeHash, NodeEncoded)]] =
     dataSource.iterate(namespace).map { result =>
@@ -71,17 +69,14 @@ class NodeStorage(val dataSource: DataSource)
 
   def updateCond(toRemove: Seq[NodeHash], toUpsert: Seq[(NodeHash, NodeEncoded)], inMemory: Boolean): NodesStorage =
     update(toRemove, toUpsert)
-}
 
 class CachedNodeStorage(val storage: NodeStorage, val cache: Cache[NodeHash, NodeEncoded])
     extends CachedKeyValueStorage[NodeHash, NodeEncoded, CachedNodeStorage]
-    with NodesStorage {
+    with NodesStorage:
   override type I = NodeStorage
   override def apply(cache: Cache[NodeHash, NodeEncoded], storage: NodeStorage): CachedNodeStorage =
     new CachedNodeStorage(storage, cache)
-}
 
-object NodeStorage {
+object NodeStorage:
   type NodeHash = ByteString
   type NodeEncoded = Array[Byte]
-}

@@ -6,12 +6,11 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator._
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.ledger.BloomFilter
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.*
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.testing.Tags.*
 
-class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
+class StdBlockValidatorSpec extends AnyFlatSpec with Matchers:
 
   "Block based on valid data" should "pass validation" taggedAs (UnitTest, ConsensusTest) in {
     val block = Block(validBlockHeader, validBlockBody)
@@ -19,78 +18,72 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "correctly handle the case where a block has no receipts" taggedAs (UnitTest, ConsensusTest) in {
-    StdBlockValidator.validate(blockWithOutReceipts, Nil) match {
+    StdBlockValidator.validate(blockWithOutReceipts, Nil) match
       case Right(_) => succeed
       case _        => fail()
-    }
   }
 
   "Invalid block" should "return a failure if created based on invalid transactions header" taggedAs (
     UnitTest,
     ConsensusTest
   ) in {
-    StdBlockValidator.validate(Block(wrongTransactionsRootHeader, validBlockBody), validReceipts) match {
+    StdBlockValidator.validate(Block(wrongTransactionsRootHeader, validBlockBody), validReceipts) match
       case Left(BlockTransactionsHashError) => succeed
       case _                                => fail()
-    }
   }
 
   it should "return a failure if created based on invalid ommers header" taggedAs (UnitTest, ConsensusTest) in {
-    StdBlockValidator.validate(Block(wrongOmmersHashHeader, validBlockBody), validReceipts) match {
+    StdBlockValidator.validate(Block(wrongOmmersHashHeader, validBlockBody), validReceipts) match
       case Left(BlockOmmersHashError) => succeed
       case _                          => fail()
-    }
   }
 
   it should "return a failure if created based on invalid receipts header" taggedAs (UnitTest, ConsensusTest) in {
-    StdBlockValidator.validate(Block(wrongReceiptsHeader, validBlockBody), validReceipts) match {
+    StdBlockValidator.validate(Block(wrongReceiptsHeader, validBlockBody), validReceipts) match
       case Left(BlockReceiptsHashError) => succeed
       case _                            => fail()
-    }
   }
 
   it should "return a failure if created based on invalid log bloom header" taggedAs (UnitTest, ConsensusTest) in {
-    StdBlockValidator.validate(Block(wrongLogBloomBlockHeader, validBlockBody), validReceipts) match {
+    StdBlockValidator.validate(Block(wrongLogBloomBlockHeader, validBlockBody), validReceipts) match
       case Left(BlockLogBloomError) => succeed
       case _                        => fail()
-    }
   }
 
   it should "return a failure if a block body doesn't corresponds to a block header due to wrong tx hash" taggedAs (
     UnitTest,
     ConsensusTest
   ) in {
-    StdBlockValidator.validateHeaderAndBody(wrongTransactionsRootHeader, validBlockBody) match {
+    StdBlockValidator.validateHeaderAndBody(wrongTransactionsRootHeader, validBlockBody) match
       case Left(BlockTransactionsHashError) => succeed
       case _                                => fail()
-    }
   }
 
   it should "return a failure if a block body doesn't corresponds to a block header due to wrong ommers hash" taggedAs (
     UnitTest,
     ConsensusTest
   ) in {
-    StdBlockValidator.validateHeaderAndBody(wrongOmmersHashHeader, validBlockBody) match {
+    StdBlockValidator.validateHeaderAndBody(wrongOmmersHashHeader, validBlockBody) match
       case Left(BlockOmmersHashError) => succeed
       case _                          => fail()
-    }
   }
 
   val validBlockHeader: BlockHeader = BlockHeader(
-    parentHash = ByteString(Hex.decode("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71")),
-    ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+    parentHash = BlockHash(ByteString(Hex.decode("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71"))),
+    ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("df7d7e053933b5cc24372f878c90e62dadad5d42")),
-    stateRoot = ByteString(Hex.decode("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67")),
-    transactionsRoot = ByteString(Hex.decode("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac")),
-    receiptsRoot = ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d")),
-    logsBloom = ByteString(Hex.decode("0" * 512)),
-    difficulty = BigInt("14005986920576"),
+    stateRoot = TrieRoot(ByteString(Hex.decode("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67"))),
+    transactionsRoot =
+      TrieRoot(ByteString(Hex.decode("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d"))),
+    logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
+    difficulty = Difficulty(BigInt("14005986920576")),
     number = 3125369,
     gasLimit = 4699996,
     gasUsed = 84000,
     unixTimestamp = 1486131165,
     extraData = ByteString(Hex.decode("d5830104098650617269747986312e31332e30826c69")),
-    mixHash = ByteString(Hex.decode("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a")),
+    mixHash = BlockHash(ByteString(Hex.decode("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a"))),
     nonce = ByteString(Hex.decode("2b0fb0c002946392"))
   )
 
@@ -157,51 +150,50 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
       postTransactionStateHash =
         ByteString(Hex.decode("ce0ac687bb90d457b6573d74e4a25ea7c012fee329eb386dbef161c847f9842d")),
       cumulativeGasUsed = 21000,
-      logsBloomFilter = ByteString(Hex.decode("0" * 512)),
+      logsBloomFilter = BloomFilter(ByteString(Hex.decode("0" * 512))),
       logs = Seq[TxLogEntry]()
     ),
     LegacyReceipt.withHashOutcome(
       postTransactionStateHash =
         ByteString(Hex.decode("b927d361126302acaa1fa5e93d0b7e349e278231fe2fc2846bfd54f50377f20a")),
       cumulativeGasUsed = 42000,
-      logsBloomFilter = ByteString(Hex.decode("0" * 512)),
+      logsBloomFilter = BloomFilter(ByteString(Hex.decode("0" * 512))),
       logs = Seq[TxLogEntry]()
     ),
     LegacyReceipt.withHashOutcome(
       postTransactionStateHash =
         ByteString(Hex.decode("1e913d6bdd412d71292173d7908f8792adcf958b84c89575bc871a1decaee56d")),
       cumulativeGasUsed = 63000,
-      logsBloomFilter = ByteString(Hex.decode("0" * 512)),
+      logsBloomFilter = BloomFilter(ByteString(Hex.decode("0" * 512))),
       logs = Seq[TxLogEntry]()
     ),
     LegacyReceipt.withHashOutcome(
       postTransactionStateHash =
         ByteString(Hex.decode("0c6e052bc83482bafaccffc4217adad49f3a9533c69c820966d75ed0154091e6")),
       cumulativeGasUsed = 84000,
-      logsBloomFilter = ByteString(Hex.decode("0" * 512)),
+      logsBloomFilter = BloomFilter(ByteString(Hex.decode("0" * 512))),
       logs = Seq[TxLogEntry]()
     )
   )
 
   val wrongTransactionsRootHeader: BlockHeader = validBlockHeader.copy(
-    transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b420"))
+    transactionsRoot =
+      TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b420")))
   )
 
   val wrongOmmersHashHeader: BlockHeader = validBlockHeader.copy(
-    ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d4934a"))
+    ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d4934a")))
   )
 
   val wrongReceiptsHeader: BlockHeader = validBlockHeader.copy(
-    receiptsRoot = ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5a"))
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5a")))
   )
 
   val wrongLogBloomBlockHeader: BlockHeader = validBlockHeader.copy(
-    logsBloom = ByteString(Hex.decode("1" * 512))
+    logsBloom = BloomFilter(ByteString(Hex.decode("1" * 512)))
   )
 
   val blockWithOutReceipts: Block = Block(
-    validBlockHeader.copy(receiptsRoot = Account.EmptyStorageRootHash, logsBloom = BloomFilter.EmptyBloomFilter),
+    validBlockHeader.copy(receiptsRoot = Account.EmptyStorageRootHash, logsBloom = BloomFilter.Empty),
     validBlockBody
   )
-
-}

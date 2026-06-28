@@ -2,32 +2,36 @@ package com.chipprbots.ethereum.jsonrpc
 
 import cats.effect.IO
 
-import org.json4s.JsonDSL._
+import org.apache.pekko.actor.ActorSystem
 
+import scala.concurrent.ExecutionContext
+
+import org.json4s.JsonDSL.*
+
+import com.chipprbots.ethereum.jsonrpc.AdminService.*
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoRequest
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoResponse
-import com.chipprbots.ethereum.jsonrpc.EthBlocksService._
-import com.chipprbots.ethereum.jsonrpc.EthFilterService._
-import com.chipprbots.ethereum.jsonrpc.EthInfoService._
-import com.chipprbots.ethereum.jsonrpc.EthMiningService._
-import com.chipprbots.ethereum.jsonrpc.EthTxService._
-import com.chipprbots.ethereum.jsonrpc.EthUserService._
+import com.chipprbots.ethereum.jsonrpc.EthBlocksService.*
+import com.chipprbots.ethereum.jsonrpc.EthFilterService.*
+import com.chipprbots.ethereum.jsonrpc.EthInfoService.*
+import com.chipprbots.ethereum.jsonrpc.EthMiningService.*
+import com.chipprbots.ethereum.jsonrpc.EthSimulateService.*
+import com.chipprbots.ethereum.jsonrpc.EthTxService.*
+import com.chipprbots.ethereum.jsonrpc.EthUserService.*
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsRequest
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsResponse
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.ResetFastSyncRequest
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.ResetFastSyncResponse
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.RestartFastSyncRequest
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.RestartFastSyncResponse
-import com.chipprbots.ethereum.jsonrpc.McpService._
-import com.chipprbots.ethereum.jsonrpc.NetService._
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.McpService.*
+import com.chipprbots.ethereum.jsonrpc.NetService.*
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofRequest
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
-import com.chipprbots.ethereum.jsonrpc.EthSimulateService._
-import com.chipprbots.ethereum.jsonrpc.TestService._
-import com.chipprbots.ethereum.jsonrpc.Web3Service._
-import com.chipprbots.ethereum.jsonrpc.AdminService._
-import com.chipprbots.ethereum.jsonrpc.TxPoolService._
+import com.chipprbots.ethereum.jsonrpc.TestService.*
+import com.chipprbots.ethereum.jsonrpc.TxPoolService.*
+import com.chipprbots.ethereum.jsonrpc.Web3Service.*
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
@@ -54,26 +58,29 @@ case class JsonRpcController(
     txPoolService: TxPoolService,
     debugTracingService: DebugTracingService,
     traceService: TraceService,
-    override val config: JsonRpcConfig
+    override val config: JsonRpcConfig,
+    actorSystem: ActorSystem
 ) extends ApisBuilder
     with Logger
-    with JsonRpcBaseController {
+    with JsonRpcBaseController:
 
-  import AdminJsonMethodsImplicits._
-  import TxPoolJsonMethodsImplicits._
-  import DebugJsonMethodsImplicits._
-  import EthJsonMethodsImplicits._
-  import EthBlocksJsonMethodsImplicits._
-  import EthMiningJsonMethodsImplicits._
-  import EthTxJsonMethodsImplicits._
-  import EthUserJsonMethodsImplicits._
-  import EthFilterJsonMethodsImplicits._
-  import EthProofJsonMethodsImplicits._
-  import JsonMethodsImplicits._
-  import QAJsonMethodsImplicits._
-  import TestJsonMethodsImplicits._
-  import FukuiiJsonMethodImplicits._
-  import McpJsonMethodsImplicits._
+  implicit override def executionContext: ExecutionContext = actorSystem.dispatcher
+
+  import AdminJsonMethodsImplicits.given
+  import TxPoolJsonMethodsImplicits.given
+  import DebugJsonMethodsImplicits.given
+  import EthJsonMethodsImplicits.given
+  import EthBlocksJsonMethodsImplicits.given
+  import EthMiningJsonMethodsImplicits.given
+  import EthTxJsonMethodsImplicits.given
+  import EthUserJsonMethodsImplicits.given
+  import EthFilterJsonMethodsImplicits.given
+  import EthProofJsonMethodsImplicits.given
+  import JsonMethodsImplicits.given
+  import QAJsonMethodsImplicits.given
+  import TestJsonMethodsImplicits.given
+  import FukuiiJsonMethodImplicits.given
+  import McpJsonMethodsImplicits.given
 
   override def apisHandleFns: Map[String, PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]]] = Map(
     Apis.Eth -> handleEthRequest,
@@ -296,31 +303,31 @@ case class JsonRpcController(
     // debug_trace* methods routed to DebugTracingService via handleDebugTracingRequest.
   }
 
-  private def handleDebugTracingRequest: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] = {
+  private def handleDebugTracingRequest: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] =
     import DebugTracingService.{
-      TraceTransactionRequest => DTxReq,
-      TraceTransactionResponse => DTxResp,
-      TraceCallRequest => DCallReq,
-      TraceCallResponse => DCallResp,
-      TraceCallManyRequest => DManyReq,
-      TraceCallManyResponse => DManyResp,
-      TraceBlockByHashRequest => DBlkHashReq,
-      TraceBlockByHashResponse => DBlkHashResp,
-      TraceBlockByNumberRequest => DBlkNumReq,
-      TraceBlockByNumberResponse => DBlkNumResp,
-      IntermediateRootsRequest => DRootsReq,
-      IntermediateRootsResponse => DRootsResp,
-      TraceChainRequest => DChainReq,
-      TraceChainBlockResult => DChainResult
+      TraceTransactionRequest as DTxReq,
+      TraceTransactionResponse as DTxResp,
+      TraceCallRequest as DCallReq,
+      TraceCallResponse as DCallResp,
+      TraceCallManyRequest as DManyReq,
+      TraceCallManyResponse as DManyResp,
+      TraceBlockByHashRequest as DBlkHashReq,
+      TraceBlockByHashResponse as DBlkHashResp,
+      TraceBlockByNumberRequest as DBlkNumReq,
+      TraceBlockByNumberResponse as DBlkNumResp,
+      IntermediateRootsRequest as DRootsReq,
+      IntermediateRootsResponse as DRootsResp,
+      TraceChainRequest as DChainReq,
+      TraceChainBlockResult as DChainResult
     }
     import DebugTracingJsonMethodsImplicits.{
-      debug_traceTransaction => dTx,
-      debug_traceCall => dCall,
-      debug_traceCallMany => dMany,
-      debug_traceBlockByHash => dHash,
-      debug_traceBlockByNumber => dNum,
-      debug_intermediateRoots => dRoots,
-      debug_traceChain => dChain
+      debug_traceTransaction as dTx,
+      debug_traceCall as dCall,
+      debug_traceCallMany as dMany,
+      debug_traceBlockByHash as dHash,
+      debug_traceBlockByNumber as dNum,
+      debug_intermediateRoots as dRoots,
+      debug_traceChain as dChain
     }
     ({
       case req @ JsonRpcRequest(_, "debug_traceTransaction", _, _) =>
@@ -341,12 +348,11 @@ case class JsonRpcController(
           req
         )(dChain, dChain)
     }: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]])
-  }
 
   private def handleTraceRequest: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] =
     handleTraceRequestImpl
 
-  private def handleTraceRequestImpl: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] = {
+  private def handleTraceRequestImpl: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] =
     // Use explicit implicits to sidestep the ambiguity with DebugTracingService types
     val tTx = TraceJsonMethodsImplicits.trace_transaction
     val tBlock = TraceJsonMethodsImplicits.trace_block
@@ -390,13 +396,11 @@ case class JsonRpcController(
           tFilter
         )
     }
-  }
 
   private def handleTestRequest: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] =
-    testServiceOpt match {
+    testServiceOpt match
       case Some(testService) => handleTestRequest(testService)
       case None              => PartialFunction.empty
-    }
 
   private def handleTestRequest(testService: TestService): PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] = {
     case req @ JsonRpcRequest(_, "test_setChainParams", _, _) =>
@@ -542,4 +546,3 @@ case class JsonRpcController(
       val result = enabledApis.map(_ -> "1.0").toMap
       IO(JsonRpcResponse("2.0", Some(result), None, req.id))
   }
-}

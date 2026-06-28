@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
   *
   * Stores block first-seen timestamps in a dedicated namespace to avoid conflicts with other blockchain data.
   */
-class BlockFirstSeenRocksDbStorage(val dataSource: DataSource) extends BlockFirstSeenStorage {
+class BlockFirstSeenRocksDbStorage(val dataSource: DataSource) extends BlockFirstSeenStorage:
 
   /** Encodes a Long timestamp as bytes for storage. Note: This creates an intermediate ByteString that is immediately
     * converted to Array[Byte]. Could be optimized with direct Long-to-byte-array conversion to reduce allocation
@@ -24,7 +24,7 @@ class BlockFirstSeenRocksDbStorage(val dataSource: DataSource) extends BlockFirs
   private def decodeTimestamp(bytes: Array[Byte]): Long =
     ByteStringUtils.byteStringToLong(ByteString(bytes))
 
-  override def put(blockHash: ByteString, timestamp: Long): Unit = {
+  override def put(blockHash: ByteString, timestamp: Long): Unit =
     val key = blockHash.toArray
     val value = encodeTimestamp(timestamp)
     dataSource.update(
@@ -36,14 +36,12 @@ class BlockFirstSeenRocksDbStorage(val dataSource: DataSource) extends BlockFirs
         )
       )
     )
-  }
 
-  override def get(blockHash: ByteString): Option[Long] = {
+  override def get(blockHash: ByteString): Option[Long] =
     val key = blockHash.toArray
     dataSource.getOptimized(BlockFirstSeenNamespace, key).map(decodeTimestamp)
-  }
 
-  override def remove(blockHash: ByteString): Unit = {
+  override def remove(blockHash: ByteString): Unit =
     val key = blockHash.toArray
     dataSource.update(
       Seq(
@@ -54,5 +52,3 @@ class BlockFirstSeenRocksDbStorage(val dataSource: DataSource) extends BlockFirs
         )
       )
     )
-  }
-}

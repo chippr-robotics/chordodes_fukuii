@@ -6,14 +6,15 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
 import org.bouncycastle.util.encoders.Hex
-import org.scalatest.matchers.should._
+import org.scalatest.matchers.should.*
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.utils.Config._
+import com.chipprbots.ethereum.utils.Config.*
 
-import ForkIdValidator._
+import ForkIdValidationResult.*
+import ForkIdValidator.*
 
-class ForkIdValidatorSpec extends AnyWordSpec with Matchers {
+class ForkIdValidatorSpec extends AnyWordSpec with Matchers:
 
   implicit val runtime: IORuntime = IORuntime.global
 
@@ -102,4 +103,3 @@ class ForkIdValidatorSpec extends AnyWordSpec with Matchers {
       validatePeer(7279999, ForkId(0xa00bc324L, Some(7279999L))) shouldBe ErrLocalIncompatibleOrStale
     }
   }
-}

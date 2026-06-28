@@ -16,8 +16,9 @@ import com.google.common.hash.PrimitiveSink
 import fs2.Stream
 import io.vavr.collection.PriorityQueue
 
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
 import com.chipprbots.ethereum.blockchain.sync.fast.LoadableBloomFilter.BloomFilterLoadingResult
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler._
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.*
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.NodeStorage
@@ -27,11 +28,10 @@ import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.mpt.BranchNode
 import com.chipprbots.ethereum.mpt.ExtensionNode
 import com.chipprbots.ethereum.mpt.HashNode
-import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.HexPrefix
+import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MptNode
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.MptNodeDec
 
 /** Scheduler which traverses Merkle patricia trie in DFS fashion, while also creating requests for nodes missing in
   * traversed trie. Traversal example: Merkle Patricia Trie with 2 leaf child nodes, each with non empty code value.
@@ -60,14 +60,13 @@ class SyncStateScheduler(
     evmCodeStorage: EvmCodeStorage,
     stateStorage: StateStorage,
     bloomFilter: LoadableBloomFilter[ByteString]
-) {
+):
 
   val loadFilterFromBlockchain: IO[BloomFilterLoadingResult] = bloomFilter.loadFromSource
 
   def initState(targetRootHash: ByteString): Option[SchedulerState] =
-    if (targetRootHash == emptyStateRootHash) {
-      None
-    } else {
+    if targetRootHash == emptyStateRootHash then None
+    else
       // Always schedule the root for download even if it exists locally.
       // The root node existing doesn't mean the full state trie is complete —
       // a previous SNAP or fast sync may have stored only the root without
@@ -76,7 +75,6 @@ class SyncStateScheduler(
       val initialState = SchedulerState()
       val initialRequest = StateNodeRequest(targetRootHash, None, StateNode, Seq(), 0, 0)
       Option(initialState.schedule(initialRequest))
-    }
 
   /** Default responses processor which ignores duplicated or not requested hashes, but informs the caller about
     * critical errors. If it would valuable, it possible to implement processor which would gather statistics about
@@ -85,38 +83,32 @@ class SyncStateScheduler(
   def processResponses(
       state: SchedulerState,
       responses: List[SyncResponse]
-  ): Either[CriticalError, (SchedulerState, ProcessingStatistics)] = {
+  ): Either[CriticalError, (SchedulerState, ProcessingStatistics)] =
     @tailrec
     def go(
         currentState: SchedulerState,
         currentStatistics: ProcessingStatistics,
         remaining: Seq[SyncResponse]
     ): Either[CriticalError, (SchedulerState, ProcessingStatistics)] =
-      if (remaining.isEmpty) {
-        Right((currentState, currentStatistics))
-      } else {
+      if remaining.isEmpty then Right((currentState, currentStatistics))
+      else
         val responseToProcess = remaining.head
-        processResponse(currentState, responseToProcess) match {
+        processResponse(currentState, responseToProcess) match
           case Left(value) =>
-            value match {
+            value match
               case error: CriticalError =>
                 Left(error)
               case err: NotCriticalError =>
-                err match {
+                err match
                   case SyncStateScheduler.NotRequestedItem =>
                     go(currentState, currentStatistics.addNotRequested(), remaining.tail)
                   case SyncStateScheduler.AlreadyProcessedItem =>
                     go(currentState, currentStatistics.addDuplicated(), remaining.tail)
-                }
-            }
 
           case Right(newState) =>
             go(newState, currentStatistics, remaining.tail)
-        }
-      }
 
     go(state, ProcessingStatistics(), responses)
-  }
 
   def getMissingNodes(state: SchedulerState, max: Int): (List[ByteString], SchedulerState) =
     state.getMissingHashes(max)
@@ -124,80 +116,75 @@ class SyncStateScheduler(
   def getAllMissingNodes(state: SchedulerState): (List[ByteString], SchedulerState) =
     getMissingNodes(state, state.numberOfMissingHashes)
 
-  def persistBatch(state: SchedulerState, targetBlockNumber: BigInt): SchedulerState = {
+  def persistBatch(state: SchedulerState, targetBlockNumber: BigInt): SchedulerState =
     // Potential optimisation would be to expose some kind batch api from db to make only 1 write instead od 100k
     // for we could do this over code as it exposes DataSourceBatchUpdate, but not for mpt node as it write path is more
     // complex due to pruning.
     val (nodes, newState) = state.getNodesToPersist
     nodes.foreach { case (hash, (data, reqType)) =>
       bloomFilter.put(hash)
-      reqType match {
+      reqType match
         case _: CodeRequest => evmCodeStorage.put(hash, data).commit()
         case _: NodeRequest => stateStorage.saveNode(hash, data.toArray, targetBlockNumber)
-      }
     }
     newState
-  }
 
   private def isRequestAlreadyKnownOrResolved(
       state: SchedulerState,
       response: SyncResponse
   ): Either[ResponseProcessingError, StateNodeRequest] =
-    for {
+    for
       activeRequest <- state.getPendingRequestByHash(response.hash).toRight(NotRequestedItem)
-      _ <- if (activeRequest.resolvedData.isDefined) Left(AlreadyProcessedItem) else Right(())
-    } yield activeRequest
+      _ <- if activeRequest.resolvedData.isDefined then Left(AlreadyProcessedItem) else Right(())
+    yield activeRequest
 
   private def processActiveResponse(
       state: SchedulerState,
       activeRequest: StateNodeRequest,
       response: SyncResponse
   ): Either[ResponseProcessingError, SchedulerState] =
-    activeRequest.requestType match {
+    activeRequest.requestType match
       case _: CodeRequest => Right(state.commit(activeRequest.copy(resolvedData = Some(response.data))))
       case requestType: NodeRequest =>
-        for {
+        for
           mptNode <- Try(response.data.toArray.toMptNode).toEither.left.map(_ => CannotDecodeMptNode)
           possibleChildRequests <- createPossibleChildRequests(mptNode, activeRequest, requestType)
-        } yield {
+        yield
           val childWithoutAlreadyKnown =
             possibleChildRequests.filterNot(req => isRequestedHashAlreadyCommitted(state, req))
-          if (childWithoutAlreadyKnown.isEmpty && activeRequest.dependencies == 0) {
+          if childWithoutAlreadyKnown.isEmpty && activeRequest.dependencies == 0 then
             state.commit(activeRequest.copy(resolvedData = Some(response.data)))
-          } else {
-            state.resolveRequest(activeRequest, response.data, childWithoutAlreadyKnown)
-          }
-        }
-    }
+          else state.resolveRequest(activeRequest, response.data, childWithoutAlreadyKnown)
 
   def processResponse(
       state: SchedulerState,
       response: SyncResponse
   ): Either[ResponseProcessingError, SchedulerState] =
-    for {
+    for
       activeRequest <- isRequestAlreadyKnownOrResolved(state, response)
       newState <- processActiveResponse(state, activeRequest, response)
-    } yield newState
+    yield newState
 
   // scalastyle:off method.length
   private def createPossibleChildRequests(
       mptNode: MptNode,
       parentRequest: StateNodeRequest,
       requestType: NodeRequest
-  ): Either[NotAccountLeafNode.type, Seq[StateNodeRequest]] = mptNode match {
+  ): Either[NotAccountLeafNode.type, Seq[StateNodeRequest]] = mptNode match
     case n: LeafNode =>
-      requestType match {
+      requestType match
         case SyncStateScheduler.StateNode =>
           Account(n.value).toEither.left.map(_ => NotAccountLeafNode).map { account =>
             // We are scheduling both storage trie and code requests with highest priority to be sure that leaf nodes completed
             // as fast as possible
-            val evmRequests = if (account.codeHash != emptyCodeHash) {
-              Seq(StateNodeRequest(account.codeHash, None, Code, Seq(parentRequest.nodeHash), maxMptTrieDepth, 0))
-            } else {
-              Seq()
-            }
+            val evmRequests =
+              if account.codeHash != emptyCodeHash then
+                Seq(
+                  StateNodeRequest(account.codeHash.value, None, Code, Seq(parentRequest.nodeHash), maxMptTrieDepth, 0)
+                )
+              else Seq()
 
-            val storageRequests = if (account.storageRoot != emptyStateRootHash) {
+            val storageRequests = if account.storageRoot.value != emptyStateRootHash then
               // Compute the full account hash from the leaf's nibble path + leaf key.
               // This is needed for GetTrieNodes storage requests: [accountHash, storagePath].
               val leafKeyNibbles = n.key.toArray.toSeq
@@ -205,7 +192,7 @@ class SyncStateScheduler(
               val acctHash = ByteString(HexPrefix.nibblesToBytes(fullAccountPath.toArray))
               Seq(
                 StateNodeRequest(
-                  account.storageRoot,
+                  account.storageRoot.value,
                   None,
                   StorageNode,
                   Seq(parentRequest.nodeHash),
@@ -215,16 +202,13 @@ class SyncStateScheduler(
                   accountHash = Some(acctHash)
                 )
               )
-            } else {
-              Seq()
-            }
+            else Seq()
 
             evmRequests ++ storageRequests
           }
 
         case SyncStateScheduler.StorageNode =>
           Right(Seq())
-      }
 
     case n: BranchNode =>
       val children = ArraySeq.unsafeWrapArray(n.children)
@@ -242,7 +226,7 @@ class SyncStateScheduler(
       })
 
     case n: ExtensionNode =>
-      Right(n.next match {
+      Right(n.next match
         case HashNode(hash) =>
           Seq(
             StateNodeRequest(
@@ -257,26 +241,23 @@ class SyncStateScheduler(
             )
           )
         case _ => Nil
-      })
+      )
     case _ => Right(Nil)
-  }
 
   private def isInDatabase(req: StateNodeRequest): Boolean =
-    req.requestType match {
+    req.requestType match
       case _: CodeRequest =>
         evmCodeStorage.get(req.nodeHash).isDefined
       case _: NodeRequest =>
         blockchainReader.getMptNodeByHash(req.nodeHash).isDefined
-    }
 
   private def isRequestedHashAlreadyCommitted(state: SchedulerState, req: StateNodeRequest): Boolean =
     state.memBatch.contains(req.nodeHash) ||
       (bloomFilter.mightContain(req.nodeHash) && isInDatabase(
         req
       )) // if hash is in bloom filter we need to double check on db
-}
 
-object SyncStateScheduler {
+object SyncStateScheduler:
   private val emptyStateRootHash = ByteString(MerklePatriciaTrie.EmptyRootHash)
   private val emptyCodeHash = Account.EmptyCodeHash
   private val maxMptTrieDepth = 64
@@ -293,10 +274,9 @@ object SyncStateScheduler {
 
   case object StorageNode extends NodeRequest
 
-  implicit object ByteStringFunnel extends Funnel[ByteString] {
+  implicit object ByteStringFunnel extends Funnel[ByteString]:
     override def funnel(from: ByteString, into: PrimitiveSink): Unit =
       into.putBytes(from.toArray)
-  }
 
   def getEmptyFilter(expectedFilterSize: Int): BloomFilter[ByteString] =
     BloomFilter.create[ByteString](ByteStringFunnel, expectedFilterSize)
@@ -307,7 +287,7 @@ object SyncStateScheduler {
       stateStorage: StateStorage,
       nodeStorage: NodeStorage,
       expectedBloomFilterSize: Int
-  ): SyncStateScheduler = {
+  ): SyncStateScheduler =
     // provided source i.e mptStateSavedKeys() is guaranteed to finish on first `Left` element which means that returned
     // error is the reason why loading has stopped
     val mptStateSavedKeys: Stream[IO, Either[IterationError, ByteString]] =
@@ -320,7 +300,6 @@ object SyncStateScheduler {
       stateStorage,
       LoadableBloomFilter[ByteString](expectedBloomFilterSize, mptStateSavedKeys)
     )
-  }
 
   final case class StateNodeRequest(
       nodeHash: ByteString,
@@ -331,21 +310,16 @@ object SyncStateScheduler {
       dependencies: Int,
       nibblePath: Seq[Byte] = Seq.empty,
       accountHash: Option[ByteString] = None
-  ) {
-    def isNodeRequest: Boolean = requestType match {
+  ):
+    def isNodeRequest: Boolean = requestType match
       case _: CodeRequest => false
       case _: NodeRequest => true
-    }
-  }
 
-  private val stateNodeRequestComparator = new Comparator[StateNodeRequest] {
+  private val stateNodeRequestComparator = new Comparator[StateNodeRequest]:
     override def compare(o1: StateNodeRequest, o2: StateNodeRequest): Int =
       o2.nodeDepth.compare(o1.nodeDepth)
-  }
 
-  implicit class Tuple2Ops[A, B](o: io.vavr.Tuple2[A, B]) {
-    def asScala(): (A, B) = (o._1, o._2)
-  }
+  extension [A, B](o: io.vavr.Tuple2[A, B]) def asScala(): (A, B) = (o._1, o._2)
 
   final case class SyncResponse(hash: ByteString, data: ByteString)
 
@@ -353,36 +327,31 @@ object SyncStateScheduler {
       activeRequest: Map[ByteString, StateNodeRequest],
       queue: PriorityQueue[StateNodeRequest],
       memBatch: Map[ByteString, (ByteString, RequestType)]
-  ) {
+  ):
 
     def schedule(request: StateNodeRequest): SchedulerState =
-      activeRequest.get(request.nodeHash) match {
+      activeRequest.get(request.nodeHash) match
         case Some(oldRequest) =>
           copy(activeRequest + (request.nodeHash -> oldRequest.copy(parents = oldRequest.parents ++ request.parents)))
 
         case None =>
           copy(activeRequest + (request.nodeHash -> request), queue.enqueue(request))
-      }
 
-    def getMissingHashes(max: Int): (List[ByteString], SchedulerState) = {
+    def getMissingHashes(max: Int): (List[ByteString], SchedulerState) =
       @tailrec
       def go(
           currentQueue: PriorityQueue[StateNodeRequest],
           remaining: Int,
           got: List[ByteString]
       ): (PriorityQueue[StateNodeRequest], List[ByteString]) =
-        if (remaining == 0) {
-          (currentQueue, got.reverse)
-        } else if (currentQueue.isEmpty) {
-          (currentQueue, got.reverse)
-        } else {
+        if remaining == 0 then (currentQueue, got.reverse)
+        else if currentQueue.isEmpty then (currentQueue, got.reverse)
+        else
           val (elem, newQueue) = currentQueue.dequeue().asScala()
           go(newQueue, remaining - 1, elem.nodeHash :: got)
-        }
 
       val (newQueue, elements) = go(queue, max, List.empty)
       (elements, copy(queue = newQueue))
-    }
 
     def getAllMissingHashes: (List[ByteString], SchedulerState) = getMissingHashes(queue.size())
 
@@ -392,16 +361,15 @@ object SyncStateScheduler {
 
     def numberOfMissingHashes: Int = queue.size()
 
-    def commit(request: StateNodeRequest): SchedulerState = {
+    def commit(request: StateNodeRequest): SchedulerState =
       @tailrec
       def go(
           currentRequests: Map[ByteString, StateNodeRequest],
           currentBatch: Map[ByteString, (ByteString, RequestType)],
           parentsToCheck: Seq[ByteString]
       ): (Map[ByteString, StateNodeRequest], Map[ByteString, (ByteString, RequestType)]) =
-        if (parentsToCheck.isEmpty) {
-          (currentRequests, currentBatch)
-        } else {
+        if parentsToCheck.isEmpty then (currentRequests, currentBatch)
+        else
           val parent = parentsToCheck.head
           // if the parent is not there, something is terribly wrong and our assumptions do not hold, it is perfectly fine to
           // fail with exception
@@ -413,7 +381,7 @@ object SyncStateScheduler {
             )
           )
           val newParentDeps = parentRequest.dependencies - 1
-          if (newParentDeps == 0) {
+          if newParentDeps == 0 then
             // we can always call `parentRequest.resolvedData.get` on parent node, as to even have children parent data
             // needs to be provided
             go(
@@ -430,14 +398,12 @@ object SyncStateScheduler {
               )),
               parentsToCheck.tail ++ parentRequest.parents
             )
-          } else {
+          else
             go(
               currentRequests + (parent -> parentRequest.copy(dependencies = newParentDeps)),
               currentBatch,
               parentsToCheck.tail
             )
-          }
-        }
 
       val newActive = activeRequest - request.nodeHash
       val newMemBatch = request.resolvedData.fold(memBatch) { data =>
@@ -446,33 +412,29 @@ object SyncStateScheduler {
 
       val (newRequests, newBatch) = go(newActive, newMemBatch, request.parents)
       copy(activeRequest = newRequests, memBatch = newBatch)
-    }
 
     def resolveRequest(
         request: StateNodeRequest,
         receivedData: ByteString,
         requestNewChildren: Seq[StateNodeRequest]
-    ): SchedulerState = {
+    ): SchedulerState =
       val numberOfChildren = requestNewChildren.size
       val resolvedStateNodeRequest =
         request.copy(resolvedData = Some(receivedData), dependencies = request.dependencies + numberOfChildren)
       val newRequests = activeRequest + (request.nodeHash -> resolvedStateNodeRequest)
       val stateWithUpdatedParent = copy(activeRequest = newRequests)
       requestNewChildren.foldLeft(stateWithUpdatedParent) { case (state, child) => state.schedule(child) }
-    }
 
     def getNodesToPersist: (Seq[(ByteString, (ByteString, RequestType))], SchedulerState) =
       (memBatch.toSeq, copy(memBatch = Map.empty))
-  }
 
-  object SchedulerState {
+  object SchedulerState:
     def apply(): SchedulerState =
       new SchedulerState(
         Map.empty[ByteString, StateNodeRequest],
         PriorityQueue.empty(stateNodeRequestComparator),
         Map.empty
       )
-  }
 
   case object ProcessingSuccess
 
@@ -490,7 +452,7 @@ object SyncStateScheduler {
 
   case object AlreadyProcessedItem extends NotCriticalError
 
-  final case class ProcessingStatistics(duplicatedHashes: Long, notRequestedHashes: Long, saved: Long) {
+  final case class ProcessingStatistics(duplicatedHashes: Long, notRequestedHashes: Long, saved: Long):
     def addNotRequested(): ProcessingStatistics = copy(notRequestedHashes = notRequestedHashes + 1)
     def addDuplicated(): ProcessingStatistics = copy(duplicatedHashes = duplicatedHashes + 1)
     def addSaved(newSaved: Long): ProcessingStatistics = copy(saved = saved + newSaved)
@@ -499,9 +461,6 @@ object SyncStateScheduler {
         duplicatedHashes = that.duplicatedHashes,
         notRequestedHashes = that.notRequestedHashes
       )
-  }
 
-  object ProcessingStatistics {
+  object ProcessingStatistics:
     def apply(): ProcessingStatistics = new ProcessingStatistics(0, 0, 0)
-  }
-}

@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.network.p2p.EthereumMessageDecoder
 import com.chipprbots.ethereum.network.p2p.NetworkMessageDecoder
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Wire-format compliance tests for ETH68.
   *
@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.testing.Tags._
   *
   * Run before every JAR build targeted at live peer testing.
   */
-class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
+class ETH68ComplianceSpec extends AnyWordSpec with Matchers:
 
   private val eth68Decoder =
     NetworkMessageDecoder.orElse(EthereumMessageDecoder.ethMessageDecoder(Capability.ETH68))
@@ -28,7 +28,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── Status68 — 6-field wire format ──────────────────────────────────────────
 
   "ETH68 Status68" when {
-    import ETHPackets.Status68.Status68._
+    import ETHPackets.Status68.Status68.*
 
     "encoding" should {
 
@@ -51,19 +51,18 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
           68,
           61L,
           td,
-          Fixtures.Blocks.Block3125369.header.hash,
-          Fixtures.Blocks.Genesis.header.hash,
+          Fixtures.Blocks.Block3125369.header.hash.value,
+          Fixtures.Blocks.Genesis.header.hash.value,
           ForkId(0xbe46d57cL, None)
         )
         val encoded = msg.toBytes
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         import com.chipprbots.ethereum.utils.ByteUtils
-        rawDecode(encoded) match {
+        rawDecode(encoded) match
           case RLPList(_, _, RLPValue(tdBytes), _, _, _) =>
             ByteUtils.bytesToBigInt(tdBytes) shouldEqual td
             ByteUtils.bytesToBigInt(tdBytes) should be > BigInt(0)
           case _ => fail("Expected 6-field RLPList for Status68")
-        }
       }
     }
   }
@@ -71,36 +70,40 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── GetBlockHeaders / BlockHeaders — requestId round-trip ──────────────────
 
   "ETH68 GetBlockHeaders" when {
-    import ETHPackets.GetBlockHeaders._
+    import ETHPackets.GetBlockHeaders.*
 
     "encoding and decoding" should {
 
       "preserve requestId through encode/decode" taggedAs UnitTest in {
         val requestId = BigInt(42)
         val msg =
-          ETHPackets.GetBlockHeaders(requestId, Right(Fixtures.Blocks.Block3125369.header.hash), 1, 0, reverse = false)
-        eth68Decoder.fromBytes(Codes.GetBlockHeadersCode, msg.toBytes) match {
+          ETHPackets.GetBlockHeaders(
+            requestId,
+            Right(Fixtures.Blocks.Block3125369.header.hash.value),
+            1,
+            0,
+            reverse = false
+          )
+        eth68Decoder.fromBytes(Codes.GetBlockHeadersCode, msg.toBytes) match
           case Right(decoded: ETHPackets.GetBlockHeaders) =>
             decoded.requestId shouldEqual requestId
           case other => fail(s"Expected GetBlockHeaders, got $other")
-        }
       }
     }
   }
 
   "ETH68 BlockHeaders" when {
-    import ETHPackets.BlockHeaders._
+    import ETHPackets.BlockHeaders.*
 
     "encoding and decoding" should {
 
       "preserve requestId matching the GetBlockHeaders request" taggedAs UnitTest in {
         val requestId = BigInt(42)
         val response = ETHPackets.BlockHeaders(requestId, Seq(Fixtures.Blocks.Block3125369.header))
-        eth68Decoder.fromBytes(Codes.BlockHeadersCode, response.toBytes) match {
+        eth68Decoder.fromBytes(Codes.BlockHeadersCode, response.toBytes) match
           case Right(decoded: ETHPackets.BlockHeaders) =>
             decoded.requestId shouldEqual requestId
           case other => fail(s"Expected BlockHeaders, got $other")
-        }
       }
     }
   }
@@ -108,18 +111,17 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── GetBlockBodies / BlockBodies — requestId round-trip ────────────────────
 
   "ETH68 GetBlockBodies" when {
-    import ETHPackets.GetBlockBodies._
+    import ETHPackets.GetBlockBodies.*
 
     "encoding and decoding" should {
 
       "preserve requestId through encode/decode" taggedAs UnitTest in {
         val requestId = BigInt(99)
-        val msg = ETHPackets.GetBlockBodies(requestId, Seq(Fixtures.Blocks.Block3125369.header.hash))
-        eth68Decoder.fromBytes(Codes.GetBlockBodiesCode, msg.toBytes) match {
+        val msg = ETHPackets.GetBlockBodies(requestId, Seq(Fixtures.Blocks.Block3125369.header.hash.value))
+        eth68Decoder.fromBytes(Codes.GetBlockBodiesCode, msg.toBytes) match
           case Right(decoded: ETHPackets.GetBlockBodies) =>
             decoded.requestId shouldEqual requestId
           case other => fail(s"Expected GetBlockBodies, got $other")
-        }
       }
     }
   }
@@ -127,18 +129,17 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── GetReceipts / Receipts68 — requestId round-trip ────────────────────────
 
   "ETH68 GetReceipts" when {
-    import ETHPackets.GetReceipts._
+    import ETHPackets.GetReceipts.*
 
     "encoding and decoding" should {
 
       "preserve requestId through encode/decode" taggedAs UnitTest in {
         val requestId = BigInt(7)
-        val msg = ETHPackets.GetReceipts(requestId, Seq(Fixtures.Blocks.Block3125369.header.hash))
-        eth68Decoder.fromBytes(Codes.GetReceiptsCode, msg.toBytes) match {
+        val msg = ETHPackets.GetReceipts(requestId, Seq(Fixtures.Blocks.Block3125369.header.hash.value))
+        eth68Decoder.fromBytes(Codes.GetReceiptsCode, msg.toBytes) match
           case Right(decoded: ETHPackets.GetReceipts) =>
             decoded.requestId shouldEqual requestId
           case other => fail(s"Expected GetReceipts, got $other")
-        }
       }
     }
   }
@@ -146,8 +147,8 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── Receipts68 — bloom PRESENT in wire format ───────────────────────────────
 
   "ETH68 Receipts68" when {
-    import ETHPackets.Receipts68._
-    import com.chipprbots.ethereum.rlp._
+    import ETHPackets.Receipts68.*
+    import com.chipprbots.ethereum.rlp.*
 
     "encoding" should {
 
@@ -163,13 +164,12 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
         val msg = ETHPackets.Receipts68(BigInt(1), receiptsForBlocks)
         val encoded = msg.toBytes
 
-        eth68Decoder.fromBytes(Codes.ReceiptsCode, encoded) match {
+        eth68Decoder.fromBytes(Codes.ReceiptsCode, encoded) match
           case Right(r: ETHPackets.Receipts68) =>
             val blockReceiptList = r.receiptsForBlocks.items.head.asInstanceOf[RLPList]
             val receipt = blockReceiptList.items.head.asInstanceOf[RLPList]
             receipt.items.size shouldEqual 4 // stateHash, gasUsed, bloom, logs
           case other => fail(s"Expected Receipts68, got $other")
-        }
       }
     }
   }
@@ -209,8 +209,8 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── NewBlock — TD field present in wire bytes ────────────────────────────────
 
   "ETH68 NewBlock" when {
-    import ETHPackets.NewBlock._
-    import com.chipprbots.ethereum.rlp._
+    import ETHPackets.NewBlock.*
+    import com.chipprbots.ethereum.rlp.*
     import com.chipprbots.ethereum.utils.ByteUtils
 
     "encoding" should {
@@ -221,25 +221,22 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
         val msg = ETHPackets.NewBlock(block, td)
         val encoded = msg.toBytes
         // Wire: RLPList([blockHeader, txList, uncleList], TD)
-        rawDecode(encoded) match {
+        rawDecode(encoded) match
           case RLPList(_, RLPValue(tdBytes)) =>
             val decodedTd = ByteUtils.bytesToBigInt(tdBytes)
             decodedTd shouldEqual td
             decodedTd should be > BigInt(0)
           case _ => fail("Expected RLPList([blockData, td]) for NewBlock")
-        }
       }
 
       "round-trip correctly via ETH68 decoder" taggedAs UnitTest in {
         val td = BigInt("34359738368")
         val block = Fixtures.Blocks.Block3125369.block
         val msg = ETHPackets.NewBlock(block, td)
-        eth68Decoder.fromBytes(Codes.NewBlockCode, msg.toBytes) match {
+        eth68Decoder.fromBytes(Codes.NewBlockCode, msg.toBytes) match
           case Right(decoded: ETHPackets.NewBlock) =>
             decoded.totalDifficulty shouldEqual td
           case other => fail(s"Expected NewBlock, got $other")
-        }
       }
     }
   }
-}

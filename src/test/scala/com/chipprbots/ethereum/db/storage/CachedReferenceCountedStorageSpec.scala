@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.mpt.NodesKeyValueStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.NodeCacheConfig
 
 // scalastyle:off magic.number
@@ -23,9 +23,9 @@ class CachedReferenceCountedStorageSpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with ObjectGenerators {
+    with ObjectGenerators:
 
-  "ChangeLog" should "record all changes" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  "ChangeLog" should "record all changes" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     var blockNumber = 1
     forAll(keyValueByteStringGen(10)) { changes =>
       val toUpdate = changes
@@ -56,9 +56,8 @@ class CachedReferenceCountedStorageSpec
 
       blockNumber = blockNumber + 1
     }
-  }
 
-  it should "save all recorded changes to storage" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  it should "save all recorded changes to storage" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     var blockNumber = 1
     forAll(keyValueByteStringGen(10)) { changes =>
       val toUpdate = changes
@@ -98,12 +97,11 @@ class CachedReferenceCountedStorageSpec
 
       blockNumber = blockNumber + 1
     }
-  }
 
   "CachedReferenceCountedStorage" should "prune not referenced nodes " taggedAs (
     UnitTest,
     DatabaseTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     updateStorage(1) { stor =>
       stor.update(generateKeys(5).map(_._1), generateKeys(10))
     }
@@ -123,9 +121,8 @@ class CachedReferenceCountedStorageSpec
     assertKeysExists(storage1, generateKeys(20, 6))
     // Pruned 5 nodes marked for delete
     assert(testLruCache.getValues.size == 15)
-  }
 
-  it should "not prune nodes which became referenced" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  it should "not prune nodes which became referenced" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     updateStorage(1) { stor =>
       stor.update(generateKeys(5).map(_._1), generateKeys(10))
     }
@@ -151,9 +148,8 @@ class CachedReferenceCountedStorageSpec
     assert(reAllocatedValue.isDefined)
     val value = reAllocatedValue.get
     assert(value.numOfParents == 1 && value.bn == 2)
-  }
 
-  it should "enable roll-backing changes made by block" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  it should "enable roll-backing changes made by block" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     updateStorage(1) { stor =>
       stor.update(generateKeys(5).map(_._1), generateKeys(10))
     }
@@ -180,9 +176,8 @@ class CachedReferenceCountedStorageSpec
 
     // All changes to reference counts, and possible new nodes are reversed
     cacheStateBeforeChanges should contain theSameElementsAs cacheStateAfterRollback
-  }
 
-  it should "flush exising nodes to disk" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  it should "flush exising nodes to disk" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     updateStorage(1) { stor =>
       stor.update(generateKeys(5).map(_._1), generateKeys(10))
     }
@@ -194,21 +189,18 @@ class CachedReferenceCountedStorageSpec
 
     val result: Boolean = CachedReferenceCountedStorage.persistCache(testLruCache, nodeStorage)
 
-    if (result) {
+    if result then
       assert(testLruCache.getValues.isEmpty)
       assertKeysExists(storage1, generateKeys(20))
-    }
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val dataSource: EphemDataSource = EphemDataSource()
     val nodeStorage = new NodeStorage(dataSource)
     val changeLog = new ChangeLog(nodeStorage)
 
-    object TestCacheConfig extends NodeCacheConfig {
+    object TestCacheConfig extends NodeCacheConfig:
       override val maxSize: Long = 100
       override val maxHoldTime: FiniteDuration = FiniteDuration(1, TimeUnit.NANOSECONDS)
-    }
 
     val testLruCache = new LruCache[ByteString, HeapEntry](
       TestCacheConfig,
@@ -218,31 +210,26 @@ class CachedReferenceCountedStorageSpec
     def generateKeys(to: Int, from: Int = 1): List[(ByteString, Array[Byte])] =
       (from to to).map(i => kec256(ByteString(s"key$i")) -> ByteString(s"value$i").toArray[Byte]).toList
 
-    def insertRangeKeys(n: Int, storage: NodesKeyValueStorage): Seq[(ByteString, Array[Byte])] = {
+    def insertRangeKeys(n: Int, storage: NodesKeyValueStorage): Seq[(ByteString, Array[Byte])] =
       val toInsert = generateKeys(n)
       toInsert.foreach(i => storage.put(i._1, i._2))
       toInsert
-    }
 
     def scatterUpdates(updates: List[Update]): (List[ByteString], List[ByteString]) =
       updates.foldLeft((List.empty[ByteString], List.empty[ByteString])) { (acc, up) =>
-        up match {
+        up match
           case Increase(hash) => acc.copy(_2 = hash :: acc._2)
           case New(hash)      => acc.copy(_2 = hash :: acc._2)
           case Decrease(hash) => acc.copy(_1 = hash :: acc._1)
-        }
       }
 
-    def updateStorage(bn: BigInt)(update: NodesKeyValueStorage => Unit): NodesKeyValueStorage = {
+    def updateStorage(bn: BigInt)(update: NodesKeyValueStorage => Unit): NodesKeyValueStorage =
       val storage = new CachedReferenceCountedStorage(nodeStorage, testLruCache, changeLog, bn)
       update(storage)
       changeLog.persistChangeLog(bn)
       storage
-    }
 
     def assertKeysExists(storage: NodesKeyValueStorage, keys: List[(ByteString, Array[Byte])]): Unit =
       keys.foreach { case (key, value) =>
         assert(storage.get(key).exists(enc => enc.sameElements(value)))
       }
-  }
-}

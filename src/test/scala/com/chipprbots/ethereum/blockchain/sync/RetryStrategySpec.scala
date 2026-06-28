@@ -1,16 +1,16 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
-  "RetryStrategy" should "calculate exponential backoff correctly" taggedAs (UnitTest, SyncTest) in {
+  "RetryStrategy" should "calculate exponential backoff correctly" taggedAs (UnitTest) in {
     val strategy = RetryStrategy(
       initialDelay = 100.millis,
       maxDelay = 10.seconds,
@@ -29,7 +29,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     delay3 shouldBe 800L +- 1L
   }
 
-  it should "respect maximum delay cap" taggedAs (UnitTest, SyncTest) in {
+  it should "respect maximum delay cap" taggedAs (UnitTest) in {
     val strategy = RetryStrategy(
       initialDelay = 100.millis,
       maxDelay = 500.millis,
@@ -41,7 +41,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     delay10.toMillis shouldBe 500L +- 1L
   }
 
-  it should "add jitter to delay" taggedAs (UnitTest, SyncTest) in {
+  it should "add jitter to delay" taggedAs (UnitTest) in {
     val strategy = RetryStrategy(
       initialDelay = 1000.millis,
       maxDelay = 10.seconds,
@@ -59,14 +59,14 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     delays.foreach(_ should ((be >= 1000L).and(be <= 1200L)))
   }
 
-  it should "require non-negative attempt number" taggedAs (UnitTest, SyncTest) in {
+  it should "require non-negative attempt number" taggedAs (UnitTest) in {
     val strategy = RetryStrategy.default
     assertThrows[IllegalArgumentException] {
       strategy.nextDelay(-1)
     }
   }
 
-  it should "calculate total time correctly" taggedAs (UnitTest, SyncTest) in {
+  it should "calculate total time correctly" taggedAs (UnitTest) in {
     val strategy = RetryStrategy(
       initialDelay = 100.millis,
       maxDelay = 10.seconds,
@@ -79,7 +79,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     total shouldBe 700L +- 50L // Allow some variance
   }
 
-  "RetryStrategy.default" should "have reasonable parameters" taggedAs (UnitTest, SyncTest) in {
+  "RetryStrategy.default" should "have reasonable parameters" taggedAs (UnitTest) in {
     val strategy = RetryStrategy.default
 
     strategy.initialDelay shouldBe 500.millis
@@ -88,7 +88,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     strategy.jitterFactor shouldBe 0.2 +- 0.01
   }
 
-  "RetryStrategy.fast" should "have faster parameters" taggedAs (UnitTest, SyncTest) in {
+  "RetryStrategy.fast" should "have faster parameters" taggedAs (UnitTest) in {
     val strategy = RetryStrategy.fast
 
     strategy.initialDelay shouldBe 100.millis
@@ -96,7 +96,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     strategy.multiplier shouldBe 1.5 +- 0.01
   }
 
-  "RetryStrategy.slow" should "have slower parameters" taggedAs (UnitTest, SyncTest) in {
+  "RetryStrategy.slow" should "have slower parameters" taggedAs (UnitTest) in {
     val strategy = RetryStrategy.slow
 
     strategy.initialDelay shouldBe 1.second
@@ -104,7 +104,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     strategy.multiplier shouldBe 2.5 +- 0.01
   }
 
-  "RetryStrategy.conservative" should "have high jitter" taggedAs (UnitTest, SyncTest) in {
+  "RetryStrategy.conservative" should "have high jitter" taggedAs (UnitTest) in {
     val strategy = RetryStrategy.conservative
 
     strategy.initialDelay shouldBe 2.seconds
@@ -113,7 +113,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     strategy.jitterFactor shouldBe 0.5 +- 0.01
   }
 
-  "RetryStrategy" should "support fluent configuration" taggedAs (UnitTest, SyncTest) in {
+  "RetryStrategy" should "support fluent configuration" taggedAs (UnitTest) in {
     val strategy = RetryStrategy.default
       .withInitialDelay(200.millis)
       .withMaxDelay(20.seconds)
@@ -126,12 +126,12 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     strategy.jitterFactor shouldBe 0.1 +- 0.01
   }
 
-  "RetryState" should "start at attempt 0" taggedAs (UnitTest, SyncTest) in {
+  "RetryState" should "start at attempt 0" taggedAs (UnitTest) in {
     val state = RetryState()
     state.attempt shouldBe 0
   }
 
-  it should "increment attempt on record" taggedAs (UnitTest, SyncTest) in {
+  it should "increment attempt on record" taggedAs (UnitTest) in {
     val state = RetryState()
     val updated = state.recordAttempt
 
@@ -141,7 +141,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     updated.firstAttemptTime shouldBe updated.lastAttemptTime
   }
 
-  it should "reset to initial state" taggedAs (UnitTest, SyncTest) in {
+  it should "reset to initial state" taggedAs (UnitTest) in {
     val state = RetryState(
       attempt = 5,
       firstAttemptTime = Some(System.currentTimeMillis()),
@@ -154,7 +154,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     reset.lastAttemptTime shouldBe None
   }
 
-  it should "calculate next delay based on current attempt" taggedAs (UnitTest, SyncTest) in {
+  it should "calculate next delay based on current attempt" taggedAs (UnitTest) in {
     val strategy = RetryStrategy(
       initialDelay = 100.millis,
       maxDelay = 10.seconds,
@@ -167,7 +167,7 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
     delay shouldBe 400L +- 1L // 100 * 2^2
   }
 
-  it should "detect when max attempts reached" taggedAs (UnitTest, SyncTest) in {
+  it should "detect when max attempts reached" taggedAs (UnitTest) in {
     val state = RetryState(attempt = 5)
 
     state.shouldGiveUp(maxAttempts = 3) shouldBe true
@@ -179,4 +179,3 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
   // Note: totalTimeSpent method removed from tests as it's a trivial calculation
   // (System.currentTimeMillis() - startTime) that doesn't warrant time-dependent testing.
   // The method is tested implicitly through integration tests and production usage.
-}

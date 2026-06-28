@@ -6,26 +6,20 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.AccountRangeEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.AccountRangeDec
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes.ByteCodesEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes.ByteCodesDec
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.GetAccountRangeEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.GetAccountRangeDec
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.GetByteCodesEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.GetByteCodesDec
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetStorageRanges.GetStorageRangesEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetStorageRanges.GetStorageRangesDec
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes.GetTrieNodesEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes.GetTrieNodesDec
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.StorageRangesEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.StorageRangesDec
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.TrieNodesEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.TrieNodesDec
-import com.chipprbots.ethereum.rlp.{RLPList, RLPValue, rawDecode}
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetStorageRanges.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.*
+import com.chipprbots.ethereum.rlp.RLPList
+import com.chipprbots.ethereum.rlp.RLPValue
+import com.chipprbots.ethereum.rlp.rawDecode
 
-class SNAPMessagesSpec extends AnyWordSpec with Matchers {
+class SNAPMessagesSpec extends AnyWordSpec with Matchers:
 
   private val zeroHash = ByteString(new Array[Byte](32))
   private val maxHash = ByteString(Array.fill(32)(0xff.toByte))
@@ -44,11 +38,10 @@ class SNAPMessagesSpec extends AnyWordSpec with Matchers {
 
       val encoded = msg.toBytes
 
-      rawDecode(encoded) match {
+      rawDecode(encoded) match
         case RLPList(RLPValue(requestIdBytes), _*) =>
           requestIdBytes shouldBe Array(0x80.toByte)
         case _ => fail("Expected RLPList with request-id as first element")
-      }
     }
 
     "encode GetAccountRange requestId=0 as empty bytes per RLP spec" in {
@@ -62,11 +55,10 @@ class SNAPMessagesSpec extends AnyWordSpec with Matchers {
 
       val encoded = msg.toBytes
 
-      rawDecode(encoded) match {
+      rawDecode(encoded) match
         case RLPList(RLPValue(requestIdBytes), _*) =>
           requestIdBytes shouldBe empty
         case _ => fail("Expected RLPList with request-id as first element")
-      }
     }
 
     "round-trip GetAccountRange with all fields preserved" in {
@@ -281,4 +273,3 @@ class SNAPMessagesSpec extends AnyWordSpec with Matchers {
       an[Exception] should be thrownBy malformed.toGetStorageRanges
     }
   }
-}

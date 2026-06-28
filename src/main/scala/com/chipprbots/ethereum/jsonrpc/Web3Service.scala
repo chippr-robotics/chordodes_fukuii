@@ -9,20 +9,18 @@ import scala.annotation.unused
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.utils.Config
 
-object Web3Service {
+object Web3Service:
   case class Sha3Request(data: ByteString)
   case class Sha3Response(data: ByteString)
 
   case class ClientVersionRequest()
   case class ClientVersionResponse(value: String)
-}
 
-class Web3Service {
-  import Web3Service._
+class Web3Service:
+  import Web3Service.*
 
   def sha3(req: Sha3Request): ServiceResponse[Sha3Response] =
     IO(Right(Sha3Response(crypto.kec256(req.data))))
 
   def clientVersion(@unused req: ClientVersionRequest): ServiceResponse[ClientVersionResponse] =
     IO(Right(ClientVersionResponse(Config.clientVersion)))
-}

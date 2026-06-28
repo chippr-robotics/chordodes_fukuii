@@ -3,7 +3,7 @@ package com.chipprbots.scalanet.peergroup.dynamictls
 import java.net.Socket
 import java.security.KeyStore
 import java.security.cert.X509Certificate
-import javax.net.ssl._
+import javax.net.ssl.*
 
 import com.chipprbots.scalanet.peergroup.dynamictls.DynamicTLSPeerGroup.PeerInfo
 import io.netty.handler.ssl.ClientAuth
@@ -81,7 +81,7 @@ private[scalanet] object DynamicTLSPeerGroupUtils {
     f match {
       case SSLContextForServer =>
         SslContextBuilder
-          .forServer(config.connectionKeyPair.getPrivate, List(config.connectionCertificate): _*)
+          .forServer(config.connectionKeyPair.getPrivate, List(config.connectionCertificate)*)
           .trustManager(new CustomTrustManagerFactory(None))
           .sslProvider(sslProvider)
           .clientAuth(ClientAuth.REQUIRE)
@@ -91,7 +91,7 @@ private[scalanet] object DynamicTLSPeerGroupUtils {
       case SSLContextForClient(info) =>
         SslContextBuilder
           .forClient()
-          .keyManager(config.connectionKeyPair.getPrivate, List(config.connectionCertificate): _*)
+          .keyManager(config.connectionKeyPair.getPrivate, List(config.connectionCertificate)*)
           .trustManager(new CustomTrustManagerFactory(Some(info.id)))
           .sslProvider(sslProvider)
           .protocols("TLSv1.3")

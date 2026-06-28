@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.consensus.pow
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.{ActorSystem => ClassicSystem}
+import org.apache.pekko.actor.ActorSystem as ClassicSystem
 import org.apache.pekko.testkit.TestActor
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -17,6 +17,7 @@ import org.scalamock.handlers.CallHandler4
 import org.scalamock.handlers.CallHandler6
 
 import com.chipprbots.ethereum.Fixtures
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.FullMiningConfig
@@ -27,7 +28,7 @@ import com.chipprbots.ethereum.consensus.pow.difficulty.EthashDifficultyCalculat
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.VMImpl
@@ -43,7 +44,7 @@ import com.chipprbots.ethereum.utils.Config
 trait MinerSpecSetup
     extends MiningConfigBuilder
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
   // Abstract mock members - must be implemented by test class that has MockFactory
   def mockBlockchainReader: BlockchainReader
   def mockBlockchain: BlockchainImpl
@@ -117,7 +118,7 @@ trait MinerSpecSetup
   protected def getParentBlock(parentBlockNumber: Int): Block =
     origin.copy(header = origin.header.copy(number = parentBlockNumber))
 
-  def buildPoWConsensus(): PoWMining = {
+  def buildPoWConsensus(): PoWMining =
     val fukuiiConfig = Config.config
     val specificConfig = EthashConfig(fukuiiConfig)
 
@@ -135,7 +136,6 @@ trait MinerSpecSetup
       validators,
       additionalPoWData
     )
-  }
 
   // Abstract method for setting up block generation expectations
   // Must be implemented by the test class with MockFactory context
@@ -154,12 +154,11 @@ trait MinerSpecSetup
     * NOTE: The expectation is set to anyNumberOfTimes() to avoid failures when tests crash before actually mining
     * (e.g., actor initialization failures).
     */
-  protected def setBlockForMining(parentBlock: Block, transactions: Seq[SignedTransaction] = Seq(txToMine)): Block = {
+  protected def setBlockForMining(parentBlock: Block, transactions: Seq[SignedTransaction] = Seq(txToMine)): Block =
     val block = createBlockForMining(parentBlock, transactions)
     setBlockForMiningExpectation(parentBlock, block, fakeWorld)
       .anyNumberOfTimes()
     block
-  }
 
   /** Creates a block for mining WITHOUT setting up any mock expectations. Use this when the test will set up its own
     * mocks (e.g., MockedMiner tests where blockCreator is mocked and blockGenerator is never called).
@@ -167,13 +166,14 @@ trait MinerSpecSetup
   protected def createBlockForMining(
       parentBlock: Block,
       transactions: Seq[SignedTransaction] = Seq(txToMine)
-  ): Block = {
+  ): Block =
     val parentHeader: BlockHeader = parentBlock.header
 
     Block(
       BlockHeader(
         parentHash = parentHeader.hash,
-        ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = miningConfig.coinbase.bytes,
         stateRoot = parentHeader.stateRoot,
         transactionsRoot = parentHeader.transactionsRoot,
@@ -185,27 +185,23 @@ trait MinerSpecSetup
         gasUsed = BigInt(0),
         unixTimestamp = blockForMiningTimestamp,
         extraData = miningConfig.headerExtraData,
-        mixHash = ByteString.empty,
+        mixHash = BlockHash(ByteString.empty),
         nonce = ByteString.empty
       ),
       BlockBody(transactions, Nil)
     )
-  }
 
-  private def calculateGasLimit(parentGas: UInt256): UInt256 = {
+  private def calculateGasLimit(parentGas: UInt256): UInt256 =
     val GasLimitBoundDivisor: Int = 1024
     val target = UInt256(miningConfig.gasLimitTarget)
     val delta = parentGas / GasLimitBoundDivisor - 1
-    if (parentGas < target) {
+    if parentGas < target then
       val next = parentGas + delta
-      if (next > target) target else next
-    } else if (parentGas > target) {
+      if next > target then target else next
+    else if parentGas > target then
       val next = parentGas - delta
-      if (next < target) target else next
-    } else {
-      parentGas
-    }
-  }
+      if next < target then target else next
+    else parentGas
 
   // Abstract method for block creator behavior expectations
   def blockCreatorBehaviourExpectation(
@@ -242,25 +238,31 @@ trait MinerSpecSetup
   // Abstract method for prepareMocks expectations
   def setupMiningServiceExpectation(): Unit
 
-  protected def prepareMocks(): Unit = {
+  protected def prepareMocks(): Unit =
     setupMiningServiceExpectation()
 
-    ommersPool.setAutoPilot { (sender: ActorRef, _: Any) =>
-      sender ! OmmersPool.Ommers(Nil)
+    ommersPool.setAutoPilot { (_: ActorRef, msg: Any) =>
+      msg match
+        case OmmersPool.GetOmmers(_, replyTo) => replyTo ! OmmersPool.Ommers(Nil)
+        case _                                => ()
       TestActor.KeepRunning
     }
 
-    pendingTransactionsManager.setAutoPilot { (sender: ActorRef, _: Any) =>
-      sender ! PendingTransactionsManager.PendingTransactionsResponse(Nil)
+    pendingTransactionsManager.setAutoPilot { (_: ActorRef, msg: Any) =>
+      msg match
+        case PendingTransactionsManager.GetPendingTransactionsReq(replyTo) =>
+          replyTo ! PendingTransactionsManager.PendingTransactionsResponse(Nil)
+        case _ => ()
       TestActor.KeepRunning
     }
-  }
 
   protected def waitForMinedBlock(implicit timeout: Duration): Block =
-    sync.expectMsgPF[Block](timeout) { case m: SyncProtocol.MinedBlock =>
-      m.block
+    // ROOT-c: miners now wrap mined-block sends in SyncController.WrappedSyncProtocol so they survive SyncController's
+    // Behavior[Command] boundary. The sync probe therefore receives the wrapper; unwrap to the MinedBlock here.
+    sync.expectMsgPF[Block](timeout) {
+      case SyncController.WrappedSyncProtocol(m: SyncProtocol.MinedBlock) => m.block
+      case m: SyncProtocol.MinedBlock                                     => m.block
     }
 
   protected def expectNoNewBlockMsg(timeout: FiniteDuration): Unit =
     sync.expectNoMessage(timeout)
-}

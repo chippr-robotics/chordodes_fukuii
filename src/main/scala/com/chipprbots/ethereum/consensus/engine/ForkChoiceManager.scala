@@ -1,10 +1,11 @@
 package com.chipprbots.ethereum.consensus.engine
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.util.ByteString
-
 import java.util.concurrent.atomic.AtomicReference
 
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.util.ByteString
+
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
@@ -22,7 +23,7 @@ import com.chipprbots.ethereum.utils.Logger
 class ForkChoiceManager(
     blockchainReader: BlockchainReader,
     blockchainWriter: BlockchainWriter
-) extends Logger {
+) extends Logger:
 
   private val currentState: AtomicReference[Option[ForkChoiceState]] =
     new AtomicReference(None)
@@ -30,7 +31,8 @@ class ForkChoiceManager(
   // Listener that wants to know whenever the CL publishes a head, even when the head is unknown
   // (Left("SYNCING") branch) — that's exactly the trigger SNAP needs to begin / re-pivot. Set
   // by SyncController on post-merge chains; never set on ETC mainnet (terminalTotalDifficulty=None).
-  private val listenerRef: AtomicReference[Option[ActorRef]] = new AtomicReference(None)
+  private val listenerRef: AtomicReference[Option[TypedActorRef[ForkChoiceManager.BeaconHead]]] =
+    new AtomicReference(None)
 
   def isActive: Boolean = currentState.get().isDefined
 
@@ -46,7 +48,7 @@ class ForkChoiceManager(
     * listener. Only registered on post-merge chains (gated by `blockchainConfig.terminalTotalDifficulty.isDefined` in
     * SyncController).
     */
-  def setListener(ref: ActorRef): Unit = listenerRef.set(Some(ref))
+  def setListener(ref: TypedActorRef[ForkChoiceManager.BeaconHead]): Unit = listenerRef.set(Some(ref))
 
   /** Unregister the current listener (e.g. on shutdown / mode switch). */
   def clearListener(): Unit = listenerRef.set(None)
@@ -58,18 +60,18 @@ class ForkChoiceManager(
     * @return
     *   Right(()) if valid, Left(error) if head block is unknown
     */
-  def applyForkChoiceState(newState: ForkChoiceState): Either[String, Unit] = {
-    val maybeHeader = blockchainReader.getBlockHeaderByHash(newState.headBlockHash)
+  def applyForkChoiceState(newState: ForkChoiceState): Either[String, Unit] =
+    val maybeHeader = blockchainReader.getBlockHeaderByHash(BlockHash(newState.headBlockHash))
 
     // Publish to the listener regardless of head-known status — SNAP needs the
     // unknown-head case as its trigger to start / re-pivot. The listener message
     // is fire-and-forget; the rest of this method's behavior is unchanged.
     publishBeaconHead(newState.headBlockHash, maybeHeader)
 
-    if (maybeHeader.isEmpty) {
+    if maybeHeader.isEmpty then
       log.info(s"Fork choice head ${newState.headBlockHash} not known yet (SYNCING)")
       Left("SYNCING")
-    } else {
+    else
       log.info(
         s"Fork choice updated: head=${newState.headBlockHash}, " +
           s"safe=${newState.safeBlockHash}, finalized=${newState.finalizedBlockHash}"
@@ -79,13 +81,11 @@ class ForkChoiceManager(
       // Rewrite number→hash mapping for the new canonical branch (no-op if already canonical).
       // Then persist canonical best-block pointer.
       maybeHeader.foreach { header =>
-        blockchainWriter.promoteBranchToCanonical(newState.headBlockHash, blockchainReader)
-        blockchainWriter.saveBestKnownBlocks(newState.headBlockHash, header.number)
+        blockchainWriter.promoteBranchToCanonical(BlockHash(newState.headBlockHash), blockchainReader)
+        blockchainWriter.saveBestKnownBlocks(BlockHash(newState.headBlockHash), header.number)
       }
 
       Right(())
-    }
-  }
 
   /** Clear fork choice state (e.g., on shutdown or mode switch). */
   def clear(): Unit = currentState.set(None)
@@ -94,9 +94,8 @@ class ForkChoiceManager(
     listenerRef.get().foreach { ref =>
       ref ! ForkChoiceManager.BeaconHead(headHash, knownHeader)
     }
-}
 
-object ForkChoiceManager {
+object ForkChoiceManager:
 
   /** Notification sent by [[ForkChoiceManager]] to its registered listener whenever the CL pushes a fork choice via
     * engine_forkchoiceUpdated. Carries both the head hash (always) and the locally-stored header (when we already have
@@ -104,4 +103,3 @@ object ForkChoiceManager {
     * post-merge initial-sync case where the EL is far behind the CL.
     */
   final case class BeaconHead(headHash: ByteString, knownHeader: Option[BlockHeader])
-}

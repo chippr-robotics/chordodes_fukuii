@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.testing
 
-import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
+import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 
 /** Simple in-memory test storage for EVM code
   *

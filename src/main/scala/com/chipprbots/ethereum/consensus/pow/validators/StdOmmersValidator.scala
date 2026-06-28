@@ -5,15 +5,16 @@ import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
 import com.chipprbots.ethereum.consensus.mining.GetNBlocksBack
 import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError
-import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError._
+import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError.*
 import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-class StdOmmersValidator(blockHeaderValidator: BlockHeaderValidator) extends OmmersValidator {
+class StdOmmersValidator(blockHeaderValidator: BlockHeaderValidator) extends OmmersValidator:
 
   val OmmerGenerationLimit: Int = 6 // Stated on section 11.1, eq. (143) of the YP
   val OmmerSizeLimit: Int = 2
@@ -50,16 +51,15 @@ class StdOmmersValidator(blockHeaderValidator: BlockHeaderValidator) extends Omm
       getBlockHeaderByHash: GetBlockHeaderByHash,
       getNBlocksBack: GetNBlocksBack
   )(implicit blockchainConfig: BlockchainConfig): Either[OmmersError, OmmersValid] =
-    if (ommers.isEmpty)
-      Right(OmmersValid)
+    if ommers.isEmpty then Right(OmmersValid)
     else
-      for {
+      for
         _ <- validateOmmersLength(ommers)
         _ <- validateDuplicatedOmmers(ommers)
         _ <- validateOmmersHeaders(ommers, getBlockHeaderByHash)
         _ <- validateOmmersAncestors(parentHash, blockNumber, ommers, getNBlocksBack)
         _ <- validateOmmersNotUsed(parentHash, blockNumber, ommers, getNBlocksBack)
-      } yield OmmersValid
+      yield OmmersValid
 
   /** Validates ommers length based on validations stated in section 11.1 of the YP
     *
@@ -70,7 +70,7 @@ class StdOmmersValidator(blockHeaderValidator: BlockHeaderValidator) extends Omm
     *   [[OmmersValidator.OmmersValid]] if valid, an [[OmmersValidator.OmmersError.OmmersLengthError]] otherwise
     */
   private def validateOmmersLength(ommers: Seq[BlockHeader]): Either[OmmersError, OmmersValid] =
-    if (ommers.length <= OmmerSizeLimit) Right(OmmersValid)
+    if ommers.length <= OmmerSizeLimit then Right(OmmersValid)
     else Left(OmmersLengthError)
 
   /** Validates that each ommer's header is valid based on validations stated in section 11.1 of the YP
@@ -85,16 +85,14 @@ class StdOmmersValidator(blockHeaderValidator: BlockHeaderValidator) extends Omm
   private def validateOmmersHeaders(
       ommers: Seq[BlockHeader],
       getBlockParentsHeaderByHash: GetBlockHeaderByHash
-  )(implicit blockchainConfig: BlockchainConfig): Either[OmmersError, OmmersValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[OmmersError, OmmersValid] =
     val validationsResult: Seq[Either[BlockHeaderError, BlockHeaderValid]] =
       ommers.map(blockHeaderValidator.validate(_, getBlockParentsHeaderByHash))
 
-    if (validationsResult.forall(_.isRight)) Right(OmmersValid)
-    else {
+    if validationsResult.forall(_.isRight) then Right(OmmersValid)
+    else
       val errors = validationsResult.collect { case Left(error) => error }.toList
       Left(OmmersHeaderError(errors))
-    }
-  }
 
   /** Validates that each ommer is not too old and that it is a sibling as one of the current block's ancestors based on
     * validations stated in section 11.1 of the YP
@@ -116,22 +114,21 @@ class StdOmmersValidator(blockHeaderValidator: BlockHeaderValidator) extends Omm
       blockNumber: BigInt,
       ommers: Seq[BlockHeader],
       getNBlocksBack: GetNBlocksBack
-  ): Either[OmmersError, OmmersValid] = {
+  ): Either[OmmersError, OmmersValid] =
 
     val ancestors = collectAncestors(parentHash, blockNumber, getNBlocksBack)
-    lazy val ommersHashes: Seq[ByteString] = ommers.map(_.hash)
-    lazy val ommersThatAreAncestors: Seq[ByteString] = ancestors.map(_.hash).intersect(ommersHashes)
+    lazy val ommersHashes: Seq[BlockHash] = ommers.map(_.hash)
+    lazy val ommersThatAreAncestors: Seq[BlockHash] = ancestors.map(_.hash).intersect(ommersHashes)
 
-    lazy val ancestorsParents: Seq[ByteString] = ancestors.map(_.parentHash)
-    lazy val ommersParentsHashes: Seq[ByteString] = ommers.map(_.parentHash)
+    lazy val ancestorsParents: Seq[BlockHash] = ancestors.map(_.parentHash)
+    lazy val ommersParentsHashes: Seq[BlockHash] = ommers.map(_.parentHash)
 
     // parent not an ancestor or is too old (we only compare up to 6 previous ancestors)
     lazy val ommersParentsAreAllAncestors: Boolean = ommersParentsHashes.forall(ancestorsParents.contains)
 
-    if (ommersThatAreAncestors.nonEmpty) Left(OmmerIsAncestorError)
-    else if (!ommersParentsAreAllAncestors) Left(OmmerParentIsNotAncestorError)
+    if ommersThatAreAncestors.nonEmpty then Left(OmmerIsAncestorError)
+    else if !ommersParentsAreAllAncestors then Left(OmmerParentIsNotAncestorError)
     else Right(OmmersValid)
-  }
 
   /** Validates that each ommer was not previously used based on validations stated in the white paper
     * (https://github.com/ethereum/wiki/wiki/White-Paper)
@@ -152,13 +149,12 @@ class StdOmmersValidator(blockHeaderValidator: BlockHeaderValidator) extends Omm
       blockNumber: BigInt,
       ommers: Seq[BlockHeader],
       getNBlocksBack: GetNBlocksBack
-  ): Either[OmmersError, OmmersValid] = {
+  ): Either[OmmersError, OmmersValid] =
 
     val ommersFromAncestors = collectOmmersFromAncestors(parentHash, blockNumber, getNBlocksBack)
 
-    if (ommers.intersect(ommersFromAncestors).isEmpty) Right(OmmersValid)
+    if ommers.intersect(ommersFromAncestors).isEmpty then Right(OmmersValid)
     else Left(OmmersUsedBeforeError)
-  }
 
   /** Validates that there are no duplicated ommers based on validations stated in the white paper
     * (https://github.com/ethereum/wiki/wiki/White-Paper)
@@ -169,24 +165,21 @@ class StdOmmersValidator(blockHeaderValidator: BlockHeaderValidator) extends Omm
     *   [[OmmersValidator.OmmersValid]] if valid, an [[OmmersValidator.OmmersError.OmmersDuplicatedError]] otherwise
     */
   private def validateDuplicatedOmmers(ommers: Seq[BlockHeader]): Either[OmmersError, OmmersValid] =
-    if (ommers.distinct.length == ommers.length) Right(OmmersValid)
+    if ommers.distinct.length == ommers.length then Right(OmmersValid)
     else Left(OmmersDuplicatedError)
 
   private def collectAncestors(
       parentHash: ByteString,
       blockNumber: BigInt,
       getNBlocksBack: GetNBlocksBack
-  ): Seq[BlockHeader] = {
+  ): Seq[BlockHeader] =
     val numberOfBlocks = blockNumber.min(OmmerGenerationLimit).toInt
     getNBlocksBack(parentHash, numberOfBlocks).map(_.header)
-  }
 
   private def collectOmmersFromAncestors(
       parentHash: ByteString,
       blockNumber: BigInt,
       getNBlocksBack: GetNBlocksBack
-  ): Seq[BlockHeader] = {
+  ): Seq[BlockHeader] =
     val numberOfBlocks = blockNumber.min(OmmerGenerationLimit).toInt
     getNBlocksBack(parentHash, numberOfBlocks).flatMap(_.body.uncleNodesList)
-  }
-}

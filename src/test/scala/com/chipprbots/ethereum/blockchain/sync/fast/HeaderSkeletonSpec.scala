@@ -1,12 +1,12 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.ParallelTestExecution
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class HeaderSkeletonSpec extends AnyWordSpec with Matchers with ParallelTestExecution {
+class HeaderSkeletonSpec extends AnyWordSpec with Matchers with ParallelTestExecution:
 
   // [] <- skeleton boundary
   // *x* <- skeleton header
@@ -42,5 +42,3 @@ class HeaderSkeletonSpec extends AnyWordSpec with Matchers with ParallelTestExec
       assert(skeleton.limit === BigInt(1))
     }
   }
-
-}

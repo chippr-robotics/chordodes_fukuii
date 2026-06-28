@@ -76,12 +76,14 @@ version with us and are disconnected during negotiation instead.
 
 ## Decode Flow Verification
 
-All protocol decoders (ETH63-ETH68) were verified to be correctly implemented:
+> **Note (2026):** ETH63–ETH67 decoders have since been removed. The live decode path covers ETH68, ETH69, and ETH70. The historical verification summary below reflects the state at the time this document was written.
 
-- **ETH63-ETH65**: Use legacy message format without RequestId
-- **ETH66-ETH68**: Use RequestId wrapper for request/response tracking
+All protocol decoders (ETH63-ETH68) were verified to be correctly implemented at the time of this update:
+
+- **ETH63-ETH65**: Used legacy message format without RequestId (now removed)
+- **ETH66-ETH68**: Use RequestId wrapper for request/response tracking (ETH66/67 now removed; ETH68 remains)
 - **Message adaptation**: `PeersClient` automatically adapts messages based on negotiated protocol
-- **RequestId detection**: `Capability.usesRequestId()` correctly identifies ETH66+ and SNAP1
+- **RequestId detection**: `Capability.usesRequestId()` correctly identifies ETH68+ and SNAP1
 
 ## Impact
 

@@ -7,7 +7,7 @@ import java.nio.file.Files
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Integration tests for launcher configurations.
   *
@@ -20,38 +20,33 @@ import com.chipprbots.ethereum.testing.Tags._
   * @see
   *   test-launcher-integration.sh (deprecated)
   */
-class LauncherIntegrationSpec extends AnyFlatSpec with Matchers {
+class LauncherIntegrationSpec extends AnyFlatSpec with Matchers:
 
   // Cached reflection methods for efficiency
-  private lazy val isModifierMethod = {
+  private lazy val isModifierMethod =
     val method = App.getClass.getDeclaredMethod("isModifier", classOf[String])
     method.setAccessible(true)
     method
-  }
 
-  private lazy val isNetworkMethod = {
+  private lazy val isNetworkMethod =
     val method = App.getClass.getDeclaredMethod("isNetwork", classOf[String])
     method.setAccessible(true)
     method
-  }
 
-  private lazy val isOptionFlagMethod = {
+  private lazy val isOptionFlagMethod =
     val method = App.getClass.getDeclaredMethod("isOptionFlag", classOf[String])
     method.setAccessible(true)
     method
-  }
 
-  private lazy val applyModifiersMethod = {
+  private lazy val applyModifiersMethod =
     val method = App.getClass.getDeclaredMethod("applyModifiers", classOf[Set[String]])
     method.setAccessible(true)
     method
-  }
 
-  private lazy val setNetworkConfigMethod = {
+  private lazy val setNetworkConfigMethod =
     val method = App.getClass.getDeclaredMethod("setNetworkConfig", classOf[String])
     method.setAccessible(true)
     method
-  }
 
   private def isModifier(arg: String): Boolean =
     isModifierMethod.invoke(App, arg).asInstanceOf[Boolean]
@@ -68,33 +63,28 @@ class LauncherIntegrationSpec extends AnyFlatSpec with Matchers {
   private def setNetworkConfig(network: String): Unit =
     setNetworkConfigMethod.invoke(App, network)
 
-  private def clearConfigOverrides(): Unit = {
+  private def clearConfigOverrides(): Unit =
     System.clearProperty("config.file")
     System.clearProperty("config.resource")
     System.clearProperty("fukuii.conf.dir")
-  }
 
-  private def withTempDirectory(testCode: File => Any): Unit = {
+  private def withTempDirectory(testCode: File => Any): Unit =
     val dir = Files.createTempDirectory("launcher-config-test").toFile
     try testCode(dir)
     finally deleteRecursively(dir)
-  }
 
-  private def deleteRecursively(file: File): Unit = {
-    if (file.isDirectory) {
+  private def deleteRecursively(file: File): Unit =
+    if file.isDirectory then
       val children = Option(file.listFiles()).getOrElse(Array.empty[File])
       children.foreach(deleteRecursively)
-    }
     file.delete()
-  }
 
-  private def writeConfig(file: File, contents: String = "include \"base-testnet.conf\"\n"): Unit = {
+  private def writeConfig(file: File, contents: String = "include \"base-testnet.conf\"\n"): Unit =
     file.getParentFile.mkdirs()
     Files.writeString(file.toPath, contents, StandardCharsets.UTF_8)
-  }
 
   // Helper to clear system properties used by modifiers
-  private def clearModifierProperties(): Unit = {
+  private def clearModifierProperties(): Unit =
     System.clearProperty("fukuii.network.discovery.discovery-enabled")
     System.clearProperty("fukuii.network.automatic-port-forwarding")
     System.clearProperty("fukuii.network.discovery.reuse-known-nodes")
@@ -102,7 +92,6 @@ class LauncherIntegrationSpec extends AnyFlatSpec with Matchers {
     System.clearProperty("fukuii.sync.blacklist-duration")
     System.clearProperty("fukuii.network.rpc.http.interface")
     clearConfigOverrides()
-  }
 
   behavior.of("Basic launch configurations")
 
@@ -537,4 +526,3 @@ class LauncherIntegrationSpec extends AnyFlatSpec with Matchers {
 
     clearModifierProperties()
   }
-}

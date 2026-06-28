@@ -155,7 +155,7 @@ private[peergroup] object DynamicTLSPeerGroupInternals {
         case e: TooLongFrameException =>
           logger.error("Too long frame {} on channel to peer {}", e.getMessage, ctx.channel().remoteAddress())
           handleEvent(DecodingError)
-        case e =>
+        case _ =>
           // swallow netty's default logging of the stack trace.
           logger.error(
             "Unexpected exception {} on channel to peer {}",

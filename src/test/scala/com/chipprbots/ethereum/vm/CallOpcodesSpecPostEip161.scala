@@ -6,16 +6,16 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.vm.MockWorldState._
+import com.chipprbots.ethereum.vm.MockWorldState.*
 
 import Fixtures.blockchainConfig
 
 // scalastyle:off object.name
-class CallOpcodesSpecPostEip161 extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks {
+class CallOpcodesSpecPostEip161 extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks:
 
   val config: EvmConfig = EvmConfig.PostEIP161ConfigBuilder(blockchainConfig)
   val startState: MockWorldState = MockWorldState(touchedAccounts = Set.empty, noEmptyAccountsCond = true)
-  import config.feeSchedule._
+  import config.feeSchedule.*
 
   val fxt = new CallOpFixture(config, startState)
 
@@ -70,4 +70,3 @@ class CallOpcodesSpecPostEip161 extends AnyWordSpec with Matchers with ScalaChec
       }
     }
   }
-}

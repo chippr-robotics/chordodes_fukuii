@@ -1,14 +1,16 @@
 package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
+
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 import Fixtures.blockchainConfig
 
@@ -17,7 +19,7 @@ import Fixtures.blockchainConfig
   * EIP-6049 is an informational EIP that deprecates SELFDESTRUCT but does NOT change its behavior. The opcode continues
   * to work exactly as before - this EIP only marks it as deprecated.
   */
-class Eip6049Spec extends AnyWordSpec with Matchers {
+class Eip6049Spec extends AnyWordSpec with Matchers:
 
   // Config before EIP-6049 (Mystique fork - no deprecation flag)
   val configPreEip6049: EvmConfig = EvmConfig.MystiqueConfigBuilder(blockchainConfig)
@@ -25,13 +27,13 @@ class Eip6049Spec extends AnyWordSpec with Matchers {
   // Config with EIP-6049 (Spiral fork - deprecation flag enabled)
   val configWithEip6049: EvmConfig = EvmConfig.SpiralConfigBuilder(blockchainConfig)
 
-  object fxt {
+  object fxt:
     val ownerAddr: Address = Address(0x0123)
     val beneficiaryAddr: Address = Address(0xface)
     val otherAddr: Address = Address(0x9999)
 
-    val fakeHeaderPreEip6049 = BlockFixtures.ValidBlock.header.copy(number = Fixtures.MystiqueBlockNumber)
-    val fakeHeaderWithEip6049 = BlockFixtures.ValidBlock.header.copy(number = Fixtures.SpiralBlockNumber)
+    val fakeHeaderPreEip6049: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = Fixtures.MystiqueBlockNumber)
+    val fakeHeaderWithEip6049: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = Fixtures.SpiralBlockNumber)
 
     // Code that calls SELFDESTRUCT
     val codeWithSelfDestruct: Assembly = Assembly(
@@ -45,7 +47,7 @@ class Eip6049Spec extends AnyWordSpec with Matchers {
         header: com.chipprbots.ethereum.domain.BlockHeader,
         config: EvmConfig,
         startGas: BigInt = 1000000
-    ): ProgramContext[MockWorldState, MockStorage] = {
+    ): ProgramContext[MockWorldState, MockStorage] =
       val world = MockWorldState()
         .saveAccount(ownerAddr, Account(balance = UInt256(1000), nonce = 1))
         .saveAccount(beneficiaryAddr, Account(balance = UInt256(500)))
@@ -71,10 +73,8 @@ class Eip6049Spec extends AnyWordSpec with Matchers {
         warmAddresses = Set(ownerAddr),
         warmStorage = Set.empty
       )
-    }
-  }
 
-  import fxt._
+  import fxt.*
 
   "EIP-6049" when {
 
@@ -198,4 +198,3 @@ class Eip6049Spec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

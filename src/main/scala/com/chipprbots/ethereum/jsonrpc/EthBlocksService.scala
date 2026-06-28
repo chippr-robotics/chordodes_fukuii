@@ -4,21 +4,20 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
 
+import scala.annotation.unused
+
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeaderImplicits.BlockHeaderEnc
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.rlp
-
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
-import scala.annotation.unused
-
-object EthBlocksService {
+object EthBlocksService:
   case class BestBlockNumberRequest()
   case class BestBlockNumberResponse(bestBlockNumber: BigInt)
 
@@ -74,19 +73,17 @@ object EthBlocksService {
   case class GetRawReceiptsRequest(block: BlockParam)
   case class GetRawReceiptsResponse(rawReceipts: Option[Seq[ByteString]])
 
-}
-
 class EthBlocksService(
     val blockchain: Blockchain,
     val blockchainReader: BlockchainReader,
     val mining: Mining,
     val blockQueue: BlockQueue,
     private val _forkChoiceManagerOpt: Option[ForkChoiceManager] = None
-) extends ResolveBlock {
+) extends ResolveBlock:
   final override def forkChoiceManagerOpt: Option[ForkChoiceManager] = _forkChoiceManagerOpt
-  import EthBlocksService._
+  import EthBlocksService.*
 
-  implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+  given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
   /** eth_blockNumber that returns the number of most recent block.
     *
@@ -94,7 +91,7 @@ class EthBlocksService(
     *   Current block number the client is on.
     */
   def bestBlockNumber(@unused req: BestBlockNumberRequest): ServiceResponse[BestBlockNumberResponse] = IO {
-    Right(BestBlockNumberResponse(blockchainReader.getBestBlockNumber()))
+    Right(BestBlockNumberResponse(blockchainReader.getBestBlockNumber))
   }
 
   /** Implements the eth_getBlockTransactionCountByHash method that fetches the number of txs that a certain block has.
@@ -106,7 +103,7 @@ class EthBlocksService(
     */
   def getBlockTransactionCountByHash(request: TxCountByBlockHashRequest): ServiceResponse[TxCountByBlockHashResponse] =
     IO {
-      val txsCount = blockchainReader.getBlockBodyByHash(request.blockHash).map(_.transactionList.size)
+      val txsCount = blockchainReader.getBlockBodyByHash(BlockHash(request.blockHash)).map(_.transactionList.size)
       Right(TxCountByBlockHashResponse(txsCount))
     }
 
@@ -119,8 +116,11 @@ class EthBlocksService(
     */
   def getByBlockHash(request: BlockByBlockHashRequest): ServiceResponse[BlockByBlockHashResponse] = IO {
     val BlockByBlockHashRequest(blockHash, fullTxs) = request
-    val blockOpt = blockchainReader.getBlockByHash(blockHash).orElse(blockQueue.getBlockByHash(blockHash))
-    val weight = blockchainReader.getChainWeightByHash(blockHash).orElse(blockQueue.getChainWeightByHash(blockHash))
+    val blockOpt =
+      blockchainReader.getBlockByHash(BlockHash(blockHash)).orElse(blockQueue.getBlockByHash(BlockHash(blockHash)))
+    val weight = blockchainReader
+      .getChainWeightByHash(BlockHash(blockHash))
+      .orElse(blockQueue.getChainWeightByHash(BlockHash(blockHash)))
 
     // Hide engine-API optimistic blocks (ACCEPTED with unknown parent, stored via
     // storeBlockByHashOnly) — they skip the number→hash mapping and haven't been executed.
@@ -133,7 +133,7 @@ class EthBlocksService(
       blockchainReader.getReceiptsByHash(b.header.hash).isDefined
     }
     val blockResponseOpt =
-      if (!isExposed) None
+      if !isExposed then None
       else blockOpt.map(block => BlockResponse(block, weight, fullTxs = fullTxs))
     Right(BlockByBlockHashResponse(blockResponseOpt))
   }
@@ -178,12 +178,11 @@ class EthBlocksService(
   ): ServiceResponse[UncleByBlockHashAndIndexResponse] = IO {
     val UncleByBlockHashAndIndexRequest(blockHash, uncleIndex) = request
     val uncleHeaderOpt = blockchainReader
-      .getBlockBodyByHash(blockHash)
+      .getBlockBodyByHash(BlockHash(blockHash))
       .flatMap { body =>
-        if (uncleIndex >= 0 && uncleIndex < body.uncleNodesList.size)
+        if uncleIndex >= 0 && uncleIndex < body.uncleNodesList.size then
           Some(body.uncleNodesList.apply(uncleIndex.toInt))
-        else
-          None
+        else None
       }
     val weight = uncleHeaderOpt.flatMap(uncleHeader => blockchainReader.getChainWeightByHash(uncleHeader.hash))
 
@@ -209,7 +208,7 @@ class EthBlocksService(
     val UncleByBlockNumberAndIndexRequest(blockParam, uncleIndex) = request
     val uncleBlockResponseOpt = resolveBlock(blockParam).toOption
       .flatMap { case ResolvedBlock(block, pending) =>
-        if (uncleIndex >= 0 && uncleIndex < block.body.uncleNodesList.size) {
+        if uncleIndex >= 0 && uncleIndex < block.body.uncleNodesList.size then
           val uncleHeader = block.body.uncleNodesList.apply(uncleIndex.toInt)
           val weight = blockchainReader.getChainWeightByHash(uncleHeader.hash)
 
@@ -221,8 +220,7 @@ class EthBlocksService(
               pendingBlock = pending.isDefined
             )
           )
-        } else
-          None
+        else None
       }
 
     Right(UncleByBlockNumberAndIndexResponse(uncleBlockResponseOpt))
@@ -241,14 +239,13 @@ class EthBlocksService(
       req: GetUncleCountByBlockHashRequest
   ): ServiceResponse[GetUncleCountByBlockHashResponse] =
     IO {
-      blockchainReader.getBlockBodyByHash(req.blockHash) match {
+      blockchainReader.getBlockBodyByHash(BlockHash(req.blockHash)) match
         case Some(blockBody) =>
           Right(GetUncleCountByBlockHashResponse(blockBody.uncleNodesList.size))
         case None =>
           Left(
             JsonRpcError.InvalidParams(s"Block with hash ${Hex.toHexString(req.blockHash.toArray[Byte])} not found")
           )
-      }
     }
 
   def getBlockReceipts(req: GetBlockReceiptsRequest): ServiceResponse[GetBlockReceiptsResponse] = IO {
@@ -257,7 +254,7 @@ class EthBlocksService(
         var baseLogIndex = 0
         block.body.transactionList.zip(receipts).zipWithIndex.map { case ((stx, receipt), idx) =>
           val gasUsed =
-            if (idx == 0) receipt.cumulativeGasUsed
+            if idx == 0 then receipt.cumulativeGasUsed
             else receipt.cumulativeGasUsed - receipts(idx - 1).cumulativeGasUsed
           val sender = SignedTransaction.getSender(stx).getOrElse(Address(0))
           val resp = TransactionReceiptResponse(receipt, stx, sender, idx, block.header, gasUsed, baseLogIndex)
@@ -270,7 +267,7 @@ class EthBlocksService(
   }
 
   def feeHistory(req: FeeHistoryRequest): ServiceResponse[FeeHistoryResponse] = IO {
-    val bestBlock = blockchainReader.getBestBlockNumber()
+    val bestBlock = blockchainReader.getBestBlockNumber
     val newestBlockNum = resolveBlock(req.newestBlock).toOption.map(_.block.header.number).getOrElse(bestBlock)
     val count = req.blockCount.min(1024).toInt
     val oldestBlock = (newestBlockNum - count + 1).max(0)
@@ -283,7 +280,7 @@ class EthBlocksService(
       blockchainReader
         .getBlockHeaderByNumber(num)
         .map { h =>
-          if (h.gasLimit > 0) h.gasUsed.toDouble / h.gasLimit.toDouble else 0.0
+          if h.gasLimit > 0 then h.gasUsed.toDouble / h.gasLimit.toDouble else 0.0
         }
         .getOrElse(0.0)
     }.toSeq
@@ -310,7 +307,7 @@ class EthBlocksService(
             .map { used =>
               val max = com.chipprbots.ethereum.consensus.engine.BlobGasUtils
                 .maxBlobGasPerBlock(h.unixTimestamp, blockchainConfig)
-              if (used > 0 && max > 0) used.toDouble / max.toDouble else 0.0
+              if used > 0 && max > 0 then used.toDouble / max.toDouble else 0.0
             }
             .getOrElse(0.0)
         }
@@ -344,8 +341,7 @@ class EthBlocksService(
     }
 
   def blobBaseFee(@unused req: BlobBaseFeeRequest): ServiceResponse[BlobBaseFeeResponse] = IO {
-    val fee = blockchainReader
-      .getBestBlock()
+    val fee = blockchainReader.getBestBlock
       .flatMap(b => b.header.excessBlobGas.map(eg => (eg, b.header.unixTimestamp)))
       .map { case (eg, ts) =>
         com.chipprbots.ethereum.consensus.engine.BlobGasUtils.getBlobGasPrice(eg, ts, blockchainConfig)
@@ -369,7 +365,7 @@ class EthBlocksService(
   }
 
   def getRawReceipts(req: GetRawReceiptsRequest): ServiceResponse[GetRawReceiptsResponse] = IO {
-    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
+    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
     val raw = resolveBlock(req.block).toOption.flatMap { case ResolvedBlock(block, _) =>
       blockchainReader.getReceiptsByHash(block.header.hash).map { receipts =>
         receipts.map(r => ByteString(r.toBytes))
@@ -377,4 +373,3 @@ class EthBlocksService(
     }
     Right(GetRawReceiptsResponse(raw))
   }
-}

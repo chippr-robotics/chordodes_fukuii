@@ -4,12 +4,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
-import com.chipprbots.ethereum.vm.MockWorldState._
+import com.chipprbots.ethereum.vm.MockWorldState.*
 
 // scalastyle:off object.name
-class StaticCallOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks {
+class StaticCallOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks:
 
   val config: EvmConfig = EvmConfig.ByzantiumConfigBuilder(blockchainConfig)
   val startState: MockWorldState = MockWorldState(touchedAccounts = Set.empty, noEmptyAccountsCond = true)
@@ -80,4 +80,3 @@ class StaticCallOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProp
     }
 
   }
-}

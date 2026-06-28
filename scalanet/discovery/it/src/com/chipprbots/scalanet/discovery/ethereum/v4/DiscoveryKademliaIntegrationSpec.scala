@@ -13,7 +13,7 @@ import com.chipprbots.scalanet.peergroup.InetMultiAddress
 import com.chipprbots.scalanet.peergroup.udp.StaticUDPPeerGroup
 import java.net.InetSocketAddress
 import cats.effect.IO
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scodec.bits.BitVector
 
 class DiscoveryKademliaIntegrationSpec extends KademliaIntegrationSpec("DiscoveryService with StaticUDPPeerGroup") {
@@ -29,7 +29,7 @@ class DiscoveryKademliaIntegrationSpec extends KademliaIntegrationSpec("Discover
 
   // Using fake crypto and scodec encoding instead of RLP.
   implicit val sigalg: SigAlg = new MockSigAlg()
-  import com.chipprbots.scalanet.discovery.ethereum.codecs.DefaultCodecs._
+  import com.chipprbots.scalanet.discovery.ethereum.codecs.DefaultCodecs.*
   // Not dealing with non-conforming clients here.
   implicit val packetCoded = Packet.packetCodec(allowDecodeOverMaxPacketSize = false)
 

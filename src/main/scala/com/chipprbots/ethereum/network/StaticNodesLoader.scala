@@ -8,8 +8,8 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 
 import com.chipprbots.ethereum.utils.Logger
 
@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.utils.Logger
   * URLs: ["enode://pubkey@host:port", ...] Each valid entry is added to PeerManagerActor.maintainedPeersByNodeId via
   * AddMaintainedPeer.
   */
-object StaticNodesLoader extends Logger {
+object StaticNodesLoader extends Logger:
 
   /** File name relative to the datadir. Matches Besu and core-geth convention. */
   val FileName: String = "static-nodes.json"
@@ -40,28 +40,24 @@ object StaticNodesLoader extends Logger {
     */
   def load(datadir: String): Seq[URI] = load(java.nio.file.Paths.get(datadir))
 
-  def load(datadir: Path): Seq[URI] = {
+  def load(datadir: Path): Seq[URI] =
     val filePath = datadir.resolve(FileName)
-    if (!Files.exists(filePath)) {
+    if !Files.exists(filePath) then
       log.debug("Static nodes file {} does not exist — no static peers will be dialled", filePath)
       Seq.empty
-    } else {
-      Try(new String(Files.readAllBytes(filePath), "UTF-8")) match {
+    else
+      Try(new String(Files.readAllBytes(filePath), "UTF-8")) match
         case Failure(_) =>
           log.warn("Unable to read static nodes file {}", filePath)
           Seq.empty
         case Success(content) =>
           parseContent(content, filePath)
-      }
-    }
-  }
 
-  private def parseContent(content: String, filePath: Path): Seq[URI] = {
+  private def parseContent(content: String, filePath: Path): Seq[URI] =
     val trimmed = content.trim
-    if (trimmed.isEmpty || trimmed == "[]") {
-      Seq.empty
-    } else {
-      Try(parse(trimmed)) match {
+    if trimmed.isEmpty || trimmed == "[]" then Seq.empty
+    else
+      Try(parse(trimmed)) match
         case Failure(ex) =>
           log.warn("Static nodes file {} contains invalid JSON: {}", filePath, ex.getMessage)
           Seq.empty
@@ -70,13 +66,10 @@ object StaticNodesLoader extends Logger {
         case Success(_) =>
           log.warn("Static nodes file {} must contain a JSON array of enode URL strings", filePath)
           Seq.empty
-      }
-    }
-  }
 
-  private def decodeEntry(entry: JValue, filePath: Path): Option[URI] = entry match {
+  private def decodeEntry(entry: JValue, filePath: Path): Option[URI] = entry match
     case JString(url) =>
-      Try(new URI(url)) match {
+      Try(new URI(url)) match
         case Failure(ex) =>
           log.warn("Skipping malformed enode URL '{}' in {}: {}", url, filePath, ex.getMessage)
           None
@@ -84,11 +77,9 @@ object StaticNodesLoader extends Logger {
         case Success(uri) =>
           log.warn("Skipping invalid enode URL '{}' in {} — expected enode://pubkey@host:port", uri, filePath)
           None
-      }
     case other =>
       log.warn("Skipping non-string entry {} in static nodes file {}", other, filePath)
       None
-  }
 
   /** Validates that a URI is a well-formed enode URL with a non-empty pubkey and a valid port.
     *
@@ -100,4 +91,3 @@ object StaticNodesLoader extends Logger {
       uri.getUserInfo != null && uri.getUserInfo.nonEmpty &&
       uri.getHost != null && uri.getHost.nonEmpty &&
       uri.getPort > 0
-}

@@ -3,9 +3,10 @@ package com.chipprbots.ethereum.consensus.validators
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.consensus.eip1559.BaseFeeCalculator
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError._
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostPrague
@@ -22,9 +23,9 @@ import com.chipprbots.ethereum.utils.DaoForkConfig
   * The latter is treated polymorphically by directly using a difficulty
   * [[com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator calculator]].
   */
-trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
+trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
 
-  import BlockHeaderValidator._
+  import BlockHeaderValidator.*
 
   /** The difficulty calculator. This is specific to the consensus protocol.
     */
@@ -47,7 +48,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
   def validate(blockHeader: BlockHeader, parentHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    for {
+    for
       // NOTE how we include everything except PoW (which is deferred to `validateEvenMore`),
       //      and that difficulty validation is in effect abstract (due to `difficulty`).
       _ <- validateExtraData(blockHeader)
@@ -60,7 +61,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
       _ <- validateBaseFee(blockHeader, parentHeader)
       _ <- validateBlobGasAgainstParent(blockHeader, parentHeader)
       _ <- validateEvenMore(blockHeader)
-    } yield BlockHeaderValid
+    yield BlockHeaderValid
 
   /** EIP-4844 / EIP-7691: validate blobGasUsed ≤ MAX_BLOB_GAS_PER_BLOCK, is a multiple of GAS_PER_BLOB, and
     * excessBlobGas equals calcExcessBlobGas(parent). Runs only when the header declares blob fields.
@@ -68,9 +69,9 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
   private def validateBlobGasAgainstParent(
       blockHeader: BlockHeader,
       parentHeader: BlockHeader
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     import com.chipprbots.ethereum.consensus.engine.BlobGasUtils
-    (blockHeader.blobGasUsed, blockHeader.excessBlobGas) match {
+    (blockHeader.blobGasUsed, blockHeader.excessBlobGas) match
       case (Some(used), Some(excess)) =>
         val maxBlobGas = BlobGasUtils.maxBlobGasPerBlock(blockHeader.unixTimestamp, blockchainConfig)
         val parentExcess = parentHeader.excessBlobGas.getOrElse(BigInt(0))
@@ -83,16 +84,13 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
           blockHeader.unixTimestamp,
           blockchainConfig
         )
-        if (used > maxBlobGas)
-          Left(HeaderBlobGasError(s"blobGasUsed $used exceeds max $maxBlobGas"))
-        else if (used % BlobGasUtils.GAS_PER_BLOB != 0)
+        if used > maxBlobGas then Left(HeaderBlobGasError(s"blobGasUsed $used exceeds max $maxBlobGas"))
+        else if used % BlobGasUtils.GAS_PER_BLOB != 0 then
           Left(HeaderBlobGasError(s"blobGasUsed $used is not a multiple of GAS_PER_BLOB"))
-        else if (excess != expectedExcess)
+        else if excess != expectedExcess then
           Left(HeaderBlobGasError(s"INCORRECT_EXCESS_BLOB_GAS: expected $expectedExcess got $excess"))
         else Right(BlockHeaderValid)
       case _ => Right(BlockHeaderValid)
-    }
-  }
 
   /** This method allows validate a BlockHeader (stated on section 4.4.4 of http://paper.gavwood.com/).
     *
@@ -105,12 +103,12 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
       blockHeader: BlockHeader,
       getBlockHeaderByHash: GetBlockHeaderByHash
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    for {
-      blockHeaderParent <- getBlockHeaderByHash(blockHeader.parentHash)
+    for
+      blockHeaderParent <- getBlockHeaderByHash(blockHeader.parentHash.value)
         .map(Right(_))
         .getOrElse(Left(HeaderParentNotFoundError))
       _ <- validate(blockHeader, blockHeaderParent)
-    } yield BlockHeaderValid
+    yield BlockHeaderValid
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.extraData]] length based on validations stated in section
     * 4.4.4 of http://paper.gavwood.com/
@@ -123,28 +121,24 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
     */
   protected def validateExtraData(
       blockHeader: BlockHeader
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
 
     def validateDaoForkExtraData(
         blockHeader: BlockHeader,
         daoForkConfig: DaoForkConfig
     ): Either[BlockHeaderError, BlockHeaderValid] =
-      (daoForkConfig.requiresExtraData(blockHeader.number), daoForkConfig.blockExtraData) match {
+      (daoForkConfig.requiresExtraData(blockHeader.number), daoForkConfig.blockExtraData) match
         case (false, _) =>
           Right(BlockHeaderValid)
         case (true, Some(forkExtraData)) if blockHeader.extraData == forkExtraData =>
           Right(BlockHeaderValid)
         case _ =>
           Left(DaoHeaderExtraDataError)
-      }
 
-    if (blockHeader.extraData.length <= MaxExtraDataSize) {
-      import blockchainConfig._
+    if blockHeader.extraData.length <= MaxExtraDataSize then
+      import blockchainConfig.*
       daoForkConfig.map(c => validateDaoForkExtraData(blockHeader, c)).getOrElse(Right(BlockHeaderValid))
-    } else {
-      Left(HeaderExtraDataError)
-    }
-  }
+    else Left(HeaderExtraDataError)
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.unixTimestamp]] is greater than the one of its parent based
     * on validations stated in section 4.4.4 of http://paper.gavwood.com/
@@ -160,7 +154,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
       blockHeader: BlockHeader,
       parentHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if (blockHeader.unixTimestamp > parentHeader.unixTimestamp) Right(BlockHeaderValid)
+    if blockHeader.unixTimestamp > parentHeader.unixTimestamp then Right(BlockHeaderValid)
     else Left(HeaderTimestampError)
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.difficulty]] is correct based on validations stated in
@@ -177,14 +171,16 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
       blockHeader: BlockHeader,
       parent: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    if (blockHeader.difficulty == 0)
+    if blockHeader.difficulty == Difficulty.Zero then
       // Post-merge: difficulty is always 0 (EIP-3675). Pre-merge blocks never have difficulty=0
       // because the Ethash difficulty algorithm always produces a positive value.
       Right(BlockHeaderValid)
-    else if (
-      difficulty.calculateDifficulty(blockHeader.number, blockHeader.unixTimestamp, parent) == blockHeader.difficulty
-    )
-      Right(BlockHeaderValid)
+    else if difficulty.calculateDifficulty(
+        blockHeader.number,
+        blockHeader.unixTimestamp,
+        parent
+      ) == blockHeader.difficulty
+    then Right(BlockHeaderValid)
     else Left(HeaderDifficultyError)
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.gasUsed]] is not greater than
@@ -197,7 +193,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
     *   BlockHeader if valid, an [[HeaderGasUsedError]] otherwise
     */
   private def validateGasUsed(blockHeader: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] =
-    if (blockHeader.gasUsed <= blockHeader.gasLimit && blockHeader.gasUsed >= 0) Right(BlockHeaderValid)
+    if blockHeader.gasUsed <= blockHeader.gasLimit && blockHeader.gasUsed >= 0 then Right(BlockHeaderValid)
     else Left(HeaderGasUsedError)
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.gasLimit]] follows the restrictions based on its parent
@@ -215,23 +211,19 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
   private def validateGasLimit(
       blockHeader: BlockHeader,
       parentHeader: BlockHeader
-  )(implicit _blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
+  ): Either[BlockHeaderError, BlockHeaderValid] =
     // 2^63 - 1 is the protocol-wide gasLimit cap (cannot fit in an int64). It applies
     // regardless of EIP-106 activation — any block with gasLimit >= 2^63 is malformed.
-    if (blockHeader.gasLimit > MaxGasLimit)
-      Left(HeaderGasLimitError)
-    else {
+    if blockHeader.gasLimit > MaxGasLimit then Left(HeaderGasLimitError)
+    else
       // Standard ±1/1024 bound applies at all blocks including the Olympia activation.
       // ETC Olympia increases gas limit 7.5× (8M → 60M) via gradual miner convergence
       // over ~2,055 blocks — not the 2× one-shot doubling of ETH London (which was
       // maintaining effective capacity, not increasing throughput).
       val gasLimitDiff = (blockHeader.gasLimit - parentHeader.gasLimit).abs
       val gasLimitDiffLimit = parentHeader.gasLimit / GasLimitBoundDivisor
-      if (gasLimitDiff < gasLimitDiffLimit && blockHeader.gasLimit >= MinGasLimit)
-        Right(BlockHeaderValid)
-      else
-        Left(HeaderGasLimitError)
-    }
+      if gasLimitDiff < gasLimitDiffLimit && blockHeader.gasLimit >= MinGasLimit then Right(BlockHeaderValid)
+      else Left(HeaderGasLimitError)
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.number]] is the next one after its parents number based on
     * validations stated in section 4.4.4 of http://paper.gavwood.com/
@@ -247,17 +239,17 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
       blockHeader: BlockHeader,
       parentHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if (blockHeader.number == parentHeader.number + 1) Right(BlockHeaderValid)
+    if blockHeader.number == parentHeader.number + 1 then Right(BlockHeaderValid)
     else Left(HeaderNumberError)
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.extraFields]] match the Olympia fork activation.
     */
   private def validateExtraFields(
       blockHeader: BlockHeader
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     val isOlympiaActivated = blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
 
-    blockHeader.extraFields match {
+    blockHeader.extraFields match
       case HefPostPrague(_, _, _, _, _, _) if isOlympiaActivated => Right(BlockHeaderValid)
       case HefPostCancun(_, _, _, _, _) if isOlympiaActivated    => Right(BlockHeaderValid)
       case HefPostShanghai(_, _) if isOlympiaActivated           => Right(BlockHeaderValid)
@@ -265,8 +257,6 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
       case HefEmpty if !isOlympiaActivated                       => Right(BlockHeaderValid)
       case _ =>
         Left(HeaderExtraFieldsError(blockHeader.extraFields))
-    }
-  }
 
   /** Validates that the baseFee in the block header matches the expected value calculated from the parent header using
     * the EIP-1559 algorithm.
@@ -274,17 +264,16 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
   private def validateBaseFee(
       blockHeader: BlockHeader,
       parentHeader: BlockHeader
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     val isOlympiaActivated = blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-    if (!isOlympiaActivated) {
-      Right(BlockHeaderValid)
-    } else {
-      blockHeader.baseFee match {
+    if !isOlympiaActivated then Right(BlockHeaderValid)
+    else
+      blockHeader.baseFee match
         case None =>
           Left(HeaderBaseFeeError("missing baseFee after Olympia activation"))
         case Some(actualBaseFee) =>
           val expectedBaseFee = BaseFeeCalculator.calcBaseFee(parentHeader, blockchainConfig)
-          if (actualBaseFee == expectedBaseFee) Right(BlockHeaderValid)
+          if actualBaseFee == expectedBaseFee then Right(BlockHeaderValid)
           else
             Left(
               HeaderBaseFeeError(
@@ -292,16 +281,12 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
                   s"parentBaseFee ${parentHeader.baseFee}, parentGasUsed ${parentHeader.gasUsed}"
               )
             )
-      }
-    }
-  }
 
   override def validateHeaderOnly(
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    for {
+    for
       _ <- validateExtraData(blockHeader)
       _ <- validateGasUsed(blockHeader)
       _ <- validateEvenMore(blockHeader)
-    } yield BlockHeaderValid
-}
+    yield BlockHeaderValid

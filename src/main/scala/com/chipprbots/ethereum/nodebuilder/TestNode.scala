@@ -2,6 +2,8 @@ package com.chipprbots.ethereum.nodebuilder
 
 import java.util.concurrent.atomic.AtomicReference
 
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+
 import cats.effect.unsafe.IORuntime
 
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
@@ -14,7 +16,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class TestNode(
     _instanceConfig: com.chipprbots.ethereum.utils.InstanceConfig = com.chipprbots.ethereum.utils.Config
-) extends BaseNode {
+) extends BaseNode:
   override lazy val instanceConfig: com.chipprbots.ethereum.utils.InstanceConfig = _instanceConfig
 
   override lazy val ioRuntime: IORuntime = IORuntime.global
@@ -54,11 +56,12 @@ class TestNode(
         blockchainWriter,
         storagesInstance.storages.stateStorage,
         storagesInstance.storages.evmCodeStorage,
-        pendingTransactionsManager,
+        pendingTransactionsManagerTyped,
         miningConfig,
         testModeComponentsProvider,
         storagesInstance.storages.transactionMappingStorage,
-        this
+        this,
+        classicSystem.toTyped.scheduler
       )(ioRuntime)
     )
 
@@ -67,5 +70,3 @@ class TestNode(
 
   val currentSealEngine: AtomicReference[SealEngineType] = new AtomicReference(SealEngineType.NoReward)
   def sealEngine: SealEngineType = currentSealEngine.get()
-
-}

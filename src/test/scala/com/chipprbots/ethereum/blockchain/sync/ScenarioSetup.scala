@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockValidation
 import com.chipprbots.ethereum.ledger.VMImpl
-import com.chipprbots.ethereum.nodebuilder._
+import com.chipprbots.ethereum.nodebuilder.*
 
 /** Provides a standard setup for the test suites. The reference to "cake" is about the "Cake Pattern" used in Fukuii.
   * Specifically it relates to the creation and wiring of the several components of a
@@ -29,7 +29,7 @@ import com.chipprbots.ethereum.nodebuilder._
 trait ScenarioSetup
     extends StdTestMiningBuilder
     with StxLedgerBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
   protected lazy val executionContextExecutor: ExecutionContextExecutor =
     ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4))
   implicit protected lazy val ioRuntime: IORuntime = IORuntime.global
@@ -77,7 +77,7 @@ trait ScenarioSetup
   protected def newTestMining(validators: Validators = mining.validators, vm: VMImpl = mining.vm): Mining =
     mining.withValidators(validators).withVM(vm)
 
-  protected def mkBlockExecution(validators: Validators = validators): BlockExecution = {
+  protected def mkBlockExecution(validators: Validators = validators): BlockExecution =
     val consensuz = mining.withValidators(validators).withVM(new Mocks.MockVM())
     val blockValidation = new BlockValidation(consensuz, blockchainReader, blockQueue)
     new BlockExecution(
@@ -88,12 +88,11 @@ trait ScenarioSetup
       consensuz.blockPreparator,
       blockValidation
     )
-  }
 
   protected def mkConsensus(
       validators: Validators = validators,
       blockExecutionOpt: Option[BlockExecution] = None
-  ): ConsensusAdapter = {
+  ): ConsensusAdapter =
     val testMining = mining.withValidators(validators).withVM(new Mocks.MockVM())
     val blockValidation = new BlockValidation(testMining, blockchainReader, blockQueue)
 
@@ -108,6 +107,3 @@ trait ScenarioSetup
       blockValidation,
       ioRuntime
     )
-  }
-
-}

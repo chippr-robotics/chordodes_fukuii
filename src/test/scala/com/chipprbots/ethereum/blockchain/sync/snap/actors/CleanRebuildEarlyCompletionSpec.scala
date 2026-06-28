@@ -1,22 +1,21 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem}
-import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
-import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
 import com.chipprbots.ethereum.db.storage.{HealingFrontierStorage, Namespaces}
 import com.chipprbots.ethereum.mpt.LeafNode
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 import java.io.File
@@ -48,38 +47,35 @@ import java.util.concurrent.{Executors, TimeUnit}
   * delete temp dir, so an in-flight walk can never touch a freed native handle.
   */
 class CleanRebuildEarlyCompletionSpec
-    extends TestKit(ActorSystem("CleanRebuildEarlyCompletionSpec"))
-    with ImplicitSender
+    extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfterAll {
+    with Eventually:
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   /** A trivially-present childless leaf root so `StartTrieNodeHealing` takes the restart (resume/rebuild) branch. A
     * childless-leaf root ⇒ the rebuild walk discovers nothing ⇒ it is a CLEAN walk (0 missing). Mirrors
     * `HealingFrontierResumeSpec.storedRoot` / `HealingTrieFixtures.childlessLeafRoot`.
     */
-  private def storedLeafRoot(storage: TestMptStorage, seed: Int): ByteString = {
+  private def storedLeafRoot(storage: TestMptStorage, seed: Int): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](seed.toByte)), ByteString(Array[Byte](seed.toByte)))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   /** Query the coordinator's `pendingTasks` via the public progress message (a dedicated probe per query so the shared
-    * ImplicitSender inbox cannot steal the reply — mirrors `HealingFrontierResumeSpec.pendingTasks`).
+    * inbox cannot steal the reply — mirrors `HealingFrontierResumeSpec.pendingTasks`).
     */
-  private def pendingTasks(coordinator: ActorRef): Int = {
-    val probe = TestProbe()
-    coordinator.tell(Messages.HealingGetProgress, probe.ref)
-    probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
-  }
+  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
+    val probe = testKit.createTestProbe[HealingStatistics]()
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
+    probe.expectMessageType[HealingStatistics].pendingTasks
 
   /** Owns the RocksDB store, a dedicated single-thread EC for the coordinator's rebuild/flush `Future`s, and the
     * coordinator. `storage`/`root` are supplied by the caller so a fixture can inject a clean trie (childless leaf) or
@@ -90,12 +86,19 @@ class CleanRebuildEarlyCompletionSpec
   private def withRebuildFixture(
       storage: TestMptStorage,
       root: ByteString
-  )(body: (ActorRef, ByteString, HealingFrontierStorage, TestProbe) => Unit): Unit = {
+  )(
+      body: (
+          ActorRef[TrieNodeHealingCoordinator.Command],
+          ByteString,
+          HealingFrontierStorage,
+          org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+      ) => Unit
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("clean-rebuild-early-completion-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -105,45 +108,32 @@ class CleanRebuildEarlyCompletionSpec
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
 
-    val controllerProbe = TestProbe()
-    val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
-        stateRoot = root,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 16,
-        snapSyncController = controllerProbe.ref,
-        healingFrontierStorage = Some(store),
-        // spec 005 default-off gating: markComplete() (FrontierRebuildComplete :735 and
-        // HealingCheckCompletion :1049) is gated on frontierPersistenceEnabled. This fixture's
-        // docstring already states "Persistence is ON" and T-1/T-4 assert the CF `g` completeness
-        // marker (store.isComplete) is set on the clean early-completion path; that marker is only
-        // written when persistence is enabled. Must be explicit here — the prop defaults to false.
-        // Test-only: production gating is left untouched (FR-005 byte-parity stays default-off).
-        frontierPersistenceEnabled = true,
-        healingWriterEcOverride = Some(ec)
-      )
+    val controllerProbe = testKit.createTestProbe[SNAPSyncController.Command]()
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = root,
+      networkPeerManager =
+        testKit.createTestProbe[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command]().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 16,
+      snapSyncController = controllerProbe.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec)
     )
-    val death = TestProbe()
-    death.watch(coordinator)
     try body(coordinator, root, store, controllerProbe)
-    finally {
+    finally
       // 1) No more actor-thread RocksDB ops. 2) Drain the EC so the rebuild `loadAll`/walk iterators are closed.
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+      testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       // 3) Now nothing references the store — safe to free the native handles.
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   // ---- T-1 (FR-001/SC-001): one walk, not two, on a clean rebuild ----
 
@@ -156,10 +146,10 @@ class CleanRebuildEarlyCompletionSpec
       val storage = new TestMptStorage()
       val root = storedLeafRoot(storage, seed = 1)
       withRebuildFixture(storage, root) { (coordinator, r, store, controller) =>
-        coordinator ! Messages.StartTrieNodeHealing(r)
-        controller.expectMsg(5.seconds, SNAPSyncController.StateHealingComplete)
+        coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(r)
+        controller.expectMessage(5.seconds, SNAPSyncController.StateHealingComplete)
         // The same clean rebuild set the CF `g` completeness marker (already true today; asserted for parity).
-        awaitAssert(store.isComplete shouldBe true, 5.seconds, 100.millis)
+        eventually(timeout(5.seconds), interval(100.millis))(store.isComplete shouldBe true)
       }
     }
 
@@ -172,9 +162,9 @@ class CleanRebuildEarlyCompletionSpec
     // would normally take over, but no completion may be declared while a node is missing.
     val fixture = HealingTrieFixtures.sharedAncestor()
     withRebuildFixture(fixture.storage, fixture.rootHash) { (coordinator, r, _, controller) =>
-      coordinator ! Messages.StartTrieNodeHealing(r)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(r)
       // The single missing grandchild is discovered and queued.
-      awaitAssert(pendingTasks(coordinator) should be > 0, 5.seconds, 100.millis)
+      eventually(timeout(5.seconds), interval(100.millis))(pendingTasks(coordinator) should be > 0)
       // And no early completion is declared while that node is still missing.
       controller.expectNoMessage(5.seconds)
     }
@@ -203,8 +193,10 @@ class CleanRebuildEarlyCompletionSpec
     // rootB intentionally NOT put into storage — forces the deterministic reseed branch in HealingPivotRefreshed.
     val rootB = ByteString(LeafNode(ByteString(Array[Byte](2.toByte)), ByteString(Array[Byte](2.toByte))).hash)
     withRebuildFixture(storage, rootA) { (coordinator, _, _, controller) =>
-      coordinator ! Messages.StartTrieNodeHealing(rootA)
-      coordinator ! Messages.HealingPivotRefreshed(rootB) // flips stateRoot A → B before the stale A-walk lands
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(rootA)
+      coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(
+        rootB
+      ) // flips stateRoot A → B before the stale A-walk lands
       // The stale FrontierRebuildComplete(walkRoot = A) must NOT complete against the new root B.
       controller.expectNoMessage(5.seconds)
     }
@@ -220,12 +212,11 @@ class CleanRebuildEarlyCompletionSpec
     val storage = new TestMptStorage()
     val root = storedLeafRoot(storage, seed = 1)
     withRebuildFixture(storage, root) { (coordinator, r, store, controller) =>
-      coordinator ! Messages.StartTrieNodeHealing(r)
-      controller.expectMsg(5.seconds, SNAPSyncController.StateHealingComplete)
-      val earlyPathMarker = {
-        awaitAssert(store.isComplete shouldBe true, 5.seconds, 100.millis)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(r)
+      controller.expectMessage(5.seconds, SNAPSyncController.StateHealingComplete)
+      val earlyPathMarker =
+        eventually(timeout(5.seconds), interval(100.millis))(store.isComplete shouldBe true)
         store.isComplete
-      }
       // The two-walk path's marker is the same CF `g` 0x01 sentinel written via the same markComplete(); the
       // early path neither changes what the marker asserts nor its bytes. Parity is `true == true`.
       earlyPathMarker shouldBe true
@@ -242,9 +233,8 @@ class CleanRebuildEarlyCompletionSpec
     val storage = new TestMptStorage()
     val root = storedLeafRoot(storage, seed = 1)
     withRebuildFixture(storage, root) { (coordinator, r, _, controller) =>
-      coordinator ! Messages.StartTrieNodeHealing(r)
-      controller.expectMsg(5.seconds, SNAPSyncController.StateHealingComplete)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(r)
+      controller.expectMessage(5.seconds, SNAPSyncController.StateHealingComplete)
       controller.expectNoMessage(2.seconds)
     }
   }
-}

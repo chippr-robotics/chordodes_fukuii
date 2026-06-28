@@ -1,58 +1,58 @@
 package com.chipprbots.ethereum.faucet.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern.RetrySupport
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.Timeout
 
+import cats.effect.IO
+
+import scala.annotation.unused
+
 import com.chipprbots.ethereum.faucet.FaucetConfig
-import com.chipprbots.ethereum.faucet.FaucetConfigBuilder
-import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerMsg
+import com.chipprbots.ethereum.faucet.FaucetHandler
+import com.chipprbots.ethereum.faucet.FaucetHandler.Command
 import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerResponse
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsRequest
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsResponse
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusRequest
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusResponse
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
-
-import scala.annotation.unused
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.ServiceResponse
 import com.chipprbots.ethereum.utils.Logger
 
-class FaucetRpcService(config: FaucetConfig)(implicit system: ActorSystem)
-    extends FaucetConfigBuilder
-    with RetrySupport
-    with FaucetHandlerSelector
-    with Logger {
+class FaucetRpcService(config: FaucetConfig, handler: ActorRef[FaucetHandler.Command])(implicit
+    system: ActorSystem
+) extends Logger:
 
-  implicit lazy val actorTimeout: Timeout = Timeout(config.actorCommunicationMargin + config.rpcClient.timeout)
+  given actorTimeout: Timeout = Timeout(config.actorCommunicationMargin + config.rpcClient.timeout)
+  given scheduler: Scheduler = system.toTyped.scheduler
 
   def sendFunds(sendFundsRequest: SendFundsRequest): ServiceResponse[SendFundsResponse] =
-    selectFaucetHandler()
-      .flatMap(handler =>
-        handler
-          .askFor[Any](FaucetHandlerMsg.SendFunds(sendFundsRequest.address))
-          .map(handleSendFundsResponse.orElse(handleErrors))
-      )
-      .recover(handleErrors)
+    IO.fromFuture(
+      IO(handler.ask[FaucetHandlerResponse](replyTo => Command.SendFunds(sendFundsRequest.address, replyTo)))
+    ).map(handleSendFundsResponse.orElse(handleResponseErrors))
+      .recover(handleThrowable)
 
   def status(@unused statusRequest: StatusRequest): ServiceResponse[StatusResponse] =
-    selectFaucetHandler()
-      .flatMap(handler => handler.askFor[Any](FaucetHandlerMsg.Status))
-      .map(handleStatusResponse.orElse(handleErrors))
-      .recover(handleErrors)
+    IO.fromFuture(IO(handler.ask[FaucetHandlerResponse](replyTo => Command.Status(replyTo))))
+      .map(handleStatusResponse.orElse(handleResponseErrors))
+      .recover(handleThrowable)
 
-  private def handleSendFundsResponse: PartialFunction[Any, Either[JsonRpcError, SendFundsResponse]] = {
+  private def handleSendFundsResponse
+      : PartialFunction[FaucetHandlerResponse, Either[JsonRpcError, SendFundsResponse]] = {
     case FaucetHandlerResponse.TransactionSent(txHash) =>
       Right(SendFundsResponse(txHash))
   }
 
-  private def handleStatusResponse: PartialFunction[Any, Either[JsonRpcError, StatusResponse]] = {
+  private def handleStatusResponse: PartialFunction[FaucetHandlerResponse, Either[JsonRpcError, StatusResponse]] = {
     case FaucetHandlerResponse.StatusResponse(status) =>
       Right(StatusResponse(status))
   }
 
-  private def handleErrors[T]: PartialFunction[Any, Either[JsonRpcError, T]] = {
+  private def handleResponseErrors[T]: PartialFunction[FaucetHandlerResponse, Either[JsonRpcError, T]] = {
     case FaucetHandlerResponse.FaucetIsUnavailable =>
       Left(JsonRpcError.LogicError("Faucet is unavailable: Please try again in a few more seconds"))
     case FaucetHandlerResponse.WalletRpcClientError(error) =>
@@ -62,4 +62,7 @@ class FaucetRpcService(config: FaucetConfig)(implicit system: ActorSystem)
       Left(JsonRpcError.InternalError)
   }
 
-}
+  private def handleThrowable[T]: PartialFunction[Throwable, Either[JsonRpcError, T]] = { case other =>
+    log.debug(s"process failure: $other")
+    Left(JsonRpcError.InternalError)
+  }

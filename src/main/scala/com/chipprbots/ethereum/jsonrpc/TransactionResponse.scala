@@ -2,11 +2,11 @@ package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
-trait BaseTransactionResponse {
+trait BaseTransactionResponse:
   def hash: ByteString
   def nonce: BigInt
   def blockHash: Option[ByteString]
@@ -18,7 +18,6 @@ trait BaseTransactionResponse {
   def gasPrice: BigInt
   def gas: BigInt
   def input: ByteString
-}
 
 final case class TransactionResponse(
     hash: ByteString,
@@ -53,9 +52,9 @@ final case class TransactionData(
     transactionIndex: Option[Int] = None
 )
 
-object TransactionResponse {
+object TransactionResponse:
 
-  implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+  given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
   def apply(tx: TransactionData): TransactionResponse =
     TransactionResponse(tx.stx, tx.blockHeader, tx.transactionIndex)
@@ -64,12 +63,12 @@ object TransactionResponse {
       stx: SignedTransaction,
       blockHeader: Option[BlockHeader] = None,
       transactionIndex: Option[Int] = None
-  ): TransactionResponse = {
+  ): TransactionResponse =
     val (txType, txChainId, txMaxFee, txMaxPriority, txAccessList, txMaxBlobFee, txBlobHashes, txAuthList) =
-      stx.tx match {
+      stx.tx match
         case _: LegacyTransaction =>
           // EIP-155: extract chainId from v value for replay-protected legacy txs
-          val legacyChainId = if (stx.signature.v > 35) Some((stx.signature.v - 35) / 2) else None
+          val legacyChainId = if stx.signature.v > 35 then Some((stx.signature.v - 35) / 2) else None
           (BigInt(0), legacyChainId, None, None, None, None, None, None)
         case tx: TransactionWithAccessList =>
           (BigInt(1), Some(tx.chainId), None, None, Some(encodeAccessList(tx.accessList)), None, None, None)
@@ -92,7 +91,7 @@ object TransactionResponse {
             Some(tx.maxPriorityFeePerGas),
             Some(encodeAccessList(tx.accessList)),
             Some(tx.maxFeePerBlobGas),
-            Some(tx.blobVersionedHashes),
+            Some(tx.blobVersionedHashes.map(_.value)),
             None
           )
         case tx: SetCodeTransaction =>
@@ -106,14 +105,13 @@ object TransactionResponse {
             None,
             Some(encodeAuthorizationList(tx.authorizationList))
           )
-      }
 
     val effectiveGasPrice = Transaction.effectiveGasPrice(stx.tx, blockHeader.flatMap(_.baseFee))
 
     TransactionResponse(
-      hash = stx.hash,
+      hash = stx.hash.value,
       nonce = stx.tx.nonce,
-      blockHash = blockHeader.map(_.hash),
+      blockHash = blockHeader.map(_.hash.value),
       blockNumber = blockHeader.map(_.number),
       transactionIndex = transactionIndex.map(txIndex => BigInt(txIndex)),
       from = SignedTransaction.getSender(stx).map(_.bytes),
@@ -131,13 +129,12 @@ object TransactionResponse {
       blobVersionedHashes = txBlobHashes,
       authorizationList = txAuthList,
       // yParity only for typed transactions (type >= 1), not legacy
-      yParity = if (txType > 0) Some(stx.signature.v) else None,
+      yParity = if txType > 0 then Some(stx.signature.v) else None,
       v = Some(stx.signature.v),
       r = Some(stx.signature.r),
       s = Some(stx.signature.s),
       blockTimestamp = blockHeader.map(h => BigInt(h.unixTimestamp))
     )
-  }
 
   private def encodeAccessList(accessList: List[AccessListItem]): Seq[Map[String, Any]] =
     accessList.map { item =>
@@ -158,5 +155,3 @@ object TransactionResponse {
         "s" -> auth.s
       )
     }
-
-}

@@ -1,13 +1,14 @@
 package com.chipprbots.ethereum.sync.util
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
 import cats.effect.Resource
 
 import scala.annotation.tailrec
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Try
 
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
@@ -19,36 +20,38 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.mpt.MptTraversals
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
 import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.FakePeerCustomConfig.defaultConfig
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
 import com.chipprbots.ethereum.utils.ByteUtils
-object FastSyncItSpecUtils {
+object FastSyncItSpecUtils:
 
   class FakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig)
-      extends CommonFakePeer(peerName, fakePeerCustomConfig) {
+      extends CommonFakePeer(peerName, fakePeerCustomConfig):
 
     lazy val validators = new MockValidatorsAlwaysSucceed
 
-    lazy val fastSync: ActorRef = system.actorOf(
-      FastSync.props(
-        storagesInstance.storages.fastSyncStateStorage,
-        storagesInstance.storages.appStateStorage,
-        storagesInstance.storages.blockNumberMappingStorage,
-        bl,
-        blockchainReader,
-        blockchainWriter,
-        storagesInstance.storages.evmCodeStorage,
-        storagesInstance.storages.stateStorage,
-        storagesInstance.storages.nodeStorage,
-        validators,
-        peerEventBus,
-        etcPeerManager,
-        blacklist,
-        testSyncConfig,
-        system.scheduler,
-        this
+    lazy val fastSync: ActorRef = system
+      .spawnAnonymous(
+        FastSync.behavior(
+          storagesInstance.storages.fastSyncStateStorage,
+          storagesInstance.storages.appStateStorage,
+          storagesInstance.storages.blockNumberMappingStorage,
+          bl,
+          blockchainReader,
+          blockchainWriter,
+          storagesInstance.storages.evmCodeStorage,
+          storagesInstance.storages.stateStorage,
+          storagesInstance.storages.nodeStorage,
+          validators,
+          peerEventBus.toClassic,
+          etcPeerManager,
+          blacklist,
+          testSyncConfig,
+          this,
+          system.deadLetters
+        )
       )
-    )
+      .toClassic
 
     def startFastSync(): IO[Unit] = IO {
       fastSync ! SyncProtocol.Start
@@ -62,7 +65,7 @@ object FastSyncItSpecUtils {
     // Reads whole trie into memory, if the trie lacks nodes in storage it will be None
     def getBestBlockTrie(): Option[MptNode] =
       Try {
-        val bestBlock = blockchainReader.getBestBlock().get
+        val bestBlock = blockchainReader.getBestBlock.get
         val bestStateRoot = bestBlock.header.stateRoot
         MptTraversals.parseTrieIntoMemory(
           HashNode(bestStateRoot.toArray),
@@ -70,21 +73,20 @@ object FastSyncItSpecUtils {
         )
       }.toOption
 
-    def containsExpectedDataUpToAccountAtBlock(n: BigInt, blockNumber: BigInt): Boolean = {
+    def containsExpectedDataUpToAccountAtBlock(n: BigInt, blockNumber: BigInt): Boolean =
       @tailrec
       def go(i: BigInt): Boolean =
-        if (i >= n) {
-          true
-        } else {
+        if i >= n then true
+        else
           val expectedBalance = i
           val accountAddress = Address(i)
           val accountExpectedCode = ByteString(i.toByteArray)
           val codeHash = kec256(accountExpectedCode)
           val accountExpectedStorageAddresses = (i until i + 20).toList
-          val account = blockchainReader.getAccount(blockchainReader.getBestBranch(), accountAddress, blockNumber).get
+          val account = blockchainReader.getAccount(blockchainReader.getBestBranch, accountAddress, blockNumber).get
           val code = evmCodeStorage.get(codeHash).get
           val storedData = accountExpectedStorageAddresses.map { addr =>
-            ByteUtils.toBigInt(bl.getAccountStorageAt(account.storageRoot, addr, ethCompatibleStorage = true))
+            ByteUtils.toBigInt(bl.getAccountStorageAt(account.storageRoot.value, addr, ethCompatibleStorage = true))
           }
           val haveAllStoredData = accountExpectedStorageAddresses.zip(storedData).forall { case (address, value) =>
             address == value
@@ -92,19 +94,14 @@ object FastSyncItSpecUtils {
 
           val dataIsCorrect =
             account.balance.toBigInt == expectedBalance && code == accountExpectedCode && haveAllStoredData
-          if (dataIsCorrect) {
-            go(i + 1)
-          } else {
-            false
-          }
-        }
+          if dataIsCorrect then go(i + 1)
+          else false
 
       go(0)
-    }
 
     def startWithState(): IO[Unit] =
       IO {
-        val currentBest = blockchainReader.getBestBlock().get.header
+        val currentBest = blockchainReader.getBestBlock.get.header
         val safeTarget = currentBest.number + syncConfig.fastSyncBlockValidationX
         val nextToValidate = currentBest.number + 1
         val syncState =
@@ -122,15 +119,13 @@ object FastSyncItSpecUtils {
         storagesInstance.storages.fastSyncStateStorage.putSyncState(syncState)
       }.map(_ => ())
 
-  }
-
-  object FakePeer {
+  object FakePeer:
 
     def startFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig): IO[FakePeer] =
-      for {
+      for
         peer <- IO(new FakePeer(peerName, fakePeerCustomConfig))
         _ <- peer.startPeer()
-      } yield peer
+      yield peer
 
     def start1FakePeerRes(
         fakePeerCustomConfig: FakePeerCustomConfig = defaultConfig,
@@ -146,21 +141,21 @@ object FastSyncItSpecUtils {
         fakePeerCustomConfig1: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig2: FakePeerCustomConfig = defaultConfig
     ): Resource[IO, (FakePeer, FakePeer)] =
-      for {
+      for
         peer1 <- start1FakePeerRes(fakePeerCustomConfig1, "Peer1")
         peer2 <- start1FakePeerRes(fakePeerCustomConfig2, "Peer2")
-      } yield (peer1, peer2)
+      yield (peer1, peer2)
 
     def start3FakePeersRes(
         fakePeerCustomConfig1: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig2: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig3: FakePeerCustomConfig = defaultConfig
     ): Resource[IO, (FakePeer, FakePeer, FakePeer)] =
-      for {
+      for
         peer1 <- start1FakePeerRes(fakePeerCustomConfig1, "Peer1")
         peer2 <- start1FakePeerRes(fakePeerCustomConfig2, "Peer2")
         peer3 <- start1FakePeerRes(fakePeerCustomConfig3, "Peer3")
-      } yield (peer1, peer2, peer3)
+      yield (peer1, peer2, peer3)
 
     def start4FakePeersRes(
         fakePeerCustomConfig1: FakePeerCustomConfig = defaultConfig,
@@ -168,11 +163,9 @@ object FastSyncItSpecUtils {
         fakePeerCustomConfig3: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig4: FakePeerCustomConfig = defaultConfig
     ): Resource[IO, (FakePeer, FakePeer, FakePeer, FakePeer)] =
-      for {
+      for
         peer1 <- start1FakePeerRes(fakePeerCustomConfig1, "Peer1")
         peer2 <- start1FakePeerRes(fakePeerCustomConfig2, "Peer2")
         peer3 <- start1FakePeerRes(fakePeerCustomConfig3, "Peer3")
         peer4 <- start1FakePeerRes(fakePeerCustomConfig4, "Peer3")
-      } yield (peer1, peer2, peer3, peer4)
-  }
-}
+      yield (peer1, peer2, peer3, peer4)

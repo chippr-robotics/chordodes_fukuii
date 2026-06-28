@@ -2,94 +2,119 @@ package com.chipprbots.ethereum.network
 
 import java.net.URI
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.Scheduler
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.db.storage.KnownNodesStorage
-import com.chipprbots.ethereum.network.KnownNodesManager.KnownNodesManagerConfig
 
-class KnownNodesManager(
-    config: KnownNodesManagerConfig,
-    knownNodesStorage: KnownNodesStorage,
-    externalSchedulerOpt: Option[Scheduler] = None
-) extends Actor
-    with ActorLogging {
+object KnownNodesManager:
 
-  import KnownNodesManager._
-
-  private def scheduler = externalSchedulerOpt.getOrElse(context.system.scheduler)
-
-  var knownNodes: Set[URI] = knownNodesStorage.getKnownNodes()
-
-  var toAdd: Set[URI] = Set.empty
-
-  var toRemove: Set[URI] = Set.empty
-
-  scheduler.scheduleWithFixedDelay(config.persistInterval, config.persistInterval, self, PersistChanges)
-
-  override def receive: Receive = {
-    case AddKnownNode(uri) =>
-      if (!knownNodes.contains(uri)) {
-        knownNodes += uri
-        toAdd += uri
-        toRemove -= uri
+  /** Behavior factory for the Typed KnownNodesManager.
+    *
+    * Mutable Classic vars (knownNodes, toAdd, toRemove) are threaded through the recursive behavior as the [[State]]
+    * accumulator. The PersistChanges tick is driven by a fixed-delay timer rather than the Classic external scheduler.
+    */
+  def apply(
+      config: KnownNodesManagerConfig,
+      knownNodesStorage: KnownNodesStorage
+  ): Behavior[Command] =
+    Behaviors.setup { ctx =>
+      Behaviors.withTimers { timers =>
+        timers.startTimerWithFixedDelay(PersistChanges, config.persistInterval)
+        running(ctx, config, knownNodesStorage, State(knownNodes = knownNodesStorage.getKnownNodes))
       }
-
-    case RemoveKnownNode(uri) =>
-      if (knownNodes.contains(uri)) {
-        knownNodes -= uri
-        toAdd -= uri
-        toRemove += uri
-      }
-
-    case GetKnownNodes =>
-      sender() ! KnownNodes(knownNodes)
-
-    case PersistChanges =>
-      persistChanges()
-  }
-
-  private def persistChanges(): Unit = {
-    log.debug(s"Persisting ${knownNodes.size} known nodes.")
-    if (knownNodes.size > config.maxPersistedNodes) {
-      val toAbandon = knownNodes.take(knownNodes.size - config.maxPersistedNodes)
-      toRemove ++= toAbandon
-      toAdd --= toAbandon
     }
-    if (toAdd.nonEmpty || toRemove.nonEmpty) {
-      knownNodesStorage.updateKnownNodes(toAdd = toAdd, toRemove = toRemove).commit()
-      toAdd = Set.empty
-      toRemove = Set.empty
+
+  final private case class State(
+      knownNodes: Set[URI],
+      toAdd: Set[URI] = Set.empty,
+      toRemove: Set[URI] = Set.empty
+  )
+
+  private def running(
+      ctx: ActorContext[Command],
+      config: KnownNodesManagerConfig,
+      knownNodesStorage: KnownNodesStorage,
+      state: State
+  ): Behavior[Command] =
+    Behaviors.receiveMessage {
+      case AddKnownNode(uri) =>
+        if !state.knownNodes.contains(uri) then
+          running(
+            ctx,
+            config,
+            knownNodesStorage,
+            state.copy(
+              knownNodes = state.knownNodes + uri,
+              toAdd = state.toAdd + uri,
+              toRemove = state.toRemove - uri
+            )
+          )
+        else Behaviors.same
+
+      case RemoveKnownNode(uri) =>
+        if state.knownNodes.contains(uri) then
+          running(
+            ctx,
+            config,
+            knownNodesStorage,
+            state.copy(
+              knownNodes = state.knownNodes - uri,
+              toAdd = state.toAdd - uri,
+              toRemove = state.toRemove + uri
+            )
+          )
+        else Behaviors.same
+
+      case GetKnownNodesReq(replyTo) =>
+        replyTo ! KnownNodes(state.knownNodes)
+        Behaviors.same
+
+      case PersistChanges =>
+        running(ctx, config, knownNodesStorage, persistChanges(ctx, config, knownNodesStorage, state))
     }
-  }
 
-}
+  private def persistChanges(
+      ctx: ActorContext[Command],
+      config: KnownNodesManagerConfig,
+      knownNodesStorage: KnownNodesStorage,
+      state: State
+  ): State =
+    ctx.log.debug(s"Persisting ${state.knownNodes.size} known nodes.")
+    val pruned =
+      if state.knownNodes.size > config.maxPersistedNodes then
+        val toAbandon = state.knownNodes.take(state.knownNodes.size - config.maxPersistedNodes)
+        state.copy(toRemove = state.toRemove ++ toAbandon, toAdd = state.toAdd -- toAbandon)
+      else state
+    if pruned.toAdd.nonEmpty || pruned.toRemove.nonEmpty then
+      knownNodesStorage.updateKnownNodes(toAdd = pruned.toAdd, toRemove = pruned.toRemove).commit()
+      pruned.copy(toAdd = Set.empty, toRemove = Set.empty)
+    else pruned
 
-object KnownNodesManager {
-  def props(config: KnownNodesManagerConfig, knownNodesStorage: KnownNodesStorage): Props =
-    Props(new KnownNodesManager(config, knownNodesStorage))
+  sealed trait Command
 
-  case class AddKnownNode(uri: URI)
-  case class RemoveKnownNode(uri: URI)
-  case object GetKnownNodes
-  case class KnownNodes(nodes: Set[URI])
+  final case class AddKnownNode(uri: URI) extends Command
+  final case class RemoveKnownNode(uri: URI) extends Command
 
-  private case object PersistChanges
+  /** Typed ask request for the current known-node set. */
+  final case class GetKnownNodesReq(replyTo: ActorRef[KnownNodes]) extends Command
+
+  /** Internal persist tick. Package-private so tests can inject it directly instead of advancing a scheduler. */
+  private[network] case object PersistChanges extends Command
+
+  /** Response message — not part of the Command ADT. */
+  final case class KnownNodes(nodes: Set[URI])
 
   case class KnownNodesManagerConfig(persistInterval: FiniteDuration, maxPersistedNodes: Int)
 
-  object KnownNodesManagerConfig {
-    def apply(etcClientConfig: com.typesafe.config.Config): KnownNodesManagerConfig = {
+  object KnownNodesManagerConfig:
+    def apply(etcClientConfig: com.typesafe.config.Config): KnownNodesManagerConfig =
       val knownNodesManagerConfig = etcClientConfig.getConfig("network.known-nodes")
       KnownNodesManagerConfig(
         persistInterval = knownNodesManagerConfig.getDuration("persist-interval").toMillis.millis,
         maxPersistedNodes = knownNodesManagerConfig.getInt("max-persisted-nodes")
       )
-    }
-  }
-}

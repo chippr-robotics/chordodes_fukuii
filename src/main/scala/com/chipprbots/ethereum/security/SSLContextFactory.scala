@@ -7,24 +7,23 @@ import javax.net.ssl.SSLContext
 
 import scala.util.Try
 
-case class SSLContextFactory() extends FileUtils with KeyStoreUtils {
+case class SSLContextFactory() extends FileUtils with KeyStoreUtils:
 
   def createSSLContext(sslConfig: SSLConfig, secureRandom: SecureRandom): Either[SSLError, SSLContext] =
-    for {
+    for
       _ <- validateCertificateFiles(
         sslConfig.keyStorePath,
         sslConfig.passwordFile
       )
       sslContext <- getSSLContext(sslConfig, secureRandom)
-    } yield sslContext
+    yield sslContext
 
-  private def getSSLContext(sslConfig: SSLConfig, secureRandom: SecureRandom): Either[SSLError, SSLContext] = {
+  private def getSSLContext(sslConfig: SSLConfig, secureRandom: SecureRandom): Either[SSLError, SSLContext] =
     val passwordReader = getReader(sslConfig.passwordFile)
-    try {
+    try
       val password = passwordReader.getLines().mkString
       obtainSSLContext(secureRandom, sslConfig.keyStorePath, sslConfig.keyStoreType, password)
-    } finally passwordReader.close()
-  }
+    finally passwordReader.close()
 
   /** Validates that the keystore certificate file and password file were configured and that the files exists
     *
@@ -38,18 +37,14 @@ case class SSLContextFactory() extends FileUtils with KeyStoreUtils {
   private def validateCertificateFiles(
       keystorePath: String,
       passwordFile: String
-  ): Either[SSLError, Unit] = {
+  ): Either[SSLError, Unit] =
     val keystoreDirMissing = !exist(keystorePath)
     val passwordFileMissing = !exist(passwordFile)
-    if (keystoreDirMissing && passwordFileMissing)
+    if keystoreDirMissing && passwordFileMissing then
       Left(SSLError("Certificate keystore path and password file configured but files are missing"))
-    else if (keystoreDirMissing)
-      Left(SSLError("Certificate keystore path configured but file is missing"))
-    else if (passwordFileMissing)
-      Left(SSLError("Certificate password file configured but file is missing"))
-    else
-      Right(())
-  }
+    else if keystoreDirMissing then Left(SSLError("Certificate keystore path configured but file is missing"))
+    else if passwordFileMissing then Left(SSLError("Certificate password file configured but file is missing"))
+    else Right(())
 
   /** Constructs the SSL context given a certificate
     *
@@ -67,7 +62,7 @@ case class SSLContextFactory() extends FileUtils with KeyStoreUtils {
       keyStorePath: String,
       keyStoreType: String,
       password: String
-  ): Either[SSLError, SSLContext] = {
+  ): Either[SSLError, SSLContext] =
     val passwordCharArray: Array[Char] = password.toCharArray
 
     val maybeKeyStore: Either[SSLError, KeyStore] = Try(KeyStore.getInstance(keyStoreType)).toOption
@@ -76,20 +71,19 @@ case class SSLContextFactory() extends FileUtils with KeyStoreUtils {
       val keyStoreFileCreationResult: Either[SSLError, FileInputStream] =
         createFileInputStream(keyStorePath).toOption.toRight(SSLError("Certificate keystore file creation failed"))
       keyStoreFileCreationResult.flatMap { keyStoreFile =>
-        loadKeyStore(keyStoreFile, passwordCharArray, keyStore) match {
+        loadKeyStore(keyStoreFile, passwordCharArray, keyStore) match
           case Right(_) =>
             Right(keyStore)
           case Left(err) =>
             Left(SSLError(err.getMessage))
-        }
       }
     }
 
     keyStoreInitResult.flatMap { ks =>
-      (for {
+      (for
         km <- getKeyManager(ks, passwordCharArray)
         tm <- getTrustManager(ks)
-      } yield (km, tm)) match {
+      yield (km, tm)) match
         case Right((km, tm)) =>
           val sslContext: SSLContext = SSLContext.getInstance("TLS")
           sslContext.init(km, tm, secureRandom)
@@ -97,8 +91,4 @@ case class SSLContextFactory() extends FileUtils with KeyStoreUtils {
         case Left(error) =>
           log.debug("Invalid Certificate keystore", error)
           Left(SSLError("Invalid Certificate keystore"))
-      }
     }
-  }
-
-}

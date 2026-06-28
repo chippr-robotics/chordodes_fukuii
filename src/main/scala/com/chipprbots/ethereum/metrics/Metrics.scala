@@ -3,43 +3,38 @@ package com.chipprbots.ethereum.metrics
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-import io.micrometer.core.instrument._
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.micrometer.core.instrument.*
 import io.micrometer.core.instrument.binder.logging.LogbackMetrics
-import io.prometheus.metrics.exporter.httpserver.{HTTPServer => PrometheusHTTPServer}
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.prometheus.metrics.exporter.httpserver.HTTPServer as PrometheusHTTPServer
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics
 import kamon.Kamon
 import org.slf4j.LoggerFactory
 
-case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: Int = 0) {
+case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: Int = 0):
 
-  private[this] def mkName: String => String = MetricsUtils.mkNameWithPrefix(metricsPrefix)
+  private def mkName: String => String = MetricsUtils.mkNameWithPrefix(metricsPrefix)
 
   private lazy val server: PrometheusHTTPServer =
     PrometheusHTTPServer.builder().port(serverPort).buildAndStart()
 
   private var logbackMetricsBinder: Option[LogbackMetrics] = None
 
-  def start(): Unit = {
+  def start(): Unit =
     server // We need this to evaluate the lazy val!
     JvmMetrics.builder().register()
     val lm = new LogbackMetrics()
     lm.bindTo(registry)
     logbackMetricsBinder = Some(lm)
     Kamon.init()
-  }
 
-  def close(): Unit = {
+  def close(): Unit =
     logbackMetricsBinder.foreach(_.close())
     registry.close()
     server.close()
-  }
-
-  def deltaSpike(name: String): DeltaSpikeGauge =
-    new DeltaSpikeGauge(mkName(name), this)
 
   /** Returns a [[io.micrometer.core.instrument.Gauge Gauge]].
     * @param computeValue
@@ -51,7 +46,7 @@ case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: I
       //      If you do, you risk getting no metrics out of the gauge.
       //      So we just use a vanilla `this` but any other non-`null`
       //      value would also do.
-      .builder(mkName(name), this, (_: Any) => computeValue())
+      .builder(mkName(name), this, (_: Any) => computeValue()) // Any: Micrometer gauge state — library API
       .register(registry)
 
   /** Returns a [[io.micrometer.core.instrument.Counter Counter]].
@@ -66,7 +61,7 @@ case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: I
   def timer(name: String, tags: String*): Timer =
     Timer
       .builder(mkName(name))
-      .tags(tags: _*)
+      .tags(tags*)
       .register(registry)
 
   /** Returns a [[io.micrometer.core.instrument.DistributionSummary DistributionSummary]].
@@ -75,9 +70,8 @@ case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: I
     DistributionSummary
       .builder(mkName(name))
       .register(registry)
-}
 
-object Metrics {
+object Metrics:
   private val log = LoggerFactory.getLogger(getClass)
 
   final val MetricsPrefix = "app"
@@ -86,7 +80,7 @@ object Metrics {
   private val instances = new ConcurrentHashMap[String, Metrics]()
 
   // Default/fallback instance for backward compatibility
-  final private[this] val defaultMetrics = Metrics(MetricsPrefix, new SimpleMeterRegistry())
+  final private val defaultMetrics = Metrics(MetricsPrefix, new SimpleMeterRegistry())
   private val defaultRef = new AtomicReference[Metrics](defaultMetrics)
 
   /** Get the default metrics instance (backward compatible with single-instance mode). */
@@ -112,15 +106,15 @@ object Metrics {
     */
   def configure(config: MetricsConfig, instanceId: String = "default"): Try[Unit] =
     Try {
-      if (config.enabled) {
+      if config.enabled then
         val registry = MeterRegistryBuilder.build(MetricsPrefix)
         val metrics = new Metrics(MetricsPrefix, registry, config.port)
         val existing = instances.putIfAbsent(instanceId, metrics)
-        if (existing == null) {
+        if existing == null then
           metrics.start()
           // First instance also becomes the default
           val becameDefault = defaultRef.compareAndSet(defaultMetrics, metrics)
-          if (!becameDefault) {
+          if !becameDefault then
             // Identify the owner of `defaultRef` — that's the instance whose writes the shared
             // registry actually reflects. `instances` may have other entries too (3+-way
             // multi-instance), but the default-owner is the one operators need to know about.
@@ -138,15 +132,11 @@ object Metrics {
               config.port.toString,
               ownerId
             )
-          }
-        } else {
+        else
           metrics.close()
           // Already configured for this instance — not an error in multi-instance mode
-        }
-      }
     }
 
   /** Shut down metrics for a specific instance. */
   def closeInstance(instanceId: String): Unit =
     Option(instances.remove(instanceId)).foreach(_.close())
-}

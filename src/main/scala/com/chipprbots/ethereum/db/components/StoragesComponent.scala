@@ -1,14 +1,14 @@
 package com.chipprbots.ethereum.db.components
 
-import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.db.storage.pruning.PruningMode
 import com.chipprbots.ethereum.domain.BlockchainStorages
 
-trait StoragesComponent {
+trait StoragesComponent:
 
   val storages: Storages
 
-  trait Storages extends BlockchainStorages {
+  trait Storages extends BlockchainStorages:
 
     val blockHeadersStorage: BlockHeadersStorage
 
@@ -39,6 +39,3 @@ trait StoragesComponent {
     val flatAccountStorage: FlatAccountStorage
 
     val pruningMode: PruningMode
-
-  }
-}

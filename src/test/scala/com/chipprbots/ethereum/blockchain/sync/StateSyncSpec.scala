@@ -5,23 +5,24 @@ import java.util.concurrent.ThreadLocalRandom
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe as TypedTestProbe
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActor.AutoPilot
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
 
 import org.scalactic.anyvals.PosInt
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.ObjectGenerators
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.MptNodeData
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.TrieProvider
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler
@@ -35,117 +36,104 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.ChainWeight
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
+import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData.GetNodeDataEnc
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData.GetNodeDataEnc
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
-import com.chipprbots.ethereum.testing.Tags._
 
 class StateSyncSpec
-    extends TestKit(ActorSystem("StateSyncSpec"))
+    extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfterAll
-    with ScalaCheckPropertyChecks
-    with WithActorSystemShutDown {
+    with ScalaCheckPropertyChecks:
 
   // those tests are somewhat long running 3 successful evaluation should be fine
   implicit override val generatorDrivenConfig: PropertyCheckConfiguration =
     PropertyCheckConfiguration(minSuccessful = PosInt(3))
 
-  "StateSync" should "sync state to different tries" taggedAs (UnitTest, SyncTest) in new TestSetup() {
+  "StateSync" should "sync state to different tries" taggedAs (UnitTest, SyncTest) in new TestSetup():
     forAll(ObjectGenerators.genMultipleNodeData(1000)) { nodeData =>
-      val initiator = TestProbe()
-      initiator.ignoreMsg { case SyncStateSchedulerActor.StateSyncStats(_, _) => true }
       val trieProvider = TrieProvider()
       val target = trieProvider.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider)
-      initiator.send(syncStateSchedulerActor, StartSyncingTo(target, 1))
-      initiator.expectMsg(20.seconds, StateSyncFinished)
+      syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
+      syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
     }
-  }
 
   it should "sync state to different tries when peers provide different set of data each time" taggedAs (
     UnitTest,
     SyncTest
-  ) in new TestSetup() {
+  ) in new TestSetup():
     forAll(ObjectGenerators.genMultipleNodeData(1000)) { nodeData =>
-      val initiator = TestProbe()
-      initiator.ignoreMsg { case SyncStateSchedulerActor.StateSyncStats(_, _) => true }
       val trieProvider1 = TrieProvider()
       val target = trieProvider1.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider1, partialResponseConfig)
-      initiator.send(syncStateSchedulerActor, StartSyncingTo(target, 1))
-      initiator.expectMsg(20.seconds, StateSyncFinished)
+      syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
+      syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
     }
-  }
 
   it should "sync state to different tries when peer provide mixed responses" taggedAs (
     UnitTest,
     SyncTest
-  ) in new TestSetup() {
+  ) in new TestSetup():
     forAll(ObjectGenerators.genMultipleNodeData(1000)) { nodeData =>
-      val initiator = TestProbe()
-      initiator.ignoreMsg { case SyncStateSchedulerActor.StateSyncStats(_, _) => true }
       val trieProvider1 = TrieProvider()
       val target = trieProvider1.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider1, mixedResponseConfig)
-      initiator.send(syncStateSchedulerActor, StartSyncingTo(target, 1))
-      initiator.expectMsg(20.seconds, StateSyncFinished)
+      syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
+      syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
     }
-  }
 
-  it should "restart state sync when requested" taggedAs (UnitTest, SyncTest) in new TestSetup() {
+  it should "restart state sync when requested" taggedAs (UnitTest, SyncTest) in new TestSetup():
     forAll(ObjectGenerators.genMultipleNodeData(1000)) { nodeData =>
-      val initiator = TestProbe()
       val trieProvider1 = TrieProvider()
       val target = trieProvider1.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider1)
-      initiator.send(syncStateSchedulerActor, StartSyncingTo(target, 1))
-      initiator.send(syncStateSchedulerActor, RestartRequested)
-      initiator.fishForMessage(20.seconds) {
-        case _: StateSyncStats        => false
-        case WaitingForNewTargetBlock => true
-      }
+      syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
+      syncStateSchedulerActor ! RestartRequested
+      // Stats go to syncInitStats; responses go to syncInitResponse — wait directly for WaitingForNewTargetBlock.
+      syncInitResponse.expectMessage(20.seconds, WaitingForNewTargetBlock)
     }
-  }
 
   it should "start state sync when receiving start signal while bloom filter is loading" taggedAs (
     UnitTest,
     SyncTest
-  ) in new TestSetup() {
-    override def buildBlockChain(): (BlockchainReader, BlockchainImpl) = {
+  ) in new TestSetup():
+    override def buildBlockChain(): (BlockchainReader, BlockchainImpl) =
       val storages = getNewStorages.storages
       val blockchainReader = BlockchainReader(storages)
       (blockchainReader, BlockchainImpl(storages, blockchainReader))
-    }
 
     val nodeData: IndexedSeq[MptNodeData] = (0 until 1000).map(i => MptNodeData(Address(i), None, Seq(), i))
-    val initiator: TestProbe = TestProbe()
-    initiator.ignoreMsg { case SyncStateSchedulerActor.StateSyncStats(_, _) => true }
     val trieProvider1: TrieProvider = TrieProvider()
     val target: ByteString = trieProvider1.buildWorld(nodeData)
     setAutoPilotWithProvider(trieProvider1)
-    initiator.send(syncStateSchedulerActor, StartSyncingTo(target, 1))
-    initiator.expectMsg(20.seconds, StateSyncFinished)
-  }
+    syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
+    syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
 
-  class TestSetup extends EphemBlockchainTestSetup with TestSyncConfig {
-    implicit override lazy val system: ActorSystem = StateSyncSpec.this.system
+  class TestSetup extends EphemBlockchainTestSetup with TestSyncConfig:
+    implicit override lazy val classicSystem: ActorSystem = StateSyncSpec.this.system.classicSystem
     type PeerConfig = Map[PeerId, PeerAction]
-    val syncInit: TestProbe = TestProbe()
+    // Two Typed probes — SSA now sends responses and stats to separate typed refs.
+    val syncInitResponse: TypedTestProbe[SyncStateSchedulerActor.SyncStateSchedulerActorResponse] =
+      testKit.createTestProbe[SyncStateSchedulerActor.SyncStateSchedulerActorResponse]()
+    val syncInitStats: TypedTestProbe[SyncStateSchedulerActor.StateSyncStats] =
+      testKit.createTestProbe[SyncStateSchedulerActor.StateSyncStats]()
 
     val peerStatus: RemoteStatus = RemoteStatus(
       capability = Capability.ETH63,
       networkId = 1,
       chainWeight = ChainWeight.totalDifficultyOnly(10000),
-      bestHash = Fixtures.Blocks.Block3125369.header.hash,
-      genesisHash = Fixtures.Blocks.Genesis.header.hash
+      bestHash = Fixtures.Blocks.Block3125369.header.hash.value,
+      genesisHash = Fixtures.Blocks.Genesis.header.hash.value
     )
     val initialPeerInfo: PeerInfo = PeerInfo(
       remoteStatus = peerStatus,
@@ -163,7 +151,7 @@ class StateSyncSpec
         Peer(
           PeerId(s"peer$i"),
           new InetSocketAddress("127.0.0.1", i),
-          TestProbe(i.toString).ref,
+          TestProbe(i.toString).ref.toTyped[PeerActor.Command],
           incomingConnection = false
         ),
         initialPeerInfo
@@ -188,13 +176,9 @@ class StateSyncSpec
     }
 
     val mixedResponseConfig: PeerConfig = peersMap.map { case (peer, _) =>
-      if (peer.remoteAddress.getPort <= 3) {
-        peer.id -> FullResponse
-      } else if (peer.remoteAddress.getPort > 3 && peer.remoteAddress.getPort <= 6) {
-        peer.id -> PartialResponse
-      } else {
-        peer.id -> NoResponse
-      }
+      if peer.remoteAddress.getPort <= 3 then peer.id -> FullResponse
+      else if peer.remoteAddress.getPort > 3 && peer.remoteAddress.getPort <= 6 then peer.id -> PartialResponse
+      else peer.id -> NoResponse
     }
 
     val networkPeerManager: TestProbe = TestProbe()
@@ -202,32 +186,31 @@ class StateSyncSpec
     val peerEventBus: TestProbe = TestProbe()
 
     def setAutoPilotWithProvider(trieProvider: TrieProvider, peerConfig: PeerConfig = defaultPeerConfig): Unit =
-      networkPeerManager.setAutoPilot(new AutoPilot {
-        override def run(sender: ActorRef, msg: Any): AutoPilot =
-          msg match {
-            case SendMessage(msg: GetNodeDataEnc, peer) =>
-              peerConfig(peer) match {
-                case FullResponse =>
-                  val responseMsg =
-                    NodeData(trieProvider.getNodes(msg.underlyingMsg.mptElementsHashes.toList).map(_.data))
-                  sender ! MessageFromPeer(responseMsg, peer)
-                  this
-                case PartialResponse =>
-                  val random: ThreadLocalRandom = ThreadLocalRandom.current()
-                  val elementsToServe = random.nextInt(minMptNodeRequest, maxMptNodeRequest + 1)
-                  val toGet = msg.underlyingMsg.mptElementsHashes.toList.take(elementsToServe)
-                  val responseMsg = NodeData(trieProvider.getNodes(toGet).map(_.data))
-                  sender ! MessageFromPeer(responseMsg, peer)
-                  this
-                case NoResponse =>
-                  this
-              }
+      networkPeerManager.setAutoPilot(
+        new AutoPilot:
+          override def run(sender: ActorRef, msg: Any): AutoPilot =
+            msg match
+              case SendMessage(msg: GetNodeDataEnc, peer) =>
+                peerConfig(peer) match
+                  case FullResponse =>
+                    val responseMsg =
+                      NodeData(trieProvider.getNodes(msg.underlyingMsg.mptElementsHashes.toList).map(_.data))
+                    sender ! MessageFromPeer(responseMsg, peer)
+                    this
+                  case PartialResponse =>
+                    val random: ThreadLocalRandom = ThreadLocalRandom.current()
+                    val elementsToServe = random.nextInt(minMptNodeRequest, maxMptNodeRequest + 1)
+                    val toGet = msg.underlyingMsg.mptElementsHashes.toList.take(elementsToServe)
+                    val responseMsg = NodeData(trieProvider.getNodes(toGet).map(_.data))
+                    sender ! MessageFromPeer(responseMsg, peer)
+                    this
+                  case NoResponse =>
+                    this
 
-            case GetHandshakedPeers =>
-              sender ! HandshakedPeers(peersMap)
-              this
-          }
-      })
+              case GetHandshakedPeersCmd(replyTo) =>
+                replyTo ! HandshakedPeers(peersMap)
+                this
+      )
 
     override lazy val syncConfig: Config.SyncConfig = defaultSyncConfig.copy(
       peersScanInterval = 0.5.second,
@@ -237,27 +220,25 @@ class StateSyncSpec
       syncRetryInterval = 50.milliseconds
     )
 
-    def buildBlockChain(): (BlockchainReader, BlockchainImpl) = {
+    def buildBlockChain(): (BlockchainReader, BlockchainImpl) =
       val storages = getNewStorages.storages
       (
         BlockchainReader(storages),
         BlockchainImpl(storages, BlockchainReader(storages))
       )
-    }
 
-    def genRandomArray(): Array[Byte] = {
+    def genRandomArray(): Array[Byte] =
       val arr = new Array[Byte](32)
       Random.nextBytes(arr)
       arr
-    }
 
     def genRandomByteString(): ByteString =
       ByteString.fromArrayUnsafe(genRandomArray())
 
-    lazy val syncStateSchedulerActor: ActorRef = {
+    lazy val syncStateSchedulerActor: TypedActorRef[SyncStateSchedulerActor.Command] =
       val (blockchainReader, _) = buildBlockChain()
-      system.actorOf(
-        SyncStateSchedulerActor.props(
+      testKit.spawn(
+        SyncStateSchedulerActor.behavior(
           SyncStateScheduler(
             blockchainReader,
             getNewStorages.storages.evmCodeStorage,
@@ -269,10 +250,7 @@ class StateSyncSpec
           networkPeerManager.ref,
           peerEventBus.ref,
           blacklist,
-          system.scheduler
+          syncInitResponse.ref,
+          syncInitStats.ref
         )
       )
-    }
-  }
-
-}

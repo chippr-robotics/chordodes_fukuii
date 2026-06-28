@@ -6,9 +6,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks {
+class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks:
 
   val maxStackSize = 32
   val stackGen: Gen[Stack] = Generators.getStackGen(maxSize = maxStackSize)
@@ -22,13 +22,12 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
   test("pop single element", UnitTest, VMTest) {
     forAll(stackGen) { stack =>
       val (v, stack1) = stack.pop()
-      if (stack.size > 0) {
+      if stack.size > 0 then
         v shouldEqual stack.toSeq.head
         stack1.toSeq shouldEqual stack.toSeq.tail
-      } else {
+      else
         v shouldEqual 0
         stack1 shouldEqual stack
-      }
     }
   }
 
@@ -43,13 +42,12 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
   test("pop multiple elements", UnitTest, VMTest) {
     forAll(stackGen, intGen) { (stack, i) =>
       val (vs, stack1) = stack.pop(i)
-      if (stack.size >= i) {
+      if stack.size >= i then
         vs shouldEqual stack.toSeq.take(i)
         stack1.toSeq shouldEqual stack.toSeq.drop(i)
-      } else {
+      else
         vs shouldEqual Seq.fill(i)(UInt256.Zero)
         stack1 shouldEqual stack
-      }
     }
   }
 
@@ -73,11 +71,8 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
     forAll(stackGen, uint256ListGen) { (stack, vs) =>
       val stack1 = stack.push(vs)
 
-      if (stack.size + vs.size <= stack.maxSize) {
-        stack1.toSeq shouldEqual (vs.reverse ++ stack.toSeq)
-      } else {
-        stack1 shouldEqual stack
-      }
+      if stack.size + vs.size <= stack.maxSize then stack1.toSeq shouldEqual (vs.reverse ++ stack.toSeq)
+      else stack1 shouldEqual stack
     }
   }
 
@@ -85,12 +80,10 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
     forAll(stackGen, intGen) { (stack, i) =>
       val stack1 = stack.dup(i)
 
-      if (i < stack.size && stack.size < stack.maxSize) {
+      if i < stack.size && stack.size < stack.maxSize then
         val x = stack.toSeq(i)
         stack1.toSeq shouldEqual (x +: stack.toSeq)
-      } else {
-        stack1 shouldEqual stack
-      }
+      else stack1 shouldEqual stack
     }
   }
 
@@ -98,14 +91,10 @@ class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks 
     forAll(stackGen, intGen) { (stack, i) =>
       val stack1 = stack.swap(i)
 
-      if (i < stack.size) {
+      if i < stack.size then
         val x = stack.toSeq.head
         val y = stack.toSeq(i)
         stack1.toSeq shouldEqual stack.toSeq.updated(0, y).updated(i, x)
-      } else {
-        stack1 shouldEqual stack
-      }
+      else stack1 shouldEqual stack
     }
   }
-
-}

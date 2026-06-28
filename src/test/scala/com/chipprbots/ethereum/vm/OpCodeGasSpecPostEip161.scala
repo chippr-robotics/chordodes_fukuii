@@ -6,16 +6,16 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.domain.UInt256._
-import com.chipprbots.ethereum.vm.Generators._
+import com.chipprbots.ethereum.domain.UInt256.*
+import com.chipprbots.ethereum.vm.Generators.*
 
 import Fixtures.blockchainConfig
 
-class OpCodeGasSpecPostEip161 extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks {
+class OpCodeGasSpecPostEip161 extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks:
 
   override val config: EvmConfig = EvmConfig.PostEIP161ConfigBuilder(blockchainConfig)
 
-  import config.feeSchedule._
+  import config.feeSchedule.*
 
   test(SELFDESTRUCT) { op =>
     val stateGen = getProgramStateGen(
@@ -54,4 +54,3 @@ class OpCodeGasSpecPostEip161 extends AnyFunSuite with OpCodeTesting with Matche
       }
     }
   }
-}

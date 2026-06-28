@@ -2,15 +2,15 @@ package com.chipprbots.scalanet.discovery.ethereum.v4
 
 import java.net.InetAddress
 
-import cats._
-import cats.implicits._
+import cats.*
+import cats.implicits.*
 
 import com.chipprbots.scalanet.discovery.ethereum.Node
 import com.chipprbots.scalanet.discovery.hash.Hash
 import com.chipprbots.scalanet.kademlia.KBuckets
 import com.chipprbots.scalanet.kademlia.TimeSet
 import com.chipprbots.scalanet.peergroup.Addressable
-import com.chipprbots.scalanet.peergroup.InetAddressOps._
+import com.chipprbots.scalanet.peergroup.InetAddressOps.*
 import scodec.bits.BitVector
 
 case class KBucketsWithSubnetLimits[A: Addressable](
@@ -20,7 +20,7 @@ case class KBucketsWithSubnetLimits[A: Addressable](
     bucketLevelCounts: KBucketsWithSubnetLimits.BucketLevelCounts
 ) {
   import DiscoveryNetwork.Peer
-  import KBucketsWithSubnetLimits._
+  import KBucketsWithSubnetLimits.*
 
   def contains(peer: Peer[A]): Boolean =
     table.contains(peer.kademliaId.value)

@@ -9,14 +9,14 @@ import org.bouncycastle.crypto.params.ECPublicKeyParameters
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
-import com.chipprbots.ethereum.network._
+import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.network.*
 import com.chipprbots.ethereum.network.rlpx.AuthHandshakeSuccess
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.network.rlpx.Secrets
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 
-trait SecureChannelSetup extends SecureRandomBuilder {
+trait SecureChannelSetup extends SecureRandomBuilder:
 
   val remoteNodeKey: AsymmetricCipherKeyPair = generateKeyPair(secureRandom)
   val remoteEphemeralKey: AsymmetricCipherKeyPair = generateKeyPair(secureRandom)
@@ -38,5 +38,3 @@ trait SecureChannelSetup extends SecureRandomBuilder {
     handshakerInitiated.handleResponseMessageV4(responsePacket): @unchecked
 
   def randomNonce(): ByteString = crypto.secureRandomByteString(secureRandom, AuthHandshaker.NonceSize)
-
-}

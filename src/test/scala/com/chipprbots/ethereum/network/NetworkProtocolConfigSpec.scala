@@ -1,14 +1,15 @@
 package com.chipprbots.ethereum.network
 
+import com.typesafe.config.ConfigFactory
+import com.typesafe.config.ConfigValueFactory
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
-
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.utils.{Config, InstanceConfig}
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.Config
+import com.chipprbots.ethereum.utils.InstanceConfig
 
 // scalastyle:off magic.number
 /** Tests for NetworkProtocolConfig case class and config-driven InstanceConfig.supportedCapabilities.
@@ -20,7 +21,7 @@ import com.chipprbots.ethereum.utils.{Config, InstanceConfig}
   *   - ETC global defaults yield [ETH68, ETH69, SNAP1] only
   *   - Startup validation does not abort on misconfigured combinations
   */
-class NetworkProtocolConfigSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class NetworkProtocolConfigSpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   // ── NetworkProtocolConfig.default ─────────────────────────────────────────
 
@@ -159,4 +160,3 @@ class NetworkProtocolConfigSpec extends AnyFlatSpec with Matchers with ParallelT
       ConfigFactory.load().getConfig("fukuii").withValue(path, ConfigValueFactory.fromAnyRef(value)),
       "test-override"
     )
-}

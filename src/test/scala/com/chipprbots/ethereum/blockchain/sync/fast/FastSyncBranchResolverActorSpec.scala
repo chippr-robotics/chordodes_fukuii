@@ -4,9 +4,10 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern.gracefulStop
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActor.AutoPilot
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
@@ -14,7 +15,7 @@ import org.apache.pekko.util.Timeout
 import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits._
+import cats.implicits.*
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
@@ -25,9 +26,7 @@ import org.scalatest.freespec.AnyFreeSpecLike
 
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.blockchain.sync._
+import com.chipprbots.ethereum.blockchain.sync.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed.NoCommonBlockFound
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolvedSuccessful
@@ -35,37 +34,36 @@ import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{
-  BlockHeaders => ETHBlockHeaders,
-  GetBlockHeaders => ETHGetBlockHeaders
-}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders as ETHBlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETHGetBlockHeaders
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Logger
 
 class FastSyncBranchResolverActorSpec
-    extends TestKit(ActorSystem("FastSyncBranchResolver_testing"))
+    extends ScalaTestWithActorTestKit()
     with AnyFreeSpecLike
     with ScalaFutures
-    with NormalPatience
-    with WithActorSystemShutDown { self =>
-  implicit val timeout: Timeout = Timeout(30.seconds)
+    with NormalPatience:
+  self =>
+  implicit override val timeout: Timeout = Timeout(30.seconds)
 
-  import FastSyncBranchResolverActorSpec._
+  import FastSyncBranchResolverActorSpec.*
 
   "FastSyncBranchResolver" - {
     "fetch headers from the new master peer" - {
       "the chain is repaired from the first request to the new master pair and then the last two blocks are removed" taggedAs (
         UnitTest,
         SyncTest
-      ) in new TestSetup {
-        implicit override lazy val system = self.system
+      ) in new TestSetup:
+        implicit override lazy val system: ActorSystem = self.system.classicSystem
         implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-        val sender = TestProbe("sender")
+        val sender: TestProbe = TestProbe("sender")
 
         val commonBlocks: List[Block] = BlockHelpers.generateChain(
           5,
@@ -91,34 +89,33 @@ class FastSyncBranchResolverActorSpec
         val blocksSentFromPeer: Map[Int, List[Block]] = Map(1 -> firstBatchBlockHeaders)
 
         saveBlocks(blocksSaved)
-        val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-        val fastSyncBranchResolver =
+        val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+        val fastSyncBranchResolver: TypedActorRef[FastSyncBranchResolverActor.Command] =
           creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
         val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
           case r @ BranchResolvedSuccessful(num, _) if num == BigInt(5) => r
         }
 
-        val response = (for {
-          _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+        val response: BranchResolvedSuccessful = (for
+          _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
           response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
           _ <- IO(stopController(fastSyncBranchResolver))
-        } yield response).unsafeRunSync()
+        yield response).unsafeRunSync()
         assert(getBestPeers.contains(response.masterPeer))
-      }
 
       "The chain is repaired doing binary searching with the new master peer and then remove the last invalid blocks" - {
-        "highest common block is in the middle" taggedAs (UnitTest, SyncTest) in new TestSetup {
-          implicit override lazy val system = self.system
+        "highest common block is in the middle" taggedAs (UnitTest, SyncTest) in new TestSetup:
+          implicit override lazy val system: ActorSystem = self.system.classicSystem
           implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-          val sender = TestProbe("sender")
+          val sender: TestProbe = TestProbe("sender")
 
           val commonBlocks: List[Block] = BlockHelpers.generateChain(5, BlockHelpers.genesis)
           val blocksSaved: List[Block] = commonBlocks :++ BlockHelpers.generateChain(5, commonBlocks.last)
           val blocksSavedInPeer: List[Block] = commonBlocks :++ BlockHelpers.generateChain(6, commonBlocks.last)
 
-          val firstBatchBlockHeaders =
+          val firstBatchBlockHeaders: List[Block] =
             blocksSavedInPeer.slice(blocksSavedInPeer.size - syncConfig.blockHeadersPerRequest, blocksSavedInPeer.size)
 
           val blocksSentFromPeer: Map[Int, List[Block]] = Map(
@@ -130,32 +127,31 @@ class FastSyncBranchResolverActorSpec
           )
 
           saveBlocks(blocksSaved)
-          val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-          val fastSyncBranchResolver =
+          val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+          val fastSyncBranchResolver: TypedActorRef[FastSyncBranchResolverActor.Command] =
             creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
           val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
             case r @ BranchResolvedSuccessful(num, _) if num == BigInt(5) => r
           }
 
-          val response = (for {
-            _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+          val response: BranchResolvedSuccessful = (for
+            _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
             response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
             _ <- IO(stopController(fastSyncBranchResolver))
-          } yield response).unsafeRunSync()
+          yield response).unsafeRunSync()
           assert(getBestPeers.contains(response.masterPeer))
-        }
-        "highest common block is in the first half" taggedAs (UnitTest, SyncTest) in new TestSetup {
-          implicit override lazy val system = self.system
+        "highest common block is in the first half" taggedAs (UnitTest, SyncTest) in new TestSetup:
+          implicit override lazy val system: ActorSystem = self.system.classicSystem
           implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-          val sender = TestProbe("sender")
+          val sender: TestProbe = TestProbe("sender")
 
           val commonBlocks: List[Block] = BlockHelpers.generateChain(3, BlockHelpers.genesis)
           val blocksSaved: List[Block] = commonBlocks :++ BlockHelpers.generateChain(7, commonBlocks.last)
           val blocksSavedInPeer: List[Block] = commonBlocks :++ BlockHelpers.generateChain(8, commonBlocks.last)
 
-          val firstBatchBlockHeaders =
+          val firstBatchBlockHeaders: List[Block] =
             blocksSavedInPeer.slice(blocksSavedInPeer.size - syncConfig.blockHeadersPerRequest, blocksSavedInPeer.size)
 
           val blocksSentFromPeer: Map[Int, List[Block]] = Map(
@@ -168,33 +164,32 @@ class FastSyncBranchResolverActorSpec
           )
 
           saveBlocks(blocksSaved)
-          val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-          val fastSyncBranchResolver =
+          val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+          val fastSyncBranchResolver: TypedActorRef[FastSyncBranchResolverActor.Command] =
             creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
           val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
             case r @ BranchResolvedSuccessful(num, _) if num == BigInt(3) => r
           }
 
-          val response = (for {
-            _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+          val response: BranchResolvedSuccessful = (for
+            _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
             response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
             _ <- IO(stopController(fastSyncBranchResolver))
-          } yield response).unsafeRunSync()
+          yield response).unsafeRunSync()
           assert(getBestPeers.contains(response.masterPeer))
-        }
 
-        "highest common block is in the second half" taggedAs (UnitTest, SyncTest) in new TestSetup {
-          implicit override lazy val system = self.system
+        "highest common block is in the second half" taggedAs (UnitTest, SyncTest) in new TestSetup:
+          implicit override lazy val system: ActorSystem = self.system.classicSystem
           implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-          val sender = TestProbe("sender")
+          val sender: TestProbe = TestProbe("sender")
 
           val commonBlocks: List[Block] = BlockHelpers.generateChain(6, BlockHelpers.genesis)
           val blocksSaved: List[Block] = commonBlocks :++ BlockHelpers.generateChain(4, commonBlocks.last)
           val blocksSavedInPeer: List[Block] = commonBlocks :++ BlockHelpers.generateChain(5, commonBlocks.last)
 
-          val firstBatchBlockHeaders =
+          val firstBatchBlockHeaders: List[Block] =
             blocksSavedInPeer.slice(blocksSavedInPeer.size - syncConfig.blockHeadersPerRequest, blocksSavedInPeer.size)
 
           val blocksSentFromPeer: Map[Int, List[Block]] = Map(
@@ -206,34 +201,33 @@ class FastSyncBranchResolverActorSpec
           )
 
           saveBlocks(blocksSaved)
-          val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-          val fastSyncBranchResolver =
+          val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+          val fastSyncBranchResolver: TypedActorRef[FastSyncBranchResolverActor.Command] =
             creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
           val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
             case r @ BranchResolvedSuccessful(num, _) if num == BigInt(6) => r
           }
 
-          val response = (for {
-            _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+          val response: BranchResolvedSuccessful = (for
+            _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
             response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
             _ <- IO(stopController(fastSyncBranchResolver))
-          } yield response).unsafeRunSync()
+          yield response).unsafeRunSync()
           assert(getBestPeers.contains(response.masterPeer))
-        }
       }
 
-      "No common block is found" taggedAs (UnitTest, SyncTest) in new TestSetup {
-        implicit override lazy val system = self.system
+      "No common block is found" taggedAs (UnitTest, SyncTest) in new TestSetup:
+        implicit override lazy val system: ActorSystem = self.system.classicSystem
         implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-        val sender = TestProbe("sender")
+        val sender: TestProbe = TestProbe("sender")
 
         // same genesis block but no common blocks
         val blocksSaved: List[Block] = BlockHelpers.generateChain(5, BlockHelpers.genesis)
         val blocksSavedInPeer: List[Block] = BlockHelpers.generateChain(6, BlockHelpers.genesis)
 
-        val firstBatchBlockHeaders =
+        val firstBatchBlockHeaders: List[Block] =
           blocksSavedInPeer.slice(blocksSavedInPeer.size - syncConfig.blockHeadersPerRequest, blocksSavedInPeer.size)
 
         val blocksSentFromPeer: Map[Int, List[Block]] = Map(
@@ -244,28 +238,27 @@ class FastSyncBranchResolverActorSpec
         )
 
         saveBlocks(blocksSaved)
-        val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-        val fastSyncBranchResolver =
+        val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+        val fastSyncBranchResolver: TypedActorRef[FastSyncBranchResolverActor.Command] =
           creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
         log.debug(s"*** peers: ${handshakedPeers.map(p => (p._1.id, p._2.maxBlockNumber))}")
-        (for {
-          _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+        (for
+          _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
           response <- IO(sender.expectMsg(branchResolutionTimeout, BranchResolutionFailed(NoCommonBlockFound)))
           _ <- IO(stopController(fastSyncBranchResolver))
-        } yield response).unsafeRunSync()
-      }
+        yield response).unsafeRunSync()
     }
   }
 
-  trait TestSetup extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers {
+  trait TestSetup extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers:
 
     protected val branchResolutionTimeout: FiniteDuration = syncConfig.peerResponseTimeout + 2.seconds
 
     def peerId(number: Int): PeerId = PeerId(s"peer_$number")
     def getPeer(id: PeerId): Peer =
       Peer(id, new InetSocketAddress("127.0.0.1", 0), TestProbe(id.value).ref, incomingConnection = false)
-    def getPeerInfo(peer: Peer): PeerInfo = {
+    def getPeerInfo(peer: Peer): PeerInfo =
       val status =
         RemoteStatus(
           Capability.ETH68,
@@ -281,10 +274,9 @@ class FastSyncBranchResolverActorSpec
         maxBlockNumber = Random.between(1, 10),
         bestBlockHash = status.bestHash
       )
-    }
 
     val handshakedPeers: Map[Peer, PeerInfo] =
-      (0 to 5).toList.map((peerId _).andThen(getPeer)).fproduct(getPeerInfo(_)).toMap
+      (0 to 5).toList.map(peerId.andThen(getPeer)).fproduct(getPeerInfo(_)).toMap
 
     def saveBlocks(blocks: List[Block]): Unit =
       blocks.foreach(block =>
@@ -293,7 +285,7 @@ class FastSyncBranchResolverActorSpec
 
     def createNetworkPeerManager(peers: Map[Peer, PeerInfo], blocks: Map[Int, List[Block]])(implicit
         ioRuntime: IORuntime
-    ): ActorRef = {
+    ): ActorRef =
       val networkPeerManager = TestProbe("network_peer_manager")
       val autoPilot =
         new NetworkPeerManagerAutoPilot(
@@ -303,34 +295,33 @@ class FastSyncBranchResolverActorSpec
         )
       networkPeerManager.setAutoPilot(autoPilot)
       networkPeerManager.ref
-    }
 
-    def creatFastSyncBranchResolver(fastSync: ActorRef, networkPeerManager: ActorRef, blacklist: Blacklist): ActorRef =
-      system.actorOf(
-        FastSyncBranchResolverActor.props(
-          fastSync = fastSync,
+    def creatFastSyncBranchResolver(
+        fastSync: ActorRef,
+        networkPeerManager: ActorRef,
+        blacklist: Blacklist
+    ): TypedActorRef[FastSyncBranchResolverActor.Command] =
+      self.testKit.spawn(
+        FastSyncBranchResolverActor(
+          replyTo = fastSync.toTyped[FastSyncBranchResolverActor.BranchResolverResponse],
           peerEventBus = TestProbe("peer_event_bus").ref,
           networkPeerManager = networkPeerManager,
           blockchain = blockchain,
           blockchainReader = blockchainReader,
           blacklist = blacklist,
-          syncConfig = syncConfig,
-          appStateStorage = storagesInstance.storages.appStateStorage,
-          scheduler = system.scheduler
-        )
+          syncConfig = syncConfig
+        ),
+        s"fast-sync-branch-resolver-${java.util.UUID.randomUUID()}"
       )
 
-    def stopController(actorRef: ActorRef): Unit =
-      awaitCond(gracefulStop(actorRef, actorAskTimeout.duration).futureValue)
+    def stopController(actorRef: TypedActorRef[FastSyncBranchResolverActor.Command]): Unit =
+      self.testKit.stop(actorRef)
 
-    def getBestPeers: List[Peer] = {
+    def getBestPeers: List[Peer] =
       val maxBlock = handshakedPeers.toList.map { case (_, peerInfo) => peerInfo.maxBlockNumber }.max
       handshakedPeers.toList.filter { case (_, peerInfo) => peerInfo.maxBlockNumber == maxBlock }.map(_._1)
-    }
-  }
-}
 
-object FastSyncBranchResolverActorSpec extends Logger {
+object FastSyncBranchResolverActorSpec extends Logger:
 
   private val BlacklistMaxElements: Int = 100
 
@@ -341,30 +332,24 @@ object FastSyncBranchResolverActorSpec extends Logger {
       peers: Map[Peer, PeerInfo],
       blocks: Map[Int, List[Block]]
   )(implicit ioRuntime: IORuntime)
-      extends AutoPilot {
+      extends AutoPilot:
 
     var blockIndex = 0
     lazy val blocksSetSize = blocks.size
 
-    def run(sender: ActorRef, msg: Any): NetworkPeerManagerAutoPilot = {
-      msg match {
-        case NetworkPeerManagerActor.GetHandshakedPeers =>
-          sender ! NetworkPeerManagerActor.HandshakedPeers(peers)
+    def run(sender: ActorRef, msg: Any): NetworkPeerManagerAutoPilot =
+      msg match
+        case NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo) =>
+          replyTo ! NetworkPeerManagerActor.HandshakedPeers(peers)
           peersConnected.complete(()).handleError(_ => ()).unsafeRunSync()
-        case NetworkPeerManagerActor.SendMessage(rawMsg, peerId) =>
-          val response = rawMsg.underlyingMsg match {
+        case NetworkPeerManagerActor.SendMessageCmd(rawMsg, peerId) =>
+          val response = rawMsg.underlyingMsg match
             case req: ETHGetBlockHeaders if !req.reverse =>
-              if (blockIndex < blocksSetSize)
-                blockIndex += 1
+              if blockIndex < blocksSetSize then blockIndex += 1
               ETHBlockHeaders(req.requestId, blocks.get(blockIndex).map(_.map(_.header)).getOrElse(Nil))
             case other =>
               throw new RuntimeException(s"Unexpected message sent to NetworkPeerManagerAutoPilot: $other")
-          }
           val theResponse = MessageFromPeer(response, peerId)
           sender ! theResponse
-          if (blockIndex == blocksSetSize) ()
-      }
+          if blockIndex == blocksSetSize then ()
       this
-    }
-  }
-}

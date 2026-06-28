@@ -2,28 +2,27 @@ package com.chipprbots.ethereum.utils
 
 import org.apache.pekko.util.ByteString
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
+import com.typesafe.config.Config as TypesafeConfig
 import com.typesafe.config.ConfigRenderOptions
-import com.typesafe.config.{Config => TypesafeConfig}
 
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
-import com.chipprbots.ethereum.domain.{Address, UInt256}
-import com.chipprbots.ethereum.utils.NumericUtils._
+import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.utils.NumericUtils.*
 
 /** Identifies whether the chain follows ETC (PoW indefinitely) or ETH (post-Merge PoS via CL). */
-sealed trait NetworkType
-object NetworkType {
-  case object ETC extends NetworkType
-  case object ETH extends NetworkType
+enum NetworkType:
+  case ETC
+  case ETH
 
-  def fromString(s: String): NetworkType = s.toLowerCase match {
+object NetworkType:
+  def fromString(s: String): NetworkType = s.toLowerCase match
     case "etc" => ETC
     case "eth" => ETH
     case other => throw new IllegalArgumentException(s"Unknown network-type: $other (expected 'etc' or 'eth')")
-  }
-}
 
 /** Timestamp-based fork activation for post-Merge Ethereum forks. */
 case class ForkTimestamps(
@@ -58,8 +57,8 @@ case class BlockchainConfig(
     networkType: NetworkType = NetworkType.ETC,
     terminalTotalDifficulty: Option[BigInt] = None,
     forkTimestamps: ForkTimestamps = ForkTimestamps()
-) {
-  def isPostMerge(totalDifficulty: BigInt): Boolean =
+):
+  def isPoS(totalDifficulty: BigInt): Boolean =
     terminalTotalDifficulty.exists(ttd => totalDifficulty >= ttd)
 
   def isShanghaiTimestamp(timestamp: Long): Boolean =
@@ -86,7 +85,6 @@ case class BlockchainConfig(
 
   def withUpdatedForkBlocks(update: (ForkBlockNumbers) => ForkBlockNumbers): BlockchainConfig =
     copy(forkBlockNumbers = update(forkBlockNumbers))
-}
 
 case class ForkBlockNumbers(
     frontierBlockNumber: BigInt,
@@ -124,7 +122,7 @@ case class ForkBlockNumbers(
     // regardless of operator config. None → fall back to miningConfig.gasLimitTarget.
     spiralGasTarget: Option[BigInt] = None,
     olympiaGasTarget: Option[BigInt] = None
-) {
+):
   def all: List[BigInt] = this.productIterator.toList.collect { case i: BigInt =>
     i
   }
@@ -135,12 +133,11 @@ case class ForkBlockNumbers(
     * falls back to miningConfig.gasLimitTarget.
     */
   def gasLimitAdjustmentStartAt(blockNumber: BigInt): Option[BigInt] =
-    if (blockNumber >= olympiaBlockNumber) olympiaGasTarget
-    else if (blockNumber >= spiralBlockNumber) spiralGasTarget
+    if blockNumber >= olympiaBlockNumber then olympiaGasTarget
+    else if blockNumber >= spiralBlockNumber then spiralGasTarget
     else None
-}
 
-object ForkBlockNumbers {
+object ForkBlockNumbers:
   val Empty: ForkBlockNumbers = ForkBlockNumbers(
     frontierBlockNumber = 0,
     homesteadBlockNumber = Long.MaxValue,
@@ -168,12 +165,11 @@ object ForkBlockNumbers {
     olympiaBlockNumber = Long.MaxValue,
     mergeNetsplitBlockNumber = Long.MaxValue
   )
-}
 
-object BlockchainConfig {
+object BlockchainConfig:
 
   // scalastyle:off method.length
-  def fromRawConfig(blockchainConfig: TypesafeConfig): BlockchainConfig = {
+  def fromRawConfig(blockchainConfig: TypesafeConfig): BlockchainConfig =
     val powTargetTime: Option[Long] =
       ConfigUtils
         .getOptionalValue(blockchainConfig, _.getDuration, "pow-target-time")
@@ -211,10 +207,9 @@ object BlockchainConfig {
     val daoForkConfig = Try(blockchainConfig.getConfig("dao")).toOption.map(DaoForkConfig(_))
     val accountStartNonce: UInt256 = UInt256(BigInt(blockchainConfig.getString("account-start-nonce")))
 
-    val chainId: BigInt = {
+    val chainId: BigInt =
       val s = blockchainConfig.getString("chain-id")
       parseHexOrDecNumber(s)
-    }
 
     val networkId: Long = Try(blockchainConfig.getLong("network-id")).getOrElse {
       Try(BigInt(blockchainConfig.getString("network-id")).toLong).getOrElse(1L)
@@ -335,13 +330,10 @@ object BlockchainConfig {
       terminalTotalDifficulty = terminalTotalDifficulty,
       forkTimestamps = forkTimestamps
     )
-  }
   // scalastyle:on method.length
-  private def readPubKeySet(blockchainConfig: TypesafeConfig, path: String): Set[ByteString] = {
+  private def readPubKeySet(blockchainConfig: TypesafeConfig, path: String): Set[ByteString] =
     val keys: Seq[String] = ConfigUtils
       .getOptionalValue(blockchainConfig, _.getStringList, path)
       .map(_.asScala.toSeq)
       .getOrElse(Nil)
     keys.map(ByteStringUtils.string2hash).toSet
-  }
-}

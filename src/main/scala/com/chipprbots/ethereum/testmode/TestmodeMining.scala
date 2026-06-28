@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerProto
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponse
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses.MinerNotExist
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
-import com.chipprbots.ethereum.consensus.validators._
+import com.chipprbots.ethereum.consensus.validators.*
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator
 import com.chipprbots.ethereum.consensus.validators.std.StdSignedTransactionValidator
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
@@ -34,7 +34,7 @@ import com.chipprbots.ethereum.ledger.BlockExecutionSuccess
 import com.chipprbots.ethereum.ledger.BlockPreparator
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.VMImpl
-import com.chipprbots.ethereum.nodebuilder._
+import com.chipprbots.ethereum.nodebuilder.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class TestmodeMining(
@@ -46,7 +46,7 @@ class TestmodeMining(
     node: TestNode,
     blockTimestamp: Long = 0
 ) // var, because it can be modified by test_ RPC endpoints
-    extends Mining {
+    extends Mining:
 
   override type Config = AnyRef
   override def protocol: Protocol = Protocol.PoW
@@ -54,8 +54,8 @@ class TestmodeMining(
 
   override def difficultyCalculator: DifficultyCalculator = DifficultyCalculator
 
-  class TestValidators extends Validators {
-    override def blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator {
+  class TestValidators extends Validators:
+    override def blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator:
       override def validate(
           blockHeader: BlockHeader,
           getBlockHeaderByHash: GetBlockHeaderByHash
@@ -67,7 +67,6 @@ class TestmodeMining(
           blockchainConfig: BlockchainConfig
       ): Either[BlockHeaderError, BlockHeaderValid] =
         Right(BlockHeaderValid)
-    }
     override def signedTransactionValidator: SignedTransactionValidator = StdSignedTransactionValidator
     override def validateBlockBeforeExecution(
         block: Block,
@@ -84,7 +83,7 @@ class TestmodeMining(
     )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockExecutionSuccess] = Right(
       BlockExecutionSuccess
     )
-    override def blockValidator: BlockValidator = new BlockValidator {
+    override def blockValidator: BlockValidator = new BlockValidator:
       override def validateBlockAndReceipts(
           blockHeader: BlockHeader,
           receipts: Seq[Receipt]
@@ -93,8 +92,6 @@ class TestmodeMining(
           blockHeader: BlockHeader,
           blockBody: BlockBody
       ): Either[StdBlockValidator.BlockError, StdBlockValidator.BlockValid] = Right(StdBlockValidator.BlockValid)
-    }
-  }
 
   override def validators: Validators = ValidatorsExecutor.apply(Protocol.MockedPow)
 
@@ -103,17 +100,15 @@ class TestmodeMining(
     signedTxValidator = validators.signedTransactionValidator,
     blockchain = blockchain,
     blockchainReader = blockchainReader
-  ) {
+  ):
     override def payBlockReward(block: Block, worldStateProxy: InMemoryWorldStateProxy)(implicit
         blockchainConfig: BlockchainConfig
     ): InMemoryWorldStateProxy =
-      node.sealEngine match {
+      node.sealEngine match
         case SealEngineType.NoProof =>
           super.payBlockReward(block, worldStateProxy)
         case SealEngineType.NoReward =>
           worldStateProxy
-      }
-  }
 
   override def blockGenerator: NoOmmersBlockGenerator =
     new NoOmmersBlockGenerator(
@@ -121,13 +116,10 @@ class TestmodeMining(
       miningConfig,
       blockPreparator,
       difficultyCalculator,
-      new BlockTimestampProvider {
+      new BlockTimestampProvider:
         override def getEpochSecond: Long = blockTimestamp
-      }
-    ) {
+    ):
       override def withBlockTimestampProvider(blockTimestampProvider: BlockTimestampProvider): TestBlockGenerator = this
-
-    }
 
   override def startProtocol(node: Node): Unit = {}
   override def stopProtocol(): Unit = {}
@@ -139,4 +131,3 @@ class TestmodeMining(
   /** Sends msg to the internal miner
     */
   override def sendMiner(msg: MinerProtocol): Unit = {}
-}

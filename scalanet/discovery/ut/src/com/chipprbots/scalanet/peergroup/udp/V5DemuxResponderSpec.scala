@@ -71,7 +71,7 @@ class V5DemuxResponderSpec extends AnyFlatSpec with Matchers {
 
     // q.next would block on an empty queue; race a 50 ms timeout to confirm
     // the queue is empty without blocking the test forever.
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
     val raced = runIO(IO.race(q.next, IO.sleep(50.millis).as("timeout")))
     raced shouldBe Right("timeout")
   }

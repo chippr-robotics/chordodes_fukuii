@@ -3,32 +3,36 @@ package com.chipprbots.ethereum.jsonrpc
 import java.time.Duration
 import java.time.Instant
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
-import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status._
+import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.*
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.BlockByNumberRequest
-import com.chipprbots.ethereum.jsonrpc.NetService._
+import com.chipprbots.ethereum.jsonrpc.NetService.*
 import com.chipprbots.ethereum.jsonrpc.NodeJsonRpcHealthChecker.JsonRpcHealthConfig
 import com.chipprbots.ethereum.utils.AsyncConfig
 
 class NodeJsonRpcHealthChecker(
     netService: NetService,
     ethBlocksService: EthBlocksService,
-    syncingController: ActorRef,
+    syncingController: TypedActorRef[SyncController.Command],
     config: JsonRpcHealthConfig,
-    asyncConfig: AsyncConfig
-) extends JsonRpcHealthChecker {
+    asyncConfig: AsyncConfig,
+    scheduler: Scheduler
+) extends JsonRpcHealthChecker:
 
-  implicit val askTimeout: Timeout = asyncConfig.askTimeout
+  given askTimeout: Timeout = asyncConfig.askTimeout
+  private given typedScheduler: Scheduler = scheduler
 
   protected def mainService: String = "node health"
 
@@ -73,14 +77,19 @@ class NodeJsonRpcHealthChecker(
 
   private val syncStatusHC =
     JsonRpcHealthcheck
-      .fromTask("syncStatus", syncingController.askFor[SyncProtocol.Status](SyncProtocol.GetStatus))
+      .fromTask(
+        "syncStatus",
+        syncingController.askForTyped[SyncProtocol.Status](replyTo =>
+          SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo))
+        )
+      )
       .map(_.withInfo {
         case NotSyncing                                          => "STARTING"
         case s: Syncing if isConsideredSyncing(s.blocksProgress) => "SYNCING"
         case _                                                   => "SYNCED"
       })
 
-  override def healthCheck(): IO[HealthcheckResponse] = {
+  override def healthCheck: IO[HealthcheckResponse] =
     val responseTask = List(
       peerCountHC,
       storedBlockHC,
@@ -93,9 +102,8 @@ class NodeJsonRpcHealthChecker(
       .map(HealthcheckResponse.apply)
 
     handleResponse(responseTask)
-  }
 
-  override def readinessCheck(): IO[HealthcheckResponse] = {
+  override def readinessCheck(): IO[HealthcheckResponse] =
     // Readiness checks: DB opened (storedBlock exists), peers > 0, tip advancing (updateStatus)
     val responseTask = List(
       peerCountHC,
@@ -106,21 +114,19 @@ class NodeJsonRpcHealthChecker(
       .map(HealthcheckResponse.apply)
 
     handleResponse(responseTask)
-  }
 
   private def blockNumberHasChanged(newBestFetchingBlock: BigInt) =
-    previousBestFetchingBlock match {
+    previousBestFetchingBlock match
       case Some((firstSeenAt, value)) if value == newBestFetchingBlock =>
         Instant.now().minus(config.noUpdateDurationThreshold).isBefore(firstSeenAt)
       case _ =>
         previousBestFetchingBlock = Some((Instant.now(), newBestFetchingBlock))
         true
-    }
 
   /** Try to fetch best block number from the sync controller or fallback to ethBlocksService */
   private def getBestKnownBlockTask =
     syncingController
-      .askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
+      .askForTyped[SyncProtocol.Status](replyTo => SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo)))
       .flatMap {
         case NotSyncing | SyncDone =>
           ethBlocksService
@@ -132,7 +138,7 @@ class NodeJsonRpcHealthChecker(
   /** Try to fetch best fetching number from the sync controller or fallback to ethBlocksService */
   private def getBestFetchingBlockTask =
     syncingController
-      .askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
+      .askForTyped[SyncProtocol.Status](replyTo => SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo)))
       .flatMap {
         case NotSyncing | SyncDone =>
           ethBlocksService
@@ -144,16 +150,12 @@ class NodeJsonRpcHealthChecker(
   private def isConsideredSyncing(progress: Progress) =
     progress.target - progress.current > config.syncingStatusThreshold
 
-}
-
-object NodeJsonRpcHealthChecker {
+object NodeJsonRpcHealthChecker:
   case class JsonRpcHealthConfig(noUpdateDurationThreshold: Duration, syncingStatusThreshold: Int)
 
-  object JsonRpcHealthConfig {
+  object JsonRpcHealthConfig:
     def apply(rpcConfig: TypesafeConfig): JsonRpcHealthConfig =
       JsonRpcHealthConfig(
         noUpdateDurationThreshold = rpcConfig.getDuration("health.no-update-duration-threshold"),
         syncingStatusThreshold = rpcConfig.getInt("health.syncing-status-threshold")
       )
-  }
-}

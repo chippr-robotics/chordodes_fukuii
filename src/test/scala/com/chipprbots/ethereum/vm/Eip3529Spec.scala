@@ -3,21 +3,20 @@ package com.chipprbots.ethereum.vm
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 import Fixtures.blockchainConfig
 
 /** Tests for EIP-3529: Reduction in refunds https://eips.ethereum.org/EIPS/eip-3529
   */
-class Eip3529SpecPostMystique extends Eip3529Spec {
+class Eip3529SpecPostMystique extends Eip3529Spec:
   override val config: EvmConfig = EvmConfig.MystiqueConfigBuilder(blockchainConfig)
   override val forkBlockHeight = Fixtures.MystiqueBlockNumber
-}
 
-trait Eip3529Spec extends AnyFunSuite with Matchers {
+trait Eip3529Spec extends AnyFunSuite with Matchers:
 
-  protected[this] def forkBlockHeight: Int
-  protected[this] def config: EvmConfig
+  protected def forkBlockHeight: Int
+  protected def config: EvmConfig
 
   test("EIP-3529: R_sclear should be 4800", UnitTest, VMTest) {
     config.feeSchedule.R_sclear shouldBe 4800
@@ -39,4 +38,3 @@ trait Eip3529Spec extends AnyFunSuite with Matchers {
     val phoenixFork = blockchainConfig.etcForkForBlockNumber(Fixtures.PhoenixBlockNumber)
     BlockchainConfigForEvm.isEip3529Enabled(phoenixFork) shouldBe false
   }
-}

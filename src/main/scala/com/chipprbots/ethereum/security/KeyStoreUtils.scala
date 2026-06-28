@@ -11,7 +11,7 @@ import scala.util.Try
 
 import com.chipprbots.ethereum.utils.Logger
 
-trait KeyStoreUtils extends Logger {
+trait KeyStoreUtils extends Logger:
 
   lazy val algorithm: String = "SunX509"
 
@@ -27,21 +27,18 @@ trait KeyStoreUtils extends Logger {
       val keyManagerFactory: KeyManagerFactory = KeyManagerFactory.getInstance(algorithm)
       keyManagerFactory.init(keyStore, passwordCharArray)
       keyManagerFactory.getKeyManagers
-    }.toEither match {
+    }.toEither match
       case Right(keyManager) => Right(keyManager)
       case Left(error) =>
         log.error("getKeyManager failure", error)
         Left(error)
-    }
 
   def getTrustManager(keyStore: KeyStore): Either[Throwable, Array[TrustManager]] = Try {
     val tmf: TrustManagerFactory = TrustManagerFactory.getInstance(algorithm)
     tmf.init(keyStore)
     tmf.getTrustManagers
-  }.toEither match {
+  }.toEither match
     case Right(trustManager) => Right(trustManager)
     case Left(error) =>
       log.error("getTrustManager failure", error)
       Left(error)
-  }
-}

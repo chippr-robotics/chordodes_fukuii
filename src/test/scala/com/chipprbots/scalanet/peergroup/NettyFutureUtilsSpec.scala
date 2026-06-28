@@ -1,16 +1,16 @@
 package com.chipprbots.scalanet.peergroup
 
-import scala.concurrent.duration._
-
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+
+import scala.concurrent.duration.*
 
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.util.concurrent.DefaultPromise
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-class NettyFutureUtilsSpec extends AnyFlatSpec with Matchers {
+class NettyFutureUtilsSpec extends AnyFlatSpec with Matchers:
 
   // Timeout used for tests that expect operations to hang
   private val TestTimeout = 500.milliseconds
@@ -19,19 +19,19 @@ class NettyFutureUtilsSpec extends AnyFlatSpec with Matchers {
 
   it should "handle already completed futures" in {
     val eventLoopGroup = new NioEventLoopGroup(1)
-    try {
+    try
       val executor = eventLoopGroup.next()
       val promise = new DefaultPromise[String](executor)
       promise.setSuccess("test-value")
 
       val result = NettyFutureUtils.fromNettyFuture(IO.pure(promise)).unsafeRunSync()
       result shouldBe "test-value"
-    } finally eventLoopGroup.shutdownGracefully().sync()
+    finally eventLoopGroup.shutdownGracefully().sync()
   }
 
   it should "handle futures that complete normally" in {
     val eventLoopGroup = new NioEventLoopGroup(1)
-    try {
+    try
       val executor = eventLoopGroup.next()
       val promise = new DefaultPromise[Int](executor)
 
@@ -40,7 +40,7 @@ class NettyFutureUtilsSpec extends AnyFlatSpec with Matchers {
 
       val result = NettyFutureUtils.fromNettyFuture(IO.pure(promise)).unsafeRunSync()
       result shouldBe 42
-    } finally eventLoopGroup.shutdownGracefully().sync()
+    finally eventLoopGroup.shutdownGracefully().sync()
   }
 
   it should "handle futures when event loop is shutting down" in {
@@ -97,7 +97,7 @@ class NettyFutureUtilsSpec extends AnyFlatSpec with Matchers {
 
   it should "handle failed futures" in {
     val eventLoopGroup = new NioEventLoopGroup(1)
-    try {
+    try
       val executor = eventLoopGroup.next()
       val promise = new DefaultPromise[String](executor)
       val testException = new RuntimeException("test failure")
@@ -107,12 +107,12 @@ class NettyFutureUtilsSpec extends AnyFlatSpec with Matchers {
         NettyFutureUtils.fromNettyFuture(IO.pure(promise)).unsafeRunSync()
       }
       caught.getMessage shouldBe "test failure"
-    } finally eventLoopGroup.shutdownGracefully().sync()
+    finally eventLoopGroup.shutdownGracefully().sync()
   }
 
   it should "handle cancelled futures" in {
     val eventLoopGroup = new NioEventLoopGroup(1)
-    try {
+    try
       val executor = eventLoopGroup.next()
       val promise = new DefaultPromise[String](executor)
       promise.cancel(true)
@@ -126,6 +126,5 @@ class NettyFutureUtilsSpec extends AnyFlatSpec with Matchers {
         .unsafeRunSync()
 
       result.isLeft shouldBe true
-    } finally eventLoopGroup.shutdownGracefully().sync()
+    finally eventLoopGroup.shutdownGracefully().sync()
   }
-}

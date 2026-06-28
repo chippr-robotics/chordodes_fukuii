@@ -1,316 +1,84 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.Scheduler
-import org.apache.pekko.actor.Terminated
-import org.apache.pekko.actor.Timers
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
-import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg
+import com.chipprbots.ethereum.blockchain.sync.PeerListHelper
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.RequestFailed
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
-import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders => ETH68BlockHeaders}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETH68GetBlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders as ETH68BlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETH68GetBlockHeaders
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-class FastSyncBranchResolverActor(
-    val fastSync: ActorRef,
-    val peerEventBus: ActorRef,
-    val networkPeerManager: ActorRef,
-    val blockchain: Blockchain,
-    val blockchainReader: BlockchainReader,
-    val blacklist: Blacklist,
-    val syncConfig: SyncConfig,
-    val appStateStorage: AppStateStorage,
-    implicit val scheduler: Scheduler
-) extends Actor
-    with ActorLogging
-    with FastSyncBranchResolver
-    with PeerListSupportNg
-    with Timers {
+/** Finds the first common block between our chain and the chain of the master peer (the peer with the highest block),
+  * so fast sync can discard our diverged tip and re-download from the common ancestor.
+  *
+  * Pekko Typed migration (Group S2 — narrowed): `Behavior[Command]` with a sealed Command ADT. Three named behavior
+  * states: `waitingForPeerWithHighestBlock` / `waitingForRecentBlockHeaders` / `waitingForBinarySearchBlock`. Peer-list
+  * responsibilities live in [[PeerListHelper]]; the periodic `GetHandshakedPeers` poll runs via `Behaviors.withTimers`.
+  *
+  * All inbound message types are Command ADT members. `HandshakedPeers` replies from `NetworkPeerManagerActor` (Classic
+  * tell) are wrapped via a `messageAdapter` into `HandshakedPeersMsg`. `PeerRequestHandler` results arrive wrapped as
+  * `PeerRequestResult` via another adapter; the PRH child is spawned typed and death-watched with `watchWith(handler,
+  * HandlerTerminated(handler))`. `replyTo: TypedActorRef[BranchResolverResponse]` stays a typed ref — `FastSync` passes
+  * `ctx.messageAdapter[BranchResolverResponse](identity)` until it is itself narrowed (SNAP2). The pure
+  * binary-search/discard logic stays in [[FastSyncBranchResolver]] via [[BranchLogic]].
+  */
+object FastSyncBranchResolverActor:
 
-  import FastSyncBranchResolverActor._
-  import FastSyncBranchResolver._
-  import BinarySearchSupport._
+  import FastSyncBranchResolver.*
 
-  private val recentHeadersSize: Int = syncConfig.blockHeadersPerRequest
+  // ----- Sealed Command ADT -----
 
-  private val recentBlocksSearch: RecentBlocksSearch = new RecentBlocksSearch(blockchainReader)
+  sealed trait Command
 
-  override def receive: Receive = waitingForPeerWithHighestBlock
+  /** Begin (or restart) branch resolution. Public command sent by the parent / test. */
+  case object StartBranchResolver extends Command
 
-  private def waitingForPeerWithHighestBlock: Receive = handlePeerListMessages.orElse { case StartBranchResolver =>
-    getPeerWithHighestBlock match {
-      case Some(peerWithInfo @ PeerWithInfo(peer, _)) =>
-        log.debug(
-          "Starting branch resolution now with peer {} and block number {}",
-          peerWithInfo,
-          blockchainReader.getBestBlockNumber()
-        )
-        requestRecentBlockHeaders(peer, blockchainReader.getBestBlockNumber())
-      case None =>
-        log.info("Waiting for peers, rescheduling StartBranchResolver")
-        timers.startSingleTimer(RestartTimerKey, StartBranchResolver, 1.second)
-    }
-  }
+  /** Periodic timer fire: poll `networkPeerManager` for handshaked peers. */
+  private case object ScanPeers extends Command
 
-  private def waitingForRecentBlockHeaders(
-      masterPeer: Peer,
-      bestBlockNumber: BigInt,
-      requestHandler: ActorRef
-  ): Receive =
-    handlePeerListMessages.orElse {
-      case ResponseReceived(peer, ETH68BlockHeaders(_, headers), timeTaken) if peer == masterPeer =>
-        if (headers.size == recentHeadersSize) {
-          log.debug("Received {} block headers from peer {} in {} ms", headers.size, masterPeer.id, timeTaken)
-          handleRecentBlockHeadersResponse(headers, masterPeer, bestBlockNumber)
-        } else {
-          handleInvalidResponse(peer, requestHandler)
-        }
-      case ResponseReceived(peer, ETH68BlockHeaders(_, headers), timeTaken) if peer == masterPeer =>
-        if (headers.size == recentHeadersSize) {
-          log.debug("Received {} block headers from peer {} in {} ms", headers.size, masterPeer.id, timeTaken)
-          handleRecentBlockHeadersResponse(headers, masterPeer, bestBlockNumber)
-        } else {
-          handleInvalidResponse(peer, requestHandler)
-        }
-      case RequestFailed(peer, reason)              => handleRequestFailure(peer, sender(), reason)
-      case Terminated(ref) if ref == requestHandler => handlePeerTermination(masterPeer, ref)
-    }
+  /** A watched PeerRequestHandler child terminated. */
+  final private case class HandlerTerminated(ref: TypedActorRef[PeerRequestHandler.Command]) extends Command
 
-  private def waitingForBinarySearchBlock(
-      searchState: SearchState,
-      blockHeaderNumberToSearch: BigInt,
-      requestHandler: ActorRef
-  ): Receive =
-    handlePeerListMessages.orElse {
-      case ResponseReceived(peer, ETH68BlockHeaders(_, headers), durationMs) if peer == searchState.masterPeer =>
-        context.unwatch(requestHandler)
-        headers.toList match {
-          case childHeader :: Nil if childHeader.number == blockHeaderNumberToSearch =>
-            log.debug(ReceivedBlockHeaderLog, blockHeaderNumberToSearch, peer.id, durationMs)
-            handleBinarySearchBlockHeaderResponse(searchState, childHeader)
-          case _ =>
-            handleInvalidResponse(peer, requestHandler)
-        }
-      case ResponseReceived(peer, ETH68BlockHeaders(_, headers), durationMs) if peer == searchState.masterPeer =>
-        context.unwatch(requestHandler)
-        headers.toList match {
-          case childHeader :: Nil if childHeader.number == blockHeaderNumberToSearch =>
-            log.debug(ReceivedBlockHeaderLog, blockHeaderNumberToSearch, peer.id, durationMs)
-            handleBinarySearchBlockHeaderResponse(searchState, childHeader)
-          case _ =>
-            log.warning(ReceivedWrongHeaders, blockHeaderNumberToSearch, headers.map(_.number))
-            handleInvalidResponse(peer, requestHandler)
-        }
-      case RequestFailed(peer, reason)              => handleRequestFailure(peer, sender(), reason)
-      case Terminated(ref) if ref == requestHandler => handlePeerTermination(searchState.masterPeer, ref)
-      case Terminated(_)                            => () // ignore
-    }
+  /** Wraps the `HandshakedPeers` reply from `NetworkPeerManagerActor` (Classic tell → adapter). */
+  final private case class HandshakedPeersMsg(msg: NetworkPeerManagerActor.HandshakedPeers) extends Command
 
-  private def requestRecentBlockHeaders(masterPeer: Peer, bestBlockNumber: BigInt): Unit = {
-    val requestHandler = sendGetBlockHeadersRequest(
-      masterPeer,
-      fromBlock = childOf((bestBlockNumber - recentHeadersSize).max(0)),
-      amount = recentHeadersSize
-    )
-    context.become(waitingForRecentBlockHeaders(masterPeer, bestBlockNumber, requestHandler))
-  }
+  /** Wraps a `PeerDisconnected` event from the peer event bus adapter. */
+  final private case class PeerDisconnectedMsg(event: PeerDisconnected) extends Command
 
-  /** Searches recent blocks for a valid parent/child relationship. If we dont't find one, we switch to binary search.
-    */
-  private def handleRecentBlockHeadersResponse(
-      blockHeaders: Seq[BlockHeader],
-      masterPeer: Peer,
-      bestBlockNumber: BigInt
-  ): Unit =
-    recentBlocksSearch.getHighestCommonBlock(blockHeaders, bestBlockNumber) match {
-      case Some(highestCommonBlockNumber) =>
-        finalizeBranchResolver(highestCommonBlockNumber, masterPeer)
-      case None =>
-        log.info(SwitchToBinarySearchLog, recentHeadersSize)
-        requestBlockHeaderForBinarySearch(
-          SearchState(minBlockNumber = 1, maxBlockNumber = bestBlockNumber, masterPeer)
-        )
-    }
+  /** Wraps a `PeerRequestHandler.Result` reply from the PRH result adapter. */
+  final private case class PeerRequestResult(result: PeerRequestHandler.Result) extends Command
 
-  private def requestBlockHeaderForBinarySearch(searchState: SearchState): Unit = {
-    val headerNumberToRequest = blockHeaderNumberToRequest(searchState.minBlockNumber, searchState.maxBlockNumber)
-    val handler = sendGetBlockHeadersRequest(searchState.masterPeer, headerNumberToRequest, 1)
-    context.become(waitingForBinarySearchBlock(searchState, headerNumberToRequest, handler))
-  }
-
-  private def handleBinarySearchBlockHeaderResponse(searchState: SearchState, childHeader: BlockHeader): Unit = {
-    import BinarySearchSupport._
-    blockchainReader.getBlockHeaderByNumber(parentOf(childHeader.number)) match {
-      case Some(parentHeader) =>
-        validateBlockHeaders(parentHeader, childHeader, searchState) match {
-          case NoCommonBlock => stopWithFailure(BranchResolutionFailed.noCommonBlock)
-          case BinarySearchCompleted(highestCommonBlockNumber) =>
-            finalizeBranchResolver(highestCommonBlockNumber, searchState.masterPeer)
-          case ContinueBinarySearch(newSearchState) =>
-            log.debug(s"Continuing binary search with new search state: $newSearchState")
-            requestBlockHeaderForBinarySearch(newSearchState)
-        }
-      case None => stopWithFailure(BranchResolutionFailed.blockHeaderNotFound(childHeader.number))
-    }
-  }
-
-  private def finalizeBranchResolver(firstCommonBlockNumber: BigInt, masterPeer: Peer): Unit = {
-    discardBlocksAfter(firstCommonBlockNumber)
-    log.info(s"Branch resolution completed with first common block number [$firstCommonBlockNumber]")
-    fastSync ! BranchResolvedSuccessful(highestCommonBlockNumber = firstCommonBlockNumber, masterPeer = masterPeer)
-    context.stop(self)
-  }
-
-  /** In case of fatal errors (and to prevent trying forever) branch resolver will signal fast-sync about the error and
-    * let fast-sync decide if it issues another request.
-    */
-  private def stopWithFailure(response: BranchResolutionFailed): Unit = {
-    fastSync ! response
-    context.stop(self)
-  }
-
-  private def sendGetBlockHeadersRequest(peer: Peer, fromBlock: BigInt, amount: BigInt): ActorRef = {
-    // Create message in correct format based on peer's negotiated capability
-    val usesRequestId = handshakedPeers
-      .get(peer.id)
-      .exists(peerWithInfo => Capability.usesRequestId(peerWithInfo.peerInfo.remoteStatus.capability))
-
-    val handler = if (usesRequestId) {
-      context.actorOf(
-        PeerRequestHandler.props[ETH68GetBlockHeaders, ETH68BlockHeaders](
-          peer,
-          syncConfig.peerResponseTimeout,
-          networkPeerManager,
-          peerEventBus,
-          requestMsg =
-            ETH68GetBlockHeaders(ETHPackets.nextRequestId, Left(fromBlock), amount, skip = 0, reverse = false),
-          responseMsgCode = Codes.BlockHeadersCode
-        )
-      )
-    } else {
-      // ETH68+ always uses request-id; fallback uses requestId=0
-      context.actorOf(
-        PeerRequestHandler.props[ETH68GetBlockHeaders, ETH68BlockHeaders](
-          peer,
-          syncConfig.peerResponseTimeout,
-          networkPeerManager,
-          peerEventBus,
-          requestMsg =
-            ETH68GetBlockHeaders(ETHPackets.nextRequestId, Left(fromBlock), amount, skip = 0, reverse = false),
-          responseMsgCode = Codes.BlockHeadersCode
-        )
-      )
-    }
-    context.watch(handler)
-    handler
-  }
-
-  private def handleInvalidResponse(peer: Peer, peerRef: ActorRef): Unit = {
-    log.warning(s"Received invalid response from peer [${peer.id}]. Restarting branch resolver.")
-    context.unwatch(peerRef)
-    blacklistIfHandshaked(
-      peer.id,
-      syncConfig.blacklistDuration,
-      BlacklistReason.WrongBlockHeaders
-    )
-    restart()
-  }
-
-  private def handleRequestFailure(peer: Peer, peerRef: ActorRef, reason: String): Unit = {
-    log.warning(s"Request to peer [${peer.id}] failed: [$reason]. Restarting branch resolver.")
-    context.unwatch(peerRef)
-    blacklistIfHandshaked(
-      peer.id,
-      syncConfig.blacklistDuration,
-      BlacklistReason.FastSyncRequestFailed(reason)
-    )
-    restart()
-  }
-
-  private def handlePeerTermination(peer: Peer, peerHandlerRef: ActorRef): Unit = {
-    log.warning(peerTerminatedLog, peerHandlerRef.path.name, peer.id)
-    restart()
-  }
-
-  private def restart(): Unit = {
-    context.become(waitingForPeerWithHighestBlock)
-    self ! StartBranchResolver
-  }
-
-}
-
-object FastSyncBranchResolverActor {
-
-  protected val RestartTimerKey: String = "Restart"
-
-  protected val InvalidHeadersResponseLog: String =
-    "Invalid response - Received {} block headers from peer {}. Requested {} headers. Current master peer {}"
-
-  protected val SwitchToBinarySearchLog: String =
-    "Branch diverged earlier than {} blocks ago. Switching to binary search to determine first common block."
-
-  protected val ReceivedBlockHeaderLog: String =
-    "Received requested block header [{}] from peer [{}] in {} ms"
-
-  protected val ReceivedWrongHeaders: String =
-    "Received invalid response when requesting block header [{}]. Received: {}"
-
-  protected val peerTerminatedLog: String =
-    "Peer request handler [{}] for peer [{}] terminated. Restarting branch resolver."
-
-  // scalastyle:off parameter.number
-  def props(
-      fastSync: ActorRef,
-      peerEventBus: ActorRef,
-      networkPeerManager: ActorRef,
-      blockchain: Blockchain,
-      blockchainReader: BlockchainReader,
-      blacklist: Blacklist,
-      syncConfig: SyncConfig,
-      appStateStorage: AppStateStorage,
-      scheduler: Scheduler
-  ): Props =
-    Props(
-      new FastSyncBranchResolverActor(
-        fastSync,
-        peerEventBus,
-        networkPeerManager,
-        blockchain,
-        blockchainReader,
-        blacklist,
-        syncConfig,
-        appStateStorage,
-        scheduler
-      )
-    )
-
-  sealed trait BranchResolverRequest
-  case object StartBranchResolver extends BranchResolverRequest
+  // ----- Outgoing messages to the Classic `fastSync` parent -----
 
   sealed trait BranchResolverResponse
   final case class BranchResolvedSuccessful(highestCommonBlockNumber: BigInt, masterPeer: Peer)
       extends BranchResolverResponse
-  import BranchResolutionFailed._
-  final case class BranchResolutionFailed(failure: BranchResolutionFailure)
-  object BranchResolutionFailed {
+
+  import BranchResolutionFailed.*
+  final case class BranchResolutionFailed(failure: BranchResolutionFailure) extends BranchResolverResponse
+  object BranchResolutionFailed:
     def noCommonBlock: BranchResolutionFailed = BranchResolutionFailed(NoCommonBlockFound)
     def blockHeaderNotFound(blockHeaderNum: BigInt): BranchResolutionFailed = BranchResolutionFailed(
       BlockHeaderNotFound(blockHeaderNum)
@@ -319,6 +87,300 @@ object FastSyncBranchResolverActor {
     sealed trait BranchResolutionFailure
     case object NoCommonBlockFound extends BranchResolutionFailure
     final case class BlockHeaderNotFound(blockHeaderNum: BigInt) extends BranchResolutionFailure
-  }
 
-}
+  // ----- Timer / log constants -----
+
+  private val ScanKey: String = "ScanPeers"
+  private val RestartTimerKey: String = "Restart"
+
+  private val SwitchToBinarySearchLog: String =
+    "Branch diverged earlier than {} blocks ago. Switching to binary search to determine first common block."
+
+  private val ReceivedBlockHeaderLog: String =
+    "Received requested block header [{}] from peer [{}] in {} ms"
+
+  private val ReceivedWrongHeaders: String =
+    "Received invalid response when requesting block header [{}]. Received: {}"
+
+  private val peerTerminatedLog: String =
+    "Peer request handler [{}] for peer [{}] terminated. Restarting branch resolver."
+
+  /** Bundles the pure branch-resolution logic (`discardBlocksAfter`) provided by the trait. */
+  private class BranchLogic(val blockchain: Blockchain, val blockchainReader: BlockchainReader)
+      extends FastSyncBranchResolver
+
+  // scalastyle:off parameter.number
+  def apply(
+      replyTo: TypedActorRef[BranchResolverResponse],
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
+      blockchain: Blockchain,
+      blockchainReader: BlockchainReader,
+      blacklist: Blacklist,
+      syncConfig: SyncConfig
+  ): Behavior[Command] =
+    Behaviors.setup { context =>
+      Behaviors.withTimers { timers =>
+        val peerDisconnectedAdapter: TypedActorRef[PeerEvent] =
+          context.messageAdapter[PeerEvent] {
+            case pd: PeerDisconnected => PeerDisconnectedMsg(pd)
+            case e                    => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
+
+        val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
+          context.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](HandshakedPeersMsg(_))
+
+        val peerListHelper = new PeerListHelper(
+          peerEventBus,
+          blacklist,
+          peerDisconnectedAdapter,
+          context.log
+        )
+
+        val branchLogic = new BranchLogic(blockchain, blockchainReader)
+
+        val resolver = new Resolver(
+          context,
+          timers,
+          replyTo,
+          peerEventBus,
+          networkPeerManager,
+          blockchainReader,
+          syncConfig,
+          peerListHelper,
+          branchLogic,
+          new RecentBlocksSearch(blockchainReader),
+          syncConfig.blockHeadersPerRequest,
+          handshakedPeersAdapter
+        )
+
+        // Immediate poll, then periodic poll for handshaked peers (replaces PeerListSupportNg's scheduleWithFixedDelay).
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
+        timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
+
+        resolver.waitingForPeerWithHighestBlock()
+      }
+    }
+
+  /** Holds the wiring shared across the behavior states. Each `waiting...` method returns the next `Behavior`. */
+  private class Resolver(
+      context: ActorContext[Command],
+      timers: TimerScheduler[Command],
+      replyTo: TypedActorRef[BranchResolverResponse],
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
+      blockchainReader: BlockchainReader,
+      syncConfig: SyncConfig,
+      peerListHelper: PeerListHelper,
+      branchLogic: BranchLogic,
+      recentBlocksSearch: RecentBlocksSearch,
+      recentHeadersSize: Int,
+      handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
+  ):
+    import BinarySearchSupport.*
+
+    private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
+      context.messageAdapter[PeerRequestHandler.Result](PeerRequestResult(_))
+
+    private def log = context.log
+
+    /** Shared peer-list / scan handling for every state. Returns `Some(next)` if the message was handled. */
+    private def handleCommon(message: Command): Option[Behavior[Command]] = message match
+      case ScanPeers =>
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
+        Some(Behaviors.same)
+      case HandshakedPeersMsg(NetworkPeerManagerActor.HandshakedPeers(peers)) =>
+        peerListHelper.handleHandshakedPeers(peers)
+        Some(Behaviors.same)
+      case PeerDisconnectedMsg(PeerDisconnected(peerId)) =>
+        peerListHelper.handlePeerDisconnected(peerId)
+        Some(Behaviors.same)
+      case _ => None
+
+    def waitingForPeerWithHighestBlock(): Behavior[Command] =
+      Behaviors.receiveMessage { message =>
+        handleCommon(message).getOrElse {
+          message match
+            case StartBranchResolver =>
+              peerListHelper.getPeerWithHighestBlock match
+                case Some(peerWithInfo @ PeerWithInfo(peer, _)) =>
+                  log.debug(
+                    "Starting branch resolution now with peer {} and block number {}",
+                    peerWithInfo,
+                    blockchainReader.getBestBlockNumber
+                  )
+                  requestRecentBlockHeaders(peer, blockchainReader.getBestBlockNumber)
+                case None =>
+                  log.info("Waiting for peers, rescheduling StartBranchResolver")
+                  timers.startSingleTimer(RestartTimerKey, StartBranchResolver, 1.second)
+                  Behaviors.same
+            case _ => Behaviors.same
+        }
+      }
+
+    private def waitingForRecentBlockHeaders(
+        masterPeer: Peer,
+        bestBlockNumber: BigInt,
+        requestHandler: TypedActorRef[PeerRequestHandler.Command]
+    ): Behavior[Command] =
+      Behaviors.receiveMessage { message =>
+        handleCommon(message).getOrElse {
+          message match
+            case PeerRequestResult(ResponseReceived(peer, ETH68BlockHeaders(_, headers), timeTaken))
+                if peer == masterPeer =>
+              if headers.size == recentHeadersSize then
+                log.debug("Received {} block headers from peer {} in {} ms", headers.size, masterPeer.id, timeTaken)
+                handleRecentBlockHeadersResponse(headers, masterPeer, bestBlockNumber)
+              else handleInvalidResponse(peer, requestHandler)
+            case PeerRequestResult(RequestFailed(peer, reason)) =>
+              handleRequestFailure(peer, requestHandler, reason)
+            case HandlerTerminated(ref) if ref == requestHandler =>
+              handlePeerTermination(masterPeer, ref)
+            case _ => Behaviors.same
+        }
+      }
+
+    private def waitingForBinarySearchBlock(
+        searchState: SearchState,
+        blockHeaderNumberToSearch: BigInt,
+        requestHandler: TypedActorRef[PeerRequestHandler.Command]
+    ): Behavior[Command] =
+      Behaviors.receiveMessage { message =>
+        handleCommon(message).getOrElse {
+          message match
+            case PeerRequestResult(ResponseReceived(peer, ETH68BlockHeaders(_, headers), durationMs))
+                if peer == searchState.masterPeer =>
+              context.unwatch(requestHandler)
+              headers.toList match
+                case childHeader :: Nil if childHeader.number == blockHeaderNumberToSearch =>
+                  log.debug(ReceivedBlockHeaderLog, blockHeaderNumberToSearch, peer.id, durationMs)
+                  handleBinarySearchBlockHeaderResponse(searchState, childHeader)
+                case _ =>
+                  log.warn(ReceivedWrongHeaders, blockHeaderNumberToSearch, headers.map(_.number))
+                  handleInvalidResponse(peer, requestHandler)
+            case PeerRequestResult(RequestFailed(peer, reason)) =>
+              handleRequestFailure(peer, requestHandler, reason)
+            case HandlerTerminated(ref) if ref == requestHandler =>
+              handlePeerTermination(searchState.masterPeer, ref)
+            case HandlerTerminated(_) => Behaviors.same // ignore stale death-watch
+            case _                    => Behaviors.same
+        }
+      }
+
+    private def requestRecentBlockHeaders(masterPeer: Peer, bestBlockNumber: BigInt): Behavior[Command] =
+      val requestHandler = sendGetBlockHeadersRequest(
+        masterPeer,
+        fromBlock = childOf((bestBlockNumber - recentHeadersSize).max(0)),
+        amount = recentHeadersSize
+      )
+      waitingForRecentBlockHeaders(masterPeer, bestBlockNumber, requestHandler)
+
+    /** Searches recent blocks for a valid parent/child relationship. If none found, switch to binary search. */
+    private def handleRecentBlockHeadersResponse(
+        blockHeaders: Seq[BlockHeader],
+        masterPeer: Peer,
+        bestBlockNumber: BigInt
+    ): Behavior[Command] =
+      recentBlocksSearch.getHighestCommonBlock(blockHeaders, bestBlockNumber) match
+        case Some(highestCommonBlockNumber) =>
+          finalizeBranchResolver(highestCommonBlockNumber, masterPeer)
+        case None =>
+          log.info(SwitchToBinarySearchLog, recentHeadersSize)
+          requestBlockHeaderForBinarySearch(
+            SearchState(minBlockNumber = 1, maxBlockNumber = bestBlockNumber, masterPeer)
+          )
+
+    private def requestBlockHeaderForBinarySearch(searchState: SearchState): Behavior[Command] =
+      val headerNumberToRequest = blockHeaderNumberToRequest(searchState.minBlockNumber, searchState.maxBlockNumber)
+      val handler = sendGetBlockHeadersRequest(searchState.masterPeer, headerNumberToRequest, 1)
+      waitingForBinarySearchBlock(searchState, headerNumberToRequest, handler)
+
+    private def handleBinarySearchBlockHeaderResponse(
+        searchState: SearchState,
+        childHeader: BlockHeader
+    ): Behavior[Command] =
+      import BinarySearchSupport.*
+      blockchainReader.getBlockHeaderByNumber(parentOf(childHeader.number)) match
+        case Some(parentHeader) =>
+          validateBlockHeaders(parentHeader, childHeader, searchState) match
+            case NoCommonBlock => stopWithFailure(BranchResolutionFailed.noCommonBlock)
+            case BinarySearchCompleted(highestCommonBlockNumber) =>
+              finalizeBranchResolver(highestCommonBlockNumber, searchState.masterPeer)
+            case ContinueBinarySearch(newSearchState) =>
+              log.debug(s"Continuing binary search with new search state: $newSearchState")
+              requestBlockHeaderForBinarySearch(newSearchState)
+        case None => stopWithFailure(BranchResolutionFailed.blockHeaderNotFound(childHeader.number))
+
+    private def finalizeBranchResolver(firstCommonBlockNumber: BigInt, masterPeer: Peer): Behavior[Command] =
+      branchLogic.discardBlocksAfter(firstCommonBlockNumber)
+      log.info(s"Branch resolution completed with first common block number [$firstCommonBlockNumber]")
+      replyTo ! BranchResolvedSuccessful(highestCommonBlockNumber = firstCommonBlockNumber, masterPeer = masterPeer)
+      Behaviors.stopped
+
+    /** On fatal errors (and to prevent trying forever) signal the caller and let it decide whether to retry. */
+    private def stopWithFailure(response: BranchResolutionFailed): Behavior[Command] =
+      replyTo ! response
+      Behaviors.stopped
+
+    private def sendGetBlockHeadersRequest(
+        peer: Peer,
+        fromBlock: BigInt,
+        amount: BigInt
+    ): TypedActorRef[PeerRequestHandler.Command] =
+      // ETH68+ always uses request-id; capability check kept for parity with the Classic implementation.
+      val _ = peerListHelper.handshakedPeers
+        .get(peer.id)
+        .exists(peerWithInfo => Capability.usesRequestId(peerWithInfo.peerInfo.remoteStatus.capability))
+
+      val handler = context.spawnAnonymous(
+        PeerRequestHandler.behavior[ETH68GetBlockHeaders, ETH68BlockHeaders](
+          peer,
+          syncConfig.peerResponseTimeout,
+          networkPeerManager,
+          peerEventBus,
+          requestMsg =
+            ETH68GetBlockHeaders(ETHPackets.nextRequestId, Left(fromBlock), amount, skip = 0, reverse = false),
+          responseMsgCode = Codes.BlockHeadersCode,
+          replyTo = prhResultAdapter
+        )
+      )
+      context.watchWith(handler, HandlerTerminated(handler))
+      handler
+
+    private def handleInvalidResponse(
+        peer: Peer,
+        peerRef: TypedActorRef[PeerRequestHandler.Command]
+    ): Behavior[Command] =
+      log.warn(s"Received invalid response from peer [${peer.id}]. Restarting branch resolver.")
+      context.unwatch(peerRef)
+      peerListHelper.blacklistIfHandshaked(
+        peer.id,
+        syncConfig.blacklistDuration,
+        BlacklistReason.WrongBlockHeaders
+      )
+      restart()
+
+    private def handleRequestFailure(
+        peer: Peer,
+        peerRef: TypedActorRef[PeerRequestHandler.Command],
+        reason: String
+    ): Behavior[Command] =
+      log.warn(s"Request to peer [${peer.id}] failed: [$reason]. Restarting branch resolver.")
+      context.unwatch(peerRef)
+      peerListHelper.blacklistIfHandshaked(
+        peer.id,
+        syncConfig.blacklistDuration,
+        BlacklistReason.FastSyncRequestFailed(reason)
+      )
+      restart()
+
+    private def handlePeerTermination(
+        peer: Peer,
+        peerHandlerRef: TypedActorRef[PeerRequestHandler.Command]
+    ): Behavior[Command] =
+      log.warn(peerTerminatedLog, peerHandlerRef.path.name, peer.id)
+      restart()
+
+    private def restart(): Behavior[Command] =
+      context.self ! StartBranchResolver
+      waitingForPeerWithHighestBlock()

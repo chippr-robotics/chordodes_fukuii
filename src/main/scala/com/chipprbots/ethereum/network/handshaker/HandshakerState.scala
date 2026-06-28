@@ -7,7 +7,7 @@ import com.chipprbots.ethereum.network.p2p.MessageSerializable
 
 sealed trait HandshakerState[T <: HandshakeResult]
 
-trait InProgressState[T <: HandshakeResult] extends HandshakerState[T] {
+trait InProgressState[T <: HandshakeResult] extends HandshakerState[T]:
 
   /** Obtains the next message to be sent
     *
@@ -47,8 +47,6 @@ trait InProgressState[T <: HandshakeResult] extends HandshakerState[T] {
     * them. If defined, it processes a message and obtains a new state of the handshake
     */
   protected def applyResponseMessage: PartialFunction[Message, HandshakerState[T]]
-
-}
 
 case class ConnectedState[T <: HandshakeResult](result: T) extends HandshakerState[T]
 

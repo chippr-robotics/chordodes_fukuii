@@ -6,9 +6,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class HealingTaskSpec extends AnyFlatSpec with Matchers {
+class HealingTaskSpec extends AnyFlatSpec with Matchers:
 
   private val rootHash = kec256(ByteString("trie-root"))
   private val nodeHash1 = kec256(ByteString("node1"))
@@ -101,4 +101,3 @@ class HealingTaskSpec extends AnyFlatSpec with Matchers {
     val task = HealingTask(Seq(nodeHash1), nodeHash1, rootHash, pending = false, done = true)
     task.toShortString should include("done")
   }
-}

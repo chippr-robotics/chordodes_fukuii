@@ -1,100 +1,89 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.util.ByteString
-import org.json4s.JsonAST._
 
-import com.chipprbots.ethereum.jsonrpc.EthUserService._
+import org.json4s.JsonAST.*
+
+import com.chipprbots.ethereum.jsonrpc.EthUserService.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 
-object EthUserJsonMethodsImplicits extends JsonMethodsImplicits {
+object EthUserJsonMethodsImplicits extends JsonMethodsImplicits:
 
-  implicit val eth_getCode: JsonMethodDecoder[GetCodeRequest] with JsonEncoder[GetCodeResponse] =
-    new JsonMethodDecoder[GetCodeRequest] with JsonEncoder[GetCodeResponse] {
+  given eth_getCode: (JsonMethodDecoder[GetCodeRequest] & JsonEncoder[GetCodeResponse]) =
+    new JsonMethodDecoder[GetCodeRequest] with JsonEncoder[GetCodeResponse]:
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetCodeRequest] =
-        params match {
+        params match
           case Some(JArray((address: JString) :: (blockValue: JValue) :: Nil)) =>
-            for {
+            for
               addr <- extractAddress(address)
               block <- extractBlockParam(blockValue)
-            } yield GetCodeRequest(addr, block)
+            yield GetCodeRequest(addr, block)
           case _ => Left(InvalidParams())
-        }
 
       def encodeJson(t: GetCodeResponse): JValue = encodeAsHex(t.result)
-    }
 
-  implicit val eth_getBalance: JsonMethodDecoder[GetBalanceRequest] with JsonEncoder[GetBalanceResponse] =
-    new JsonMethodDecoder[GetBalanceRequest] with JsonEncoder[GetBalanceResponse] {
+  given eth_getBalance: (JsonMethodDecoder[GetBalanceRequest] & JsonEncoder[GetBalanceResponse]) =
+    new JsonMethodDecoder[GetBalanceRequest] with JsonEncoder[GetBalanceResponse]:
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetBalanceRequest] =
-        params match {
+        params match
           case Some(JArray((addressStr: JString) :: (blockValue: JValue) :: Nil)) =>
-            for {
+            for
               address <- extractAddress(addressStr)
               block <- extractBlockParam(blockValue)
-            } yield GetBalanceRequest(address, block)
+            yield GetBalanceRequest(address, block)
           case _ =>
             Left(InvalidParams())
-        }
 
       def encodeJson(t: GetBalanceResponse): JValue = encodeAsHex(t.value)
-    }
 
-  implicit val eth_getStorageAt: JsonMethodDecoder[GetStorageAtRequest] with JsonEncoder[GetStorageAtResponse] =
-    new JsonMethodDecoder[GetStorageAtRequest] with JsonEncoder[GetStorageAtResponse] {
+  given eth_getStorageAt: (JsonMethodDecoder[GetStorageAtRequest] & JsonEncoder[GetStorageAtResponse]) =
+    new JsonMethodDecoder[GetStorageAtRequest] with JsonEncoder[GetStorageAtResponse]:
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetStorageAtRequest] =
-        params match {
+        params match
           case Some(JArray((addressStr: JString) :: (positionStr: JString) :: (blockValue: JValue) :: Nil)) =>
             val keyHex = positionStr.s.stripPrefix("0x").stripPrefix("0X")
-            if (keyHex.length > 64)
+            if keyHex.length > 64 then
               Left(InvalidParams(s"""storage key too long (want at most 32 bytes): "${positionStr.s}""""))
             else
-              for {
+              for
                 address <- extractAddress(addressStr)
                 position <- extractQuantity(positionStr)
                 block <- extractBlockParam(blockValue)
-              } yield GetStorageAtRequest(address, position, block)
+              yield GetStorageAtRequest(address, position, block)
           case _ => Left(InvalidParams())
-        }
 
-      def encodeJson(t: GetStorageAtResponse): JValue = {
+      def encodeJson(t: GetStorageAtResponse): JValue =
         // eth_getStorageAt returns a full 32-byte zero-padded value per spec
-        val padded = if (t.value.length < 32) {
-          ByteString(new Array[Byte](32 - t.value.length)) ++ t.value
-        } else t.value
+        val padded =
+          if t.value.length < 32 then ByteString(new Array[Byte](32 - t.value.length)) ++ t.value
+          else t.value
         encodeAsHex(padded)
-      }
-    }
 
-  implicit val eth_getTransactionCount
-      : JsonMethodDecoder[GetTransactionCountRequest] with JsonEncoder[GetTransactionCountResponse] =
-    new JsonMethodDecoder[GetTransactionCountRequest] with JsonEncoder[GetTransactionCountResponse] {
+  given eth_getTransactionCount
+      : (JsonMethodDecoder[GetTransactionCountRequest] & JsonEncoder[GetTransactionCountResponse]) =
+    new JsonMethodDecoder[GetTransactionCountRequest] with JsonEncoder[GetTransactionCountResponse]:
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetTransactionCountRequest] =
-        params match {
+        params match
           case Some(JArray((addressStr: JString) :: (blockValue: JValue) :: Nil)) =>
-            for {
+            for
               address <- extractAddress(addressStr)
               block <- extractBlockParam(blockValue)
-            } yield GetTransactionCountRequest(address, block)
+            yield GetTransactionCountRequest(address, block)
           case _ => Left(InvalidParams())
-        }
 
       def encodeJson(t: GetTransactionCountResponse): JValue = encodeAsHex(t.value)
-    }
 
-  implicit val eth_getStorageRoot: JsonMethodDecoder[GetStorageRootRequest] with JsonEncoder[GetStorageRootResponse] =
-    new JsonMethodDecoder[GetStorageRootRequest] with JsonEncoder[GetStorageRootResponse] {
+  given eth_getStorageRoot: (JsonMethodDecoder[GetStorageRootRequest] & JsonEncoder[GetStorageRootResponse]) =
+    new JsonMethodDecoder[GetStorageRootRequest] with JsonEncoder[GetStorageRootResponse]:
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetStorageRootRequest] =
-        params match {
+        params match
           case Some(JArray((addressStr: JString) :: (blockValue: JValue) :: Nil)) =>
-            for {
+            for
               address <- extractAddress(addressStr)
               block <- extractBlockParam(blockValue)
-            } yield GetStorageRootRequest(address, block)
+            yield GetStorageRootRequest(address, block)
           case _ => Left(InvalidParams())
-        }
 
       def encodeJson(t: GetStorageRootResponse): JValue = encodeAsHex(t.storageRoot)
-    }
-}

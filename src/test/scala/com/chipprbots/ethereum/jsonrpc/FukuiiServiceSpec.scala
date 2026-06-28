@@ -1,8 +1,9 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -13,18 +14,19 @@ import scala.collection.immutable.NumericRange
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.SpecFixtures
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsRequest
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsResponse
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
-import com.chipprbots.ethereum.nodebuilder.JSONRpcConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.FukuiiServiceBuilder
+import com.chipprbots.ethereum.nodebuilder.JSONRpcConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.PendingTransactionsManagerBuilder
 import com.chipprbots.ethereum.nodebuilder.SyncControllerRefBuilder
 import com.chipprbots.ethereum.nodebuilder.TransactionHistoryServiceBuilder
@@ -33,13 +35,11 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.domain.Block
 
-class FukuiiServiceSpec
-    extends TestKit(ActorSystem("FukuiiServiceSpec"))
-    with FreeSpecBase
-    with SpecFixtures
-    with WithActorSystemShutDown {
+class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with SpecFixtures:
+
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
+
   class Fixture
       extends TransactionHistoryServiceBuilder.Default
       with EphemBlockchainTestSetup
@@ -48,17 +48,29 @@ class FukuiiServiceSpec
       with FukuiiServiceBuilder
       with JSONRpcConfigBuilder
       with ApisBuilder
-      with SyncControllerRefBuilder {
+      with SyncControllerRefBuilder:
     lazy val pendingTransactionsManagerProbe: TestProbe = TestProbe()
-    override lazy val pendingTransactionsManager: ActorRef = pendingTransactionsManagerProbe.ref
+    override lazy val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ] = pendingTransactionsManagerProbe.ref.toTyped[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ]
 
-    override lazy val syncController: ActorRef = TestProbe().ref
-  }
+    override lazy val syncController: TypedActorRef[SyncController.Command] =
+      TestProbe().ref.toTyped[SyncController.Command]
+
+    // FukuiiServiceBuilder requires ActorSystemBuilder for the scheduler; override directly instead.
+    override lazy val fukuiiService: FukuiiService = new FukuiiService(
+      transactionHistoryService,
+      jsonRpcConfig,
+      syncController,
+      classicActorSystem.toTyped.scheduler
+    )
   def createFixture() = new Fixture
 
   "Fukuii Service" - {
     "should get account's transaction history" in {
-      class TxHistoryFixture extends Fixture {
+      class TxHistoryFixture extends Fixture:
         val fakeTransaction: SignedTransactionWithSender = SignedTransactionWithSender(
           LegacyTransaction(
             nonce = 0,
@@ -87,17 +99,16 @@ class FukuiiServiceSpec
           new TransactionHistoryService(
             blockchainReader,
             pendingTransactionsManager,
-            txPoolConfig.getTransactionFromPoolTimeout
-          ) {
+            txPoolConfig.getTransactionFromPoolTimeout,
+            classicActorSystem.toTyped.scheduler
+          ):
             override def getAccountTransactions(account: Address, fromBlocks: NumericRange[BigInt])(implicit
                 blockchainConfig: BlockchainConfig
             ): IO[List[ExtendedTransactionData]] =
               IO.pure(expectedResponse)
-          }
-      }
 
       customTestCaseM(new TxHistoryFixture) { fixture =>
-        import fixture._
+        import fixture.*
 
         fukuiiService
           .getAccountTransactions(GetAccountTransactionsRequest(fakeTransaction.senderAddress, BigInt(0) to BigInt(1)))
@@ -106,7 +117,7 @@ class FukuiiServiceSpec
     }
 
     "should validate range size against configuration" in testCaseM { (fixture: Fixture) =>
-      import fixture._
+      import fixture.*
 
       fukuiiService
         .getAccountTransactions(
@@ -115,4 +126,3 @@ class FukuiiServiceSpec
         .map(result => assert(result.isLeft))
     }
   }
-}

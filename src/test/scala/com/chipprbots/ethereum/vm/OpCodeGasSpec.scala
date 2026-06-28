@@ -8,19 +8,19 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.domain.UInt256._
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.vm.Generators._
+import com.chipprbots.ethereum.domain.UInt256.*
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.vm.Generators.*
 
 import Fixtures.blockchainConfig
 
-class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks {
+class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks:
 
   override val config: EvmConfig = EvmConfig.PhoenixConfigBuilder(blockchainConfig)
 
-  import config.feeSchedule._
+  import config.feeSchedule.*
 
-  val stackOpsFees: List[(OpCode with ConstGas, BigInt)] = (pushOps ++ dupOps ++ swapOps).map(_ -> G_verylow)
+  val stackOpsFees: List[(OpCode & ConstGas, BigInt)] = (pushOps ++ dupOps ++ swapOps).map(_ -> G_verylow)
   val constOpsFees: List[(ConstOp, BigInt)] = constOps.map(_ -> G_base)
 
   val constGasFees: Map[OpCode, BigInt] = Map[OpCode, BigInt](
@@ -103,26 +103,22 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
     val uint = getUInt256Gen(max = Two ** 32)
     forAll(uint, uint, uint) { (memSize, offset, dataSize) =>
-      val memNeeded: UInt256 = if (dataSize > 0) offset + dataSize else 0
+      val memNeeded: UInt256 = if dataSize > 0 then offset + dataSize else 0
 
-      def c(ms: UInt256): BigInt = {
+      def c(ms: UInt256): BigInt =
         val a = wordsForBytes(ms)
         G_memory * a + a * a / 512
-      }
 
       val expectedCost: BigInt =
-        if (memNeeded > EvmConfig.MaxMemory)
-          UInt256.MaxValue / 2
-        else if (memSize > memNeeded)
-          0
-        else
-          c(memNeeded) - c(memSize)
+        if memNeeded > EvmConfig.MaxMemory then UInt256.MaxValue / 2
+        else if memSize > memNeeded then 0
+        else c(memNeeded) - c(memSize)
 
       config.calcMemCost(memSize, offset, dataSize) shouldEqual expectedCost
     }
   }
 
-  test(constGasOps: _*) { op =>
+  test(constGasOps*) { op =>
     val stateGen = getProgramStateGen(
       stackGen = getStackGen(elems = op.delta),
       gasGen = getBigIntGen(max = op.baseGasFn(config.feeSchedule) * 2)
@@ -422,7 +418,7 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     // Constantinople + Phoenix tested in SSTOREOpCodeGasPostConstantinopleSpec
 
     val petersburgConfig = EvmConfig.PetersburgConfigBuilder(blockchainConfig)
-    import petersburgConfig.feeSchedule._
+    import petersburgConfig.feeSchedule.*
 
     val storage = MockStorage.Empty.store(Zero, One)
     val table = Table[UInt256, UInt256, BigInt, BigInt](
@@ -465,18 +461,16 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
       val (Seq(offset, value), _) = stateIn.stack.pop(2)
       val oldValue = stateIn.storage.load(offset)
-      val expectedGas: BigInt = if (UInt256(oldValue).isZero && !value.isZero) G_sset else G_sreset
-      val expectedRefund: BigInt = if (value.isZero && !UInt256(oldValue).isZero) R_sclear else Zero
+      val expectedGas: BigInt = if UInt256(oldValue).isZero && !value.isZero then G_sset else G_sreset
+      val expectedRefund: BigInt = if value.isZero && !UInt256(oldValue).isZero then R_sclear else Zero
 
       verifyGas(expectedGas, stateIn, stateOut)
 
-      if (expectedGas <= stateIn.gas) {
-        stateOut.gasRefund shouldEqual (stateIn.gasRefund + expectedRefund)
-      }
+      if expectedGas <= stateIn.gas then stateOut.gasRefund shouldEqual (stateIn.gasRefund + expectedRefund)
     }
   }
 
-  test(logOps: _*) { op =>
+  test(logOps*) { op =>
     val table = Table[UInt256, BigInt](
       ("size", "expectedGas"),
       (0, G_log + G_logtopic * op.i),
@@ -584,4 +578,3 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
   }
 
   verifyAllOpCodesRegistered(except = CREATE, CREATE2, CALL, CALLCODE, DELEGATECALL, STATICCALL, INVALID)
-}

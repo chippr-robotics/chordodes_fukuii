@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.network
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigValueFactory
 import org.scalatest.BeforeAndAfterAll
@@ -13,9 +13,8 @@ import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.metrics.MetricsConfig
 import com.chipprbots.ethereum.sync.util.RegularSyncItSpecUtils.FakePeer
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
-
-import com.chipprbots.ethereum.testing.Tags._
 
 /** End-to-End test suite for P2P handshake functionality.
   *
@@ -32,16 +31,15 @@ import com.chipprbots.ethereum.testing.Tags._
   * @see
   *   Issue: E2E testing - test driven development for resolving p2p handshake, block exchange or storage issues
   */
-class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll {
+class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll:
   implicit val testRuntime: IORuntime = IORuntime.global
 
-  override def beforeAll(): Unit = {
+  override def beforeAll(): Unit =
     // Close any previous metrics instance so the new one starts with a clean registry
     Metrics.closeInstance("default")
     Metrics.configure(
       MetricsConfig(Config.config.withValue("metrics.enabled", ConfigValueFactory.fromAnyRef(true)))
     )
-  }
 
   override def afterAll(): Unit = {
     // No need to shutdown IORuntime.global
@@ -57,13 +55,13 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           // Give time for handshake to complete
           _ <- IO.sleep(3.seconds)
-        } yield
+        yield
         // Connection should be established without errors
         // This validates the RLPx encryption handshake
         succeed
@@ -75,14 +73,14 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
 
           // Peer1 connects to peer2
           _ <- peer1.connectToPeers(Set(peer2.node))
           _ <- IO.sleep(3.seconds)
-        } yield
+        yield
         // Handshake should succeed
         succeed
       }
@@ -93,7 +91,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
 
@@ -106,7 +104,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           _ <- peer1.connectToPeers(Set(peer2.node))
           _ <- peer2.connectToPeersBestEffort(Set(peer1.node))
           _ <- IO.sleep(3.seconds)
-        } yield
+        yield
         // Should handle duplicate connection attempts gracefully
         succeed
       }
@@ -117,7 +115,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       "should exchange node status successfully" taggedAs (IntegrationTest, NetworkTest) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           // Import some blocks to create different chain states
           _ <- peer1.importBlocksUntil(100)(com.chipprbots.ethereum.sync.util.SyncCommonItSpec.IdentityUpdate)
           _ <- peer2.importBlocksUntil(50)(com.chipprbots.ethereum.sync.util.SyncCommonItSpec.IdentityUpdate)
@@ -126,7 +124,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(3.seconds)
-        } yield
+        yield
         // Status exchange should complete successfully
         // Peers should be aware of each other's best block
         succeed
@@ -138,12 +136,12 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(2.seconds)
-        } yield
+        yield
         // Peers should successfully negotiate compatible protocol versions
         succeed
       }
@@ -151,20 +149,19 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       "should exchange genesis block hash correctly" taggedAs (IntegrationTest, NetworkTest) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(2.seconds)
-        } yield {
+        yield
           // Both peers should have the same genesis block
-          val peer1Genesis = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch(), 0)
-          val peer2Genesis = peer2.blockchainReader.getBlockByNumber(peer2.blockchainReader.getBestBranch(), 0)
+          val peer1Genesis = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, 0)
+          val peer2Genesis = peer2.blockchainReader.getBlockByNumber(peer2.blockchainReader.getBestBranch, 0)
 
           peer1Genesis shouldBe defined
           peer2Genesis shouldBe defined
           peer1Genesis.get.hash shouldBe peer2Genesis.get.hash
-        }
       }
     }
 
@@ -173,12 +170,12 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       "should validate fork blocks during handshake" taggedAs (IntegrationTest, NetworkTest) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(3.seconds)
-        } yield
+        yield
         // Fork block validation should pass for compatible peers
         succeed
       }
@@ -189,14 +186,14 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
 
           // Peers should have compatible fork configurations
           _ <- peer1.connectToPeers(Set(peer2.node))
           _ <- IO.sleep(3.seconds)
-        } yield
+        yield
         // Handshake should succeed with compatible forks
         succeed
       }
@@ -211,13 +208,13 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           // Extended wait to ensure handshake completes even if slow
           _ <- IO.sleep(5.seconds)
-        } yield
+        yield
         // Handshake should eventually complete
         succeed
       }
@@ -225,7 +222,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       "should retry failed handshakes" taggedAs (IntegrationTest, NetworkTest, SlowTest) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
 
@@ -233,8 +230,8 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(3.seconds)
 
-          // Connection should be established or retried appropriately
-        } yield succeed
+        // Connection should be established or retried appropriately
+        yield succeed
       }
     }
 
@@ -246,14 +243,14 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
 
           // Connect peer1 to peer2
           _ <- peer1.connectToPeers(Set(peer2.node))
           _ <- IO.sleep(2.seconds)
-        } yield
+        yield
         // Peer1 should successfully handshake
         succeed
       }
@@ -265,7 +262,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
@@ -275,7 +272,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
 
           // Wait longer to ensure connection is maintained
           _ <- IO.sleep(5.seconds)
-        } yield
+        yield
         // Connection should remain active after handshake
         succeed
       }
@@ -289,7 +286,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           // Create chains with different heights
           _ <- peer1.importBlocksUntil(200)(com.chipprbots.ethereum.sync.util.SyncCommonItSpec.IdentityUpdate)
           _ <- peer2.importBlocksUntil(50)(com.chipprbots.ethereum.sync.util.SyncCommonItSpec.IdentityUpdate)
@@ -298,7 +295,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(3.seconds)
-        } yield
+        yield
         // Handshake should succeed regardless of chain height difference
         succeed
       }
@@ -306,7 +303,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       "should handshake with peers at genesis" taggedAs (IntegrationTest, NetworkTest) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           // Peer1 has blocks, peer2 is at genesis
           _ <- peer1.importBlocksUntil(100)(com.chipprbots.ethereum.sync.util.SyncCommonItSpec.IdentityUpdate)
 
@@ -314,31 +311,29 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(3.seconds)
-        } yield {
+        yield
           // Handshake should succeed with peer at genesis
-          val peer2BestBlock = peer2.blockchainReader.getBestBlockNumber()
+          val peer2BestBlock = peer2.blockchainReader.getBestBlockNumber
           peer2BestBlock shouldBe 0
           succeed
-        }
       }
 
       "should exchange total difficulty information" taggedAs (IntegrationTest, NetworkTest) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.importBlocksUntil(150)(com.chipprbots.ethereum.sync.util.SyncCommonItSpec.IdentityUpdate)
 
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(3.seconds)
-        } yield {
+        yield
           // Peers should exchange total difficulty during handshake
-          val peer1BestBlock = peer1.blockchainReader.getBestBlock().get
+          val peer1BestBlock = peer1.blockchainReader.getBestBlock.get
           val peer1Difficulty = peer1.blockchainReader.getChainWeightByHash(peer1BestBlock.hash)
           peer1Difficulty shouldBe defined
           succeed
-        }
       }
     }
 
@@ -347,14 +342,14 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       "should handle multiple concurrent handshakes" taggedAs (IntegrationTest, NetworkTest) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
 
           // Peer1 connects to peer2
           _ <- peer1.connectToPeers(Set(peer2.node))
           _ <- IO.sleep(4.seconds)
-        } yield
+        yield
         // Handshake should succeed
         succeed
       }
@@ -366,7 +361,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.importBlocksUntil(300)(com.chipprbots.ethereum.sync.util.SyncCommonItSpec.IdentityUpdate)
 
           _ <- peer1.startRegularSync()
@@ -375,7 +370,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           // Start sync from peer1
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(2.seconds)
-        } yield
+        yield
         // Should handle handshakes even while syncing
         succeed
       }
@@ -390,7 +385,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
 
@@ -401,7 +396,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           // Retry connection
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(2.seconds)
-        } yield
+        yield
         // Should handle retries gracefully
         succeed
       }
@@ -412,16 +407,15 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
       ) in customTestCaseResourceM(
         FakePeer.start2FakePeersRes()
       ) { case (peer1, peer2) =>
-        for {
+        for
           _ <- peer1.startRegularSync()
           _ <- peer2.startRegularSync()
           _ <- peer2.connectToPeers(Set(peer1.node))
           _ <- IO.sleep(3.seconds)
-        } yield
+        yield
         // Compatible peers should successfully handshake
         // This test validates the handshake doesn't reject compatible peers
         succeed
       }
     }
   }
-}

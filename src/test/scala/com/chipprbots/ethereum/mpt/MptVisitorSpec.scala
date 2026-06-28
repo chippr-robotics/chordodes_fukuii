@@ -10,11 +10,11 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
-import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
 import com.chipprbots.ethereum.mpt.MptVisitors.LeafWalkVisitor
 import com.chipprbots.ethereum.mpt.MptVisitors.PathTrackingLeafWalkVisitor
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for LeafWalkVisitor and PathTrackingLeafWalkVisitor.
   *
@@ -25,38 +25,35 @@ import com.chipprbots.ethereum.testing.Tags._
   * Test strategy: build tries with known key-value pairs, walk them with the visitor under test, and verify that every
   * leaf is visited exactly once with the correct data.
   */
-class MptVisitorSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
+class MptVisitorSpec extends AnyFunSuite with ScalaCheckPropertyChecks:
 
   // Each test gets its own isolated storage to prevent cross-test interference.
-  private def freshStorage(): MptStorage = {
+  private def freshStorage(): MptStorage =
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(EphemDataSource())
     stateStorage.getBackingStorage(0)
-  }
 
   private def freshTrie(storage: MptStorage): MerklePatriciaTrie[Array[Byte], Array[Byte]] =
     MerklePatriciaTrie[Array[Byte], Array[Byte]](storage)
 
   // Walk a trie from its root hash using LeafWalkVisitor.
   // Returns the values from all leaves in visit order.
-  private def walkLeaves(rootHash: Array[Byte], storage: MptStorage): Seq[ByteString] = {
+  private def walkLeaves(rootHash: Array[Byte], storage: MptStorage): Seq[ByteString] =
     // EmptyRootHash is a sentinel for an empty trie — no node is ever stored under it.
-    if (java.util.Arrays.equals(rootHash, MerklePatriciaTrie.EmptyRootHash)) return Seq.empty
+    if java.util.Arrays.equals(rootHash, MerklePatriciaTrie.EmptyRootHash) then return Seq.empty
     val collected = mutable.ArrayBuffer.empty[ByteString]
     val visitor = new LeafWalkVisitor(storage, leaf => collected += leaf.value)
     MptTraversals.dispatch(HashNode(rootHash), visitor)
     collected.toSeq
-  }
 
   // Walk a trie from its root hash using PathTrackingLeafWalkVisitor.
   // Returns (reconstructedKeyBytes → valueBytes) pairs.
-  private def walkWithPaths(rootHash: Array[Byte], storage: MptStorage): Seq[(ByteString, ByteString)] = {
-    if (java.util.Arrays.equals(rootHash, MerklePatriciaTrie.EmptyRootHash)) return Seq.empty
+  private def walkWithPaths(rootHash: Array[Byte], storage: MptStorage): Seq[(ByteString, ByteString)] =
+    if java.util.Arrays.equals(rootHash, MerklePatriciaTrie.EmptyRootHash) then return Seq.empty
     val collected = mutable.ArrayBuffer.empty[(ByteString, ByteString)]
     val visitor =
       new PathTrackingLeafWalkVisitor(storage, ByteString(), (path, leaf) => collected += ((path, leaf.value)))
     MptTraversals.dispatch(HashNode(rootHash), visitor)
     collected.toSeq
-  }
 
   // ---------------------------------------------------------------------------
   // LeafWalkVisitor — leaf count and value correctness
@@ -123,10 +120,10 @@ class MptVisitorSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
 
   test("LeafWalkVisitor count matches insert count for random key-value sets", UnitTest, MPTTest) {
     val pairsGen: Gen[Map[Seq[Byte], Seq[Byte]]] = Gen.mapOf(
-      for {
+      for
         k <- Gen.listOfN(4, Arbitrary.arbitrary[Byte])
         v <- Gen.nonEmptyListOf(Arbitrary.arbitrary[Byte])
-      } yield (k, v)
+      yield (k, v)
     )
 
     forAll(pairsGen) { (pairs: Map[Seq[Byte], Seq[Byte]]) =>
@@ -198,11 +195,11 @@ class MptVisitorSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
   test("PathTrackingLeafWalkVisitor reconstructs keys for random inputs (property-based)", UnitTest, MPTTest) {
     val pairsGen: Gen[Map[Seq[Byte], Seq[Byte]]] = Gen
       .mapOf(
-        for {
+        for
           // Use fixed-length 2-byte keys so nibble count is always even and reconstruction is unambiguous
           k <- Gen.listOfN(2, Arbitrary.arbitrary[Byte])
           v <- Gen.nonEmptyListOf(Arbitrary.arbitrary[Byte])
-        } yield (k, v)
+        yield (k, v)
       )
       .suchThat(_.nonEmpty)
 
@@ -219,4 +216,3 @@ class MptVisitorSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
       assert(reconstructed == expected, s"Key reconstruction failed. Expected $expected, got $reconstructed")
     }
   }
-}

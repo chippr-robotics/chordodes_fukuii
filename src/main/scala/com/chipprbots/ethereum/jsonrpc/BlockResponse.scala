@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
  * this trait has been introduced to deal with ETS requirements and discrepancies between fukuii and the spec
  * it should be considered a band-aid solution and replaced with something robust and non-intrusive
  */
-trait BaseBlockResponse {
+trait BaseBlockResponse:
   def number: BigInt
   def hash: Option[ByteString]
   def parentHash: ByteString
@@ -35,7 +35,6 @@ trait BaseBlockResponse {
   def mixHash: ByteString
   def transactions: Either[Seq[ByteString], Seq[BaseTransactionResponse]]
   def uncles: Seq[ByteString]
-}
 
 //scalastyle:off method.length
 case class BlockResponse(
@@ -70,7 +69,7 @@ case class BlockResponse(
     requestsHash: Option[ByteString]
 ) extends BaseBlockResponse
 
-object BlockResponse {
+object BlockResponse:
 
   val NotAvailable = "N/A"
 
@@ -79,19 +78,18 @@ object BlockResponse {
       weight: Option[ChainWeight] = None,
       fullTxs: Boolean = false,
       pendingBlock: Boolean = false
-  ): BlockResponse = {
+  ): BlockResponse =
     val transactions =
-      if (fullTxs)
+      if fullTxs then
         Right(block.body.transactionList.zipWithIndex.map { case (stx, transactionIndex) =>
           TransactionResponse(stx = stx, blockHeader = Some(block.header), transactionIndex = Some(transactionIndex))
         })
-      else
-        Left(block.body.transactionList.map(_.hash))
+      else Left(block.body.transactionList.map(_.hash.value))
 
-    val td = weight.map(_.totalDifficulty)
+    val td = weight.map(_.totalDifficulty.value)
 
     val signature =
-      if (block.header.extraData.length >= ECDSASignature.EncodedLength)
+      if block.header.extraData.length >= ECDSASignature.EncodedLength then
         ECDSASignature.fromBytes(block.header.extraData.takeRight(ECDSASignature.EncodedLength))
       else None
 
@@ -112,25 +110,25 @@ object BlockResponse {
 
     BlockResponse(
       number = block.header.number,
-      hash = if (pendingBlock) None else Some(block.header.hash),
-      parentHash = block.header.parentHash,
-      nonce = if (pendingBlock) None else Some(block.header.nonce),
-      sha3Uncles = block.header.ommersHash,
-      logsBloom = block.header.logsBloom,
-      transactionsRoot = block.header.transactionsRoot,
-      stateRoot = block.header.stateRoot,
-      receiptsRoot = block.header.receiptsRoot,
-      miner = if (pendingBlock) None else Some(block.header.beneficiary),
-      difficulty = block.header.difficulty,
+      hash = if pendingBlock then None else Some(block.header.hash.value),
+      parentHash = block.header.parentHash.value,
+      nonce = if pendingBlock then None else Some(block.header.nonce),
+      sha3Uncles = block.header.ommersHash.value,
+      logsBloom = block.header.logsBloom.value,
+      transactionsRoot = block.header.transactionsRoot.value,
+      stateRoot = block.header.stateRoot.value,
+      receiptsRoot = block.header.receiptsRoot.value,
+      miner = if pendingBlock then None else Some(block.header.beneficiary),
+      difficulty = block.header.difficulty.value,
       totalDifficulty = td,
       extraData = block.header.extraData,
       size = Block.size(block),
       gasLimit = block.header.gasLimit,
       gasUsed = block.header.gasUsed,
       timestamp = block.header.unixTimestamp,
-      mixHash = block.header.mixHash,
+      mixHash = block.header.mixHash.value,
       transactions = transactions,
-      uncles = block.body.uncleNodesList.map(_.hash),
+      uncles = block.body.uncleNodesList.map(_.hash.value),
       signature = signatureStr,
       signer = signerStr,
       baseFeePerGas = block.header.baseFee,
@@ -138,10 +136,9 @@ object BlockResponse {
       withdrawals = withdrawals,
       blobGasUsed = block.header.blobGasUsed,
       excessBlobGas = block.header.excessBlobGas,
-      parentBeaconBlockRoot = block.header.parentBeaconBlockRoot,
+      parentBeaconBlockRoot = block.header.parentBeaconBlockRoot.map(_.value),
       requestsHash = block.header.requestsHash
     )
-  }
 
   def apply(blockHeader: BlockHeader, weight: Option[ChainWeight], pendingBlock: Boolean): BlockResponse =
     BlockResponse(
@@ -149,5 +146,3 @@ object BlockResponse {
       weight = weight,
       pendingBlock = pendingBlock
     )
-
-}

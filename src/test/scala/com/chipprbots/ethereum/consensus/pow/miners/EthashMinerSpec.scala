@@ -1,8 +1,10 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
 import org.scalamock.handlers.CallHandler4
@@ -26,33 +28,32 @@ import com.chipprbots.ethereum.consensus.pow.validators.PoWBlockHeaderValidator
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.SubmitHashRateResponse
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.utils.BlockchainConfig
-
-import com.chipprbots.ethereum.testing.Tags._
 
 // SCALA 3 MIGRATION: Fixed by refactoring MinerSpecSetup to use abstract mock members pattern.
 // NOTE: This test runs real Ethash mining which is inherently slow.
 // The test takes several minutes to complete due to DAG generation and actual PoW mining.
 // Marked as @Ignore for regular CI runs - run manually with: sbt "testOnly *EthashMinerSpec"
 @org.scalatest.Ignore
-class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scalatest.MockFactory {
+class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scalatest.MockFactory:
 
-  "EthashMiner actor" should "mine valid blocks" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup {
+  "EthashMiner actor" should "mine valid blocks" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup:
     val parentBlock: Block = origin
     setBlockForMining(origin)
 
     executeTest(parentBlock)
-  }
 
   it should "mine valid block on the end and beginning of the new epoch" taggedAs (
     UnitTest,
     ConsensusTest,
     SlowTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val epochLength: Int = EthashUtils.EPOCH_LENGTH_BEFORE_ECIP_1099
     val parent29998: Int = epochLength - 2 // 29998, mined block will be 29999 (last block of the epoch)
     val parentBlock29998: Block = origin.copy(header = origin.header.copy(number = parent29998))
@@ -63,9 +64,8 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
     val parentBlock29999: Block = origin.copy(header = origin.header.copy(number = parent29999))
     setBlockForMining(parentBlock29999)
     executeTest(parentBlock29999)
-  }
 
-  it should "mine valid blocks on the end of the epoch" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup {
+  it should "mine valid blocks on the end of the epoch" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup:
     val epochLength: Int = EthashUtils.EPOCH_LENGTH_BEFORE_ECIP_1099
     val parentBlockNumber: Int =
       2 * epochLength - 2 // 59998, mined block will be 59999 (last block of the current epoch)
@@ -73,9 +73,8 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
     setBlockForMining(parentBlock)
 
     executeTest(parentBlock)
-  }
 
-  class TestSetup extends MinerSpecSetup with Eventually with MiningPatience {
+  class TestSetup extends MinerSpecSetup with Eventually with MiningPatience:
     import scala.concurrent.ExecutionContext.Implicits.global
 
     // Implement abstract mock members - created in test class with MockFactory context
@@ -89,7 +88,7 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
 
     override val origin: Block = Block(
       Fixtures.Blocks.Genesis.header.copy(
-        difficulty = UInt256(Hex.decode("0400")).toBigInt,
+        difficulty = Difficulty(UInt256(Hex.decode("0400")).toBigInt),
         number = 0,
         gasUsed = 0,
         unixTimestamp = 0
@@ -102,11 +101,12 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
     val coinbaseProvider = new CoinbaseProvider(miningConfig.coinbase)
 
     override lazy val blockCreator = new PoWBlockCreator(
-      pendingTransactionsManager = pendingTransactionsManager.ref,
+      pendingTransactionsManager = pendingTransactionsManager.ref.toTyped[PendingTransactionsManager.Command],
       getTransactionFromPoolTimeout = getTransactionFromPoolTimeout,
       mining = mining,
-      ommersPool = ommersPool.ref,
-      coinbaseProvider = coinbaseProvider
+      ommersPool = ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],
+      coinbaseProvider = coinbaseProvider,
+      system = classicSystem
     )
 
     val dagManager = new EthashDAGManager(blockCreator)
@@ -161,16 +161,15 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
         .returning(IO.pure(PendingBlockAndState(PendingBlock(resultBlock, Nil), fakeWorld)))
 
     override def setupMiningServiceExpectation(): Unit =
-      (ethMiningService.submitHashRate _)
+      ethMiningService.submitHashRate
         .expects(*)
         .returns(IO.pure(Right(SubmitHashRateResponse(true))))
         .atLeastOnce()
 
-    protected def executeTest(parentBlock: Block): Unit = {
+    protected def executeTest(parentBlock: Block): Unit =
       prepareMocks()
       val minedBlock = startMining(parentBlock)
       checkAssertions(minedBlock, parentBlock)
-    }
 
     def startMining(parentBlock: Block): Block =
       eventually {
@@ -182,10 +181,7 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
         minedBlock
       }
 
-    private def checkAssertions(minedBlock: Block, parentBlock: Block): Unit = {
+    private def checkAssertions(minedBlock: Block, parentBlock: Block): Unit =
       minedBlock.body.transactionList shouldBe Seq(txToMine)
       minedBlock.header.nonce.length shouldBe 8
       PoWBlockHeaderValidator.validate(minedBlock.header, parentBlock.header) shouldBe Right(BlockHeaderValid)
-    }
-  }
-}

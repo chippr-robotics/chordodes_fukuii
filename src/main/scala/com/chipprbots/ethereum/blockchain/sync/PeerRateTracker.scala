@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import scala.collection.mutable
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.utils.Logger
 
@@ -18,8 +18,8 @@ import com.chipprbots.ethereum.utils.Logger
   *
   * Reference: go-ethereum/p2p/msgrate/msgrate.go
   */
-class PeerRateTracker extends Logger {
-  import PeerRateTracker._
+class PeerRateTracker extends Logger:
+  import PeerRateTracker.*
 
   // Per-peer rate tracking
   private val peers = mutable.Map[String, PeerStats]()
@@ -42,10 +42,10 @@ class PeerRateTracker extends Logger {
   def update(peerId: String, msgType: Int, elapsedMs: Long, items: Int): Unit = synchronized {
     val stats = peers.getOrElseUpdate(peerId, PeerStats())
 
-    if (items == 0) {
+    if items == 0 then
       // Timeout or unavailable — slash capacity to zero (geth: Update with 0,0)
       stats.capacity.update(msgType, 0.0)
-    } else {
+    else
       val elapsed = elapsedMs.max(1) // prevent division by zero
       val measured = items.toDouble / (elapsed.toDouble / 1000.0)
 
@@ -54,7 +54,6 @@ class PeerRateTracker extends Logger {
 
       val oldRtt = stats.roundtripMs
       stats.roundtripMs = ((1 - MeasurementImpact) * oldRtt + MeasurementImpact * elapsed).toLong
-    }
   }
 
   /** Calculate the maximum number of items to request from a peer.
@@ -70,12 +69,11 @@ class PeerRateTracker extends Logger {
     */
   def capacity(peerId: String, msgType: Int, targetRTT: Long): Int = synchronized {
     val stats = peers.get(peerId)
-    val cap = stats match {
+    val cap = stats match
       case Some(s) =>
         val throughput = s.capacity.getOrElse(msgType, 0.0) * targetRTT.toDouble / 1000.0
         (1 + CapacityOverestimation * throughput).toInt
       case None => 1
-    }
     cap.max(1)
   }
 
@@ -106,7 +104,7 @@ class PeerRateTracker extends Logger {
     * with fixed periods.
     */
   def tune(): Unit = synchronized {
-    if (peers.isEmpty) return
+    if peers.isEmpty then return
 
     // Collect RTTs from all peers, sort, and pick geometric-mean index (√N)
     val rtts = peers.values.map(_.roundtripMs).toArray.sorted
@@ -133,22 +131,18 @@ class PeerRateTracker extends Logger {
     *   the new peer
     */
   def addPeer(peerId: String): Unit = synchronized {
-    if (!peers.contains(peerId)) {
+    if !peers.contains(peerId) then
       peers.put(peerId, PeerStats())
 
       // Detune confidence (geth: detune on new peer)
       val n = peers.size
-      if (n == 1) {
-        confidence = 1.0 // Single peer is authoritative
-      } else if (n < TuningConfidenceCap) {
-        confidence = (confidence * (n - 1).toDouble / n).max(RttMinConfidence)
-      }
+      if n == 1 then confidence = 1.0 // Single peer is authoritative
+      else if n < TuningConfidenceCap then confidence = (confidence * (n - 1).toDouble / n).max(RttMinConfidence)
       // If n >= TuningConfidenceCap (10), don't detune (stable network)
 
       log.debug(
         s"PeerRateTracker cold-start: peer=$peerId registered, totalPeers=$n, confidence=${"%.3f".format(confidence)}"
       )
-    }
   }
 
   /** Notify that a peer disconnected.
@@ -168,9 +162,8 @@ class PeerRateTracker extends Logger {
 
   /** Get current confidence */
   def currentConfidence: Double = synchronized(confidence)
-}
 
-object PeerRateTracker {
+object PeerRateTracker:
 
   // --- Geth msgrate constants (from p2p/msgrate/msgrate.go) ---
 
@@ -220,4 +213,3 @@ object PeerRateTracker {
       capacity: mutable.Map[Int, Double] = mutable.Map.empty,
       var roundtripMs: Long = RttMinEstimateMs * 2 // Start at 4s (conservative)
   )
-}

@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -15,55 +16,54 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum._
+import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.EthInfoService._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.EthInfoService.*
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.ledger.TxResult
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.ActorsTesting.syncStatusAutoPilot
+import com.chipprbots.ethereum.testing.Tags.*
 
 class EthServiceSpec
-    extends TestKit(ActorSystem("EthInfoServiceSpec_ActorSystem"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with OptionValues
     with MockFactory
     with NormalPatience
-    with TypeCheckedTripleEquals {
+    with TypeCheckedTripleEquals:
 
   implicit val runtime: IORuntime = IORuntime.global
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
 
-  "EthInfoService" should "return ethereum protocol version" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  "EthInfoService" should "return ethereum protocol version" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val response: Either[JsonRpcError, ProtocolVersionResponse] =
       ethService.protocolVersion(ProtocolVersionRequest()).unsafeRunSync()
     val protocolVersion = response.toOption.get.value
 
     Integer.parseInt(protocolVersion.drop(2), 16) shouldEqual currentProtocolVersion
-  }
 
-  it should "return configured chain id" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return configured chain id" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val response: ChainIdResponse = ethService.chainId(ChainIdRequest()).unsafeRunSync().toOption.get
 
     assert(response === ChainIdResponse(blockchainConfig.chainId))
-  }
 
-  it should "return syncing info if the peer is syncing" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncProtocol.GetStatus =>
-      SyncProtocol.Status.Syncing(999, Progress(200, 10000), Some(Progress(100, 144)))
-    })
+  it should "return syncing info if the peer is syncing" taggedAs (UnitTest, RPCTest) in new TestSetup:
+    syncingController.setAutoPilot(
+      syncStatusAutoPilot(SyncProtocol.Status.Syncing(999, Progress(200, 10000), Some(Progress(100, 144))))
+    )
 
     val response: SyncingResponse = ethService.syncing(SyncingRequest()).unsafeRunSync().toOption.get
 
@@ -78,37 +78,30 @@ class EthServiceSpec
         )
       )
     )
-  }
 
   // scalastyle:off magic.number
-  it should "return no syncing info if the peer is not syncing" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncProtocol.GetStatus =>
-      SyncProtocol.Status.NotSyncing
-    })
+  it should "return no syncing info if the peer is not syncing" taggedAs (UnitTest, RPCTest) in new TestSetup:
+    syncingController.setAutoPilot(syncStatusAutoPilot(SyncProtocol.Status.NotSyncing))
 
     val response: Either[JsonRpcError, SyncingResponse] = ethService.syncing(SyncingRequest()).unsafeRunSync()
 
     response shouldEqual Right(SyncingResponse(None))
-  }
 
-  it should "return no syncing info if sync is done" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncProtocol.GetStatus =>
-      SyncProtocol.Status.SyncDone
-    })
+  it should "return no syncing info if sync is done" taggedAs (UnitTest, RPCTest) in new TestSetup:
+    syncingController.setAutoPilot(syncStatusAutoPilot(SyncProtocol.Status.SyncDone))
 
     val response: Either[JsonRpcError, SyncingResponse] = ethService.syncing(SyncingRequest()).unsafeRunSync()
 
     response shouldEqual Right(SyncingResponse(None))
-  }
 
-  it should "execute call and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "execute call and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
     val worldStateProxy: InMemoryWorldStateProxy = InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       blockchain.getBackingMptStorage(-1),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       UInt256.Zero,
       ByteString.empty,
       noEmptyAccounts = false,
@@ -116,7 +109,7 @@ class EthServiceSpec
     )
 
     val txResult: TxResult = TxResult(worldStateProxy, 123, Nil, ByteString("return_value"), None)
-    (stxLedger.simulateTransaction _).expects(*, *, *).returning(txResult)
+    stxLedger.simulateTransaction.expects(*, *, *).returning(txResult)
 
     val tx: CallTx = CallTx(
       Some(ByteString(Hex.decode("da714fe079751fa7a1ad80b76571ea6ec52a446c"))),
@@ -129,9 +122,8 @@ class EthServiceSpec
     val response: ServiceResponse[CallResponse] = ethService.call(CallRequest(tx, BlockParam.Latest))
 
     response.unsafeRunSync() shouldEqual Right(CallResponse(ByteString("return_value")))
-  }
 
-  it should "execute estimateGas and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "execute estimateGas and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
@@ -140,17 +132,17 @@ class EthServiceSpec
     val worldStateProxy: InMemoryWorldStateProxy = InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       blockchain.getBackingMptStorage(-1),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       UInt256.Zero,
       ByteString.empty,
       noEmptyAccounts = false,
       ethCompatibleStorage = true
     )
     val nonRevertResult: TxResult = TxResult(worldStateProxy, 123, Nil, ByteString.empty, None)
-    (stxLedger.simulateTransaction _).expects(*, *, *).returning(nonRevertResult)
+    stxLedger.simulateTransaction.expects(*, *, *).returning(nonRevertResult)
 
     val estimatedGas: BigInt = BigInt(123)
-    (stxLedger.binarySearchGasEstimation _).expects(*, *, *).returning(estimatedGas)
+    stxLedger.binarySearchGasEstimation.expects(*, *, *).returning(estimatedGas)
 
     val tx: CallTx = CallTx(
       Some(ByteString(Hex.decode("da714fe079751fa7a1ad80b76571ea6ec52a446c"))),
@@ -163,10 +155,9 @@ class EthServiceSpec
     val response: ServiceResponse[EstimateGasResponse] = ethService.estimateGas(CallRequest(tx, BlockParam.Latest))
 
     response.unsafeRunSync() shouldEqual Right(EstimateGasResponse(123))
-  }
 
   // NOTE TestSetup uses Ethash consensus; check `consensusConfig`.
-  class TestSetup(implicit system: ActorSystem) extends EphemBlockchainTestSetup {
+  class TestSetup(implicit system: ActorSystem) extends EphemBlockchainTestSetup:
     val blockGenerator: PoWBlockGenerator = mock[PoWBlockGenerator]
     val appStateStorage: AppStateStorage = mock[AppStateStorage]
     val keyStore: KeyStore = mock[KeyStore]
@@ -186,13 +177,12 @@ class EthServiceSpec
       mining,
       stxLedger,
       keyStore,
-      syncingController.ref,
+      syncingController.ref.toTyped[SyncController.Command],
       Capability.ETH63,
-      Timeouts.shortTimeout
+      Timeouts.shortTimeout,
+      system.toTyped.scheduler
     )
 
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
     val txToRequest = Fixtures.Blocks.Block3125369.body.transactionList.head
     val txSender: Address = SignedTransaction.getSender(txToRequest).get
-  }
-}

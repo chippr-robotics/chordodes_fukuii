@@ -2,70 +2,96 @@ package com.chipprbots.ethereum.network
 
 import java.time.Clock
 
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 import scala.concurrent.duration.FiniteDuration
 
-import com.chipprbots.ethereum.network.PeerEventBusActor._
+import com.chipprbots.ethereum.network.PeerEventBusActor.*
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 
-class PeerStatisticsActor(
-    peerEventBus: ActorRef,
-    var maybeStats: Option[TimeSlotStats[PeerId, PeerStat]]
-)(implicit clock: Clock)
-    extends Actor {
-  import PeerStatisticsActor._
+object PeerStatisticsActor:
 
-  override def preStart(): Unit = {
-    // Subscribe to messages received from handshaked peers to maintain stats.
-    peerEventBus ! Subscribe(MessageSubscriptionClassifier)
-    // Removing peers is an optimisation to free space, but eventually the stats would be overwritten anyway.
-    peerEventBus ! Subscribe(SubscriptionClassifier.PeerDisconnectedClassifier(PeerSelector.AllPeers))
-  }
+  /** Behavior factory for the Typed PeerStatisticsActor.
+    *
+    * The Classic `var maybeStats` is replaced by state threaded through the recursive [[active]] behavior.
+    * Subscriptions to the (still Classic) PeerEventBus are wired through a message adapter that lifts Classic
+    * [[PeerEvent]] messages into the typed [[Command]] ADT ([[PeerMessageReceived]] / [[PeerGone]]); the adapter's
+    * underlying Classic ref is what we hand to the bus via `Subscribe`.
+    */
+  def apply(peerEventBus: TypedActorRef[PeerEventBusActor.Command], slotDuration: FiniteDuration, slotCount: Int)(
+      implicit clock: Clock
+  ): Behavior[Command] =
+    Behaviors.setup { ctx =>
+      // Lift Classic PeerEventBus notifications into the typed Command ADT.
+      val eventAdapter: TypedActorRef[PeerEvent] = ctx.messageAdapter[PeerEvent] {
+        case PeerEvent.MessageFromPeer(msg, peerId) => PeerMessageReceived(msg, peerId)
+        case PeerEvent.PeerDisconnected(peerId)     => PeerGone(peerId)
+        case _                                      => PeerEventIgnored
+      }
 
-  def receive: Receive = handlePeerEvents.orElse(handleStatsRequests)
+      // Subscribe to messages received from handshaked peers to maintain stats.
+      peerEventBus ! SubscribeCmd(MessageSubscriptionClassifier, eventAdapter)
+      // Removing peers is an optimisation to free space, but eventually the stats would be overwritten anyway.
+      peerEventBus ! SubscribeCmd(
+        SubscriptionClassifier.PeerDisconnectedClassifier(PeerSelector.AllPeers),
+        eventAdapter
+      )
 
-  private def handlePeerEvents: Receive = {
-    case PeerEvent.MessageFromPeer(msg, peerId) =>
-      handleMessageFromPeer(msg, peerId)
+      active(TimeSlotStats[PeerId, PeerStat](slotDuration, slotCount))
+    }
 
-    case PeerEvent.PeerDisconnected(peerId) =>
-      maybeStats = maybeStats.map(_.remove(peerId))
-  }
+  private def active(maybeStats: Option[TimeSlotStats[PeerId, PeerStat]])(implicit
+      clock: Clock
+  ): Behavior[Command] =
+    Behaviors.receiveMessage {
+      case PeerMessageReceived(msg, peerId) =>
+        active(maybeStats.map(_.add(peerId, observe(msg))))
 
-  private def handleStatsRequests: Receive = {
-    case GetStatsForAll(window) =>
-      val stats = maybeStats.map(_.getAll(Some(window))).getOrElse(Map.empty)
-      sender() ! StatsForAll(stats)
+      case PeerGone(peerId) =>
+        active(maybeStats.map(_.remove(peerId)))
 
-    case GetStatsForPeer(window, peerId) =>
-      val stats = maybeStats.map(_.get(peerId, Some(window))).getOrElse(PeerStat.empty)
-      sender() ! StatsForPeer(peerId, stats)
-  }
+      case GetStatsForAll(window, replyTo) =>
+        val stats = maybeStats.map(_.getAll(Some(window))).getOrElse(Map.empty)
+        replyTo ! StatsForAll(stats)
+        Behaviors.same
 
-  private def handleMessageFromPeer(msg: Message, peerId: PeerId): Unit = {
+      case GetStatsForPeer(window, peerId, replyTo) =>
+        val stats = maybeStats.map(_.get(peerId, Some(window))).getOrElse(PeerStat.empty)
+        replyTo ! StatsForPeer(peerId, stats)
+        Behaviors.same
+
+      case PeerEventIgnored =>
+        Behaviors.same
+    }
+
+  private def observe(msg: Message)(implicit clock: Clock): PeerStat =
     val now = clock.millis
-    val obs = PeerStat(
-      responsesReceived = if (ResponseCodes(msg.code)) 1 else 0,
-      requestsReceived = if (RequestCodes(msg.code)) 1 else 0,
+    PeerStat(
+      responsesReceived = if ResponseCodes(msg.code) then 1 else 0,
+      requestsReceived = if RequestCodes(msg.code) then 1 else 0,
       firstSeenTimeMillis = Some(now),
       lastSeenTimeMillis = Some(now)
     )
-    maybeStats = maybeStats.map(_.add(peerId, obs))
-  }
-}
 
-object PeerStatisticsActor {
-  def props(peerEventBus: ActorRef, slotDuration: FiniteDuration, slotCount: Int)(implicit clock: Clock): Props =
-    Props {
-      val stats = TimeSlotStats[PeerId, PeerStat](slotDuration, slotCount)
-      new PeerStatisticsActor(peerEventBus, stats)
-    }
+  /** Protocol for the Typed PeerStatisticsActor. */
+  sealed trait Command
 
-  case class GetStatsForAll(window: FiniteDuration)
+  /** Internal: a `PeerEvent.MessageFromPeer` lifted from the Classic PeerEventBus via the message adapter. */
+  final private[network] case class PeerMessageReceived(msg: Message, peerId: PeerId) extends Command
+
+  /** Internal: a `PeerEvent.PeerDisconnected` lifted from the Classic PeerEventBus via the message adapter. */
+  final private[network] case class PeerGone(peerId: PeerId) extends Command
+
+  /** Internal: any other (unexpected) PeerEvent the adapter receives; dropped. */
+  private case object PeerEventIgnored extends Command
+
+  final case class GetStatsForAll(window: FiniteDuration, replyTo: TypedActorRef[StatsForAll]) extends Command
   case class StatsForAll(stats: Map[PeerId, PeerStat])
-  case class GetStatsForPeer(window: FiniteDuration, peerId: PeerId)
+  final case class GetStatsForPeer(window: FiniteDuration, peerId: PeerId, replyTo: TypedActorRef[StatsForPeer])
+      extends Command
   case class StatsForPeer(peerId: PeerId, stat: PeerStat)
 
   val ResponseCodes: Set[Int] = Set(
@@ -91,4 +117,3 @@ object PeerStatisticsActor {
       messageCodes = RequestCodes.union(ResponseCodes),
       peerSelector = PeerSelector.AllPeers
     )
-}

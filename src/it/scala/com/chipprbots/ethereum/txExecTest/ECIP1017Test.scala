@@ -6,25 +6,24 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.domain.BlockchainStorages
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.txExecTest.util.FixtureProvider
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
-import com.chipprbots.ethereum.domain.BlockchainStorages
 
-import com.chipprbots.ethereum.testing.Tags._
-
-class ECIP1017Test extends AnyFlatSpec with Matchers {
+class ECIP1017Test extends AnyFlatSpec with Matchers:
 
   val EraDuration = 3
 
-  trait TestSetup extends ScenarioSetup {
+  trait TestSetup extends ScenarioSetup:
     implicit override lazy val blockchainConfig: BlockchainConfig = BlockchainConfig(
       monetaryPolicyConfig = MonetaryPolicyConfig(EraDuration, 0.2, 5000000000000000000L, 3000000000000000000L),
       // unused
@@ -46,8 +45,7 @@ class ECIP1017Test extends AnyFlatSpec with Matchers {
       ethCompatibleStorage = true,
       gasTieBreaker = false
     )
-    val noErrors: ResultOfATypeInvocation[Right[_, Seq[Receipt]]] = a[Right[_, Seq[Receipt]]]
-  }
+    val noErrors: ResultOfATypeInvocation[Right[?, Seq[Receipt]]] = a[Right[?, Seq[Receipt]]]
 
   /** Tests the block reward calculation through out all the monetary policy through all the eras till block mining
     * reward goes to zero. Block mining reward is tested till era 200 (that starts at block number 602) as the reward
@@ -58,7 +56,7 @@ class ECIP1017Test extends AnyFlatSpec with Matchers {
     IntegrationTest,
     VMTest,
     SlowTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val fixtures: FixtureProvider.Fixture = FixtureProvider.loadFixtures("/txExecTest/ecip1017Test")
 
     val startBlock = 1
@@ -84,6 +82,3 @@ class ECIP1017Test extends AnyFlatSpec with Matchers {
         )
       blockExecution.executeAndValidateBlock(fixtures.blockByNumber(blockToExecute)) shouldBe noErrors
     }
-  }
-
-}

@@ -1,15 +1,17 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.implicits._
+import cats.implicits.*
 
 import scala.annotation.unused
-import scala.concurrent.duration._
 import scala.collection.immutable.NumericRange
+import scala.concurrent.duration.*
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsRequest
@@ -24,7 +26,7 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTr
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
-object FukuiiService {
+object FukuiiService:
   case class GetAccountTransactionsRequest(address: Address, blocksRange: NumericRange[BigInt])
   case class GetAccountTransactionsResponse(transactions: List[ExtendedTransactionData])
 
@@ -33,22 +35,23 @@ object FukuiiService {
 
   case class RestartFastSyncRequest()
   case class RestartFastSyncResponse(started: Boolean, cooldownUntilMillis: Long)
-}
 class FukuiiService(
     transactionHistoryService: TransactionHistoryService,
     jsonRpcConfig: JsonRpcConfig,
-    syncController: ActorRef
-) {
+    syncController: TypedActorRef[SyncController.Command],
+    scheduler: Scheduler
+):
 
-  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
-  implicit val timeout: Timeout = Timeout(10.seconds)
+  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+  given timeout: Timeout = Timeout(10.seconds)
+  private given typedScheduler: Scheduler = scheduler
 
-  implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+  given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
   def getAccountTransactions(
       request: GetAccountTransactionsRequest
   ): ServiceResponse[GetAccountTransactionsResponse] =
-    if (request.blocksRange.length > jsonRpcConfig.accountTransactionsMaxBlocks) {
+    if request.blocksRange.length > jsonRpcConfig.accountTransactionsMaxBlocks then
       IO.pure(
         Left(
           JsonRpcError.InvalidParams(
@@ -57,19 +60,21 @@ class FukuiiService(
           )
         )
       )
-    } else {
+    else
       transactionHistoryService
         .getAccountTransactions(request.address, request.blocksRange)
         .map(GetAccountTransactionsResponse(_).asRight)
-    }
 
   def resetFastSync(@unused request: ResetFastSyncRequest): ServiceResponse[ResetFastSyncResponse] =
     syncController
-      .askFor[SyncProtocol.ResetFastSyncResponse](SyncProtocol.ResetFastSync)
+      .askForTyped[SyncProtocol.ResetFastSyncResponse](replyTo =>
+        SyncController.WrappedSyncProtocol(SyncProtocol.ResetFastSync(replyTo))
+      )
       .map(resp => Right(ResetFastSyncResponse(resp.reset)))
 
   def restartFastSync(@unused request: RestartFastSyncRequest): ServiceResponse[RestartFastSyncResponse] =
     syncController
-      .askFor[SyncProtocol.RestartFastSyncResponse](SyncProtocol.RestartFastSync)
+      .askForTyped[SyncProtocol.RestartFastSyncResponse](replyTo =>
+        SyncController.WrappedSyncProtocol(SyncProtocol.RestartFastSync(replyTo))
+      )
       .map(resp => Right(RestartFastSyncResponse(resp.started, resp.cooldownUntilMillis)))
-}

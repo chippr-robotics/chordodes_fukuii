@@ -7,7 +7,7 @@ import org.apache.pekko.http.scaladsl.Http
 import scala.util.Failure
 import scala.util.Success
 
-import com.chipprbots.ethereum.jsonrpc._
+import com.chipprbots.ethereum.jsonrpc.*
 import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLService
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
@@ -20,10 +20,10 @@ class InsecureJsonRpcHttpServer(
     override val graphQLService: Option[GraphQLService] = None
 )(implicit val actorSystem: ActorSystem)
     extends JsonRpcHttpServer
-    with Logger {
+    with Logger:
 
-  def run(): Unit = {
-    implicit val ec: scala.concurrent.ExecutionContext = actorSystem.dispatcher
+  def run(): Unit =
+    given ec: scala.concurrent.ExecutionContext = actorSystem.dispatcher
 
     val bindingResultF = Http(actorSystem).newServerAt(config.interface, config.port).bind(route)
 
@@ -31,7 +31,5 @@ class InsecureJsonRpcHttpServer(
       case Success(serverBinding) => log.info(s"JSON RPC HTTP server listening on ${serverBinding.localAddress}")
       case Failure(ex)            => log.error("Cannot start JSON HTTP RPC server", ex)
     }
-  }
 
   override def corsAllowedOrigins: HttpOriginMatcher = config.corsAllowedOrigins
-}

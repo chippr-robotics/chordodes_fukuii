@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.network
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 /** Thread-safe runtime IP blocklist.
   *
@@ -8,7 +8,7 @@ import scala.jdk.CollectionConverters._
   * RPC methods. Designed to be checked by discovery (DiscoveryService) and P2P (RLPxConnectionHandler) layers — wired
   * in feat/network-autoblocker.
   */
-class BlockedIPRegistry(initialIPs: Set[String]) {
+class BlockedIPRegistry(initialIPs: Set[String]):
   private val blocked = java.util.concurrent.ConcurrentHashMap.newKeySet[String]()
   initialIPs.foreach(blocked.add)
 
@@ -17,4 +17,3 @@ class BlockedIPRegistry(initialIPs: Set[String]) {
   def unblock(ip: String): Boolean = blocked.remove(ip)
   def all: Set[String] = blocked.asScala.toSet
   def size: Int = blocked.size()
-}

@@ -7,7 +7,7 @@ import org.scalacheck.Gen
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Codec round-trip + robustness for resumable recovery progress.
   *
@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.testing.Tags._
   * wrong-version input must deserialise to None — so a torn write degrades to a fresh (correct) scan, never to a
   * silently-incomplete gap list that then gets marked done.
   */
-class RecoveryProgressSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
+class RecoveryProgressSpec extends AnyFunSuite with ScalaCheckPropertyChecks:
 
   private def hash(seed: Int): ByteString = ByteString(Array.fill[Byte](32)(seed.toByte))
 
@@ -130,16 +130,15 @@ class RecoveryProgressSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
 
   test("property: serialize→deserialize is identity for arbitrary progress", UnitTest, DatabaseTest) {
     val genHash: Gen[ByteString] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(bs => ByteString(bs.toArray))
-    val gen: Gen[RecoveryProgress] = for {
+    val gen: Gen[RecoveryProgress] = for
       root <- genHash
       shardCount <- Gen.chooseNum(1, 256)
       completed <- Gen.someOf(0 until shardCount).map(_.toSet)
       bytecodes <- Gen.listOf(genHash).map(_.toVector)
       storage <- Gen.listOf(Gen.zip(genHash, genHash)).map(_.toVector)
-    } yield RecoveryProgress(root, shardCount, completed, bytecodes, storage)
+    yield RecoveryProgress(root, shardCount, completed, bytecodes, storage)
 
     forAll(gen) { p =>
       assert(RecoveryProgress.deserialize(RecoveryProgress.serialize(p)).contains(p))
     }
   }
-}

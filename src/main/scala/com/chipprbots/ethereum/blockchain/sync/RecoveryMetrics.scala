@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.metrics.MetricsContainer
   *
   * Phase encoding: 0 = idle, 1 = scanning, 2 = downloading, 3 = complete.
   */
-object RecoveryMetrics extends MetricsContainer {
+object RecoveryMetrics extends MetricsContainer:
 
   val PhaseIdle: Long = 0L
   val PhaseScanning: Long = 1L
@@ -48,19 +48,16 @@ object RecoveryMetrics extends MetricsContainer {
   final private val StoragePhase =
     metrics.registry.gauge("recovery.storage.phase.gauge", new AtomicLong(0L))
 
-  def setBytecodeScanProgress(accountsScanned: Long, contractsFound: Long, missing: Long): Unit = {
+  def setBytecodeScanProgress(accountsScanned: Long, contractsFound: Long, missing: Long): Unit =
     BytecodeAccountsScanned.set(accountsScanned)
     BytecodeContractsFound.set(contractsFound)
     BytecodeMissing.set(missing)
-  }
   def setBytecodePhase(phase: Long): Unit = BytecodePhase.set(phase)
   def setBytecodeDownloaded(count: Long): Unit = BytecodeDownloaded.set(count)
 
-  def setStorageScanProgress(accountsScanned: Long, contractsFound: Long, missing: Long): Unit = {
+  def setStorageScanProgress(accountsScanned: Long, contractsFound: Long, missing: Long): Unit =
     StorageAccountsScanned.set(accountsScanned)
     StorageContractsFound.set(contractsFound)
     StorageMissing.set(missing)
-  }
   def setStoragePhase(phase: Long): Unit = StoragePhase.set(phase)
   def setStorageDownloaded(count: Long): Unit = StorageDownloaded.set(count)
-}

@@ -1,14 +1,14 @@
 package com.chipprbots.ethereum.consensus.eip1559
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class BaseFeeCalculatorSpec
@@ -16,7 +16,7 @@ class BaseFeeCalculatorSpec
     with Matchers
     with BlockchainConfigBuilder
     with com.chipprbots.ethereum.TestInstanceConfigProvider
-    with ParallelTestExecution {
+    with ParallelTestExecution:
 
   val olympiaBlock: BigInt = 10
 
@@ -29,18 +29,16 @@ class BaseFeeCalculatorSpec
       gasLimit: BigInt,
       gasUsed: BigInt,
       baseFee: Option[BigInt] = None
-  ): BlockHeader = {
-    val extraFields = baseFee match {
+  ): BlockHeader =
+    val extraFields = baseFee match
       case Some(fee) => HefPostOlympia(fee)
       case None      => HefEmpty
-    }
     Fixtures.Blocks.ValidBlock.header.copy(
       number = number,
       gasLimit = gasLimit,
       gasUsed = gasUsed,
       extraFields = extraFields
     )
-  }
 
   "BaseFeeCalculator" should "return initial baseFee (1 gwei) when parent is pre-Olympia" taggedAs (
     OlympiaTest,
@@ -148,4 +146,3 @@ class BaseFeeCalculatorSpec
       }
     }
   }
-}

@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import scala.collection.mutable
-
 import org.apache.pekko.util.ByteString
+
+import scala.collection.mutable
 
 import com.chipprbots.ethereum.mpt.StackTrie
 
@@ -49,7 +49,7 @@ import com.chipprbots.ethereum.mpt.StackTrie
 final class SnapHashTrie(
     writeBatch: Seq[(ByteString, Array[Byte])] => Unit,
     val batchSizeThreshold: Int = SnapHashTrie.DefaultBatchSizeBytes
-) extends SnapTrie {
+) extends SnapTrie:
 
   private val pending = mutable.ArrayBuffer.empty[(ByteString, Array[Byte])]
   private var pendingBytes: Long = 0L
@@ -66,22 +66,20 @@ final class SnapHashTrie(
     *
     * Returns the 32-byte trie root hash. After commit, the wrapper must be `reset()` before any further `update` calls.
     */
-  override def commit(): ByteString = {
+  override def commit(): ByteString =
     val root = stackTrie.hash()
     flush()
     root
-  }
 
   /** Discard any in-memory state without flushing. Used when a range is being abandoned (pivot roll, abort, shutdown).
     *
     * Note: emissions already flushed to disk during the doomed run are NOT rolled back — they're still valid
     * hash-content-addressed trie nodes and will simply be unreferenced until pruning cleans them up.
     */
-  override def reset(): Unit = {
+  override def reset(): Unit =
     stackTrie.reset()
     pending.clear()
     pendingBytes = 0L
-  }
 
   /** Bytes currently buffered in the pending batch (not yet flushed). */
   def pendingBatchBytes: Long = pendingBytes
@@ -91,26 +89,23 @@ final class SnapHashTrie(
 
   // ---- internals ----
 
-  private def emit(hash: ByteString, blob: Array[Byte]): Unit = {
+  private def emit(hash: ByteString, blob: Array[Byte]): Unit =
     // Spec 007 US3 / T021 (FR-010-gated): the emitted `blob` is freshly owned per node (StackTrie
     // allocates a new array per `encodeLeaf`/`encodeExt`/`encodeBranch` and retains no reference to
     // it after the callback — it stores the node's HASH in `node.value`, not the blob). See the
     // StackTrie blob-ownership contract. So we can retain the blob directly without a defensive copy.
     pending += hash -> blob
     pendingBytes += blob.length
-    if (pendingBytes >= batchSizeThreshold) flush()
-  }
+    if pendingBytes >= batchSizeThreshold then flush()
 
   private def flush(): Unit =
-    if (pending.nonEmpty) {
+    if pending.nonEmpty then
       // toSeq creates an immutable snapshot before clearing.
       writeBatch(pending.toSeq)
       pending.clear()
       pendingBytes = 0L
-    }
-}
 
-object SnapHashTrie {
+object SnapHashTrie:
 
   /** 8 MiB, matching geth's `batchSizeThreshold` in `eth/protocols/snap/sync.go`.
     *
@@ -119,4 +114,3 @@ object SnapHashTrie {
     * heap pressure manageable.
     */
   val DefaultBatchSizeBytes: Int = 8 * 1024 * 1024
-}

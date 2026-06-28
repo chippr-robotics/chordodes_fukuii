@@ -4,13 +4,14 @@ import java.io.File
 
 import scala.sys
 
+import com.typesafe.config.ConfigFactory
+
 import com.chipprbots.ethereum.cli.CliLauncher
 import com.chipprbots.ethereum.crypto.SignatureValidator
 import com.chipprbots.ethereum.faucet.Faucet
 import com.chipprbots.ethereum.utils.Logger
-import com.typesafe.config.ConfigFactory
 
-object App extends Logger {
+object App extends Logger:
 
   // Known network names that correspond to config files in conf/ directory
   private val knownNetworks = Set(
@@ -44,7 +45,7 @@ object App extends Logger {
   /** Check if argument is a known modifier */
   private def isModifier(arg: String): Boolean = knownModifiers.contains(arg)
 
-  private def findFilesystemConfig(network: String, currentConfigFile: Option[String]): Option[File] = {
+  private def findFilesystemConfig(network: String, currentConfigFile: Option[String]): Option[File] =
     val envConfiguredDir = sys.env.get("FUKUII_CONF_DIR").map(new File(_))
     val systemConfiguredDir = Option(System.getProperty("fukuii.conf.dir")).map(new File(_))
     val launcherConfigDir = currentConfigFile
@@ -63,12 +64,11 @@ object App extends Logger {
 
     (filesFromDirs ++ directCandidates)
       .find(file => file.exists() && file.isFile)
-  }
 
   /** Set config file for the specified network (must be called before Config is accessed) */
-  private def setNetworkConfig(network: String): Unit = {
+  private def setNetworkConfig(network: String): Unit =
     val currentConfigFile = Option(System.getProperty("config.file"))
-    findFilesystemConfig(network, currentConfigFile) match {
+    findFilesystemConfig(network, currentConfigFile) match
       case Some(file) =>
         val absolutePath = file.getAbsolutePath
         System.setProperty("config.file", absolutePath)
@@ -77,41 +77,35 @@ object App extends Logger {
       case None =>
         val resourcePath = s"conf/$network.conf"
         val resourceExists = Option(getClass.getClassLoader.getResource(resourcePath)).isDefined
-        if (resourceExists) {
+        if resourceExists then
           System.clearProperty("config.file")
           System.setProperty("config.resource", resourcePath)
           log.info(s"Loading network configuration from classpath resource: $resourcePath")
-        } else {
-          log.warn(s"Config file '$resourcePath' not found in filesystem or classpath, using default config")
-        }
-    }
+        else log.warn(s"Config file '$resourcePath' not found in filesystem or classpath, using default config")
     // Invalidate cached config so ConfigFactory.load() picks up the new system properties.
     // Without this, logback's ConfigPropertyDefiner may have already triggered a
     // ConfigFactory.load() call during logger initialization, caching the default
     // application.conf (with network="etc") before we set config.resource here.
     ConfigFactory.invalidateCaches()
-  }
 
   private def determineNetworkArg(args: Array[String]): Option[String] =
-    args.headOption match {
+    args.headOption match
       case Some(`launchFukuii`) => args.tail.find(isNetwork)
       case Some(`launchKeytool`) | Some(`downloadBootstrap`) | Some(`faucet`) | Some(`sigValidator`) | Some(`cli`) =>
         None
       case Some(network) if isNetwork(network) => Some(network)
       case _                                   => None
-    }
 
   /** Apply modifiers to system configuration */
-  private def applyModifiers(modifiers: Set[String]): Unit = {
-    if (modifiers.contains("public")) {
+  private def applyModifiers(modifiers: Set[String]): Unit =
+    if modifiers.contains("public") then
       System.setProperty("fukuii.network.discovery.discovery-enabled", "true")
       // Public mode: use both bootstrap nodes and static nodes for better sync experience
       System.setProperty("fukuii.network.discovery.use-bootstrap-nodes", "true")
       log.info("Public discovery explicitly enabled")
       log.info("- Using both bootstrap nodes and static-nodes.json for peer discovery")
-    }
 
-    if (modifiers.contains("enterprise")) {
+    if modifiers.contains("enterprise") then
       // Enterprise mode: Best practices for private/permissioned EVM networks
 
       // Disable public peer discovery - use static nodes only
@@ -138,11 +132,9 @@ object App extends Logger {
       log.info("- Using ONLY static-nodes.json (bootstrap nodes ignored)")
       log.info("- Automatic port forwarding disabled")
       log.info("- RPC bound to localhost (override with config if needed)")
-    }
-  }
 
   private def showHelp(): Unit =
-    println(
+    log.info(
       """
         |Fukuii Ethereum Client
         |
@@ -221,7 +213,7 @@ object App extends Logger {
         |""".stripMargin
     )
 
-  def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit =
 
     // Parse and extract modifiers from arguments
     val modifiers = args.filter(isModifier).toSet
@@ -233,15 +225,14 @@ object App extends Logger {
     // Apply modifiers (e.g., "public" enables discovery)
     applyModifiers(modifiers)
 
-    argsWithoutModifiers.headOption match {
+    argsWithoutModifiers.headOption match
       case None                  => Fukuii.main(argsWithoutModifiers)
       case Some("--help" | "-h") => showHelp()
       case Some(`launchFukuii`)  =>
         // Filter out network name from remaining args to avoid passing it to Fukuii.main
-        val remainingArgs = argsWithoutModifiers.tail.headOption.filter(isNetwork) match {
+        val remainingArgs = argsWithoutModifiers.tail.headOption.filter(isNetwork) match
           case Some(_) => argsWithoutModifiers.tail.tail
           case None    => argsWithoutModifiers.tail
-        }
         Fukuii.main(remainingArgs)
       case Some(`launchKeytool`)     => KeyTool.main(argsWithoutModifiers.tail)
       case Some(`downloadBootstrap`) =>
@@ -249,9 +240,8 @@ object App extends Logger {
         // This delayed import is intentional - Config is a lazy-initialized object that
         // reads config.file system property at initialization time.
         import com.chipprbots.ethereum.utils.Config
-        Config.Db.dataSource match {
+        Config.Db.dataSource match
           case "rocksdb" => BootstrapDownload.main(argsWithoutModifiers.tail :+ Config.Db.RocksDb.path)
-        }
       // HIBERNATED: vm-server case commented out
       // case Some(`vmServer`)     => VmServerApp.main(argsWithoutModifiers.tail)
       case Some("runtime") =>
@@ -271,11 +261,10 @@ object App extends Logger {
         com.chipprbots.ethereum.blockchain.checkpoint.CheckpointCli.main(argsWithoutModifiers.tail)
       case Some(network) if isNetwork(network) =>
         val tail = argsWithoutModifiers.tail
-        tail.headOption match {
+        tail.headOption match
           case Some("checkpoint") =>
             com.chipprbots.ethereum.blockchain.checkpoint.CheckpointCli.main(tail.tail)
           case _ => Fukuii.main(tail)
-        }
       case Some(arg) if isOptionFlag(arg) =>
         // Option flags (starting with -) are passed directly to Fukuii
         Fukuii.main(argsWithoutModifiers)
@@ -284,7 +273,3 @@ object App extends Logger {
           s"Unrecognised launcher option: $unknown\n" +
             s"Run 'fukuii --help' to see available commands."
         )
-    }
-
-  }
-}

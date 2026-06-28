@@ -11,11 +11,12 @@ import com.chipprbots.ethereum.consensus.pow.validators.MockedPowBlockHeaderVali
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderBaseFeeError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderExtraFieldsError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderGasLimitError
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Tests that BlockHeaderValidatorSkeleton enforces extraFields and baseFee at the Olympia fork boundary.
@@ -31,7 +32,7 @@ class OlympiaBlockHeaderValidationSpec
     extends AnyWordSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val olympiaBlock: BigInt = BigInt(100)
 
@@ -53,7 +54,7 @@ class OlympiaBlockHeaderValidationSpec
       gasLimit = BigInt(8_000_000),
       gasUsed = 0,
       unixTimestamp = timestamp,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefEmpty
     )
@@ -65,7 +66,7 @@ class OlympiaBlockHeaderValidationSpec
       gasLimit = OneStepFrom8M,
       gasUsed = 0,
       unixTimestamp = timestamp,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefPostOlympia(baseFee)
     )
@@ -93,7 +94,7 @@ class OlympiaBlockHeaderValidationSpec
           extraFields = HefPostOlympia(InitialBaseFee)
         )
         val result = validate(wrongChild, parent)
-        result shouldBe a[Left[_, _]]
+        result shouldBe a[Left[?, ?]]
         result.left.toOption.get shouldBe a[HeaderExtraFieldsError]
       }
     }
@@ -113,7 +114,7 @@ class OlympiaBlockHeaderValidationSpec
         val parent = preOlympiaHeader(olympiaBlock - 1, timestamp = 1000L)
         val wrongFee = firstOlympiaHeader(timestamp = 2000L, baseFee = InitialBaseFee + 1)
         val result = validate(wrongFee, parent)
-        result shouldBe a[Left[_, _]]
+        result shouldBe a[Left[?, ?]]
         result.left.toOption.get shouldBe a[HeaderBaseFeeError]
       }
 
@@ -138,7 +139,7 @@ class OlympiaBlockHeaderValidationSpec
           extraFields = HefEmpty
         )
         val result = validate(noFeeChild, parent)
-        result shouldBe a[Left[_, _]]
+        result shouldBe a[Left[?, ?]]
         result.left.toOption.get shouldBe a[HeaderExtraFieldsError]
       }
     }
@@ -157,7 +158,7 @@ class OlympiaBlockHeaderValidationSpec
           gasLimit = TwoStepsFrom8M,
           gasUsed = 0,
           unixTimestamp = 2000L,
-          difficulty = 0,
+          difficulty = Difficulty.Zero,
           extraData = baseExtraData,
           extraFields = HefPostOlympia(expectedBaseFee)
         )
@@ -172,15 +173,14 @@ class OlympiaBlockHeaderValidationSpec
           gasLimit = TwoStepsFrom8M,
           gasUsed = 0,
           unixTimestamp = 2000L,
-          difficulty = 0,
+          difficulty = Difficulty.Zero,
           extraData = baseExtraData,
           extraFields = HefEmpty
         )
         val result = validate(missingFee, firstBlock)
-        result shouldBe a[Left[_, _]]
+        result shouldBe a[Left[?, ?]]
         result.left.toOption.get shouldBe a[HeaderExtraFieldsError]
       }
     }
   }
-}
 // scalastyle:on magic.number

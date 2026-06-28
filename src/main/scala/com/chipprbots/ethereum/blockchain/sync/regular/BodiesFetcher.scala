@@ -2,10 +2,10 @@ package com.chipprbots.ethereum.blockchain.sync.regular
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -13,6 +13,7 @@ import cats.effect.unsafe.IORuntime
 import scala.util.Failure
 import scala.util.Success
 
+import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestPeer
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.ExcludingPeers
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
@@ -25,17 +26,18 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class BodiesFetcher(
-    val peersClient: ClassicActorRef,
+    val peersClient: ActorRef[PeersClient.Command],
     val syncConfig: SyncConfig,
     val supervisor: ActorRef[FetchCommand],
     context: ActorContext[BodiesFetcher.BodiesFetcherCommand]
 ) extends AbstractBehavior[BodiesFetcher.BodiesFetcherCommand](context)
-    with FetchRequest[BodiesFetcher.BodiesFetcherCommand] {
+    with FetchRequest[BodiesFetcher.BodiesFetcherCommand]:
 
   val log = context.log
-  implicit val runtime: IORuntime = IORuntime.global
+  given scheduler: Scheduler = context.system.scheduler
+  given runtime: IORuntime = IORuntime.global
 
-  import BodiesFetcher._
+  import BodiesFetcher.*
   private type Command = BodiesFetcher.BodiesFetcherCommand
   private var totalBodiesFetched: Long = 0L
   private val bodiesFetchStartMs: Long = System.currentTimeMillis()
@@ -53,7 +55,7 @@ class BodiesFetcher(
   override def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): Command = AdaptedMessage(peer, msg)
 
   override def onMessage(message: Command): Behavior[Command] =
-    message match {
+    message match
       case FetchBodies(hashes, triedPeers, retryCount) =>
         log.debug(
           "Start fetching bodies for {} hashes (tried: {}, retry: {})",
@@ -61,15 +63,11 @@ class BodiesFetcher(
           triedPeers.size,
           retryCount
         )
-        if (hashes.isEmpty) {
-          log.warn("FetchBodies called with empty hashes list")
-        }
+        if hashes.isEmpty then log.warn("FetchBodies called with empty hashes list")
         val concurrency = syncConfig.bodiesFetchConcurrency
-        if (concurrency <= 1 || hashes.size <= syncConfig.blockBodiesPerRequest) {
+        if concurrency <= 1 || hashes.size <= syncConfig.blockBodiesPerRequest then
           requestBodies(hashes, triedPeers, retryCount)
-        } else {
-          fanOutBodies(hashes, triedPeers, retryCount, concurrency)
-        }
+        else fanOutBodies(hashes, triedPeers, retryCount, concurrency)
         Behaviors.same
 
       case AdaptedMessage(peer, blockBodies: ETHPackets.BlockBodies) =>
@@ -81,20 +79,19 @@ class BodiesFetcher(
         Behaviors.same
 
       case SliceComplete(bodies, peer, gen) =>
-        if (gen != currentBatchGen) {
+        if gen != currentBatchGen then
           log.debug("Discarding stale SliceComplete gen={} current={}", gen, currentBatchGen)
-        } else {
+        else
           collectedBodies = collectedBodies ++ bodies
-          if (sliceRepresentativePeer.isEmpty) sliceRepresentativePeer = Some(peer)
+          if sliceRepresentativePeer.isEmpty then sliceRepresentativePeer = Some(peer)
           pendingSlices -= 1
-          if (bodies.nonEmpty && bodies.size < syncConfig.blockBodiesPerRequest) {
+          if bodies.nonEmpty && bodies.size < syncConfig.blockBodiesPerRequest then
             log.warn(
               "[RegularSync] slice truncated: got {} bodies from {} — server likely hit softResponseLimit",
               bodies.size,
               peer.id
             )
-          }
-          if (pendingSlices == 0) {
+          if pendingSlices == 0 then
             val mergedCount = collectedBodies.size
             log.info(
               "[RegularSync] bodies={} merged from fan-out, peer={}",
@@ -105,16 +102,13 @@ class BodiesFetcher(
             supervisor ! BlockFetcher.ReceivedBodies(sliceRepresentativePeer.get, collectedBodies)
             collectedBodies = Seq.empty
             sliceRepresentativePeer = None
-          }
-        }
         Behaviors.same
 
       case SliceFailed(hashes, failedPeerId, triedPeers, retryCount, gen) =>
-        if (gen != currentBatchGen) {
-          log.debug("Discarding stale SliceFailed gen={} current={}", gen, currentBatchGen)
-        } else {
+        if gen != currentBatchGen then log.debug("Discarding stale SliceFailed gen={} current={}", gen, currentBatchGen)
+        else
           pendingSlices -= 1
-          if (retryCount < syncConfig.maxBodyFetchRetries) {
+          if retryCount < syncConfig.maxBodyFetchRetries then
             val updatedTried = triedPeers ++ failedPeerId.toSet
             sliceIdCounter += 1
             val worker = context.spawn(
@@ -123,7 +117,7 @@ class BodiesFetcher(
             )
             worker ! BodiesSliceFetcher.FetchSlice(hashes, updatedTried, retryCount + 1)
             pendingSlices += 1
-          } else {
+          else
             log.warn(
               "[RegularSync] slice exhausted {} retries, aborting batch gen={}",
               retryCount,
@@ -135,21 +129,18 @@ class BodiesFetcher(
             collectedBodies = Seq.empty
             sliceRepresentativePeer = None
             supervisor ! BlockFetcher.RetryBodiesRequest(failedPeerId, triedPeers, retryCount)
-          }
-        }
         Behaviors.same
 
       case other =>
         log.warn("BodiesFetcher received unhandled message of type: {}", other.getClass.getSimpleName)
         Behaviors.unhandled
-    }
 
   private def handleBodiesResponse(
       peer: Peer,
       bodies: Seq[BlockBody],
       protocolLabel: String
-  ): Behavior[Command] = {
-    if (bodies.nonEmpty) {
+  ): Behavior[Command] =
+    if bodies.nonEmpty then
       totalBodiesFetched += bodies.size
       val rate = totalBodiesFetched * 1000L / (System.currentTimeMillis() - bodiesFetchStartMs).max(1)
       log.info(
@@ -160,20 +151,17 @@ class BodiesFetcher(
         totalBodiesFetched,
         rate
       )
-    } else {
-      log.debug("[RegularSync] empty bodies response from {}", peer.id)
-    }
+    else log.debug("[RegularSync] empty bodies response from {}", peer.id)
     // Always forward bodies to supervisor to ensure state is cleared
     supervisor ! BlockFetcher.ReceivedBodies(peer, bodies)
     Behaviors.same
-  }
 
   private def fanOutBodies(
       hashes: Seq[ByteString],
       triedPeers: Set[PeerId],
       retryCount: Int,
       concurrency: Int
-  ): Unit = {
+  ): Unit =
     currentBatchGen += 1
     val gen = currentBatchGen
     pendingSlices = 0
@@ -197,12 +185,11 @@ class BodiesFetcher(
       hashes.size,
       gen
     )
-  }
 
-  private def requestBodies(hashes: Seq[ByteString], triedPeers: Set[PeerId], retryCount: Int): Unit = {
+  private def requestBodies(hashes: Seq[ByteString], triedPeers: Set[PeerId], retryCount: Int): Unit =
     log.debug("Requesting {} block bodies (excluding {} tried peers)", hashes.size, triedPeers.size)
     val msg = ETHPackets.GetBlockBodies(ETHPackets.nextRequestId, hashes)
-    val peerSelector = if (triedPeers.nonEmpty) ExcludingPeers(triedPeers) else BestPeer
+    val peerSelector = if triedPeers.nonEmpty then ExcludingPeers(triedPeers) else BestPeer
     val fallback = BodiesFetcher.RetryBodiesRequest(failedPeerId = None, triedPeers, retryCount)
     val resp = makeRequest(Request.create(msg, peerSelector), fallback, triedPeers, retryCount)
     context.pipeToSelf(resp.unsafeToFuture()) {
@@ -216,13 +203,11 @@ class BodiesFetcher(
         log.warn("Bodies request failed with exception: {}", ex.getMessage)
         BodiesFetcher.RetryBodiesRequest(failedPeerId = None, triedPeers, retryCount)
     }
-  }
-}
 
-object BodiesFetcher {
+object BodiesFetcher:
 
   def apply(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       syncConfig: SyncConfig,
       supervisor: ActorRef[FetchCommand]
   ): Behavior[BodiesFetcherCommand] =
@@ -253,4 +238,3 @@ object BodiesFetcher {
       retryCount: Int,
       batchGen: Long
   ) extends BodiesFetcherCommand
-}

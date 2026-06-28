@@ -1,8 +1,7 @@
 package com.chipprbots.ethereum.ethtest
 
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
-
-import com.chipprbots.ethereum.testing.Tags._
 
 /** Test suite for ethereum/tests GeneralStateTests category
   *
@@ -14,7 +13,7 @@ import com.chipprbots.ethereum.testing.Tags._
   *
   * See https://github.com/ethereum/tests/tree/develop/GeneralStateTests
   */
-class GeneralStateTestsSpec extends EthereumTestsSpec {
+class GeneralStateTestsSpec extends EthereumTestsSpec:
 
   // Note: The ethereum/tests repository contains GeneralStateTests in a different format
   // than BlockchainTests. The BlockchainTests/GeneralStateTests directory contains
@@ -39,14 +38,13 @@ class GeneralStateTestsSpec extends EthereumTestsSpec {
       info(s"  Network: ${test.network}")
 
       val result = executeTest(test)
-      result match {
+      result match
         case Right(executionResult) =>
           info(s"  ✓ Test passed")
           info(s"  Blocks executed: ${executionResult.blocksExecuted}")
           info(s"  Final state root: ${executionResult.finalStateRoot.toHex}")
         case Left(error) =>
           fail(s"Test failed: $error")
-      }
     }
   }
 
@@ -68,13 +66,11 @@ class GeneralStateTestsSpec extends EthereumTestsSpec {
       info(s"  Network: ${test.network}")
 
       val result = executeTest(test)
-      result match {
+      result match
         case Right(executionResult) =>
           info(s"  ✓ Test passed")
           info(s"  Blocks executed: ${executionResult.blocksExecuted}")
         case Left(error) =>
           fail(s"Test failed: $error")
-      }
     }
   }
-}

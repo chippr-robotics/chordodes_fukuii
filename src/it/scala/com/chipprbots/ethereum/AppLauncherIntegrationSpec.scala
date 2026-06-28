@@ -1,28 +1,26 @@
 package com.chipprbots.ethereum
 
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.BeforeAndAfterEach
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Integration tests for App launcher command line argument parsing. These tests verify that the launcher correctly
   * handles different argument combinations for network selection and modifiers.
   */
-class AppLauncherIntegrationSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach {
+class AppLauncherIntegrationSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach:
 
   // Helper methods to reduce reflection code duplication
-  private def getIsModifierMethod = {
+  private def getIsModifierMethod =
     val method = App.getClass.getDeclaredMethod("isModifier", classOf[String])
     method.setAccessible(true)
     method
-  }
 
-  private def getApplyModifiersMethod = {
+  private def getApplyModifiersMethod =
     val method = App.getClass.getDeclaredMethod("applyModifiers", classOf[Set[String]])
     method.setAccessible(true)
     method
-  }
 
   private def extractModifiers(args: Array[String]): Set[String] =
     args.filter { arg =>
@@ -37,7 +35,7 @@ class AppLauncherIntegrationSpec extends AnyFlatSpec with Matchers with BeforeAn
       getIsModifierMethod.invoke(App, arg).asInstanceOf[Boolean]
     }
 
-  override def beforeEach(): Unit = {
+  override def beforeEach(): Unit =
     // Clear system properties before each test
     System.clearProperty("fukuii.network.discovery.discovery-enabled")
     System.clearProperty("fukuii.network.automatic-port-forwarding")
@@ -45,9 +43,8 @@ class AppLauncherIntegrationSpec extends AnyFlatSpec with Matchers with BeforeAn
     System.clearProperty("fukuii.sync.blacklist-duration")
     System.clearProperty("fukuii.network.rpc.http.interface")
     System.clearProperty("config.file")
-  }
 
-  override def afterEach(): Unit = {
+  override def afterEach(): Unit =
     // Clean up system properties after each test
     System.clearProperty("fukuii.network.discovery.discovery-enabled")
     System.clearProperty("fukuii.network.automatic-port-forwarding")
@@ -55,7 +52,6 @@ class AppLauncherIntegrationSpec extends AnyFlatSpec with Matchers with BeforeAn
     System.clearProperty("fukuii.sync.blacklist-duration")
     System.clearProperty("fukuii.network.rpc.http.interface")
     System.clearProperty("config.file")
-  }
 
   behavior.of("App launcher with 'public' modifier")
 
@@ -209,4 +205,3 @@ class AppLauncherIntegrationSpec extends AnyFlatSpec with Matchers with BeforeAn
     // Verify discovery property is not set
     System.getProperty("fukuii.network.discovery.discovery-enabled") shouldBe null
   }
-}

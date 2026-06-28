@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.crypto.zksnark
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.crypto.zksnark.FiniteField.Ops._
+import com.chipprbots.ethereum.crypto.zksnark.FiniteField.Ops.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 // Arithmetic in on all finite fields described in:

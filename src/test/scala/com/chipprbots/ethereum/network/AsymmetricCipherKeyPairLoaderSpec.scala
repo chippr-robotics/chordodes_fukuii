@@ -11,21 +11,19 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.network
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
-class AsymmetricCipherKeyPairLoaderSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
+class AsymmetricCipherKeyPairLoaderSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder:
 
-  def withFilePath(testCode: String => Any): Unit = {
+  def withFilePath(testCode: String => Any): Unit =
     val path = Files.createTempFile("key-", "").toAbsolutePath.toString
     require(new File(path).delete(), "File deletion before test failed")
     try testCode(path)
-    finally {
+    finally
       val file = new File(path)
       assert(!file.exists() || file.delete(), "File deletion after test failed")
-    }
-  }
 
-  def equalKeyPairs(keyPair1: AsymmetricCipherKeyPair, keyPair2: AsymmetricCipherKeyPair): Boolean = {
+  def equalKeyPairs(keyPair1: AsymmetricCipherKeyPair, keyPair2: AsymmetricCipherKeyPair): Boolean =
     // Compare public keys
     val publicKeyParam1 = keyPair1.getPublic.asInstanceOf[ECPublicKeyParameters]
     val publicKeyParam2 = keyPair2.getPublic.asInstanceOf[ECPublicKeyParameters]
@@ -43,7 +41,6 @@ class AsymmetricCipherKeyPairLoaderSpec extends AnyFlatSpec with Matchers with S
         privateKeyParam1.isPrivate == privateKeyParam2.isPrivate
 
     equalPrivateKey && equalPublicKey
-  }
 
   it should "correctly save the AsymmetricCipherKeyPairLoader" taggedAs (UnitTest, NetworkTest) in {
     withFilePath { path =>
@@ -56,4 +53,3 @@ class AsymmetricCipherKeyPairLoaderSpec extends AnyFlatSpec with Matchers with S
       assert(equalKeyPairs(newKeyPair, obtainedKeyPair))
     }
   }
-}

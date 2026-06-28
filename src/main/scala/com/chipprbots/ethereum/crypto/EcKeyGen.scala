@@ -10,11 +10,10 @@ import com.chipprbots.ethereum.security.SecureRandomBuilder
   * to generate the private key for the node. Note that only the private key will be read upon Fukuii boot, and the
   * second line is equivalent to node ID. The tool can also be used to generate keys for an Ethereum account.
   */
-object EcKeyGen extends App with SecureRandomBuilder {
+object EcKeyGen extends App with SecureRandomBuilder:
   val numOfKeys: Int = args.headOption.map(_.toInt).getOrElse(1)
 
   val keyPairs: IndexedSeq[(String, String)] = for (_ <- 1 to numOfKeys) yield newRandomKeyPairAsStrings(secureRandom)
 
   // scalastyle:off
   println(keyPairs.map { case (prv, pub) => s"$prv\n$pub\n" }.mkString("\n"))
-}

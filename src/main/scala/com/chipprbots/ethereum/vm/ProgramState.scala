@@ -3,21 +3,20 @@ package com.chipprbots.ethereum.vm
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
 
-object ProgramState {
+object ProgramState:
   def apply[W <: WorldStateProxy[W, S], S <: Storage[S]](
       vm: VM[W, S],
       context: ProgramContext[W, S],
       env: ExecEnv
-  ): ProgramState[W, S] = {
+  ): ProgramState[W, S] =
     // EIP-3651: Mark COINBASE address as warm at transaction start
-    val coinbaseAddress: Set[Address] = if (context.evmConfig.eip3651Enabled) {
-      Set(Address(context.blockHeader.beneficiary))
-    } else {
-      Set.empty[Address]
-    }
+    val coinbaseAddress: Set[Address] =
+      if context.evmConfig.eip3651Enabled then Set(Address(context.blockHeader.beneficiary))
+      else Set.empty[Address]
 
     ProgramState(
       vm = vm,
@@ -34,8 +33,6 @@ object ProgramState {
       accessedStorageKeys = context.warmStorage,
       transientStorage = context.transientStorage
     )
-  }
-}
 
 /** Intermediate state updated with execution of each opcode in the program
   *
@@ -93,10 +90,10 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
     error: Option[ProgramError] = None,
     originalWorld: W,
     accessedAddresses: Set[Address],
-    accessedStorageKeys: Set[(Address, BigInt)],
-    transientStorage: Map[(Address, BigInt), BigInt] = Map.empty,
+    accessedStorageKeys: Set[(Address, StorageKey)],
+    transientStorage: Map[(Address, StorageKey), BigInt] = Map.empty,
     opcodeGasCost: BigInt = 0
-) {
+):
 
   def config: EvmConfig = env.evmConfig
 
@@ -155,7 +152,7 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
     copy(logs = logs ++ log)
 
   def withInternalTxs(txs: Seq[InternalTransaction]): ProgramState[W, S] =
-    if (config.traceInternalTransactions) copy(internalTxs = internalTxs ++ txs) else this
+    if config.traceInternalTransactions then copy(internalTxs = internalTxs ++ txs) else this
 
   def halt: ProgramState[W, S] =
     copy(halted = true)
@@ -166,19 +163,19 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
   def addAccessedAddress(addr: Address): ProgramState[W, S] =
     copy(accessedAddresses = accessedAddresses + addr)
 
-  def addAccessedStorageKey(addr: Address, storageKey: BigInt): ProgramState[W, S] =
-    copy(accessedStorageKeys = accessedStorageKeys + ((addr, storageKey)))
+  def addAccessedStorageKey(addr: Address, key: StorageKey): ProgramState[W, S] =
+    copy(accessedStorageKeys = accessedStorageKeys + ((addr, key)))
 
   def addAccessedAddresses(addresses: Set[Address]): ProgramState[W, S] =
     copy(accessedAddresses = accessedAddresses ++ addresses)
 
-  def addAccessedStorageKeys(storageKeys: Set[(Address, BigInt)]): ProgramState[W, S] =
+  def addAccessedStorageKeys(storageKeys: Set[(Address, StorageKey)]): ProgramState[W, S] =
     copy(accessedStorageKeys = accessedStorageKeys ++ storageKeys)
 
   def toResult: ProgramResult[W, S] =
     ProgramResult[W, S](
       returnData,
-      if (error.exists(_.useWholeGas)) 0 else gas,
+      if error.exists(_.useWholeGas) then 0 else gas,
       world,
       addressesToDelete,
       logs,
@@ -189,4 +186,3 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
       accessedStorageKeys,
       transientStorage
     )
-}

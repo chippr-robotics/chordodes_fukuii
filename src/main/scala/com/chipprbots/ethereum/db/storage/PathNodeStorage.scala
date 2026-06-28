@@ -35,7 +35,7 @@ import com.chipprbots.ethereum.mpt.HexPrefix
   * @param dataSource
   *   Shared RocksDB data source. Both column families live in the same data source instance.
   */
-class PathNodeStorage(val dataSource: DataSource) {
+class PathNodeStorage(val dataSource: DataSource):
 
   private val acctNs: IndexedSeq[Byte] = Namespaces.StateTriePathNamespace
   private val storageNs: IndexedSeq[Byte] = Namespaces.StorageTriePathNamespace
@@ -49,41 +49,35 @@ class PathNodeStorage(val dataSource: DataSource) {
     *
     * @param nibblePath
     *   raw nibble array (each byte 0x00–0x0f)
-    * @param hash
-    *   keccak256 hash of `rlp` (logged but not stored as the key — the path is the key in PathScheme)
     * @param rlp
     *   RLP-encoded node bytes
     */
-  def writeAccountNode(nibblePath: Array[Byte], hash: ByteString, rlp: Array[Byte]): Unit = {
+  def writeAccountNode(nibblePath: Array[Byte], rlp: Array[Byte]): Unit =
     val key = encodePath(nibblePath)
     dataSource.update(
       Seq(DataSourceUpdateOptimized(namespace = acctNs, toRemove = Nil, toUpsert = Seq(key -> rlp)))
     )
-  }
 
   /** Read an account-trie node by nibble path. Returns `None` if no node is stored at that path. */
-  def readAccountNode(nibblePath: Array[Byte]): Option[Array[Byte]] = {
+  def readAccountNode(nibblePath: Array[Byte]): Option[Array[Byte]] =
     val key = encodePath(nibblePath)
     dataSource.getOptimized(acctNs, key)
-  }
 
   /** Delete the single account-trie node at exactly `nibblePath`. No-op if the path does not exist. */
-  def deleteAccountNode(nibblePath: Array[Byte]): Unit = {
+  def deleteAccountNode(nibblePath: Array[Byte]): Unit =
     val key = encodePath(nibblePath)
     dataSource.update(
       Seq(DataSourceUpdateOptimized(namespace = acctNs, toRemove = Seq(key), toUpsert = Nil))
     )
-  }
 
   /** Delete all account-trie nodes whose path starts with `nibblePrefix`.
     *
     * Used by [[com.chipprbots.ethereum.blockchain.sync.snap.SnapPathTrie]] to prune left-boundary ancestor stubs after
     * a subtree has been fully committed.
     */
-  def deleteAccountNodesByPrefix(nibblePrefix: Array[Byte]): Unit = {
+  def deleteAccountNodesByPrefix(nibblePrefix: Array[Byte]): Unit =
     val prefix = encodePath(nibblePrefix)
     deleteByPrefix(acctNs, prefix)
-  }
 
   // ---- storage trie (STORAGE_TRIE_PATH column family) ----
 
@@ -95,37 +89,31 @@ class PathNodeStorage(val dataSource: DataSource) {
     *   32-byte account hash that owns this storage trie
     * @param nibblePath
     *   raw nibble array for the node's position in the storage trie
-    * @param hash
-    *   keccak256 hash of `rlp`
     * @param rlp
     *   RLP-encoded node bytes
     */
-  def writeStorageNode(accountHash: ByteString, nibblePath: Array[Byte], hash: ByteString, rlp: Array[Byte]): Unit = {
+  def writeStorageNode(accountHash: ByteString, nibblePath: Array[Byte], rlp: Array[Byte]): Unit =
     val key = storageKey(accountHash, nibblePath)
     dataSource.update(
       Seq(DataSourceUpdateOptimized(namespace = storageNs, toRemove = Nil, toUpsert = Seq(key -> rlp)))
     )
-  }
 
   /** Read a storage-trie node by account hash and nibble path. Returns `None` if absent. */
-  def readStorageNode(accountHash: ByteString, nibblePath: Array[Byte]): Option[Array[Byte]] = {
+  def readStorageNode(accountHash: ByteString, nibblePath: Array[Byte]): Option[Array[Byte]] =
     val key = storageKey(accountHash, nibblePath)
     dataSource.getOptimized(storageNs, key)
-  }
 
   /** Delete the single storage-trie node for `accountHash` at exactly `nibblePath`. No-op if absent. */
-  def deleteStorageNode(accountHash: ByteString, nibblePath: Array[Byte]): Unit = {
+  def deleteStorageNode(accountHash: ByteString, nibblePath: Array[Byte]): Unit =
     val key = storageKey(accountHash, nibblePath)
     dataSource.update(
       Seq(DataSourceUpdateOptimized(namespace = storageNs, toRemove = Seq(key), toUpsert = Nil))
     )
-  }
 
   /** Delete all storage-trie nodes for `accountHash` whose path starts with `nibblePrefix`. */
-  def deleteStorageNodesByPrefix(accountHash: ByteString, nibblePrefix: Array[Byte]): Unit = {
+  def deleteStorageNodesByPrefix(accountHash: ByteString, nibblePrefix: Array[Byte]): Unit =
     val prefix = storageKey(accountHash, nibblePrefix)
     deleteByPrefix(storageNs, prefix)
-  }
 
   /** True if the StateTriePathNamespace column family has at least one entry. Used by the startup guard. */
   def hasAccountData: Boolean = hasAnyEntry(acctNs)
@@ -138,9 +126,8 @@ class PathNodeStorage(val dataSource: DataSource) {
   private def storageKey(accountHash: ByteString, nibbles: Array[Byte]): Array[Byte] =
     accountHash.toArray ++ encodePath(nibbles)
 
-  private def deleteByPrefix(ns: IndexedSeq[Byte], prefix: Array[Byte]): Unit = {
+  private def deleteByPrefix(ns: IndexedSeq[Byte], prefix: Array[Byte]): Unit =
     import cats.effect.unsafe.implicits.global
-    import fs2.Stream
 
     // Collect keys matching prefix, then batch-delete them.
     val keys: Vector[Array[Byte]] = dataSource
@@ -150,19 +137,15 @@ class PathNodeStorage(val dataSource: DataSource) {
       .toVector
       .unsafeRunSync()
 
-    if (keys.nonEmpty)
+    if keys.nonEmpty then
       dataSource.update(
         Seq(DataSourceUpdateOptimized(namespace = ns, toRemove = keys, toUpsert = Nil))
       )
-  }
 
-  private def hasAnyEntry(ns: IndexedSeq[Byte]): Boolean = {
+  private def hasAnyEntry(ns: IndexedSeq[Byte]): Boolean =
     import cats.effect.unsafe.implicits.global
     dataSource.iterate(ns).take(1).compile.last.unsafeRunSync().isDefined
-  }
 
-  implicit private class ByteArrayOps(val a: Array[Byte]) {
+  implicit private class ByteArrayOps(val a: Array[Byte]):
     def startsWith(prefix: Array[Byte]): Boolean =
       prefix.length <= a.length && java.util.Arrays.equals(a, 0, prefix.length, prefix, 0, prefix.length)
-  }
-}

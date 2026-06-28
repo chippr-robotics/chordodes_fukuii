@@ -1,17 +1,20 @@
 package com.chipprbots.ethereum.network.p2p.messages
 
 import org.apache.pekko.util.ByteString
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.domain.Account._
+import com.chipprbots.ethereum.domain.Account.*
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.rlp.{RLPList, RLPValue}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.rlp.RLPList
+import com.chipprbots.ethereum.rlp.RLPValue
+import com.chipprbots.ethereum.testing.Tags.*
 
-class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers {
+class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers:
 
   "Account.AccountDec" should "normalize empty storageRoot/codeHash to canonical empty hashes" taggedAs (UnitTest) in {
     // RLP([nonce, balance, storageRoot, codeHash])
@@ -48,7 +51,6 @@ class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers {
 
     val decoded = encoded.toAccount
 
-    decoded.storageRoot shouldBe customStorageRoot
-    decoded.codeHash shouldBe customCodeHash
+    decoded.storageRoot.value shouldBe customStorageRoot
+    decoded.codeHash shouldBe CodeHash(customCodeHash)
   }
-}

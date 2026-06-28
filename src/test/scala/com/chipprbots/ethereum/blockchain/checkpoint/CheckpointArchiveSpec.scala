@@ -13,13 +13,13 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.testing.Tags.UnitTest
 
-class CheckpointArchiveSpec extends AnyWordSpec with Matchers with EitherValues {
+class CheckpointArchiveSpec extends AnyWordSpec with Matchers with EitherValues:
 
   private def sample: CheckpointArchive.Header =
     CheckpointArchive.Header(
       chainId = 61L,
       blockHeader = Fixtures.Blocks.Block3125369.header,
-      chainWeight = ChainWeight(BigInt("123456789012345678901234567890"))
+      chainWeight = ChainWeight.totalDifficultyOnly(BigInt("123456789012345678901234567890"))
     )
 
   private def hex(s: String): ByteString = ByteString(s.getBytes("UTF-8"))
@@ -28,7 +28,7 @@ class CheckpointArchiveSpec extends AnyWordSpec with Matchers with EitherValues 
       header: CheckpointArchive.Header,
       nodes: Seq[(ByteString, Array[Byte])],
       bytecodes: Seq[(ByteString, Array[Byte])]
-  ): Array[Byte] = {
+  ): Array[Byte] =
     val baos = new ByteArrayOutputStream()
     val w = new CheckpointArchive.Writer(baos)
     w.writeHeader(header)
@@ -36,7 +36,6 @@ class CheckpointArchiveSpec extends AnyWordSpec with Matchers with EitherValues 
     bytecodes.foreach { case (h, b) => w.writeBytecode(h, b) }
     w.finish()
     baos.toByteArray
-  }
 
   "CheckpointArchive" should {
 
@@ -59,24 +58,21 @@ class CheckpointArchiveSpec extends AnyWordSpec with Matchers with EitherValues 
       val r = new CheckpointArchive.Reader(new ByteArrayInputStream(bytes))
       r.readHeader().value
 
-      r.nextEntry().value match {
+      r.nextEntry().value match
         case CheckpointArchive.NodeEntry(h, b) =>
           h shouldBe n1._1
           b.toSeq shouldBe n1._2.toSeq
         case other => fail(s"expected NodeEntry, got $other")
-      }
-      r.nextEntry().value match {
+      r.nextEntry().value match
         case CheckpointArchive.NodeEntry(h, b) =>
           h shouldBe n2._1
           b.toSeq shouldBe n2._2.toSeq
         case other => fail(s"expected NodeEntry, got $other")
-      }
-      r.nextEntry().value match {
+      r.nextEntry().value match
         case CheckpointArchive.BytecodeEntry(h, b) =>
           h shouldBe b1._1
           b.toSeq shouldBe b1._2.toSeq
         case other => fail(s"expected BytecodeEntry, got $other")
-      }
       r.nextEntry().value shouldBe CheckpointArchive.EndOfStream
       r.verifyCrc() shouldBe Right(())
     }
@@ -106,17 +102,13 @@ class CheckpointArchiveSpec extends AnyWordSpec with Matchers with EitherValues 
       // Drain entries — corruption may surface as a decode error or pass through to CRC check
       var sawEnd = false
       var decodeErr: Option[CheckpointArchive.DecodeError] = None
-      while (!sawEnd && decodeErr.isEmpty)
-        r.nextEntry() match {
+      while !sawEnd && decodeErr.isEmpty do
+        r.nextEntry() match
           case Left(e)                              => decodeErr = Some(e)
           case Right(CheckpointArchive.EndOfStream) => sawEnd = true
           case Right(_)                             => ()
-        }
-      if (sawEnd) {
-        r.verifyCrc() shouldBe Left(CheckpointArchive.BadCrc)
-      } else {
-        decodeErr should not be empty
-      }
+      if sawEnd then r.verifyCrc() shouldBe Left(CheckpointArchive.BadCrc)
+      else decodeErr should not be empty
     }
 
     "reject a corrupted CRC trailer" taggedAs UnitTest in {
@@ -133,13 +125,10 @@ class CheckpointArchiveSpec extends AnyWordSpec with Matchers with EitherValues 
       val short = bytes.take(bytes.length / 2)
       val r = new CheckpointArchive.Reader(new ByteArrayInputStream(short))
       // Header may decode if first half is enough, else fails. Either way no successful CRC.
-      r.readHeader() match {
+      r.readHeader() match
         case Right(_) =>
           // Header was short enough to fit; nextEntry should fail
           r.nextEntry().isLeft shouldBe true
         case Left(_) => succeed
-      }
     }
   }
-
-}

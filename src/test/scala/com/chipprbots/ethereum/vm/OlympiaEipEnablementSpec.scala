@@ -5,7 +5,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.ledger.BlockExecution
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 import BlockchainConfigForEvm.EtcForks.EtcFork
 import Fixtures.blockchainConfig
@@ -15,7 +15,7 @@ import Fixtures.blockchainConfig
   * Verifies that all 14 Olympia EIPs are correctly gated by fork block number and that critical constants (EIP-2935
   * system contract address, history window) are correct.
   */
-class OlympiaEipEnablementSpec extends AnyWordSpec with Matchers {
+class OlympiaEipEnablementSpec extends AnyWordSpec with Matchers:
 
   val configOlympia: EvmConfig = EvmConfig.OlympiaConfigBuilder(blockchainConfig)
   val configSpiral: EvmConfig = EvmConfig.SpiralConfigBuilder(blockchainConfig)
@@ -198,4 +198,3 @@ class OlympiaEipEnablementSpec extends AnyWordSpec with Matchers {
       configOlympia.feeSchedule.G_initcode_word shouldEqual 2 // EIP-3860
     }
   }
-}

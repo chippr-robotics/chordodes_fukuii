@@ -4,22 +4,23 @@ package pow
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.DispatcherSelector
-import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.consensus.blocks.TestBlockGenerator
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.consensus.mining.FullMiningConfig
 import com.chipprbots.ethereum.consensus.mining.Protocol
 import com.chipprbots.ethereum.consensus.mining.Protocol.AdditionalPoWProtocolData
+import com.chipprbots.ethereum.consensus.mining.Protocol.EngineApi
 import com.chipprbots.ethereum.consensus.mining.Protocol.MockedPow
 import com.chipprbots.ethereum.consensus.mining.Protocol.NoAdditionalPoWData
 import com.chipprbots.ethereum.consensus.mining.Protocol.PoW
-import com.chipprbots.ethereum.consensus.mining.Protocol.EngineApi
 import com.chipprbots.ethereum.consensus.mining.Protocol.RestrictedPoW
 import com.chipprbots.ethereum.consensus.mining.Protocol.RestrictedPoWMinerData
 import com.chipprbots.ethereum.consensus.mining.TestMining
@@ -39,7 +40,6 @@ import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
 import com.chipprbots.ethereum.ledger.BlockPreparator
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.nodebuilder.Node
@@ -57,51 +57,59 @@ class PoWMining private (
     val blockGenerator: PoWBlockGenerator,
     val difficultyCalculator: DifficultyCalculator
 ) extends TestMining
-    with Logger {
+    with Logger:
 
   type Config = EthashConfig
 
-  final private[this] val _blockPreparator = new BlockPreparator(
+  final private val _blockPreparator = new BlockPreparator(
     vm = vm,
     signedTxValidator = validators.signedTransactionValidator,
     blockchain = blockchain,
     blockchainReader = blockchainReader
   )
 
-  @volatile private[pow] var minerCoordinatorRef: Option[ActorRef[CoordinatorProtocol]] = None
-  @volatile private[pow] var mockedMinerRef: Option[org.apache.pekko.actor.ActorRef] = None
+  private[pow] var minerCoordinatorRef: Option[ActorRef[CoordinatorProtocol]] = None
+  private[pow] var mockedMinerRef: Option[ActorRef[MockedMiner.Command]] = None
+  // Captured at spawn time to provide the Typed Scheduler (ask) and ignoreRef (fire-and-forget).
+  private var minerSystem: Option[org.apache.pekko.actor.typed.ActorSystem[Nothing]] = None
 
   final val BlockForgerDispatcherId = "fukuii.async.dispatchers.block-forger"
   implicit private val timeout: Timeout = 20.seconds
 
   override def sendMiner(msg: MinerProtocol): Unit =
-    msg match {
-      case mineBlocks: MockedMiner.MineBlocks => mockedMinerRef.foreach(_ ! mineBlocks)
+    msg match
+      case mineBlocks: MockedMiner.MineBlocks =>
+        // Fire-and-forget MineBlocks: no reply target needed.
+        for ref <- mockedMinerRef; sys <- minerSystem do ref ! MockedMiner.Send(mineBlocks, sys.ignoreRef)
       case MinerProtocol.StartMining =>
-        mockedMinerRef.foreach(_ ! MockedMiner.StartMining)
-        minerCoordinatorRef.foreach(_ ! PoWMiningCoordinator.SetMiningMode(PoWMiningCoordinator.RecurrentMining))
+        for ref <- mockedMinerRef; sys <- minerSystem do ref ! MockedMiner.Send(MockedMiner.StartMining, sys.ignoreRef)
+        minerCoordinatorRef.foreach(
+          _ ! PoWMiningCoordinator.SetMiningMode(PoWMiningCoordinator.MiningMode.RecurrentMining)
+        )
       case MinerProtocol.StopMining =>
-        mockedMinerRef.foreach(_ ! MockedMiner.StopMining)
+        for ref <- mockedMinerRef; sys <- minerSystem do ref ! MockedMiner.Send(MockedMiner.StopMining, sys.ignoreRef)
         minerCoordinatorRef.foreach(_ ! PoWMiningCoordinator.StopMining)
       case _ => log.warn("SendMiner method received unexpected message {}", msg)
-    }
 
   // no interactions are done with minerCoordinatorRef using the ask pattern
   override def askMiner(msg: MockedMinerProtocol): IO[MockedMinerResponse] =
-    mockedMinerRef
-      .map(_.askFor[MockedMinerResponse](msg))
-      .getOrElse(IO.pure(MinerNotExist))
+    (mockedMinerRef, minerSystem) match
+      case (Some(ref), Some(sys)) =>
+        import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+        implicit val scheduler: Scheduler = sys.scheduler
+        IO.fromFuture(IO(ref.ask[MockedMinerResponse](replyTo => MockedMiner.Send(msg, replyTo))))
+      case _ => IO.pure(MinerNotExist)
 
-  private[this] val mutex = new Object
+  private val mutex = new Object
 
-  private[this] def startMiningProcess(node: Node, blockCreator: PoWBlockCreator): Unit =
+  private def startMiningProcess(node: Node, blockCreator: PoWBlockCreator): Unit =
     mutex.synchronized {
-      if (minerCoordinatorRef.isEmpty && mockedMinerRef.isEmpty) {
-        config.generic.protocol match {
+      if minerCoordinatorRef.isEmpty && mockedMinerRef.isEmpty then
+        config.generic.protocol match
           case PoW | RestrictedPoW =>
             log.info("Instantiating PoWMiningCoordinator")
             minerCoordinatorRef = Some(
-              node.system.spawn(
+              node.system.classicSystem.spawn(
                 PoWMiningCoordinator(
                   node.syncController,
                   node.ethMiningService,
@@ -115,15 +123,14 @@ class PoWMining private (
             )
           case MockedPow =>
             log.info("Instantiating MockedMiner")
-            mockedMinerRef = Some(MockedMiner(node))
+            minerSystem = Some(node.system)
+            mockedMinerRef = Some(MockedMiner.spawn(node))
           case EngineApi =>
             log.info("Engine API mode — mining disabled (blocks from CL)")
-        }
         sendMiner(MinerProtocol.StartMining)
-      }
     }
 
-  private[this] def stopMiningProcess(): Unit =
+  private def stopMiningProcess(): Unit =
     sendMiner(MinerProtocol.StopMining)
 
   /** This is used by the [[Mining#blockGenerator blockGenerator]].
@@ -133,33 +140,31 @@ class PoWMining private (
   /** Starts the mining protocol on the current `node`.
     */
   def startProtocol(node: Node): Unit =
-    if (config.miningEnabled) {
+    if config.miningEnabled then
       log.info("Mining is enabled. Will try to start configured miner actor")
-      val blockCreator = node.mining match {
+      val blockCreator = node.mining match
         case mining: PoWMining =>
           new PoWBlockCreator(
             pendingTransactionsManager = node.pendingTransactionsManager,
             getTransactionFromPoolTimeout = node.txPoolConfig.getTransactionFromPoolTimeout,
             mining = mining,
             ommersPool = node.ommersPool,
-            coinbaseProvider = node.coinbaseProvider
+            coinbaseProvider = node.coinbaseProvider,
+            system = node.system.classicSystem
           )
         case mining => wrongMiningArgument[PoWMining](mining)
-      }
 
       startMiningProcess(node, blockCreator)
-    } else log.info("Not starting any miner actor because mining is disabled")
+    else log.info("Not starting any miner actor because mining is disabled")
 
   def stopProtocol(): Unit =
-    if (config.miningEnabled) {
-      stopMiningProcess()
-    }
+    if config.miningEnabled then stopMiningProcess()
 
   def protocol: Protocol = Protocol.PoW
 
   /** Internal API, used for testing */
   protected def newBlockGenerator(validators: Validators): PoWBlockGenerator =
-    validators match {
+    validators match
       case _validators: ValidatorsExecutor =>
         val blockPreparator = new BlockPreparator(
           vm = vm,
@@ -180,11 +185,10 @@ class PoWMining private (
 
       case _ =>
         wrongValidatorsArgument[ValidatorsExecutor](validators)
-    }
 
   /** Internal API, used for testing */
   def withValidators(validators: Validators): PoWMining =
-    validators match {
+    validators match
       case _validators: ValidatorsExecutor =>
         val blockGenerator = newBlockGenerator(validators)
 
@@ -200,7 +204,6 @@ class PoWMining private (
         )
 
       case _ => wrongValidatorsArgument[ValidatorsExecutor](validators)
-    }
 
   def withVM(vm: VMImpl): PoWMining =
     new PoWMining(
@@ -216,20 +219,24 @@ class PoWMining private (
 
   /** Internal API, used for testing */
   def withBlockGenerator(blockGenerator: TestBlockGenerator): PoWMining =
-    new PoWMining(
-      evmCodeStorage = evmCodeStorage,
-      vm = vm,
-      blockchain = blockchain,
-      blockchainReader = blockchainReader,
-      config = config,
-      validators = validators,
-      blockGenerator = blockGenerator.asInstanceOf[PoWBlockGenerator],
-      difficultyCalculator = difficultyCalculator
-    )
+    blockGenerator match
+      case pg: PoWBlockGenerator =>
+        new PoWMining(
+          evmCodeStorage = evmCodeStorage,
+          vm = vm,
+          blockchain = blockchain,
+          blockchainReader = blockchainReader,
+          config = config,
+          validators = validators,
+          blockGenerator = pg,
+          difficultyCalculator = difficultyCalculator
+        )
+      case _ =>
+        throw new IllegalArgumentException(
+          s"withBlockGenerator requires a PoWBlockGenerator, got ${blockGenerator.getClass.getName}"
+        )
 
-}
-
-object PoWMining {
+object PoWMining:
   // scalastyle:off method.length
   def apply(
       vm: VMImpl,
@@ -239,7 +246,7 @@ object PoWMining {
       config: FullMiningConfig[EthashConfig],
       validators: ValidatorsExecutor,
       additionalEthashProtocolData: AdditionalPoWProtocolData
-  ): PoWMining = {
+  ): PoWMining =
     val difficultyCalculator = DifficultyCalculator
     val blockPreparator = new BlockPreparator(
       vm = vm,
@@ -247,7 +254,7 @@ object PoWMining {
       blockchain = blockchain,
       blockchainReader = blockchainReader
     )
-    val blockGenerator = additionalEthashProtocolData match {
+    val blockGenerator = additionalEthashProtocolData match
       case RestrictedPoWMinerData(key) =>
         new RestrictedPoWBlockGeneratorImpl(
           evmCodeStorage = evmCodeStorage,
@@ -267,7 +274,6 @@ object PoWMining {
           blockPreparator = blockPreparator,
           difficultyCalc = difficultyCalculator
         )
-    }
     new PoWMining(
       vm = vm,
       evmCodeStorage = evmCodeStorage,
@@ -278,5 +284,3 @@ object PoWMining {
       blockGenerator = blockGenerator,
       difficultyCalculator
     )
-  }
-}

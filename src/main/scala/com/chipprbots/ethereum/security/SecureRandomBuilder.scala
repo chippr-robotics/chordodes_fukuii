@@ -11,18 +11,18 @@ import com.typesafe.config.ConfigFactory
 
 import com.chipprbots.ethereum.utils.Logger
 
-trait SecureRandomBuilder extends Logger {
+trait SecureRandomBuilder extends Logger:
 
   private lazy val rawFukuiiConfig: Config = ConfigFactory.load().getConfig("fukuii")
 
   private val secureRandomAlgo: Option[String] =
-    if (rawFukuiiConfig.hasPath("secure-random-algo")) Some(rawFukuiiConfig.getString("secure-random-algo"))
+    if rawFukuiiConfig.hasPath("secure-random-algo") then Some(rawFukuiiConfig.getString("secure-random-algo"))
     else None
 
   lazy val secureRandom: SecureRandom =
     secureRandomAlgo
       .flatMap(name =>
-        Try(SecureRandom.getInstance(name)) match {
+        Try(SecureRandom.getInstance(name)) match
           case Failure(exception) =>
             log.error(
               s"Couldn't create SecureRandom instance using algorithm $name. Falling-back to default one",
@@ -31,7 +31,5 @@ trait SecureRandomBuilder extends Logger {
             None
           case Success(value) =>
             Some(value)
-        }
       )
       .getOrElse(new SecureRandom())
-}

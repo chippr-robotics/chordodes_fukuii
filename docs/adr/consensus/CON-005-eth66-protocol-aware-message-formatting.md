@@ -1,5 +1,7 @@
 # ADR-016: ETH66+ Protocol-Aware Message Formatting
 
+> **Historical note:** ETH wire protocols 63–67 have been removed from fukuii as of the ETH69 alignment sprint (2026). This ADR documents the original decision and remains valid as historical record. Current live protocols: ETH68, ETH69, ETH70.
+
 ## Status
 
 Accepted

@@ -5,17 +5,17 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.keystore.EncryptedKeyJsonCodec
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteStringUtils
-import com.chipprbots.ethereum.testing.Tags._
 
-class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
+class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues:
 
-  import CliCommands._
-  import Fixture._
+  import CliCommands.*
+  import Fixture.*
 
   behavior.of(generatePrivateKeyCommand)
   it should "generate correct private key" taggedAs (UnitTest) in {
-    api.parse(Seq(generatePrivateKeyCommand)) shouldBe a[Right[_, _]]
+    api.parse(Seq(generatePrivateKeyCommand)) shouldBe a[Right[?, ?]]
   }
 
   behavior.of(deriveAddressCommand)
@@ -24,7 +24,7 @@ class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
   }
 
   it should "return an error when called without private key" taggedAs (UnitTest) in {
-    api.parse(Seq(deriveAddressCommand)) shouldBe a[Left[_, _]]
+    api.parse(Seq(deriveAddressCommand)) shouldBe a[Left[?, ?]]
   }
 
   behavior.of(generateAllocsCommand)
@@ -83,7 +83,7 @@ class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
   behavior.of(generateKeyPairsCommand)
   it should "generate one key pair when passed no args" taggedAs (UnitTest) in {
     val result = api.parse(Seq(generateKeyPairsCommand))
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     val stringSplit = result.toOption.get.split("\\n\\n")
     stringSplit.length shouldEqual 1
   }
@@ -92,7 +92,7 @@ class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
     val numOfKeys = "5"
     val numOfKeysAsInt = numOfKeys.toInt
     val result = api.parse(Seq(generateKeyPairsCommand, numOfKeys))
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     val stringSplit = result.toOption.get.split("\\n\\n")
     stringSplit.length shouldEqual numOfKeysAsInt
   }
@@ -101,10 +101,10 @@ class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
   it should "encrypt private key (without passphrase)" taggedAs (UnitTest) in {
     val json = api.parse(Seq(encryptKeyCommand, privateKey)).value
 
-    val decrypted = (for {
+    val decrypted = (for
       encrypted <- EncryptedKeyJsonCodec.fromJson(json)
       decrypted <- encrypted.decrypt("")
-    } yield decrypted).value
+    yield decrypted).value
 
     ByteStringUtils.hash2string(decrypted) shouldBe privateKey
   }
@@ -113,16 +113,15 @@ class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
     val pass = "pass"
     val json = api.parse(Seq(encryptKeyCommand, argument(passphraseOption, Some(pass)), privateKey)).value
 
-    val decrypted = (for {
+    val decrypted = (for
       encrypted <- EncryptedKeyJsonCodec.fromJson(json)
       decrypted <- encrypted.decrypt(pass)
-    } yield decrypted).value
+    yield decrypted).value
 
     ByteStringUtils.hash2string(decrypted) shouldBe privateKey
   }
-}
 
-object Fixture {
+object Fixture:
 
   def argument(name: String, value: Option[Any] = None): String = s"--$name${value.fold("")(v => s"=${v.toString}")}"
 
@@ -135,5 +134,3 @@ object Fixture {
   val address3 = "604542f9a9fb55d3e8004ff122f662f88eb32b4a"
 
   val requestedBalance = 42
-
-}
