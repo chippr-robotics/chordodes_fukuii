@@ -897,7 +897,7 @@ private class SNAPSyncControllerImpl(
                     s"(attempt $probeAttemptCount/$MaxProbeAttempts) — " +
                     s"deferring roll, coordinators unaffected (retry in ${ProbeCooldownMs / 1000}s)"
                 )
-            // lastProbeAttemptMs stays set; next stagnation tick after cooldown will re-probe
+          // lastProbeAttemptMs stays set; next stagnation tick after cooldown will re-probe
           case _ =>
             ctx.log.debug(s"Received AccountRange response: requestId=${msg.requestId}, accounts=${msg.accounts.size}")
             // Forward to the account range coordinator (it owns the workers).
