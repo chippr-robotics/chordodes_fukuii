@@ -72,6 +72,8 @@ ops/*/captured-logs/
 !.claude/agents/
 !.claude/skills/
 !.claude/agent-protocols/
+.claude/agent-protocols/working-docs/
+.claude/agent-protocols/completed/
 !.claude/looping/
 .claude/looping/state/*/
 !.claude/looping/bin/
