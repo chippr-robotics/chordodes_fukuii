@@ -96,6 +96,17 @@ jobs:
         timeout-minutes: 15
       
       - name: Run Standard Tests with Coverage (Tier 2)
+        # Tier 2 runs `clean; coverage; testEssential; testStandard; coverageReport`
+        # — a full coverage-instrumented recompile plus a re-run of BOTH test tiers in
+        # one sbt session. It takes ~45 min and has been timing out (jobs hit 1h5m and
+        # failed at the 45-min step cap), making it a permanently-red gate that blocks
+        # every merge. Skip it on the staging fast-iteration branch (pushes to staging
+        # and PRs targeting staging) and rely there on the fast gates that already run:
+        # Tier 1 Essential, KPI baselines, and the deterministic consensus Gating
+        # Integration suite (EVM compliance / ethereum-tests / ECIP-1017). Full Tier 2
+        # with coverage still runs on develop and on the release gate (PRs into main),
+        # so the heavy suite + coverage are enforced at the main boundary.
+        if: github.base_ref != 'staging' && github.ref != 'refs/heads/staging'
         run: |
           echo "=========================================="
           echo "Running Standard Tests with Coverage (< 30 minutes)"
