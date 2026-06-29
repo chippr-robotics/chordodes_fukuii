@@ -508,7 +508,7 @@ object FastSync:
           case None => Behaviors.same
           case Some(_) =>
             msg match
-              case WrappedPrhResult(PeerRequestHandler.RequestFailed(peer, reason)) =>
+              case WrappedPrhResult(PeerRequestHandler.RequestFailed(_, peer, reason)) =>
                 handleRequestFailure(peer, FastSyncRequestFailed(reason))
                 Behaviors.same
               case RequestTerminated(handler) =>
@@ -546,7 +546,7 @@ object FastSync:
     }
 
     private def handleResponses(result: ResponseReceived[?]): Behavior[Command] = result match
-      case ResponseReceived(peer, blockHeadersMsg: ETHPackets.BlockHeaders, timeTaken) =>
+      case ResponseReceived(_, peer, blockHeadersMsg: ETHPackets.BlockHeaders, timeTaken) =>
         log.debug(
           "Received {} block headers from peer [{}] in {} ms",
           blockHeadersMsg.headers.size,
@@ -578,7 +578,7 @@ object FastSync:
                 log.debug("Received block headers from unknown peer [{}], ignoring", peer.id)
                 Behaviors.same
 
-      case ResponseReceived(peer, blockBodiesMsg: ETHPackets.BlockBodies, timeTaken) =>
+      case ResponseReceived(_, peer, blockBodiesMsg: ETHPackets.BlockBodies, timeTaken) =>
         session match
           case None => Behaviors.same
           case Some(s) =>
@@ -602,7 +602,7 @@ object FastSync:
             val requestedBodies = s.requestedBlockBodies.getOrElse(peer.id, Nil)
             updateSession(s => s.copy(requestedBlockBodies = s.requestedBlockBodies - peer.id))
             handleBlockBodies(peer, requestedBodies, blockBodiesMsg.bodies)
-      case ResponseReceived(peer, receipts68: ETHPackets.Receipts68, timeTaken) =>
+      case ResponseReceived(_, peer, receipts68: ETHPackets.Receipts68, timeTaken) =>
         session match
           case None => Behaviors.same
           case Some(s) =>
@@ -660,7 +660,7 @@ object FastSync:
             updateSession(s => s.copy(requestedReceipts = s.requestedReceipts - peer.id))
             handleReceipts(peer, requestedHashes, receipts)
 
-      case ResponseReceived(peer, other, _) =>
+      case ResponseReceived(_, peer, other, _) =>
         log.debug(
           "Received unexpected response type {} from peer [{}], ignoring",
           other.getClass.getSimpleName,
@@ -770,7 +770,7 @@ object FastSync:
                   processSyncing()
                   b
 
-                case WrappedPrhResult(PeerRequestHandler.RequestFailed(peer, reason)) =>
+                case WrappedPrhResult(PeerRequestHandler.RequestFailed(_, peer, reason)) =>
                   handleRequestFailure(peer, FastSyncRequestFailed(reason))
                   Behaviors.same
                 case RequestTerminated(handler) =>
@@ -787,7 +787,7 @@ object FastSync:
             case None => Behaviors.same
             case Some(s) =>
               msg match
-                case WrappedPrhResult(PeerRequestHandler.RequestFailed(peer, reason)) =>
+                case WrappedPrhResult(PeerRequestHandler.RequestFailed(_, peer, reason)) =>
                   handleRequestFailure(peer, FastSyncRequestFailed(reason))
                   Behaviors.same
                 case RequestTerminated(handler) =>
@@ -1575,7 +1575,8 @@ object FastSync:
               peerEventBus,
               requestMsg = req,
               responseMsgCode = Codes.BlockBodiesCode,
-              replyTo = prhResultAdapter
+              replyTo = prhResultAdapter,
+              requestId = 0
             )
           )
           updateSession(s =>
@@ -1599,7 +1600,8 @@ object FastSync:
               peerEventBus,
               requestMsg = req,
               responseMsgCode = Codes.ReceiptsCode,
-              replyTo = prhResultAdapter
+              replyTo = prhResultAdapter,
+              requestId = 0
             )
           )
           updateSession(s =>
@@ -1627,7 +1629,8 @@ object FastSync:
                 peerEventBus,
                 requestMsg = req,
                 responseMsgCode = Codes.BlockHeadersCode,
-                replyTo = prhResultAdapter
+                replyTo = prhResultAdapter,
+                requestId = 0
               )
             )
           }

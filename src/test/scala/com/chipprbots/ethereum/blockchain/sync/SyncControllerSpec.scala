@@ -266,7 +266,7 @@ class SyncControllerSpec
       // FastSync must ignore them (stale/unassigned delivery) and not change the pivot.
       val futureHeaders = Seq(defaultPivotBlockHeader.copy(number = defaultPivotBlockHeader.number + 20))
       val futureResult =
-        PeerRequestHandler.ResponseReceived(peer2, ETHPackets.BlockHeaders(BigInt(0), futureHeaders), 2L)
+        PeerRequestHandler.ResponseReceived(0, peer2, ETHPackets.BlockHeaders(BigInt(0), futureHeaders), 2L)
       implicit val ec = system.dispatcher
       val injectionTask = system.scheduler.scheduleAtFixedRate(0.seconds, 0.5.seconds)(() =>
         fast.toTyped[FastSync.Command] ! FastSync.WrappedPrhResult(futureResult)

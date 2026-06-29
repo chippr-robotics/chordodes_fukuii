@@ -25,9 +25,10 @@ object PeerRequestHandler:
 
   // ---- Shared result types ----
 
-  sealed trait Result
-  final case class RequestFailed(peer: Peer, reason: String) extends Result
-  final case class ResponseReceived[T](peer: Peer, response: T, timeTaken: Long) extends Result
+  sealed trait Result:
+    def requestId: Int
+  final case class RequestFailed(requestId: Int, peer: Peer, reason: String) extends Result
+  final case class ResponseReceived[T](requestId: Int, peer: Peer, response: T, timeTaken: Long) extends Result
 
   // ---- Typed API ----
 
@@ -48,7 +49,8 @@ object PeerRequestHandler:
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       requestMsg: RequestMsg,
       responseMsgCode: Int,
-      replyTo: TypedActorRef[Result]
+      replyTo: TypedActorRef[Result],
+      requestId: Int
   )(using tt: TypeTest[Any, ResponseMsg], toSerializable: RequestMsg => MessageSerializable): Behavior[Command] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
@@ -102,7 +104,7 @@ object PeerRequestHandler:
                   case _ =>
                     val elapsed = timeTakenSoFar()
                     cleanup()
-                    replyTo ! ResponseReceived(peer, responseMsg, elapsed)
+                    replyTo ! ResponseReceived(requestId, peer, responseMsg, elapsed)
                     Behaviors.stopped
               case _ =>
                 Behaviors.same
@@ -117,7 +119,7 @@ object PeerRequestHandler:
               Long.box(responseTimeout.toMillis)
             )
             cleanup()
-            replyTo ! RequestFailed(peer, "request timeout")
+            replyTo ! RequestFailed(requestId, peer, "request timeout")
             Behaviors.stopped
 
           case PeerLeftCmd(peerId) if peerId == peer.id =>
@@ -129,7 +131,7 @@ object PeerRequestHandler:
               Long.box(elapsed)
             )
             cleanup()
-            replyTo ! RequestFailed(peer, "connection closed")
+            replyTo ! RequestFailed(requestId, peer, "connection closed")
             Behaviors.stopped
 
           case PeerLeftCmd(_) =>

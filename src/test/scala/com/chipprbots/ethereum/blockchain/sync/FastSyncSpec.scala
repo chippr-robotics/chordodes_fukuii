@@ -189,7 +189,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
 
           val watcher = TestProbe()
           watcher.watch(fastSync)
-          fastSync ! FastSync.WrappedPrhResult(ResponseReceived(peer, msg, timeTaken = 0L))
+          fastSync ! FastSync.WrappedPrhResult(ResponseReceived(0, peer, msg, timeTaken = 0L))
 
           // If the actor crashes, we'll receive Terminated.
           watcher.expectNoMessage(500.millis)

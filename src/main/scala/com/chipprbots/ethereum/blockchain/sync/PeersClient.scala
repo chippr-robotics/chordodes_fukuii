@@ -139,6 +139,13 @@ object PeersClient:
     private val nodeDataConsecutiveFailures = mutable.Map.empty[PeerId, Int]
     private var nextPrhId: Int = 0
 
+    // Registered once at setup — safe to call ctx.messageAdapter here because Impl is
+    // constructed inside Behaviors.setup. The requestId is carried in Result itself
+    // (Option A: requestId field on Result cases) so one static adapter suffices for all
+    // in-flight requests.
+    private val prhAdapter: TypedActorRef[PeerRequestHandler.Result] =
+      ctx.messageAdapter[PeerRequestHandler.Result](r => PRHResultCmd(r.requestId, r))
+
     private val peerHelper = new PeerListHelper(peerEventBus, blacklist, peerDisconnectedAdapter, ctx.log):
       override protected def maintainedNodeIdHexes: Set[String] = _maintainedNodeIdHexes
 
@@ -217,7 +224,6 @@ object PeersClient:
                   case s: MessageSerializable => s
                   case _                      => toSerializable(message) // fallback to original
               val id = nextPrhId; nextPrhId += 1
-              val prhAdapter = ctx.messageAdapter[PeerRequestHandler.Result](r => PRHResultCmd(id, r))
               issueSpawn(
                 peer,
                 adaptedMsg,
@@ -242,7 +248,7 @@ object PeersClient:
           requesters.get(id) match
             case Some(replyTo) =>
               result match
-                case PeerRequestHandler.ResponseReceived(peer, message, timeTaken) =>
+                case PeerRequestHandler.ResponseReceived(_, peer, message, timeTaken) =>
                   val (msgType, itemCount) = message match
                     case ETHPackets.BlockHeaders(_, headers) => (PeerRateTracker.MsgGetBlockHeaders, headers.size)
                     case ETHPackets.BlockBodies(_, bodies)   => (PeerRateTracker.MsgGetBlockBodies, bodies.size)
@@ -254,7 +260,7 @@ object PeersClient:
                     message.asInstanceOf[Message]
                   ) // cast: PRH ResponseReceived[T] is erased; T <: Message at construction
 
-                case PeerRequestHandler.RequestFailed(peer, reason) =>
+                case PeerRequestHandler.RequestFailed(_, peer, reason) =>
                   ctx.log.warn(s"Request to peer ${peer.remoteAddress} failed - reason: $reason")
                   replyTo ! RequestFailed(peer, BlacklistReason.RegularSyncRequestFailed(reason))
             case None =>
@@ -289,7 +295,8 @@ object PeersClient:
           peerEventBus,
           msg,
           code,
-          prhAdapter
+          prhAdapter,
+          id
         ),
         s"prh-$id"
       )

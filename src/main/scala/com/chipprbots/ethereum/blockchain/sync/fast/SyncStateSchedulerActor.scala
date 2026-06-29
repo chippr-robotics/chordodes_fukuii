@@ -419,7 +419,8 @@ object SyncStateSchedulerActor:
               responseBytes = BigInt(512 * 1024)
             ),
             responseMsgCode = SNAP.Codes.TrieNodesCode,
-            replyTo = prhResultAdapter
+            replyTo = prhResultAdapter,
+            requestId = 0
           )
         )
       else
@@ -431,7 +432,8 @@ object SyncStateSchedulerActor:
             peerEventBus,
             requestMsg = GetNodeData(request.nodes.toList),
             responseMsgCode = Codes.NodeDataCode,
-            replyTo = prhResultAdapter
+            replyTo = prhResultAdapter,
+            requestId = 0
           )
         )
       ctx.watchWith(handler, RequestTerminated(request.peer))
@@ -482,7 +484,7 @@ object SyncStateSchedulerActor:
 
             // === PRH result forwarding: unwatch + self-dispatch as wrapped RequestResult ===
 
-            case WrappedPRHResult(ResponseReceived(peer: Peer, nodeData: NodeData, timeTaken: Long)) =>
+            case WrappedPRHResult(ResponseReceived(_, peer: Peer, nodeData: NodeData, timeTaken: Long)) =>
               ctx.log.debug("Received {} state nodes via GetNodeData in {} ms", nodeData.values.size, timeTaken)
               FastSyncMetrics.setMptStateDownloadTime(timeTaken)
               activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h))
@@ -490,7 +492,7 @@ object SyncStateSchedulerActor:
               ctx.self ! WrappedRequestData(nodeData, peer)
               Behaviors.same
 
-            case WrappedPRHResult(ResponseReceived(peer: Peer, trieNodes: TrieNodes, timeTaken: Long)) =>
+            case WrappedPRHResult(ResponseReceived(_, peer: Peer, trieNodes: TrieNodes, timeTaken: Long)) =>
               ctx.log.debug("Received {} state nodes via GetTrieNodes in {} ms", trieNodes.nodes.size, timeTaken)
               FastSyncMetrics.setMptStateDownloadTime(timeTaken)
               activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h))
@@ -498,7 +500,7 @@ object SyncStateSchedulerActor:
               ctx.self ! WrappedRequestData(NodeData(trieNodes.nodes.toList), peer)
               Behaviors.same
 
-            case WrappedPRHResult(PeerRequestHandler.RequestFailed(peer: Peer, reason: String)) =>
+            case WrappedPRHResult(PeerRequestHandler.RequestFailed(_, peer: Peer, reason: String)) =>
               activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h))
               activeHandlers -= peer.id
               ctx.log.debug("Request to peer {} failed due to {}", peer.id, reason)
