@@ -5,7 +5,7 @@ import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 
 import scala.collection.mutable
 import scala.concurrent.duration.*
-import scala.reflect.ClassTag
+import scala.reflect.{ClassTag, TypeTest}
 
 import org.slf4j.Logger
 
@@ -263,7 +263,7 @@ object PeersClient:
       }
 
     // Existential capture: extract the runtime ClassTag from ClassTag[? <: Message] into a fresh
-    // local type R so that PRH.behavior[Message, R] gets a concrete ClassTag for pattern matching.
+    // local type R so that PRH.behavior[Message, R] gets a sound TypeTest for pattern matching.
     private def issueSpawn(
         peer: Peer,
         msg: Message,
@@ -274,9 +274,10 @@ object PeersClient:
         ct: ClassTag[? <: Message]
     ): Unit =
       type R <: Message
-      given ctR: ClassTag[R] = ct.asInstanceOf[ClassTag[
-        R
-      ]] // cast: existential ClassTag[? <: Message] narrowed to fresh local R for PRH.behavior type param
+      val ctR: ClassTag[R] = ct.asInstanceOf[ClassTag[R]]
+      given TypeTest[Any, R] = new TypeTest[Any, R]:
+        def unapply(x: Any): Option[x.type & R] =
+          if ctR.runtimeClass.isInstance(x) then Some(x.asInstanceOf[x.type & R]) else None
       given toSerializer: (Message => MessageSerializable) = toSer
       // PeerRequestHandler: default stop intentional — self-limiting leaf actor;
       // PeersClient re-issues requests on failure.
