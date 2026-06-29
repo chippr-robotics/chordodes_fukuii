@@ -230,7 +230,7 @@ class EthTxService(
       // 60th percentile — matches go-ethereum/core-geth default (configurable there, fixed here).
       // Biases slightly above the median to reduce stuck-transaction risk during fee spikes.
       val idx = math.min((sorted.length * 60) / 100, sorted.length - 1)
-      sorted(idx).max(floor).min(GasPriceMaxCap)
+      sorted(idx).value.max(floor).min(GasPriceMaxCap)
     else floor // no transactions in window: return floor, never 0
 
   def getGetGasPrice(@unused req: GetGasPriceRequest): ServiceResponse[GetGasPriceResponse] =

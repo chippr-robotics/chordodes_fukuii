@@ -159,23 +159,14 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
     val maxValue = BigInt(2).pow(8 * ValueLength) - 1
     val maxR = BigInt(2).pow(8 * ECDSASignature.RLength) - 1
     val maxS = BigInt(2).pow(8 * ECDSASignature.SLength) - 1
-    // EIP-2681: the maximum valid *transaction* nonce is 2^64-2 (a tx bumps the account nonce
-    // to nonce+1, so nonce == 2^64-1 would overflow uint64). This rule is intentionally UNGATED
-    // (no fork/network condition): it is not tied to any ECIP/hardfork — it is an always-on
-    // invariant the reference clients (core-geth, besu, nethermind) have enforced from genesis by
-    // storing the nonce in a 64-bit field, so it ALIGNS fukuii with them rather than diverging.
-    // It is provably inert on all canonical ETC/Mordor history: no account can reach nonce
-    // ~1.8e19 (validateNonce gates inclusion on tx.nonce == account.nonce), so the newly-rejected
-    // range [2^64-1, 2^256-1] contains no canonical tx and this can never change a state root.
-    // Do NOT fork-gate this (gating would re-introduce divergence from core-geth). See forge
-    // analysis 2026-06-27; boundary covered by StdSignedLegacyTransactionValidatorSpec.
+    // EIP-2681: nonces >= 2^64-1 are invalid (incrementing would overflow uint64)
     val eip2681NonceCap = BigInt(2).pow(64) - 2
 
     if nonce > maxNonceValue then Left(TransactionSyntaxError(s"Invalid nonce: $nonce > $maxNonceValue"))
     else if nonce > eip2681NonceCap then Left(TransactionSyntaxError(s"EIP-2681: nonce $nonce >= 2^64-1"))
     else if gasLimit > GasAmount(maxGasValue) then
       Left(TransactionSyntaxError(s"Invalid gasLimit: $gasLimit > $maxGasValue"))
-    else if gasPrice > maxGasValue then Left(TransactionSyntaxError(s"Invalid gasPrice: $gasPrice > $maxGasValue"))
+    else if gasPrice.value > maxGasValue then Left(TransactionSyntaxError(s"Invalid gasPrice: $gasPrice > $maxGasValue"))
     else if value > maxValue then Left(TransactionSyntaxError(s"Invalid value: $value > $maxValue"))
     else if signature.r > maxR then Left(TransactionSyntaxError(s"Invalid signatureRandom: ${signature.r} > $maxR"))
     else if signature.s > maxS then Left(TransactionSyntaxError(s"Invalid signature: ${signature.s} > $maxS"))

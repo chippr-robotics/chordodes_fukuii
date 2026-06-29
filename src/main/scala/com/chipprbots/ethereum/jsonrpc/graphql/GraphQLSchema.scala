@@ -146,7 +146,7 @@ object GraphQLSchema:
       case t: SetCodeTransaction =>
         val bf = baseFee.getOrElse(BigInt(0))
         t.maxPriorityFeePerGas.min(t.maxFeePerGas - bf).max(BigInt(0))
-      case other => other.gasPrice - baseFee.getOrElse(BigInt(0))
+      case other => other.gasPrice.value - baseFee.getOrElse(BigInt(0))
 
   /** `null` for pre-Byzantium receipts (which store a state root instead of a status byte — see EIP-658). Hive test 30
     * expects `status: null` for a Frontier-era transaction.
@@ -489,7 +489,7 @@ object GraphQLSchema:
             }
         ),
         Field("value", BigIntType, resolve = _.value.stx.tx.value),
-        Field("gasPrice", BigIntType, resolve = _.value.stx.tx.gasPrice),
+        Field("gasPrice", BigIntType, resolve = _.value.stx.tx.gasPrice.value),
         Field("maxFeePerGas", OptionType(BigIntType), resolve = c => txMaxFeePerGas(c.value.stx.tx)),
         Field("maxPriorityFeePerGas", OptionType(BigIntType), resolve = c => txMaxPriorityFeePerGas(c.value.stx.tx)),
         Field("maxFeePerBlobGas", OptionType(BigIntType), resolve = c => txMaxFeePerBlobGas(c.value.stx.tx)),

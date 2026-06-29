@@ -19,6 +19,7 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.ledger.StxLedger
@@ -490,6 +491,6 @@ class TraceService(
       .getOrElse(Address(0))
     val toAddress = callTx.to.map(Address.apply)
 
-    val tx = LegacyTransaction(0, callTx.gasPrice, gasLimit, toAddress, callTx.value, callTx.data)
+    val tx = LegacyTransaction(0, GasPrice(callTx.gasPrice), gasLimit, toAddress, callTx.value, callTx.data)
     val fakeSignature = ECDSASignature(0, 0, 0)
     Right(SignedTransactionWithSender(tx, fakeSignature, fromAddress))

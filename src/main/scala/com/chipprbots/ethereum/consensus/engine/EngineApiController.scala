@@ -498,8 +498,8 @@ class EngineApiController(
             case t: TransactionWithDynamicFee => (baseFee + t.maxPriorityFeePerGas).min(t.maxFeePerGas)
             case t: BlobTransaction           => (baseFee + t.maxPriorityFeePerGas).min(t.maxFeePerGas)
             case t: SetCodeTransaction        => (baseFee + t.maxPriorityFeePerGas).min(t.maxFeePerGas)
-            case t: TransactionWithAccessList => t.gasPrice
-            case _                            => stx.tx.gasPrice
+            case t: TransactionWithAccessList => t.gasPrice.value
+            case _                            => stx.tx.gasPrice.value
           val priorityPerGas = (effectiveGasPrice - baseFee).max(0)
           gasUsed * priorityPerGas
         }

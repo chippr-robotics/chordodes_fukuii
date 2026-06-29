@@ -7,6 +7,7 @@ import cats.effect.IO
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.faucet.FaucetConfig
 import com.chipprbots.ethereum.jsonrpc.client.RpcClient.RpcError
@@ -38,7 +39,7 @@ class WalletService(walletRpcClient: WalletRpcClientApi, keyStore: KeyStore, con
     val transaction =
       LegacyTransaction(
         nonce,
-        config.txGasPrice,
+        GasPrice(config.txGasPrice),
         GasAmount(config.txGasLimit),
         Some(targetAddress),
         config.txValue,

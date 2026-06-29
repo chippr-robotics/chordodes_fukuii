@@ -6,7 +6,7 @@ import org.bouncycastle.util.encoders.Hex
 
 sealed trait Transaction extends Product with Serializable:
   def nonce: BigInt
-  def gasPrice: BigInt
+  def gasPrice: GasPrice
   def gasLimit: GasAmount
   def receivingAddress: Option[Address]
   def value: BigInt
@@ -62,7 +62,7 @@ object Transaction:
       case tx: SetCodeTransaction =>
         val base = baseFee.getOrElse(BigInt(0))
         tx.maxFeePerGas.min(base + tx.maxPriorityFeePerGas)
-      case _ => tx.gasPrice
+      case _ => tx.gasPrice.value
 
   implicit class TransactionTypeValidator(val transactionType: Byte) extends AnyVal:
     def isValidTransactionType: Boolean = transactionType >= MinAllowedType && transactionType <= MaxAllowedType
@@ -79,7 +79,7 @@ object LegacyTransaction:
 
   def apply(
       nonce: BigInt,
-      gasPrice: BigInt,
+      gasPrice: GasPrice,
       gasLimit: GasAmount,
       receivingAddress: Address,
       value: BigInt,
@@ -89,7 +89,7 @@ object LegacyTransaction:
 
 case class LegacyTransaction(
     nonce: BigInt,
-    gasPrice: BigInt,
+    gasPrice: GasPrice,
     gasLimit: GasAmount,
     receivingAddress: Option[Address],
     value: BigInt,
@@ -110,7 +110,7 @@ object TransactionWithAccessList:
   def apply(
       chainId: BigInt,
       nonce: BigInt,
-      gasPrice: BigInt,
+      gasPrice: GasPrice,
       gasLimit: GasAmount,
       receivingAddress: Address,
       value: BigInt,
@@ -122,7 +122,7 @@ object TransactionWithAccessList:
 case class TransactionWithAccessList(
     chainId: BigInt,
     nonce: BigInt,
-    gasPrice: BigInt,
+    gasPrice: GasPrice,
     gasLimit: GasAmount,
     receivingAddress: Option[Address],
     value: BigInt,
@@ -180,7 +180,7 @@ case class TransactionWithDynamicFee(
 ) extends TypedTransaction:
 
   /** For upfront cost calculation, use maxFeePerGas as the worst-case gas price */
-  override def gasPrice: BigInt = maxFeePerGas
+  override def gasPrice: GasPrice = GasPrice(maxFeePerGas)
 
   override def toString: String =
     s"TransactionWithDynamicFee {" +
@@ -213,7 +213,7 @@ case class BlobTransaction(
     maxFeePerBlobGas: BigInt,
     blobVersionedHashes: List[BlobVersionedHash]
 ) extends TypedTransaction:
-  override def gasPrice: BigInt = maxFeePerGas
+  override def gasPrice: GasPrice = GasPrice(maxFeePerGas)
 
   override def toString: String =
     s"BlobTransaction {" +
@@ -283,7 +283,7 @@ case class SetCodeTransaction(
     accessList: List[AccessListItem],
     authorizationList: List[SetCodeAuthorization]
 ) extends TypedTransaction:
-  override def gasPrice: BigInt = maxFeePerGas
+  override def gasPrice: GasPrice = GasPrice(maxFeePerGas)
 
   override def toString: String =
     s"SetCodeTransaction {" +

@@ -595,10 +595,6 @@ object SignedTransactionWithSender:
         EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, latestTimestamp, blockchainConfig)
       else EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, blockchainConfig)
 
-    // EIP-2681 mempool/RPC mirror of the consensus rule in StdSignedTransactionValidator
-    // (see the rationale there): max valid tx nonce is 2^64-2; intentionally ungated, aligns
-    // with core-geth/besu uint64 nonce, inert on canonical ETC history. This path is non-consensus
-    // (stateless mempool admission + RPC tracing), so it does not affect block-import state roots.
     val eip2681NonceCap = BigInt(2).pow(64) - 2 // EIP-2681: nonces >= 2^64-1 rejected
     stxs.filter { stx =>
       val tx = stx.tx

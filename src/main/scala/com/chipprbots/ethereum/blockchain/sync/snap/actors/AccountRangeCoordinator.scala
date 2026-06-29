@@ -557,26 +557,24 @@ private class AccountRangeCoordinatorImpl(
     // Note: contractStorageFile is NOT deleted here — the controller reads it asynchronously
     // during storage sync (Bug 20 fix: streaming from file to avoid OOM). The controller
     // deletes it after streaming completes.
-    // NOTE: explicit `=> ()` bodies are load-bearing. These four cleanups are SIBLINGS — each must
-    // run unconditionally and swallow only its own exception, and the log.info must always fire.
-    // With an EMPTY catch body (`catch case _: Exception =>`), scalafmt's removeOptionalBraces rewrite
-    // nests them (each later cleanup + the log run only if the prior threw) — a resource leak +
-    // missing-log regression. Keep the `=> ()` bodies so the sibling structure is unambiguous and stable.
     try contractAccountsOut.close()
-    catch case _: Exception => ()
-    try contractStorageOut.close()
-    catch case _: Exception => ()
-    try uniqueCodeHashesOut.close()
     catch
-      case _: Exception => ()
-      // contractStorageFile intentionally NOT deleted — controller manages its lifecycle
-      // uniqueCodeHashesFile intentionally NOT deleted — controller manages its lifecycle
-      // (needed for accounts-complete recovery across process restarts)
-    try Files.deleteIfExists(contractAccountsFile)
-    catch case _: Exception => ()
-    log.info(
-      s"AccountRangeCoordinator stopped. Downloaded $accountsDownloaded accounts, identified $contractAccountsCount contracts ($uniqueCodeHashesCount unique codeHashes)"
-    )
+      case _: Exception =>
+        try contractStorageOut.close()
+        catch
+          case _: Exception =>
+            try uniqueCodeHashesOut.close()
+            catch
+              case _: Exception =>
+                try Files.deleteIfExists(contractAccountsFile)
+                catch
+                  case _: Exception =>
+                    // contractStorageFile intentionally NOT deleted — controller manages its lifecycle
+                    // uniqueCodeHashesFile intentionally NOT deleted — controller manages its lifecycle
+                    // (needed for accounts-complete recovery across process restarts)
+                    log.info(
+                      s"AccountRangeCoordinator stopped. Downloaded $accountsDownloaded accounts, identified $contractAccountsCount contracts ($uniqueCodeHashesCount unique codeHashes)"
+                    )
 
   /** Collect current task positions and send to controller for resume across restarts. */
   private def sendProgressSnapshot(): Unit =
