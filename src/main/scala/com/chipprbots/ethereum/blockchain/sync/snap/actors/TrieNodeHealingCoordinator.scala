@@ -83,7 +83,15 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
     decoupledHealServeRoot: Boolean = false,
     // FR-006 surfacing threshold: after this many unsatisfied attempts with no serve-root advance, surface (log +
     // metric). Never force-completes.
-    decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh
+    decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh,
+    // spec 009 (Moving-Root Delta Heal). When true, the heal completes toward AND fetches against ONE current served
+    // root: requestNextBatch (T005) collapses the fetch root to the completeness root `stateRoot`, and
+    // StartTrieNodeHealing (T006) seeds an absent heal root as a frontier task and fetches it instead of handing off to
+    // lazy healing. When false, the heal uses the spec-004 walk/serve split (byte-identical to pre-spec-009). Impl
+    // default false (bare construction stays on the spec-004 path); the production default-on flows from SNAPSyncConfig
+    // via the spawn sites. The content-hash store gate and the finalizeSnapSync anchor guard are byte-untouched on BOTH
+    // paths — under the flag the gate matches BY CONSTRUCTION (fetch root == completeness root), never by weakening it.
+    movingRootDeltaHeal: Boolean = false
 ):
 
   import TrieNodeHealingCoordinator.*
@@ -400,13 +408,16 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
   // T020: number of serve-root refreshes engaged this coordinator lifetime (observability only).
   private var serveRootRefreshCount: Long = 0L
 
-  /** spec 004 T019: encode the leading 8 bytes of a root hash as a numeric "short label" gauge value so an operator can
-    * eyeball-correlate the walk-root / serve-root gauges with the `[HEAL]` log lines (which print 4 bytes). This is
-    * observation-only — never read by any walk / completeness / fetch decision. Empty ⇒ 0.
+  /** spec 004 T019: encode the leading 6 bytes of a root hash as a numeric "short label" gauge value so an operator can
+    * eyeball-correlate the walk-root / serve-root gauges with the `[HEAL]` log lines. This is observation-only — never
+    * read by any walk / completeness / fetch decision. Empty ⇒ 0. Six bytes (48 bits) is deliberate: it is always
+    * non-negative and is exactly representable in a Prometheus gauge's IEEE-754 double (53-bit mantissa). Eight bytes
+    * pushed the leading byte's high bit into the Long sign (rendering a spurious negative ~-3.7e18) AND exceeded the
+    * mantissa (the displayed double no longer matched the actual bytes).
     */
   private def shortRootLabel(root: ByteString): Long =
     var acc = 0L
-    val n = root.length.min(8)
+    val n = root.length.min(6)
     var i = 0
     while i < n do
       acc = (acc << 8) | (root(i) & 0xffL)
@@ -706,6 +717,33 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
               // Mark the persisted frontier authoritative when the full walk is done (all workers complete).
               selfRef ! RestartFullRebuild(root, emptyPath)
         }(ec)
+      else if movingRootDeltaHeal then
+        // spec 009 T006/C2 (Moving-Root Delta Heal): the heal root node's OWN bytes are absent locally, but the root
+        // IS fetchable — GetTrieNodes(rootHash=stateRoot, paths=[[emptyPath]]) returns S's root node, whose keccak ==
+        // stateRoot, so the content-hash gate (byte-untouched) accepts it. The local mosaic is only a content-addressed
+        // CACHE that lets discovery prune already-present subtrees. SEED the root as a frontier task (empty-path) and
+        // fetch it against the single served root `stateRoot` (T005), EXACTLY as the HealingPivotRefreshed re-peg seed
+        // below already does for an absent re-pegged root — do NOT hand off to lazy healing. Persisted nodes are NOT
+        // discarded (this only ADDS the root task). `discoverMissingChildren` then drives the top-down delta from here.
+        // Start-of-heal and re-peg therefore seed an absent root IDENTICALLY (one moving-root mechanism).
+        if !pendingHashSet.contains(root) && !isNodeInStorage(root) then
+          val seedEntry = HealingEntry(Seq(emptyPath), root)
+          pendingTasks += seedEntry
+          pendingHashSet += root
+          persistFrontier(Seq(seedEntry)) // Layer 2: the absent heal root is a new frontier entry (mirror only)
+          log.info(
+            s"[HEAL] Root ${Hex.toHexString(root.take(8).toArray)} absent locally — seeding it as a frontier task " +
+              s"and fetching against the single served root (spec 009 moving-root delta heal); discovery drives the " +
+              s"top-down delta from the root. NOT handing off to lazy healing."
+          )
+          tryRedispatchPendingTasks()
+        else
+          // Root became present (or already seeded) between the outer check and here — nothing to seed; let normal
+          // discovery / completion proceed (mirrors HealingPivotRefreshed's already-present branch).
+          log.info(
+            s"[HEAL] Root ${Hex.toHexString(root.take(8).toArray)} already seeded or present — no re-seed needed."
+          )
+          tryRedispatchPendingTasks()
       else
         // COMPLEMENTARY GUARD (root-cause w98gfx4wn / PR #1371 seed-guard): the walk-root node's OWN bytes are absent
         // from local storage.
@@ -921,6 +959,14 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
         )
         stateRoot = newStateRoot
         flushRawNodesSync() // Flush any buffered nodes before clearing state
+        // spec 009 T010/C4 — RE-PEG-RETAINS-NODES INVARIANT (consensus-load-bearing): a re-peg MUST NOT delete any
+        // persisted trie node. Content-addressed verified nodes (keccak-keyed) carry over unchanged under the new root
+        // (~99.9% shared), so every node healed against the old root stays valid under `newStateRoot` and the
+        // post-re-peg delta only SHRINKS. The ONLY state cleared on this path is in-memory frontier (pendingTasks /
+        // pendingHashSet / activeRequests, below) plus the OPTIONAL frontier-mirror CF via clearPersistedFrontier(),
+        // which operates solely on `healingFrontierStorage` (CF 'g' — frontier mirror + completeness/subtree records)
+        // and NEVER touches the trie-node store `mptStorage`. If a future edit makes a re-peg drop trie nodes it is a
+        // consensus bug (a referenced node could go missing under the new root → false completion / import fault).
         clearPersistedFrontier() // Layer 2: old-root frontier is stale after refresh — reseed (below) repopulates it
         clearHealedPathsSet() // spec 003 C1/F5: old-root healed paths are stale — clear before next gate
         pendingTasks.clear() // Will be re-populated by root reseed + inline discovery / trie walk from controller
@@ -984,7 +1030,14 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
       // unchanged walk root (FR-001), so byte-for-byte completion parity with the coupled path is preserved by
       // construction. No-op when the feature is disabled (the fetch would ignore `serveRoot` anyway, but skipping
       // keeps the observability/counter state inert so the OFF path is byte-identical to today, SC-006).
-      if !decoupledHealServeRoot then
+      if movingRootDeltaHeal then
+        // spec 009 T014/FR-010: under moving-root delta heal the serve root IS the walk root (the fetch collapses to
+        // `stateRoot` in requestNextBatch, T005), so the spec-004 serve-root machinery is SUPERSEDED. The controller
+        // re-pegs via HealingPivotRefreshed and stops requesting serve roots (H-S6/H-S2), but a late in-flight
+        // HealingServeRootRefresh could still arrive — treat it as a documented no-op (serveRoot / serveRootRefreshCount
+        // stay inert). Flag OFF: byte-identical to the spec-004 path below (kept one release for A/B, FR-007).
+        log.debug("[HEAL] HealingServeRootRefresh ignored — single moving root (spec 009)")
+      else if !decoupledHealServeRoot then
         log.debug("[HEAL-SERVE-ROOT] HealingServeRootRefresh ignored — decoupled-heal-serve-root disabled")
       else if newServeRoot.isEmpty || newServeRoot == serveRoot then
         // T011 U2: never adopt an empty/zero serve root; a same-root refresh is a no-op (no counter churn).
@@ -1446,7 +1499,10 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
       // before it is ever stored — see handleResponse (C4). The walk root used for completeness is unchanged.
       val request = GetTrieNodes(
         requestId = requestId,
-        rootHash = if decoupledHealServeRoot then serveRoot else stateRoot,
+        // spec 009 T005/C1: under `movingRootDeltaHeal` collapse the fetch root to the completeness root `stateRoot`
+        // so the content-hash gate (keccak(node) == requested task hash) matches BY CONSTRUCTION — the spec-004
+        // wrong-axis fix. Flag OFF: byte-identical to spec-004 (serve root when decoupled, else the walk root).
+        rootHash = if movingRootDeltaHeal then stateRoot else if decoupledHealServeRoot then serveRoot else stateRoot,
         paths = paths,
         responseBytes = responseBytes
       )
@@ -1550,7 +1606,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
           // Inline child discovery — Besu/geth aligned scheduler approach.
           // Each healed node is decoded to find missing children; queue them directly
           // without waiting for a full 3h trie walk. Walk becomes validation-only.
-          taskByHash.get(nodeHash).foreach(task => discoverMissingChildren(nodeData, task.pathset))
+          taskByHash.get(nodeHash).foreach(task => discoverMissingChildren(nodeData, task.pathset, nodeHash))
         else
           log.debug(
             s"Healing response node not in request set (unexpected): ${Hex.toHexString(nodeHash.take(4).toArray)}"
@@ -2167,7 +2223,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
     * B3 FIX: branch children are checked with a single multiGetNodes call instead of up to 16 serial isNodeInStorage
     * calls on the actor thread. Extension child uses the same pattern for consistency.
     */
-  private def discoverMissingChildren(nodeData: ByteString, pathset: Seq[ByteString]): Unit =
+  private def discoverMissingChildren(nodeData: ByteString, pathset: Seq[ByteString], nodeHash: ByteString): Unit =
     import com.chipprbots.ethereum.mpt.{MptTraversals, BranchNode, ExtensionNode, HashNode, LeafNode}
     import com.chipprbots.ethereum.mpt.HexPrefix
     import com.chipprbots.ethereum.domain.Account
@@ -2248,6 +2304,45 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
             log.info(
               s"[HEAL-DISCOVER] Inline children queued: $childrenDiscoveredTotal total " +
                 s"(+${newEntries.size} from this node, pending: ${pendingTasks.size})"
+            )
+
+        // spec 005 C3b/D2/T009/T012 — heal-side subtree-complete SEED (consensus-load-bearing; the single highest
+        // chain-split risk of this port). Stage this just-healed node's OWN hash as a subtree-complete candidate IFF
+        // its subtree is durably closed by INDUCTION: every hash-referenced child is PRESENT on disk AND itself
+        // recorded subtree-complete (isSubtreeComplete). The isSubtreeComplete clause is load-bearing — mere PRESENCE is
+        // NEVER enough: a download-mosaic node can be present yet its subtree incomplete, so seeding on presence alone
+        // would write a false record → the pruned descent would skip a real hole → false completion → divergent
+        // finalized state. "present AND recorded" SUBSUMES "no missing child" and "no pending child": a still-pending /
+        // in-flight child is either absent (fails isNodeInStorage) or present-but-unrecorded (fails isSubtreeComplete).
+        // For a leaf (no hash children) the closure is VACUOUS — the inductive BASE (PrunedHealCrashSafetySpec T-3).
+        // Inline children carry NO hash references (a 32-byte hash makes a node ≥32 bytes, so it is never inlined), so
+        // direct HashNode children + the account-leaf storage root are the COMPLETE set of subtree roots under this
+        // node. Gated on prunedEnabled (else inert ⇒ OFF-path byte-identical). STAGED only — the durable record is
+        // written by writeDurableSubtreeRecords strictly AFTER mptStorage.persist() (D3 record-after-persist); a crash
+        // before the flush drops the in-memory candidate ⇒ safe descend. The `newEntries.isEmpty` pre-gate is a cheap
+        // necessary short-circuit (a found missing non-pending child means not closed); the forall over actual
+        // storage+record state is the AUTHORITATIVE gate and can never false-record regardless of pending/filter state.
+        if prunedEnabled && newEntries.isEmpty then
+          val subtreeRoots: Seq[ByteString] = decoded match
+            case branch: BranchNode =>
+              branch.children.collect { case hn: HashNode => ByteString(hn.hashNode) }.toSeq
+            case ext: ExtensionNode =>
+              ext.next match
+                case hn: HashNode => Seq(ByteString(hn.hashNode))
+                case _            => Seq.empty
+            case leaf: LeafNode if !isStorageTrie =>
+              Account(leaf.value).toOption match
+                case Some(account) if account.storageRoot != Account.EmptyStorageRootHash =>
+                  Seq(account.storageRoot.value)
+                case _ => Seq.empty
+            case _ => Seq.empty
+          val subtreeClosed =
+            subtreeRoots.forall(c => isNodeInStorage(c) && healingFrontierStorage.exists(_.isSubtreeComplete(c)))
+          if subtreeClosed then
+            pendingSubtreeRecords += nodeHash
+            log.debug(
+              s"[HEAL-VERIFY-PRUNED] Staged subtree-complete candidate ${Hex.toHexString(nodeHash.take(4).toArray)} " +
+                s"(${subtreeRoots.size} child subtree(s) present+recorded) — durable record written post-flush (D3)."
             )
       catch
         case NonFatal(e) =>
@@ -2423,7 +2518,9 @@ object TrieNodeHealingCoordinator:
       // OFF to match the impl default and the spec-005 decoupling (store may be present for pruned-heal records only).
       frontierPersistenceEnabled: Boolean = false,
       decoupledHealServeRoot: Boolean = false,
-      decoupledHealMaxAttemptsNoRefresh: Int = DefaultDecoupledHealMaxAttemptsNoRefresh
+      decoupledHealMaxAttemptsNoRefresh: Int = DefaultDecoupledHealMaxAttemptsNoRefresh,
+      // spec 009 (Moving-Root Delta Heal) — plumbing only; no behavior reads it yet (see impl ctor).
+      movingRootDeltaHeal: Boolean = false
   ): Behavior[Command] =
     Behaviors.setup { context =>
       Behaviors.withTimers { timers =>
@@ -2455,7 +2552,8 @@ object TrieNodeHealingCoordinator:
           prunedHealVerification = prunedHealVerification,
           frontierPersistenceEnabled = frontierPersistenceEnabled,
           decoupledHealServeRoot = decoupledHealServeRoot,
-          decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh
+          decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh,
+          movingRootDeltaHeal = movingRootDeltaHeal
         ).start()
       }
     }

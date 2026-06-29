@@ -154,16 +154,13 @@ class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlat
 
   // ── T-3: record written only after the subtree's bytes are durable ──────────────────────────────
 
-  // DEFERRED to PR #1374 (spec 005 C3b — wire pendingSubtreeRecords seeding so a healed clean subtree is recorded
-  // subtree-complete). The #1373 typed rewrite dropped the C3b seeding, so the heal path currently records only the
-  // root, never an interior healed leaf; this assertion (isSubtreeComplete(leaf) == true) cannot pass until C3b is
-  // re-wired. #1374 rebuilds this coordinator and carries its own spec-005 machinery, so wiring C3b there (not here)
-  // avoids duplicate, re-ported work. Tagged DisabledTest ⇒ excluded from testEssential/testStandard until #1374.
+  // spec 005 C3b — WIRED in the #1374 typed port (batch-5). `discoverMissingChildren` now stages a just-healed node's
+  // own hash into `pendingSubtreeRecords` when its subtree is durably closed by induction (every hash child present AND
+  // itself recorded subtree-complete); the durable record is written post-`persist()` by `writeDurableSubtreeRecords`
+  // (D3 record-after-persist). A clean leaf (no children) is the vacuous inductive BASE — recorded as soon as its bytes
+  // flush — so isSubtreeComplete(leaf) is observable after completion and only ever after the bytes are durable.
   "Crash safety (T-3, FR-006)" should
-    "record a clean subtree complete only AFTER its bytes are durable — never observable before" taggedAs (
-      UnitTest,
-      DisabledTest
-    ) in {
+    "record a clean subtree complete only AFTER its bytes are durable — never observable before" taggedAs UnitTest in {
       val storage = new TestMptStorage()
       val root = storedRoot(storage)
       val (pathset, hash, encoded) = cleanLeaf(0)

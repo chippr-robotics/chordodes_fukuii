@@ -82,7 +82,10 @@ object HealingTrieFixtures:
       // that exercise the Layer-2 mirror writes / completeness markers (HealingFrontierResumeSpec) set this true.
       frontierPersistenceEnabled: Boolean = false,
       decoupledHealServeRoot: Boolean = false,
-      decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh
+      decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh,
+      // spec 009 (Moving-Root Delta Heal). Default false so existing spec-004 tests spawn the flag-OFF coordinator
+      // (unchanged); the moving-root tests pass true to exercise seed-from-absent-root / single-root fetch / re-peg.
+      movingRootDeltaHeal: Boolean = false
   )(implicit testKit: ActorTestKit): TypedActorRef[TrieNodeHealingCoordinator.Command] =
     testKit.spawn(
       TrieNodeHealingCoordinator(
@@ -111,7 +114,8 @@ object HealingTrieFixtures:
         prunedHealVerification = prunedHealVerification,
         frontierPersistenceEnabled = frontierPersistenceEnabled,
         decoupledHealServeRoot = decoupledHealServeRoot,
-        decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh
+        decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh,
+        movingRootDeltaHeal = movingRootDeltaHeal
       )
     )
 
