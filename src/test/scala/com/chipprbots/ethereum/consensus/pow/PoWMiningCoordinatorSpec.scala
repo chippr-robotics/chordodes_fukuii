@@ -236,7 +236,7 @@ class PoWMiningCoordinatorSpec
       Fixtures.Blocks.Genesis.header.copy(
         difficulty = Difficulty(UInt256(Hex.decode("0400")).toBigInt),
         number = 0,
-        gasUsed = 0,
+        gasUsed = GasAmount.Zero,
         unixTimestamp = 0
       ),
       Fixtures.Blocks.ValidBlock.body

@@ -43,8 +43,8 @@ class OlympiaFeeMarketSpec
   private def olympiaParent(gasLimit: BigInt, gasUsed: BigInt, baseFee: BigInt): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
       number = olympiaBlock,
-      gasLimit = gasLimit,
-      gasUsed = gasUsed,
+      gasLimit = GasAmount(gasLimit),
+      gasUsed = GasAmount(gasUsed),
       extraFields = HefPostOlympia(baseFee)
     )
 
@@ -56,7 +56,7 @@ class OlympiaFeeMarketSpec
         val legacyTx = LegacyTransaction(
           nonce = 0,
           gasPrice = BigInt(5_000_000_000L),
-          gasLimit = 21000,
+          gasLimit = GasAmount(21000),
           receivingAddress = Address(1),
           value = BigInt(0),
           payload = ByteString.empty
@@ -73,7 +73,7 @@ class OlympiaFeeMarketSpec
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(1_000_000_000L),
           maxFeePerGas = BigInt(10_000_000_000L),
-          gasLimit = BigInt(21000),
+          gasLimit = GasAmount(BigInt(21000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -92,7 +92,7 @@ class OlympiaFeeMarketSpec
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(3_000_000_000L),
           maxFeePerGas = BigInt(10_000_000_000L),
-          gasLimit = BigInt(21000),
+          gasLimit = GasAmount(BigInt(21000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -119,7 +119,7 @@ class OlympiaFeeMarketSpec
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(1_000_000_000L),
           maxFeePerGas = BigInt(5_000_000_000L),
-          gasLimit = BigInt(50000),
+          gasLimit = GasAmount(BigInt(50000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -142,7 +142,7 @@ class OlympiaFeeMarketSpec
         val legacyTx = LegacyTransaction(
           nonce = 0,
           gasPrice = gasPrice,
-          gasLimit = 21000,
+          gasLimit = GasAmount(21000),
           receivingAddress = Address(1),
           value = BigInt(0),
           payload = ByteString.empty
@@ -161,7 +161,7 @@ class OlympiaFeeMarketSpec
           nonce = BigInt(0),
           maxPriorityFeePerGas = maxPriority,
           maxFeePerGas = maxFee,
-          gasLimit = BigInt(21000),
+          gasLimit = GasAmount(BigInt(21000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -182,7 +182,7 @@ class OlympiaFeeMarketSpec
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(0),
           maxFeePerGas = baseFee,
-          gasLimit = BigInt(21000),
+          gasLimit = GasAmount(BigInt(21000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -229,7 +229,7 @@ class OlympiaFeeMarketSpec
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(0),
           maxFeePerGas = baseFee,
-          gasLimit = BigInt(21_000),
+          gasLimit = GasAmount(BigInt(21_000)),
           receivingAddress = None,
           value = BigInt(0),
           payload = ByteString.empty,
@@ -250,7 +250,7 @@ class OlympiaFeeMarketSpec
           nonce = BigInt(0),
           maxPriorityFeePerGas = InitialBaseFee,
           maxFeePerGas = InitialBaseFee * 2,
-          gasLimit = BigInt(21_000),
+          gasLimit = GasAmount(BigInt(21_000)),
           receivingAddress = None,
           value = BigInt(0),
           payload = ByteString.empty,
@@ -266,7 +266,7 @@ class OlympiaFeeMarketSpec
         val legacyTx = LegacyTransaction(
           nonce = BigInt(0),
           gasPrice = baseFee,
-          gasLimit = BigInt(21_000),
+          gasLimit = GasAmount(BigInt(21_000)),
           receivingAddress = None,
           value = BigInt(0),
           payload = ByteString.empty

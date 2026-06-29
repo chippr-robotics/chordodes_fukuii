@@ -18,15 +18,15 @@ object BlockHelpers extends SecureRandomBuilder:
   val defaultHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     difficulty = Difficulty(1000000),
     number = 1,
-    gasLimit = 1000000,
-    gasUsed = 0,
+    gasLimit = GasAmount(1000000),
+    gasUsed = GasAmount(0),
     unixTimestamp = 0
   )
 
   val defaultTx: LegacyTransaction = LegacyTransaction(
     nonce = 42,
     gasPrice = 1,
-    gasLimit = 90000,
+    gasLimit = GasAmount(90000),
     receivingAddress = Address(123),
     value = 0,
     payload = ByteString.empty

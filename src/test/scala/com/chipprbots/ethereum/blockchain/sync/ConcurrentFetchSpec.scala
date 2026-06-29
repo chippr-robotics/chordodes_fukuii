@@ -17,6 +17,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
@@ -380,8 +381,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers:
       logsBloom = BloomFilter(bloom256),
       difficulty = Difficulty(1),
       number = 0,
-      gasLimit = 1000000,
-      gasUsed = 0,
+      gasLimit = GasAmount(1000000),
+      gasUsed = GasAmount(0),
       unixTimestamp = 0,
       extraData = ByteString.empty,
       mixHash = BlockHash(hash32),

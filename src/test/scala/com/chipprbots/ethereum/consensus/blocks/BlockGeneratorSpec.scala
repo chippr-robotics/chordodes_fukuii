@@ -50,7 +50,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -77,7 +77,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -107,7 +107,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
 
@@ -161,7 +161,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -179,7 +179,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
   ) in new TestSetup:
     val txWitGasTooBigGasLimit: SignedTransaction = SignedTransaction
       .sign(
-        transaction.copy(gasLimit = BigInt(2).pow(100000), nonce = signedTransaction.tx.nonce + 1),
+        transaction.copy(gasLimit = GasAmount(BigInt(2).pow(100000)), nonce = signedTransaction.tx.nonce + 1),
         keyPair,
         Some(BigInt(0x3d))
       )
@@ -202,7 +202,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
 
@@ -272,7 +272,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
           nonce = minedNonce,
           mixHash = BlockHash(minedMixHash),
           unixTimestamp = miningTimestamp,
-          gasLimit = generatedBlockGasLimit
+          gasLimit = GasAmount(generatedBlockGasLimit)
         )
       )
     validators.blockHeaderValidator.validate(
@@ -324,7 +324,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     val transaction1: LegacyTransaction = LegacyTransaction(
       nonce = 0,
       gasPrice = 1,
-      gasLimit = 1000000,
+      gasLimit = GasAmount(1000000),
       receivingAddress = None,
       value = 0,
       payload = ByteString.empty
@@ -368,7 +368,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
           nonce = minedNonce,
           mixHash = BlockHash(minedMixHash),
           unixTimestamp = miningTimestamp,
-          gasLimit = generatedBlockGasLimit
+          gasLimit = GasAmount(generatedBlockGasLimit)
         )
       )
     validators.blockHeaderValidator.validate(
@@ -408,7 +408,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
           nonce = minedNonce,
           mixHash = BlockHash(minedMixHash),
           unixTimestamp = miningTimestamp,
-          gasLimit = generatedBlockGasLimit
+          gasLimit = GasAmount(generatedBlockGasLimit)
         )
       )
     validators.blockHeaderValidator.validate(
@@ -434,7 +434,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     val failingTransaction: LegacyTransaction = LegacyTransaction(
       nonce = 0,
       gasPrice = 1,
-      gasLimit = txGasLimit,
+      gasLimit = GasAmount(txGasLimit),
       receivingAddress = Address(testAddress),
       value = txTransfer,
       payload = ByteString.empty
@@ -464,7 +464,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -506,7 +506,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -532,7 +532,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     val transaction: LegacyTransaction = LegacyTransaction(
       nonce = 0,
       gasPrice = 1,
-      gasLimit = txGasLimit,
+      gasLimit = GasAmount(txGasLimit),
       receivingAddress = Address(testAddress),
       value = txTransfer,
       payload = ByteString.empty
@@ -542,7 +542,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       chainId = 61, // ethereum classic mainnet
       nonce = 0,
       gasPrice = 1,
-      gasLimit = txGasLimit,
+      gasLimit = GasAmount(txGasLimit),
       receivingAddress = Address(testAddress),
       value = txTransfer,
       payload = ByteString.empty,
@@ -552,7 +552,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     lazy val signedTransaction: SignedTransaction =
       SignedTransaction.sign(transaction, keyPair, Some(BigInt(0x3d)))
     lazy val duplicatedSignedTransaction: SignedTransaction =
-      SignedTransaction.sign(transaction.copy(gasLimit = 2), keyPair, Some(BigInt(0x3d)))
+      SignedTransaction.sign(transaction.copy(gasLimit = GasAmount(2)), keyPair, Some(BigInt(0x3d)))
 
     lazy val signedTypedTransaction: SignedTransaction =
       SignedTransaction.sign(typedTransaction, keyPair, Some(BigInt(0x3d)))
