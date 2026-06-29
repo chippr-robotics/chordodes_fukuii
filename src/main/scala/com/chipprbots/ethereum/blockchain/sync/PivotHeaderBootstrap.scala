@@ -215,7 +215,7 @@ object PivotHeaderBootstrap:
         try
           blockchainWriter.storeBlockHeader(header).commit()
           // For by-hash mode: report the actual block number we discovered.
-          val resolvedNumber = if byHashMode then header.number else targetBlock
+          val resolvedNumber = if byHashMode then header.number.value else targetBlock
           ctx.log.info(
             s"[PIVOT] Bootstrap complete — block=${header.number} hash=${header.hashAsHexString.take(10)} " +
               s"parentHash=${header.parentHash.value.take(4).toArray.map("%02x".format(_)).mkString}"
@@ -352,4 +352,4 @@ object PivotHeaderBootstrap:
     private def matchesTarget(header: BlockHeader): Boolean =
       targetHash match
         case Some(hash) => header.hash.value == hash
-        case None       => header.number == targetBlock
+        case None       => header.number.value == targetBlock

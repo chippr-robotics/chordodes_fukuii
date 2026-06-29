@@ -378,7 +378,7 @@ class TestService(
 
     if blockOpt.isEmpty then AccountsInRangeResponse(Map(), ByteString(0)).rightNow
     else
-      val blockNumber: BigInt = blockOpt.map(_.header.number).getOrElse(BigInt(0))
+      val blockNumber: BigInt = blockOpt.map(_.header.number.value).getOrElse(BigInt(0))
       val accountBatch: Seq[(ByteString, Address)] = accountHashWithAdresses.view
         .dropWhile { case (hash, _) => UInt256(hash) < UInt256(request.parameters.addressHash) }
         .filter { case (_, address) =>
@@ -422,7 +422,7 @@ class TestService(
       accountOpt = blockchainReader.getAccount(
         blockchainReader.getBestBranch,
         Address(request.parameters.address),
-        block.header.number
+        block.header.number.value
       )
       account <- accountOpt.toRight(StorageRangeResponse(complete = false, Map.empty, None))
     yield

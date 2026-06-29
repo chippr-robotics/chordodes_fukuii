@@ -1977,7 +1977,7 @@ private class SNAPSyncControllerImpl(
 
           pivotHeaderOpt match
             case Some(header) =>
-              val targetPivot = header.number
+              val targetPivot = header.number.value
 
               if pivotTooStaleAgainstNetworkHead(targetPivot) then
                 // Don't commit a pivot that peers are unlikely to serve.
@@ -2203,7 +2203,7 @@ private class SNAPSyncControllerImpl(
     // variant skips this — `knownHeader` is None — and `NetworkPeerManagerActor` correctly
     // treats "never updated" as "pre-merge or unknown" → no-op).
     hint.knownHeader.foreach { header =>
-      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.UpdateClHeadCmd(header.number)
+      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.UpdateClHeadCmd(header.number.value)
     }
     // Reactive starts: if we're already at idle and a hint arrives during operator-driven
     // startup, the `Start` handler will pick this up. We don't auto-start here because
@@ -2546,15 +2546,15 @@ private class SNAPSyncControllerImpl(
             ctx.log.info(s"Beginning fast state sync with ${snapSyncConfig.accountConcurrency} concurrent workers")
             ctx.log.info("=" * 80)
 
-            pivotBlock = Some(header.number)
+            pivotBlock = Some(header.number.value)
             stateRoot = Some(header.stateRoot)
             appStateStorage
-              .putSnapSyncPivotBlock(header.number)
+              .putSnapSyncPivotBlock(header.number.value)
               .and(appStateStorage.putSnapSyncStateRoot(header.stateRoot.value))
               .commit()
-            updateBestBlockForPivot(header, header.number)
+            updateBestBlockForPivot(header, header.number.value)
 
-            SNAPSyncMetrics.setPivotBlockNumber(header.number)
+            SNAPSyncMetrics.setPivotBlockNumber(header.number.value)
             bootstrapRetryCount = 0
 
             currentPhase = AccountRangeSync
@@ -3916,7 +3916,7 @@ private class SNAPSyncControllerImpl(
     //
     // Pre-merge chains keep peer-reported best because there's no authoritative tip.
     val clHeadNumber: Option[BigInt] =
-      if isPoSChain then clPivotHint.flatMap(_.knownHeader).map(_.number) else None
+      if isPoSChain then clPivotHint.flatMap(_.knownHeader).map(_.number.value) else None
 
     val newPivotOpt: Option[BigInt] = clHeadNumber match
       case Some(clHead) =>

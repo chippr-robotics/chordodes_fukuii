@@ -312,7 +312,7 @@ object PivotBlockSelector:
               blockHeadersAdapter
             )
             val updatedPeersToAsk = peersToAsk - peerId
-            blockHeaders.headers.find(_.number == pivotBlockNumber) match
+            blockHeaders.headers.find(_.number.value == pivotBlockNumber) match
               case Some(targetBlockHeader) =>
                 val newValue =
                   headers
@@ -509,7 +509,7 @@ object PivotBlockSelector:
           // 3. Canonical match: any returned header that equals our local canonical header at its height links
           //    the pivot to the honest chain we already trust.
           val canonicalMatch = chain.find { h =>
-            getCanonicalHeaderByNumber(h.number).exists(_.hash == h.hash)
+            getCanonicalHeaderByNumber(h.number.value).exists(_.hash == h.hash)
           }
           canonicalMatch match
             case Some(anchor) =>

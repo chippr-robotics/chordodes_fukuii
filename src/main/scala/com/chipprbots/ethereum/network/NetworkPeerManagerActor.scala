@@ -776,7 +776,7 @@ object NetworkPeerManagerActor:
           // Track best network tip for timed TD calibration. NewBlock carries exact cumulative TD
           // and block number — more precise than ETH68 STATUS.
           val newBlockTD = m.totalDifficulty
-          val newBlockNum = m.block.header.number
+          val newBlockNum = m.block.header.number.value
           if bestNetworkTip.forall { case (best, _) => newBlockTD > best } then
             val prevTD = bestNetworkTip.map(_._1).getOrElse(BigInt(0))
             bestNetworkTip = Some((newBlockTD, newBlockNum))
@@ -815,7 +815,7 @@ object NetworkPeerManagerActor:
           val newPeerInfoOpt: Option[PeerInfo] =
             for
               forkResolver <- forkResolverOpt
-              forkBlockHeader <- blockHeaders.find(_.number == forkResolver.forkBlockNumber)
+              forkBlockHeader <- blockHeaders.find(_.number.value == forkResolver.forkBlockNumber)
             yield
               val newFork = forkResolver.recognizeFork(forkBlockHeader)
               log.debug("Received fork block header with fork: {}", newFork)
@@ -867,9 +867,9 @@ object NetworkPeerManagerActor:
 
       message match
         case m: ETHPackets.BlockHeaders =>
-          update(m.headers.map(header => (header.number, header.hash.value)))
+          update(m.headers.map(header => (header.number.value, header.hash.value)))
         case m: ETHPackets.NewBlock =>
-          update(Seq((m.block.header.number, m.block.header.hash.value)))
+          update(Seq((m.block.header.number.value, m.block.header.hash.value)))
         case m: NewBlockHashes =>
           update(m.hashes.map(h => (h.number, h.hash)))
         case m: ETHPackets.BlockRangeUpdate =>

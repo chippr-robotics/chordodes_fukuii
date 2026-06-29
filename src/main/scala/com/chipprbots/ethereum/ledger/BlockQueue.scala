@@ -58,7 +58,7 @@ class BlockQueue(
         log.debug(s"Block (${block.idTag}) already in queue. ")
         None
 
-      case None if isNumberOutOfRange(number, bestBlockNumber) =>
+      case None if isNumberOutOfRange(number.value, bestBlockNumber) =>
         log.debug(s"Block (${block.idTag} is outside accepted range. Current best block number is: $bestBlockNumber")
         None
 
@@ -150,7 +150,7 @@ class BlockQueue(
     */
   private def cleanUp(bestBlockNumber: BigInt): Unit =
     val staleHashes = blocks.values.collect {
-      case QueuedBlock(b, _) if isNumberOutOfRange(b.header.number, bestBlockNumber) =>
+      case QueuedBlock(b, _) if isNumberOutOfRange(b.header.number.value, bestBlockNumber) =>
         b.header.hash
     }
 

@@ -41,11 +41,11 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
       _ <- validateOlympiaTxTypes(stx, blockHeader)
       _ <- validateBlobTransactionSupport(stx, blockHeader)
       _ <- checkSyntacticValidity(stx)
-      _ <- validateInitCodeSize(stx, blockHeader.number, blockHeader.unixTimestamp)
-      _ <- validateSignature(stx, blockHeader.number)
+      _ <- validateInitCodeSize(stx, blockHeader.number.value, blockHeader.unixTimestamp)
+      _ <- validateSignature(stx, blockHeader.number.value)
       _ <- validateNonce(stx, senderAccount.nonce)
-      _ <- validateGasLimitEnoughForIntrinsicGas(stx, blockHeader.number, blockHeader.unixTimestamp)
-      _ <- validateTxGasLimitCap(stx, blockHeader.number, blockHeader.unixTimestamp)
+      _ <- validateGasLimitEnoughForIntrinsicGas(stx, blockHeader.number.value, blockHeader.unixTimestamp)
+      _ <- validateTxGasLimitCap(stx, blockHeader.number.value, blockHeader.unixTimestamp)
       _ <- validateMaxFeeAgainstBaseFee(stx, blockHeader)
       _ <- validateMaxFeePerBlobGas(stx, blockHeader)
       _ <- validateAccountHasEnoughGasToPayUpfrontCost(senderAccount.balance, upfrontGasCost)
@@ -65,7 +65,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
     // ETH gates these tx types via London/Prague, not Olympia; from Olympia onwards ETC accepts them.
     if blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETH then Right(SignedTransactionValid)
-    else if blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber then
+    else if blockHeader.number.value >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber then
       Right(SignedTransactionValid)
     else
       stx.tx match

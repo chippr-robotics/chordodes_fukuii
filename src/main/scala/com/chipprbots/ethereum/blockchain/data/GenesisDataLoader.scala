@@ -219,7 +219,7 @@ class GenesisDataLoader(
       receiptsRoot = TrieRoot(emptyTrieRootHash),
       logsBloom = BloomFilter(zeros(bloomLength)),
       difficulty = Difficulty(BigInt(genesisData.difficulty.replace("0x", ""), 16)),
-      number = 0,
+      number = BlockNumber.Zero,
       gasLimit = GasAmount(BigInt(genesisData.gasLimit.replace("0x", ""), 16)),
       gasUsed = GasAmount.Zero,
       unixTimestamp = BigInt(genesisData.timestamp.replace("0x", ""), 16).toLong,

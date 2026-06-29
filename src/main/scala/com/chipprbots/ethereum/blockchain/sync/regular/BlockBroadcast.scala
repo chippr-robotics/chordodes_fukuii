@@ -49,9 +49,9 @@ class BlockBroadcast(
     // for ECBP-1100 chain weight tracking. PoS (ETH/Sepolia) = every 32 blocks — EIP-7642 epoch
     // gate, go-ethereum aligned (shouldSend() returns true only every 32 blocks forward).
     val newHeader = blockToBroadcast.block.header
-    val shouldSendBRU = isPoWChain || (newHeader.number % 32 == 0)
+    val shouldSendBRU = isPoWChain || (newHeader.number.value % 32 == 0)
     if shouldSendBRU then
-      val bru = ETH69.BlockRangeUpdate(BigInt(0), newHeader.number, newHeader.hash.value)
+      val bru = ETH69.BlockRangeUpdate(BigInt(0), newHeader.number.value, newHeader.hash.value)
       val eth69Peers = peersWithoutBlock.filter { case (_, PeerWithInfo(_, info)) =>
         info.remoteStatus.capability == Capability.ETH69
       }
@@ -68,7 +68,7 @@ class BlockBroadcast(
         }
 
   private def shouldSendNewBlock(newBlock: BlockToBroadcast, peerInfo: PeerInfo): Boolean =
-    val blockAhead = newBlock.block.header.number > peerInfo.maxBlockNumber
+    val blockAhead = newBlock.block.header.number.value > peerInfo.maxBlockNumber
     // ETH/69 peers: chainWeight may be actual TD (local lookup) or a block-number proxy (peer
     // ahead of us). The proxy case makes the TD comparison always true, spamming every ETH69 peer.
     // Use block-number comparison only for ETH69 — maxBlockNumber is now correct (from latestBlock).
@@ -102,7 +102,7 @@ class BlockBroadcast(
     peer =>
       val newBlockHeader = blockToBroadcast.block.header
       val newBlockHashMsg =
-        ETHPackets.NewBlockHashes.NewBlockHashes(Seq(BlockHash(newBlockHeader.hash.value, newBlockHeader.number)))
+        ETHPackets.NewBlockHashes.NewBlockHashes(Seq(BlockHash(newBlockHeader.hash.value, newBlockHeader.number.value)))
       networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(newBlockHashMsg, peer.id)
   }
 

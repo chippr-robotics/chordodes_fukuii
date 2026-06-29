@@ -72,7 +72,7 @@ class ChainImporter(
           val blockHash = block.header.hash
 
           // Skip if already imported
-          val alreadyExists = blockchainReader.getBlockHeaderByNumber(blockNum) match
+          val alreadyExists = blockchainReader.getBlockHeaderByNumber(blockNum.value) match
             case Some(existing) if existing.hash == blockHash => true
             case Some(existing) =>
               log.warn(

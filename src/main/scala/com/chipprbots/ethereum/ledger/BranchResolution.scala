@@ -35,7 +35,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger:
 
   private[ledger] def compareBranch(headers: NonEmptyList[BlockHeader]): BranchResolutionResult =
     val headersList = headers.toList
-    val oldBlocksWithCommonPrefix = getTopBlocksFromNumber(headers.head.number)
+    val oldBlocksWithCommonPrefix = getTopBlocksFromNumber(headers.head.number.value)
 
     val commonPrefixLength = oldBlocksWithCommonPrefix
       .zip(headersList)
@@ -96,7 +96,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger:
     messConfig match
       case Some(config) if oldBlocks.nonEmpty =>
         val currentHeadNumber = oldBlocks.last.header.number
-        if !config.isActiveAtBlock(currentHeadNumber) then return false
+        if !config.isActiveAtBlock(currentHeadNumber.value) then return false
 
         val commonAncestorTimestamp = blockchainReader
           .getBlockHeaderByHash(oldBlocks.head.header.parentHash)
@@ -133,7 +133,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger:
               s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash.value).take(8)} " +
               s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash.value).take(8)}"
           )
-        else if currentHead.number - commonAncestorNumber > 2 then
+        else if (currentHead.number - commonAncestorNumber).value > 2 then
           // Log MESS acceptance only for non-trivial reorgs (> 2 blocks), matching core-geth forkchoice.go:177
           BlockMetrics.incrementMessAccepted()
           log.info(

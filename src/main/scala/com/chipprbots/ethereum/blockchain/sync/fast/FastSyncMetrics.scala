@@ -37,7 +37,7 @@ object FastSyncMetrics extends MetricsContainer:
     metrics.registry.timer("fastsync.state.downloadState.timer")
 
   def measure(syncState: SyncState): Unit =
-    PivotBlockNumberGauge.set(syncState.pivotBlock.number.toDouble)
+    PivotBlockNumberGauge.set(syncState.pivotBlock.number.value.toDouble)
     BestFullBlockNumberGauge.set(syncState.lastFullBlockNumber.toDouble)
     BestHeaderNumberGauge.set(syncState.bestBlockHeaderNumber.toDouble)
     MptStateTotalNodesGauge.set(syncState.totalNodesCount)

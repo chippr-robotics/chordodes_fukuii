@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
@@ -36,7 +37,7 @@ trait OmmersValidator:
       (tailBlockHash, n) =>
         Iterator
           .iterate(blockchainReader.getBlockByHash(BlockHash(tailBlockHash)))(
-            _.filter(_.number > 0) // avoid trying to fetch parent of genesis
+            _.filter(_.number != BlockNumber.Zero) // avoid trying to fetch parent of genesis
               .flatMap(block => blockchainReader.getBlockByHash(block.header.parentHash))
           )
           .collect { case Some(block) => block }

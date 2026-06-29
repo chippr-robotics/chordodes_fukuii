@@ -48,7 +48,7 @@ class StxLedger(
         getBlockHashByNumber = (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
         accountStartNonce = blockchainConfig.accountStartNonce,
         stateRootHash = blockHeader.stateRoot.value,
-        noEmptyAccounts = EvmConfig.forBlock(blockHeader.number, blockchainConfig).noEmptyAccounts,
+        noEmptyAccounts = EvmConfig.forBlock(blockHeader.number.value, blockchainConfig).noEmptyAccounts,
         ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
       )
     )
@@ -61,7 +61,7 @@ class StxLedger(
 
     val worldForTx = blockPreparator.updateSenderAccountBeforeExecution(tx, senderAddress, world2)
     val result = blockPreparator.runVM(tx, senderAddress, blockHeader, worldForTx, tracer)
-    val totalGasToRefund = blockPreparator.calcTotalGasToRefund(tx, result, blockHeader.number)
+    val totalGasToRefund = blockPreparator.calcTotalGasToRefund(tx, result, blockHeader.number.value)
 
     TxResult(result.world, tx.tx.gasLimit.value - totalGasToRefund, result.logs, result.returnData, result.error)
 
@@ -87,7 +87,7 @@ class StxLedger(
         getBlockHashByNumber = (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
         accountStartNonce = blockchainConfig.accountStartNonce,
         stateRootHash = blockHeader.stateRoot.value,
-        noEmptyAccounts = EvmConfig.forBlock(blockHeader.number, blockchainConfig).noEmptyAccounts,
+        noEmptyAccounts = EvmConfig.forBlock(blockHeader.number.value, blockchainConfig).noEmptyAccounts,
         ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
       )
     )
@@ -101,7 +101,7 @@ class StxLedger(
     val worldForTx = blockPreparator.updateSenderAccountBeforeExecution(tx, senderAddress, world2)
     tracer.onTxStart(senderAddress, tx.tx.receivingAddress, tx.tx.gasLimit.value, tx.tx.value, tx.tx.payload)
     val result = blockPreparator.runVMWithTracer(tx, senderAddress, blockHeader, worldForTx, tracer)
-    val totalGasToRefund = blockPreparator.calcTotalGasToRefund(tx, result, blockHeader.number)
+    val totalGasToRefund = blockPreparator.calcTotalGasToRefund(tx, result, blockHeader.number.value)
     val gasUsed = tx.tx.gasLimit.value - totalGasToRefund
     tracer.onTxEnd(gasUsed, result.returnData, result.error.map(_.toString))
 
@@ -136,7 +136,7 @@ class StxLedger(
       getBlockHashByNumber = (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       accountStartNonce = blockchainConfig.accountStartNonce,
       stateRootHash = parentStateRoot,
-      noEmptyAccounts = EvmConfig.forBlock(blockHeader.number, blockchainConfig).noEmptyAccounts,
+      noEmptyAccounts = EvmConfig.forBlock(blockHeader.number.value, blockchainConfig).noEmptyAccounts,
       ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
     )
     (0 until txIndex).foldLeft(world0) { (world, i) =>
@@ -148,7 +148,7 @@ class StxLedger(
       blockHeader: BlockHeader,
       world: Option[InMemoryWorldStateProxy]
   ): BigInt =
-    val lowLimit = EvmConfig.forBlock(blockHeader.number, blockchainConfig).feeSchedule.G_transaction
+    val lowLimit = EvmConfig.forBlock(blockHeader.number.value, blockchainConfig).feeSchedule.G_transaction
     val tx = stx.tx
     val highLimit = tx.tx.gasLimit
 

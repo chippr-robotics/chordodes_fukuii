@@ -104,8 +104,8 @@ case class BlockFetcherState(
 
   def lowestBlock: BigInt =
     readyBlocks.headOption
-      .map(_.number)
-      .orElse(waitingHeaders.headOption.map(_.number))
+      .map(_.number.value)
+      .orElse(waitingHeaders.headOption.map(_.number.value))
       .getOrElse(lastBlock)
 
   /** Next block number to be fetched, calculated in a way to maintain local queues consistency, even if `lastBlock`
@@ -114,8 +114,8 @@ case class BlockFetcherState(
     * only if blocks and headers queues are empty
     */
   def nextBlockToFetch: BigInt = waitingHeaders.lastOption
-    .map(_.number)
-    .orElse(readyBlocks.lastOption.map(_.number))
+    .map(_.number.value)
+    .orElse(readyBlocks.lastOption.map(_.number.value))
     .getOrElse(lastBlock) + 1
 
   def takeHashes(amount: Int): Seq[ByteString] = waitingHeaders.take(amount).map(_.hash.value)
@@ -142,7 +142,7 @@ case class BlockFetcherState(
 
   /** Add a header response to the out-of-order buffer, keyed by the first block number in the batch. */
   def bufferHeaders(headers: Seq[BlockHeader]): BlockFetcherState =
-    headers.headOption.fold(this)(h => copy(responseBuffer = responseBuffer.updated(h.number, headers)))
+    headers.headOption.fold(this)(h => copy(responseBuffer = responseBuffer.updated(h.number.value, headers)))
 
   /** Drain all contiguous buffered header batches whose first block immediately follows the current waitingHeaders tail
     * (or lastBlock+1 if waitingHeaders is empty). Returns the drained headers and the new state with those entries
@@ -150,8 +150,8 @@ case class BlockFetcherState(
     */
   def drainOrderedHeaders: (Seq[BlockHeader], BlockFetcherState) =
     val nextExpected = waitingHeaders.lastOption
-      .map(_.number + 1)
-      .orElse(readyBlocks.lastOption.map(_.number + 1))
+      .map(_.number.value + 1)
+      .orElse(readyBlocks.lastOption.map(_.number.value + 1))
       .getOrElse(lastBlock + 1)
 
     @tailrec
@@ -162,7 +162,7 @@ case class BlockFetcherState(
     ): (Seq[BlockHeader], SortedMap[BigInt, Seq[BlockHeader]]) =
       buf.headOption match
         case Some((startNr, hdrs)) if startNr == expected =>
-          val nextEnd = hdrs.lastOption.map(_.number + 1).getOrElse(expected)
+          val nextEnd = hdrs.lastOption.map(_.number.value + 1).getOrElse(expected)
           collect(nextEnd, buf.tail, acc ++ hdrs)
         case _ => (acc, buf)
 
@@ -251,7 +251,7 @@ case class BlockFetcherState(
       .map { case (waitingHeader, waitingHeadersTail) =>
         if waitingHeader.hash == block.hash then
           enqueueReadyBlock(block, fromPeer)
-            .withPossibleNewTopAt(block.number)
+            .withPossibleNewTopAt(block.number.value)
             .copy(
               waitingHeaders = waitingHeadersTail
             )
@@ -260,13 +260,15 @@ case class BlockFetcherState(
       .getOrElse(this)
 
   def enqueueReadyBlock(block: Block, fromPeer: PeerId): BlockFetcherState =
-    withPeerForBlocks(fromPeer, Seq(block.number))
+    withPeerForBlocks(fromPeer, Seq(block.number.value))
       .copy(readyBlocks = readyBlocks.enqueue(block))
 
   def pickBlocks(amount: Int): Option[(NonEmptyList[Block], BlockFetcherState)] =
     if readyBlocks.nonEmpty then
       val (picked, rest) = readyBlocks.splitAt(amount)
-      Some((NonEmptyList(picked.head, picked.tail.toList), copy(readyBlocks = rest, lastBlock = picked.last.number)))
+      Some(
+        (NonEmptyList(picked.head, picked.tail.toList), copy(readyBlocks = rest, lastBlock = picked.last.number.value))
+      )
     else None
 
   /** Returns all the ready blocks but only if it includes blocks with number:
@@ -278,11 +280,14 @@ case class BlockFetcherState(
     val upper = from.max(atLeastWith)
 
     readyBlocks.some
-      .filter(_.headOption.exists(block => block.number <= lower))
-      .filter(_.lastOption.exists(block => block.number >= upper))
+      .filter(_.headOption.exists(block => block.number.value <= lower))
+      .filter(_.lastOption.exists(block => block.number.value >= upper))
       .filter(_.nonEmpty)
       .map(blocks =>
-        (NonEmptyList(blocks.head, blocks.tail.toList), copy(readyBlocks = Queue(), lastBlock = blocks.last.number))
+        (
+          NonEmptyList(blocks.head, blocks.tail.toList),
+          copy(readyBlocks = Queue(), lastBlock = blocks.last.number.value)
+        )
       )
 
   def clearQueues(): BlockFetcherState =

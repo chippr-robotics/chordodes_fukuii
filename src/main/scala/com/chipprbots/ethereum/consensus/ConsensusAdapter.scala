@@ -53,7 +53,7 @@ class ConsensusAdapter(
       blockchainReader.getBestBlock.map(_.header).orElse(blockchainReader.getBestBlockHeader)
     bestHeaderOpt match
       case Some(bestHeader) =>
-        if isBlockADuplicate(block.header, bestHeader.number) then
+        if isBlockADuplicate(block.header, bestHeader.number.value) then
           log.debug("Ignoring duplicated block: {}", block.idTag)
           IO.pure(DuplicateBlock)
         else
@@ -77,7 +77,7 @@ class ConsensusAdapter(
             case Left(error) =>
               IO.pure(BlockImportFailed(error.describe))
             case Right(BlockExecutionSuccess) =>
-              enqueueAndGetBranch(block, bestHeader.number)
+              enqueueAndGetBranch(block, bestHeader.number.value)
                 .map(forwardAndTranslateConsensusResult) // a new branch was created so we give it to consensus
                 .getOrElse(IO.pure(BlockEnqueued)) // the block was not rooted so it was simply enqueued
           }
@@ -145,7 +145,7 @@ class ConsensusAdapter(
 
   private def isBlockADuplicate(block: BlockHeader, currentBestBlockNumber: BigInt): Boolean =
     val hash = block.hash
-    (blockchainReader.getBlockByHash(hash).isDefined && block.number <= currentBestBlockNumber) ||
+    (blockchainReader.getBlockByHash(hash).isDefined && block.number.value <= currentBestBlockNumber) ||
     blockQueue.isQueued(hash)
 
   private def enqueueAndGetBranch(block: Block, bestBlockNumber: BigInt): Option[NonEmptyList[Block]] =

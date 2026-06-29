@@ -151,7 +151,7 @@ class TraceService(
           req.txHash,
           txIndex,
           block.header.hash.value,
-          block.header.number
+          block.header.number.value
         )
       yield TraceTransactionResponse(flat)
     }.recover { case _: MissingNodeException =>
@@ -296,7 +296,7 @@ class TraceService(
       val world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentStateRoot)
       val tracer = new CallTracer(onlyTopCall = false)
       stxLedger.simulateTransactionWithTracer(stx, block.header, Some(world), tracer)
-      flattenCallTree(tracer.getResult, stx.tx.hash.value, txIndex, block.header.hash.value, block.header.number)
+      flattenCallTree(tracer.getResult, stx.tx.hash.value, txIndex, block.header.hash.value, block.header.number.value)
     }
 
   /** Builds a replay result bundle: { trace, vmTrace, stateDiff } based on options. */
@@ -315,7 +315,13 @@ class TraceService(
     val traceField: JValue =
       if options.trace then
         JArray(
-          flattenCallTree(callTracer.getResult, txHash, txIndex, block.header.hash.value, block.header.number).toList
+          flattenCallTree(
+            callTracer.getResult,
+            txHash,
+            txIndex,
+            block.header.hash.value,
+            block.header.number.value
+          ).toList
         )
       else JNull
 

@@ -273,9 +273,9 @@ class BlockFetcher(
                     // chain validation anyway since the chain ends at lastHeader).
                     val finalState = if orderedHeaders.size.toLong >= syncConfig.blockHeadersPerRequest then
                       val lastHeader = orderedHeaders.maxBy(_.number)
-                      updatedState.withPossibleNewTopAt(lastHeader.number + 1)
+                      updatedState.withPossibleNewTopAt((lastHeader.number + 1L).value)
                     else
-                      val lastHeader = orderedHeaders.lastOption.map(_.number).getOrElse(updatedState.lastBlock)
+                      val lastHeader = orderedHeaders.lastOption.map(_.number.value).getOrElse(updatedState.lastBlock)
                       updatedState.copy(
                         nextDispatchBlock = lastHeader + 1,
                         headersToIgnore = updatedState.headersToIgnore + (updatedState.inFlightHeaders - 1).max(0),
@@ -480,7 +480,7 @@ class BlockFetcher(
         headers.lastOption
           .map { bh =>
             log.debug("Candidate for new top at block {}, current known top {}", bh.number, state.knownTop)
-            val newState = state.withPossibleNewTopAt(bh.number)
+            val newState = state.withPossibleNewTopAt(bh.number.value)
             fetchBlocks(newState)
           }
           .getOrElse(processFetchCommands(state))
@@ -501,7 +501,7 @@ class BlockFetcher(
 
   private def handleNewBlock(block: Block, peerId: PeerId, state: BlockFetcherState): Behavior[FetchCommand] =
     log.debug("Received NewBlock {} from peer {}", block.idTag, peerId)
-    val newBlockNr = block.number
+    val newBlockNr = block.number.value
     val nextExpectedBlock = state.lastBlock + 1
 
     log.debug(
@@ -539,7 +539,7 @@ class BlockFetcher(
       state.knownTop,
       state.isOnTop
     )
-    val newState = state.withPossibleNewTopAt(block.number)
+    val newState = state.withPossibleNewTopAt(block.number.value)
     supervisor ! ProgressProtocol.GotNewBlock(newState.knownTop)
     fetchBlocks(newState)
 

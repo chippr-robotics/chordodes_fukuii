@@ -295,7 +295,7 @@ final private class BlockImporterLogic(
         // StateNodeFetcher exhausted MaxStateNodeFetchRetries on this missing node — no current peer
         // can serve it via SNAP GetTrieNodes (typical: pivot fell out of the 128-block serve window
         // on every connected peer).
-        val blockNum = blocksToRetry.head.number
+        val blockNum = blocksToRetry.head.number.value
         BlockImporter.survivedExhausts += 1
         val missingHashStr = pendingStateNodeHash.map(ByteStringUtils.hash2string).getOrElse("<unknown>")
 
@@ -340,7 +340,7 @@ final private class BlockImporterLogic(
           ByteStringUtils.hash2string(hash),
           blocksToRetry.head.number
         )
-        stateStorage.saveNode(hash, node.toArray, blocksToRetry.head.number)
+        stateStorage.saveNode(hash, node.toArray, blocksToRetry.head.number.value)
         // Also save as contract code — if this was a code fetch, the hash is the codeHash
         // and the data is the bytecode. EvmCodeStorage is keyed by codeHash, same as the fetch.
         try evmCodeStorage.put(hash, node).commit()
@@ -545,11 +545,11 @@ final private class BlockImporterLogic(
                     ResolvingMissingNode(NonEmptyList(failedBlock, notImportedBlocks.tail))
                   case None =>
                     log.error("Gas mismatch on block {} but no missing contract code found", failedBlock.number)
-                    val invalidBlockNr = failedBlock.number
+                    val invalidBlockNr = failedBlock.number.value
                     fetcher ! BlockFetcher.InvalidateBlocksFrom(invalidBlockNr, err.toString)
                     Running
               case _ =>
-                val invalidBlockNr = notImportedBlocks.head.number
+                val invalidBlockNr = notImportedBlocks.head.number.value
                 fetcher ! BlockFetcher.InvalidateBlocksFrom(invalidBlockNr, err.toString)
                 Running
       }
@@ -563,7 +563,7 @@ final private class BlockImporterLogic(
     NonEmptyList.fromList(blocks) match
       case None =>
         importedBlocks.headOption.foreach(block =>
-          supervisor ! ProgressProtocol.ImportedBlock(block.number, internally = false)
+          supervisor ! ProgressProtocol.ImportedBlock(block.number.value, internally = false)
         )
         IO.pure((importedBlocks, None))
       case Some(nel) =>
@@ -572,13 +572,15 @@ final private class BlockImporterLogic(
             val importedNow = blockImportData.map(_.block)
             importedNow.foreach(b => unknownParentStrikes -= b.hash.value)
             val imported = importedNow.reverse ::: importedBlocks
-            imported.headOption.foreach(b => supervisor ! ProgressProtocol.ImportedBlock(b.number, internally = false))
+            imported.headOption
+              .foreach(b => supervisor ! ProgressProtocol.ImportedBlock(b.number.value, internally = false))
             IO.pure((imported, None))
 
           case ChainReorganised(_, newBranch, _) =>
             newBranch.foreach(b => unknownParentStrikes -= b.hash.value)
             val imported = newBranch.reverse ::: importedBlocks
-            imported.headOption.foreach(b => supervisor ! ProgressProtocol.ImportedBlock(b.number, internally = false))
+            imported.headOption
+              .foreach(b => supervisor ! ProgressProtocol.ImportedBlock(b.number.value, internally = false))
             IO.pure((imported, None))
 
           case DuplicateBlock | BlockEnqueued =>
@@ -608,13 +610,13 @@ final private class BlockImporterLogic(
                 strikes
               )
               fetcher ! BlockFetcher.BlockImportFailed(
-                failedBlock.number,
+                failedBlock.number.value,
                 BlacklistReason
                   .BlockImportError(s"import failure x$strikes on block ${failedBlock.header.hashAsHexString}")
               )
             if strikes >= ForkDetectThreshold then
               val ourHashAtHeight = blockchainReader
-                .getBlockHeaderByNumber(failedBlock.number)
+                .getBlockHeaderByNumber(failedBlock.number.value)
                 .map(h => ByteStringUtils.hash2string(h.hash.value))
                 .getOrElse("<not found>")
               log.warning(
@@ -624,7 +626,7 @@ final private class BlockImporterLogic(
                   s"Received parent hash: ${ByteStringUtils.hash2string(failedBlock.header.parentHash.value)}. " +
                   "Triggering chain rollback and header re-sync."
               )
-              selfRef ! StartForkRecovery(failedBlock.number)
+              selfRef ! StartForkRecovery(failedBlock.number.value)
             IO.pure((importedBlocks, Some(err)))
         }
 
@@ -646,19 +648,21 @@ final private class BlockImporterLogic(
             broadcastBlocks(blocks, weights)
             updateTxPool(importedBlocksData.map(_.block), Seq.empty)
             blocks.foreach(b => blockTopic ! Topic.Publish(NewBlockImported(b)))
-            supervisor ! ProgressProtocol.ImportedBlock(block.number, internally)
+            supervisor ! ProgressProtocol.ImportedBlock(block.number.value, internally)
           case ChainReorganised(oldBranch, newBranch, weights) =>
             updateTxPool(newBranch, oldBranch)
             broadcastBlocks(newBranch, weights)
             newBranch.foreach(b => blockTopic ! Topic.Publish(NewBlockImported(b)))
-            newBranch.lastOption.foreach(block => supervisor ! ProgressProtocol.ImportedBlock(block.number, internally))
+            newBranch.lastOption.foreach(block =>
+              supervisor ! ProgressProtocol.ImportedBlock(block.number.value, internally)
+            )
           case BlockImportFailedDueToMissingNode(missingNodeException) if syncConfig.redownloadMissingStateNodes =>
             // state node re-download will be handled when downloading headers
             doLog(importMessages.missingStateNode(missingNodeException))
           case BlockImportFailedDueToMissingNode(missingNodeException) =>
             IO.raiseError(missingNodeException)
           case BlockImportFailed(error) if informFetcherOnFail =>
-            fetcher ! BlockFetcher.BlockImportFailed(block.number, BlacklistReason.BlockImportError(error))
+            fetcher ! BlockFetcher.BlockImportFailed(block.number.value, BlacklistReason.BlockImportError(error))
           case BlockEnqueued | DuplicateBlock | UnknownParent | BlockImportFailed(_) => ()
         }
         .map(_ => Running),
@@ -712,7 +716,7 @@ final private class BlockImporterLogic(
         ommersPool ! AddOmmers(blocks.head.header)
         Right(Nil)
       case UnknownBranch =>
-        val currentBlock = blocks.head.number.min(bestKnownBlockNumber)
+        val currentBlock = blocks.head.number.value.min(bestKnownBlockNumber)
         // Use the stored SNAP sync pivot as the reorg floor, matching go-ethereum's
         // ReadLastPivotNumber() pattern (core/rawdb/accessors_chain.go). The pivot is
         // written once during SNAP sync and never cleared; reorgs above the pivot are
@@ -725,7 +729,7 @@ final private class BlockImporterLogic(
           // After SNAP sync only the pivot header exists, so branch resolution can never
           // find a known parent below the pivot. The blocks ARE valid (they continue from
           // the SNAP-validated pivot). Filter blocks to only those at or above the pivot.
-          val validBlocks = blocks.filter(_.number > floor)
+          val validBlocks = blocks.filter(_.number.value > floor)
           if validBlocks.nonEmpty then
             log.info(s"Branch resolution at SNAP pivot floor ($floor), importing ${validBlocks.size} blocks directly")
             Right(validBlocks)
@@ -740,7 +744,7 @@ final private class BlockImporterLogic(
           fetcher ! BlockFetcher.InvalidateBlocksFrom(goingBackTo, msg, shouldBlacklist = false)
           Left(goingBackTo)
       case InvalidBranch =>
-        val goingBackTo = blocks.head.number
+        val goingBackTo = blocks.head.number.value
         val msg = s"Invalid branch, going back to $goingBackTo"
         log.warning(msg)
         fetcher ! BlockFetcher.InvalidateBlocksFrom(goingBackTo, msg)
@@ -759,7 +763,7 @@ final private class BlockImporterLogic(
           try
             // Look up the account directly via blockchainReader
             blockchainReader
-              .getAccount(blockchainReader.getBestBranch, address, parentBlockNumber)
+              .getAccount(blockchainReader.getBestBranch, address, parentBlockNumber.value)
               .flatMap { account =>
                 if account.codeHash != Account.EmptyCodeHash then
                   evmCodeStorage.get(account.codeHash.value) match

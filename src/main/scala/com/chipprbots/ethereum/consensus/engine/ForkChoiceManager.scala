@@ -82,7 +82,7 @@ class ForkChoiceManager(
       // Then persist canonical best-block pointer.
       maybeHeader.foreach { header =>
         blockchainWriter.promoteBranchToCanonical(BlockHash(newState.headBlockHash), blockchainReader)
-        blockchainWriter.saveBestKnownBlocks(BlockHash(newState.headBlockHash), header.number)
+        blockchainWriter.saveBestKnownBlocks(BlockHash(newState.headBlockHash), header.number.value)
       }
 
       Right(())

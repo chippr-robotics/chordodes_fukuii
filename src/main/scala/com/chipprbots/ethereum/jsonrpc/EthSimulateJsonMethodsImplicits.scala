@@ -173,7 +173,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits:
           "miner" -> encodeAsHex(h.beneficiary),
           "mixHash" -> encodeAsHex(h.mixHash.value),
           "nonce" -> encodeAsHex(h.nonce),
-          "number" -> encodeAsHex(h.number),
+          "number" -> encodeAsHex(h.number.value),
           "parentHash" -> encodeAsHex(h.parentHash.value),
           "receiptsRoot" -> encodeAsHex(h.receiptsRoot.value),
           "sha3Uncles" -> encodeAsHex(h.ommersHash.value),
@@ -235,7 +235,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits:
         val effectiveGasPrice = com.chipprbots.ethereum.domain.Transaction.effectiveGasPrice(tx, header.baseFee)
         val baseFields = List(
           "blockHash" -> encodeAsHex(blockHash),
-          "blockNumber" -> encodeAsHex(header.number),
+          "blockNumber" -> encodeAsHex(header.number.value),
           "blockTimestamp" -> encodeAsHex(BigInt(header.unixTimestamp)),
           "from" -> encodeAsHex(sender),
           "gas" -> encodeAsHex(tx.gasLimit.value),

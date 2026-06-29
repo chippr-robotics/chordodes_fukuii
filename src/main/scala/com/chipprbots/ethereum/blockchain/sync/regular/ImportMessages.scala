@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.*
 sealed abstract class ImportMessages(block: Block):
   import ImportMessages.*
   protected lazy val hash: ByteString = block.header.hash.value
-  protected lazy val number: BigInt = block.number
+  protected lazy val number: BigInt = block.number.value
 
   def preImport(): LogEntry
   def importedToTheTop(): LogEntry
