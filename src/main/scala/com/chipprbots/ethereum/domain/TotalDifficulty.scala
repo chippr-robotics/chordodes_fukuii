@@ -20,4 +20,7 @@ object TotalDifficulty:
     def <(other: TotalDifficulty): Boolean = td < other
 
   given rlpCodec: RLPCodec[TotalDifficulty] = bigIntEncDec.xmap(TotalDifficulty.apply, _.value)
-  given Ordering[TotalDifficulty] = Ordering.by(_.value)
+  // Same opaque-type-in-scope footgun as Difficulty: `TotalDifficulty =:= BigInt` here, so
+  // bare `Ordering.by(_.value)` resolves its implicit `Ordering` to the given being defined →
+  // self-referential init deadlock the moment it is summoned. Pin `scala.math.Ordering.BigInt`.
+  given Ordering[TotalDifficulty] = Ordering.by[TotalDifficulty, BigInt](_.value)(using scala.math.Ordering.BigInt)

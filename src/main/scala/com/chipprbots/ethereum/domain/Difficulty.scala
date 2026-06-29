@@ -29,4 +29,9 @@ object Difficulty:
   // Note: BlockHeader RLP uses bigIntToUnsignedByteArray directly (0x80 for zero), not this codec.
   // This codec follows the same BigInt encoding convention and is correct for non-header use sites.
   given rlpCodec: RLPCodec[Difficulty] = bigIntEncDec.xmap(Difficulty.apply, _.value)
-  given Ordering[Difficulty] = Ordering.by(_.value)
+  // Pin the BigInt ordering explicitly. Inside this object `Difficulty =:= BigInt`,
+  // so the implicit `Ordering` parameter of the bare `Ordering.by(_.value)` resolved to
+  // the given being defined → self-referential lazy-val init deadlock. Passing
+  // `scala.math.Ordering.BigInt` directly removes the implicit search while keeping the
+  // identical numeric total order.
+  given Ordering[Difficulty] = Ordering.by[Difficulty, BigInt](_.value)(using scala.math.Ordering.BigInt)
