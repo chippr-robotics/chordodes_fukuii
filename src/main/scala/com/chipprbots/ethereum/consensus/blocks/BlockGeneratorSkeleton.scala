@@ -57,7 +57,7 @@ abstract class BlockGeneratorSkeleton(
       receiptsRoot = TrieRoot.Empty,
       logsBloom = BloomFilter.Empty,
       difficulty = difficultyCalc.calculateDifficulty(blockNumber, blockTimestamp, parent.header),
-      number = blockNumber,
+      number = BlockNumber(blockNumber),
       gasLimit = GasAmount(calculateGasLimit(parent.header.gasLimit.value, blockNumber)),
       gasUsed = GasAmount.Zero,
       unixTimestamp = blockTimestamp,

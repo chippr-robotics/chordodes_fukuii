@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
@@ -66,6 +67,8 @@ object Picklers:
     transformPickler[GasAmount, BigInt](GasAmount(_))(_.value)
   given gasPricePickler: Pickler[GasPrice] =
     transformPickler[GasPrice, BigInt](GasPrice(_))(_.value)
+  given blockNumberPickler: Pickler[BlockNumber] =
+    transformPickler[BlockNumber, BigInt](BlockNumber(_))(_.value)
 
   given legacyTransactionPickler: Pickler[LegacyTransaction] = generatePickler[LegacyTransaction]
   given transactionWithAccessListPickler: Pickler[TransactionWithAccessList] =

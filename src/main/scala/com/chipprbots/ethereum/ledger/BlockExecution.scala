@@ -142,11 +142,11 @@ class BlockExecution(
     val _ = isProposer
     InMemoryWorldStateProxy(
       evmCodeStorage = evmCodeStorage,
-      blockchain.getBackingMptStorage(block.header.number),
+      blockchain.getBackingMptStorage(block.header.number.value),
       (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       accountStartNonce = blockchainConfig.accountStartNonce,
       stateRootHash = parentHeader.stateRoot.value,
-      noEmptyAccounts = EvmConfig.forBlock(block.header.number, blockchainConfig).noEmptyAccounts,
+      noEmptyAccounts = EvmConfig.forBlock(block.header.number.value, blockchainConfig).noEmptyAccounts,
       ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
     )
 
@@ -159,7 +159,7 @@ class BlockExecution(
       block: Block,
       initialWorld: InMemoryWorldStateProxy
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockResult] =
-    val blockHeaderNumber = block.header.number
+    val blockHeaderNumber = block.header.number.value
     executeBlockTransactions(block, blockHeaderNumber, initialWorld)
 
   protected def executeBlockTransactions(
@@ -239,7 +239,7 @@ class BlockExecution(
       world: InMemoryWorldStateProxy
   )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy =
     import BlockExecution.*
-    val blockNumber = block.header.number
+    val blockNumber = block.header.number.value
     // EIP-2935 activates at Prague on ETH chains (timestamp fork), or at Olympia on ETC chains (block number fork).
     val pragueActive = blockchainConfig.isPragueTimestamp(block.header.unixTimestamp)
     val etcOlympiaActive = blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC &&
@@ -323,7 +323,7 @@ class BlockExecution(
               newBlockData.weight,
               saveAsBestBlock = false
             )
-            blockchain.saveBlockState(blockToExecute.header.number)
+            blockchain.saveBlockState(blockToExecute.header.number.value)
             blockchainReader.recordBlockDifficulty(blockToExecute.header.difficulty)
             go(newBlockData :: executedBlocksDecOrder, remainingBlocksIncOrder.tail, newWeight)
           case Left(executionError) =>
@@ -368,7 +368,7 @@ class BlockExecution(
     if !blockchainConfig.isPragueTimestamp(block.header.unixTimestamp) then return (world, Nil)
 
     import BlockExecution.*
-    val evmConfig = EvmConfig.forBlock(block.header.number, block.header.unixTimestamp, blockchainConfig)
+    val evmConfig = EvmConfig.forBlock(block.header.number.value, block.header.unixTimestamp, blockchainConfig)
     var w = world
     val outputs = scala.collection.mutable.ListBuffer.empty[ByteString]
 

@@ -183,7 +183,7 @@ object SubscriptionManager:
     def blockHeaderJson(block: Block, includeTransactions: Boolean): JValue =
       val h = block.header
       val base = JObject(
-        "number" -> JString("0x" + h.number.toString(16)),
+        "number" -> JString("0x" + h.number.value.toString(16)),
         "hash" -> JString("0x" + h.hash.value.toHex),
         "parentHash" -> JString("0x" + h.parentHash.value.toHex),
         "sha3Uncles" -> JString("0x" + h.ommersHash.value.toHex),
@@ -229,7 +229,7 @@ object SubscriptionManager:
                 "transactionIndex" -> JString("0x" + txIndex.toHexString),
                 "transactionHash" -> JString("0x" + tx.hash.toHex),
                 "blockHash" -> JString("0x" + block.header.hash.value.toHex),
-                "blockNumber" -> JString("0x" + block.header.number.toString(16)),
+                "blockNumber" -> JString("0x" + block.header.number.value.toString(16)),
                 "address" -> JString(log.loggerAddress.toString),
                 "data" -> JString("0x" + log.data.toHex),
                 "topics" -> JArray(log.logTopics.map(t => JString("0x" + t.toHex)).toList)

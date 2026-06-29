@@ -55,7 +55,7 @@ abstract class NoOmmersBlockGenerator(
           parent,
           transactions,
           beneficiary,
-          blockNumber,
+          blockNumber.value,
           blockPreparator,
           x,
           initialWorldStateBeforeExecution

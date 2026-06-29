@@ -88,7 +88,7 @@ final case class HeaderSkeleton(
     Either.cond(headers.size == limit, (), InvalidTotalHeaders(headers.size, limit.toInt))
 
   private def checkSkeletonHeaderNumbers(headers: Seq[BlockHeader]): Either[HeaderSkeletonError, Unit] =
-    val downloadedHeaderNumbers = headers.map(_.number)
+    val downloadedHeaderNumbers = headers.map(_.number.value)
     val isValid = downloadedHeaderNumbers.zip(skeletonHeaderNumbers).forall {
       case (downloadedHeaderNumber, skeletonNumber) => downloadedHeaderNumber == skeletonNumber
     }
@@ -124,7 +124,7 @@ final case class HeaderSkeleton(
   private def findSkeletonHeaderByNumber(header: BlockHeader): Either[InvalidBatchLastNumber, BlockHeader] =
     skeletonHeaders
       .find(_.number == header.number)
-      .toRight(InvalidBatchLastNumber(header.number, skeletonHeaderNumbers))
+      .toRight(InvalidBatchLastNumber(header.number.value, skeletonHeaderNumbers))
 
   private def checkSkeletonParentHash(
       batchHeaders: Seq[BlockHeader],
@@ -137,7 +137,7 @@ final case class HeaderSkeleton(
         Right(())
 
   private def findBatchStartingNumber(batchHeaders: Seq[BlockHeader]): Either[HeaderBatchError, BigInt] =
-    batchHeaders.headOption.map(_.number) match
+    batchHeaders.headOption.map(_.number.value) match
       case Some(firstBatchHeader) =>
         val found = batchStartingHeaderNumbers.find(_ == firstBatchHeader)
         found.toRight(InvalidBatchFirstNumber(firstBatchHeader, batchStartingHeaderNumbers))

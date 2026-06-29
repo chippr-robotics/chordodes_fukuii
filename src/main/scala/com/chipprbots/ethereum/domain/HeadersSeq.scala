@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.domain
 
 object HeadersSeq:
-  def lastNumber(headers: HeadersSeq): Option[BigInt] = headers.lastOption.map(_.number)
+  def lastNumber(headers: HeadersSeq): Option[BigInt] = headers.lastOption.map(_.number.value)
 
   def areChain(headers: HeadersSeq): Boolean =
     if headers.length > 1 then

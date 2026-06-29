@@ -109,7 +109,7 @@ object BlockResponse:
     })
 
     BlockResponse(
-      number = block.header.number,
+      number = block.header.number.value,
       hash = if pendingBlock then None else Some(block.header.hash.value),
       parentHash = block.header.parentHash.value,
       nonce = if pendingBlock then None else Some(block.header.nonce),

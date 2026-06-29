@@ -274,11 +274,11 @@ object FastSyncBranchResolverActor:
                 if peer == searchState.masterPeer =>
               context.unwatch(requestHandler)
               headers.toList match
-                case childHeader :: Nil if childHeader.number == blockHeaderNumberToSearch =>
+                case childHeader :: Nil if childHeader.number.value == blockHeaderNumberToSearch =>
                   log.debug(ReceivedBlockHeaderLog, blockHeaderNumberToSearch, peer.id, durationMs)
                   handleBinarySearchBlockHeaderResponse(searchState, childHeader)
                 case _ =>
-                  log.warn(ReceivedWrongHeaders, blockHeaderNumberToSearch, headers.map(_.number))
+                  log.warn(ReceivedWrongHeaders, blockHeaderNumberToSearch, headers.map(_.number.value))
                   handleInvalidResponse(peer, requestHandler)
             case PeerRequestResult(RequestFailed(_, peer, reason)) =>
               handleRequestFailure(peer, requestHandler, reason)
@@ -322,7 +322,7 @@ object FastSyncBranchResolverActor:
         childHeader: BlockHeader
     ): Behavior[Command] =
       import BinarySearchSupport.*
-      blockchainReader.getBlockHeaderByNumber(parentOf(childHeader.number)) match
+      blockchainReader.getBlockHeaderByNumber(parentOf(childHeader.number.value)) match
         case Some(parentHeader) =>
           validateBlockHeaders(parentHeader, childHeader, searchState) match
             case NoCommonBlock => stopWithFailure(BranchResolutionFailed.noCommonBlock)
@@ -331,7 +331,7 @@ object FastSyncBranchResolverActor:
             case ContinueBinarySearch(newSearchState) =>
               log.debug(s"Continuing binary search with new search state: $newSearchState")
               requestBlockHeaderForBinarySearch(newSearchState)
-        case None => stopWithFailure(BranchResolutionFailed.blockHeaderNotFound(childHeader.number))
+        case None => stopWithFailure(BranchResolutionFailed.blockHeaderNotFound(childHeader.number.value))
 
     private def finalizeBranchResolver(firstCommonBlockNumber: BigInt, masterPeer: Peer): Behavior[Command] =
       branchLogic.discardBlocksAfter(firstCommonBlockNumber)

@@ -170,7 +170,7 @@ class EthSimulateService(
     val simulatedBlockHashes = mutable.Map[BigInt, ByteString]()
 
     // Create initial world state from base block
-    val evmConfig = EvmConfig.forBlock(baseBlock.header.number, baseBlock.header.unixTimestamp, blockchainConfig)
+    val evmConfig = EvmConfig.forBlock(baseBlock.header.number.value, baseBlock.header.unixTimestamp, blockchainConfig)
     var world = InMemoryWorldStateProxy(
       evmCodeStorage = evmCodeStorage,
       mptStorage = blockchain.getReadOnlyMptStorage(),
@@ -193,7 +193,7 @@ class EthSimulateService(
 
     // Pre-compute total blocks including gap-filling to validate against limit
     var totalBlocks = 0
-    var prevNum = baseBlock.header.number
+    var prevNum = baseBlock.header.number.value
     for bsc <- req.blockStateCalls do
       val targetNum = bsc.blockOverrides.flatMap(_.number).getOrElse(prevNum + 1)
       totalBlocks += (targetNum - prevNum).toInt
@@ -208,11 +208,11 @@ class EthSimulateService(
       )
 
     for (blockStateCall, _) <- req.blockStateCalls.zipWithIndex do
-      val targetNumber = blockStateCall.blockOverrides.flatMap(_.number).getOrElse(parentHeader.number + 1)
+      val targetNumber = blockStateCall.blockOverrides.flatMap(_.number).getOrElse((parentHeader.number + 1).value)
 
       // Generate gap-filling empty blocks if the target number is ahead.
       // Gap blocks inherit the persistent feeRecipient if one was set earlier.
-      while parentHeader.number + 1 < targetNumber do
+      while (parentHeader.number + 1).value < targetNumber do
         val gapOverrides = inheritedFeeRecipient.map(fr => BlockOverrides(feeRecipient = Some(fr)))
         val gapResult = buildAndFinalizeBlock(
           parentHeader,
@@ -231,7 +231,7 @@ class EthSimulateService(
           case Left(err) => break(Left(err))
           case Right((gapHeader, gapWorld, gapBlockResult, gapGasUsed)) =>
             blockResults += gapBlockResult
-            simulatedBlockHashes(gapHeader.number) = gapHeader.hash.value
+            simulatedBlockHashes(gapHeader.number.value) = gapHeader.hash.value
             parentHeader = gapHeader
             world = gapWorld
             globalAccumGas += gapGasUsed
@@ -265,7 +265,7 @@ class EthSimulateService(
         case Left(err) => break(Left(err))
         case Right((bscHeader, bscWorld, bscBlockResult, bscGasUsed)) =>
           blockResults += bscBlockResult
-          simulatedBlockHashes(bscHeader.number) = bscHeader.hash.value
+          simulatedBlockHashes(bscHeader.number.value) = bscHeader.hash.value
           parentHeader = bscHeader
           world = bscWorld
           globalAccumGas += bscGasUsed
@@ -338,7 +338,7 @@ class EthSimulateService(
       val reward = blockchainConfig.monetaryPolicyConfig.firstEraBlockReward
       val byzantiumReward = blockchainConfig.monetaryPolicyConfig.firstEraReducedBlockReward
       val constantinopleReward = blockchainConfig.monetaryPolicyConfig.firstEraConstantinopleReducedBlockReward
-      val n = simHeader.number
+      val n = simHeader.number.value
       val byzantium = blockchainConfig.forkBlockNumbers.byzantiumBlockNumber
       val constantinople = blockchainConfig.forkBlockNumbers.constantinopleBlockNumber
       val finalReward =
@@ -386,7 +386,7 @@ class EthSimulateService(
         cr.logs.map(
           _.copy(
             blockHash = blockHash,
-            blockNumber = finalHeader.number
+            blockNumber = finalHeader.number.value
           )
         )
       )
@@ -406,7 +406,7 @@ class EthSimulateService(
       blockStateCalls: Seq[BlockStateCall],
       baseHeader: BlockHeader
   ): Either[JsonRpcError, Unit] = boundary {
-    var prevNumber = baseHeader.number
+    var prevNumber = baseHeader.number.value
     var prevTimestamp = BigInt(baseHeader.unixTimestamp)
 
     for (bsc, _) <- blockStateCalls.zipWithIndex do
@@ -463,7 +463,7 @@ class EthSimulateService(
       validation: Boolean
   ): BlockHeader =
     val ov = overrides.getOrElse(BlockOverrides())
-    val number = ov.number.getOrElse(parentHeader.number + 1)
+    val number = ov.number.map(BlockNumber(_)).getOrElse(parentHeader.number + 1)
     val timestamp = ov.time.getOrElse(BigInt(parentHeader.unixTimestamp) + 12)
     val gasLimit = ov.gasLimit.map(GasAmount(_)).getOrElse(parentHeader.gasLimit)
     val beneficiary = ov.feeRecipient.map(_.bytes).getOrElse(ByteString(new Array[Byte](20)))
@@ -902,7 +902,7 @@ class EthSimulateService(
           transactionIndex = callIdx,
           transactionHash = stx.hash.value,
           blockHash = ByteString(new Array[Byte](32)), // Placeholder — updated after header finalized
-          blockNumber = blockHeader.number,
+          blockNumber = blockHeader.number.value,
           address = txLog.loggerAddress,
           data = txLog.data,
           topics = txLog.logTopics,
@@ -989,7 +989,7 @@ class EthSimulateService(
       world: InMemoryWorldStateProxy
   ): InMemoryWorldStateProxy =
     import com.chipprbots.ethereum.ledger.BlockExecution.*
-    val blockNumber = blockHeader.number
+    val blockNumber = blockHeader.number.value
     // Deploy history storage contract if not already deployed
     val w1 = if world.getCode(HistoryStorageAddress).isEmpty then
       val account = world

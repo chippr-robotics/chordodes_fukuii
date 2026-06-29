@@ -173,7 +173,7 @@ object GraphQLSchema:
     ctx.blockchainReader.getBlockByNumber(ctx.blockchainReader.getBestBranch, blockNumber).map { b =>
       InMemoryWorldStateProxy(
         ctx.evmCodeStorage,
-        ctx.blockchain.getBackingMptStorage(b.header.number),
+        ctx.blockchain.getBackingMptStorage(b.header.number.value),
         (n: BigInt) => ctx.blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value),
         ctx.blockchainConfig.accountStartNonce,
         b.header.stateRoot.value,
@@ -440,7 +440,7 @@ object GraphQLSchema:
               case Some(n) => BigInt(n)
               case None =>
                 c.value.parent.blockInfo
-                  .map(_.block.header.number)
+                  .map(_.block.header.number.value)
                   .getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
             GAccount(c.value.log.loggerAddress.bytes, blockNum)
         ),
@@ -469,7 +469,7 @@ object GraphQLSchema:
             val blockNum = c.arg(BlockNumberArg) match
               case Some(n) => BigInt(n)
               case None =>
-                c.value.blockInfo.map(_.block.header.number).getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
+                c.value.blockInfo.map(_.block.header.number.value).getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
             val sender = SignedTransaction.getSender(c.value.stx).getOrElse(Address(0))
             GAccount(sender.bytes, blockNum)
         ),
@@ -483,7 +483,7 @@ object GraphQLSchema:
                 case Some(n) => BigInt(n)
                 case None =>
                   c.value.blockInfo
-                    .map(_.block.header.number)
+                    .map(_.block.header.number.value)
                     .getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
               GAccount(addr.bytes, blockNum)
             }
@@ -549,7 +549,7 @@ object GraphQLSchema:
               if c.value.stx.tx.isContractInit then
                 SignedTransaction.getSender(c.value.stx).map { sender =>
                   val createdAddress = createContractAddress(sender, c.value.stx.tx.nonce)
-                  val blockNum = c.arg(BlockNumberArg).map(BigInt(_)).getOrElse(bi.block.header.number)
+                  val blockNum = c.arg(BlockNumberArg).map(BigInt(_)).getOrElse(bi.block.header.number.value)
                   GAccount(createdAddress.bytes, blockNum)
                 }
               else None

@@ -22,7 +22,7 @@ case class Block(header: BlockHeader, body: BlockBody):
   def idTag: String =
     header.idTag
 
-  def number: BigInt = header.number
+  def number: BlockNumber = header.number
 
   def hash: BlockHash = header.hash
 

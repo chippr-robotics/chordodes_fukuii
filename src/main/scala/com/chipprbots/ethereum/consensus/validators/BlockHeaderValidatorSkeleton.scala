@@ -128,7 +128,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
         blockHeader: BlockHeader,
         daoForkConfig: DaoForkConfig
     ): Either[BlockHeaderError, BlockHeaderValid] =
-      (daoForkConfig.requiresExtraData(blockHeader.number), daoForkConfig.blockExtraData) match
+      (daoForkConfig.requiresExtraData(blockHeader.number.value), daoForkConfig.blockExtraData) match
         case (false, _) =>
           Right(BlockHeaderValid)
         case (true, Some(forkExtraData)) if blockHeader.extraData == forkExtraData =>
@@ -177,7 +177,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
       // because the Ethash difficulty algorithm always produces a positive value.
       Right(BlockHeaderValid)
     else if difficulty.calculateDifficulty(
-        blockHeader.number,
+        blockHeader.number.value,
         blockHeader.unixTimestamp,
         parent
       ) == blockHeader.difficulty
@@ -248,7 +248,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
   private def validateExtraFields(
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    val isOlympiaActivated = blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
+    val isOlympiaActivated = blockHeader.number.value >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
 
     blockHeader.extraFields match
       case HefPostPrague(_, _, _, _, _, _) if isOlympiaActivated => Right(BlockHeaderValid)
@@ -266,7 +266,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
       blockHeader: BlockHeader,
       parentHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    val isOlympiaActivated = blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
+    val isOlympiaActivated = blockHeader.number.value >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
     if !isOlympiaActivated then Right(BlockHeaderValid)
     else
       blockHeader.baseFee match

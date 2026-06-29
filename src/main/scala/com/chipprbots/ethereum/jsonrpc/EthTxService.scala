@@ -130,8 +130,8 @@ class EthTxService(
         // index, AND (b) its number is <= the client's best-block pointer (i.e. FCU has
         // advanced past it). (a) alone is true right after newPayload's storeBlock but
         // (b) flips only when the subsequent FCU updates saveBestKnownBlocks.
-        _ <- blockchainReader.getBlockHeaderByNumber(header.number).filter(_.hash.value == blockHash)
-        bestNum = blockchainReader.getBestBlockNumber if header.number <= bestNum
+        _ <- blockchainReader.getBlockHeaderByNumber(header.number.value).filter(_.hash.value == blockHash)
+        bestNum = blockchainReader.getBestBlockNumber if header.number.value <= bestNum
         stx <- body.transactionList.lift(txIndex)
         receipts <- blockchainReader.getReceiptsByHash(BlockHash(blockHash))
         receipt: Receipt <- receipts.lift(txIndex)
@@ -248,7 +248,7 @@ class EthTxService(
           // use the timestamp-aware forBlock variant — Shanghai activates by timestamp on
           // post-merge chains, not block number.
           val tip = blockchainReader.getBestBlock.map(_.header)
-          val bestNum = tip.map(_.number).getOrElse(blockchainReader.getBestBlockNumber)
+          val bestNum = tip.map(_.number.value).getOrElse(blockchainReader.getBestBlockNumber)
           val ts = tip.map(_.unixTimestamp).getOrElse(0L)
           val evmConfig = com.chipprbots.ethereum.vm.EvmConfig.forBlock(bestNum, ts, blockchainConfig)
           val tx = signedTransaction.tx

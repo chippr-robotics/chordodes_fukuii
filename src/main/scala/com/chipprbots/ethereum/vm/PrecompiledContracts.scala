@@ -122,8 +122,8 @@ object PrecompiledContracts:
     getContracts(context).contains(addr)
 
   def getContracts(context: ProgramContext[?, ?]): Map[Address, PrecompiledContract] =
-    val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number)
-    val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number)
+    val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number.value)
+    val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number.value)
     // Post-Cancun detection: check if block header has blob gas fields
     val isCancun = context.blockHeader.blobGasUsed.isDefined || context.blockHeader.excessBlobGas.isDefined
     // EIP-2537 BLS12-381 precompiles activate at Prague timestamp on ETH chains
@@ -151,8 +151,8 @@ object PrecompiledContracts:
 
     def run[W <: WorldStateProxy[W, S], S <: Storage[S]](context: ProgramContext[W, S]): ProgramResult[W, S] =
 
-      val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number)
-      val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number)
+      val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number.value)
+      val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number.value)
 
       val g = gas(context.inputData, etcFork, ethFork)
 
@@ -235,8 +235,8 @@ object PrecompiledContracts:
     override def run[W <: WorldStateProxy[W, S], S <: Storage[S]](
         context: ProgramContext[W, S]
     ): ProgramResult[W, S] =
-      val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number)
-      val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number)
+      val etcFork = context.evmConfig.blockchainConfig.etcForkForBlockNumber(context.blockHeader.number.value)
+      val ethFork = context.evmConfig.blockchainConfig.ethForkForBlockNumber(context.blockHeader.number.value)
       val isOsaka = context.evmConfig.blockchainConfig.isOsakaTimestamp(context.blockHeader.unixTimestamp)
       val isEthereum = context.evmConfig.blockchainConfig.isEthereum
       // EIP-7823 (MODEXP input bounds, 1024-byte max) activates at:

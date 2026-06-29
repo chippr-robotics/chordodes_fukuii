@@ -191,7 +191,7 @@ class EngineApiService(
         blockchainReader.getBlockHeaderByHash(BlockHash(payload.parentHash)).map(_.hash.value).getOrElse(zeroHash)
       PayloadStatusV1(Invalid, latestValidHash = Some(lvh), validationError = Some("INVALID_VERSIONED_HASHES"))
     else if blockchainReader.getBlockHeaderByHash(BlockHash(payload.blockHash)).exists { h =>
-        blockchainReader.getBlockHeaderByNumber(h.number).exists(_.hash.value == payload.blockHash)
+        blockchainReader.getBlockHeaderByNumber(h.number.value).exists(_.hash.value == payload.blockHash)
       }
     then
       // Already fully stored with number mapping — skip re-execution
@@ -297,7 +297,7 @@ class EngineApiService(
         // parent) has unverified ancestry, and a child built on it must NOT be claimed as
         // VALID — hive's "Invalid NewPayload, ParentHash" test expects ACCEPTED/SYNCING.
         val parentValidated = parentHeader.exists { p =>
-          blockchainReader.getBlockHeaderByNumber(p.number).exists(_.hash == p.hash) ||
+          blockchainReader.getBlockHeaderByNumber(p.number.value).exists(_.hash == p.hash) ||
           blockchainReader.getReceiptsByHash(p.hash).isDefined
         }
         val executionResult =
@@ -330,7 +330,7 @@ class EngineApiService(
                     // we store by-hash-only so later forkchoiceUpdated can promote via
                     // ForkChoiceManager.promoteBranchToCanonical.
                     val extendsCanonical = parentHeader.exists { p =>
-                      blockchainReader.getBlockHeaderByNumber(p.number).exists(_.hash == p.hash)
+                      blockchainReader.getBlockHeaderByNumber(p.number.value).exists(_.hash == p.hash)
                     }
                     if extendsCanonical then blockchainWriter.storeBlock(block).commit()
                     else blockchainWriter.storeBlockByHashOnly(block).commit()
@@ -442,7 +442,9 @@ class EngineApiService(
       // Chain-imported blocks (chain.rlp) and newPayload VALID blocks DO have it.
       val headHeader = blockchainReader.getBlockHeaderByHash(BlockHash(forkChoiceState.headBlockHash))
       val blockFullyStored = headHeader.exists { header =>
-        blockchainReader.getBlockHeaderByNumber(header.number).exists(_.hash.value == forkChoiceState.headBlockHash)
+        blockchainReader
+          .getBlockHeaderByNumber(header.number.value)
+          .exists(_.hash.value == forkChoiceState.headBlockHash)
       }
       val blockExistsByHash = headHeader.isDefined
       val isGenesis = forkChoiceState.headBlockHash == blockchainReader
@@ -600,7 +602,7 @@ class EngineApiService(
                       val parentBaseFee = parent.header.baseFee.getOrElse(BigInt("1000000000"))
                       val parentGasTarget = parent.header.gasLimit / 2
                       val baseFee: BigInt =
-                        if parent.header.number == 0 then parentBaseFee
+                        if parent.header.number == BlockNumber.Zero then parentBaseFee
                         else if parent.header.gasUsed == parentGasTarget then parentBaseFee
                         else if parent.header.gasUsed > parentGasTarget then
                           val delta =
@@ -1130,7 +1132,7 @@ class EngineApiService(
       receiptsRoot = TrieRoot(payload.receiptsRoot),
       logsBloom = BloomFilter(payload.logsBloom),
       difficulty = Difficulty.Zero,
-      number = payload.blockNumber,
+      number = BlockNumber(payload.blockNumber),
       gasLimit = GasAmount(payload.gasLimit),
       gasUsed = GasAmount(payload.gasUsed),
       unixTimestamp = payload.timestamp,

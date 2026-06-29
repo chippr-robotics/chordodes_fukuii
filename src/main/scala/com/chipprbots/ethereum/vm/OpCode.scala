@@ -206,7 +206,7 @@ object OpCode:
       postColdGasFn: FeeSchedule => BigInt,
       postWarmGasFn: FeeSchedule => BigInt
   ): BigInt =
-    val currentBlockNumber = state.env.blockHeader.number
+    val currentBlockNumber = state.env.blockHeader.number.value
     val etcFork = state.config.blockchainConfig.etcForkForBlockNumber(currentBlockNumber)
     val ethFork = state.config.blockchainConfig.ethForkForBlockNumber(currentBlockNumber)
     val eip2929Enabled = isEip2929Enabled(etcFork, ethFork)
@@ -564,7 +564,8 @@ case object BLOCKHASH extends OpCode(0x40, 1, 1, _.G_blockhash) with ConstGas:
   protected def exec[S <: Storage[S], W <: WorldStateProxy[W, S]](state: ProgramState[W, S]): ProgramState[W, S] =
     val (blockNumber, stack1) = state.stack.pop()
 
-    val outOfLimits = state.env.blockHeader.number - blockNumber > 256 || blockNumber >= state.env.blockHeader.number
+    val outOfLimits =
+      state.env.blockHeader.number.value - blockNumber > 256 || blockNumber >= state.env.blockHeader.number.value
     val hash = if outOfLimits then UInt256.Zero else state.world.getBlockHash(blockNumber).getOrElse(UInt256.Zero)
 
     val stack2 = stack1.push(hash)
@@ -574,7 +575,7 @@ case object COINBASE extends ConstOp(0x41)(s => UInt256(s.env.blockHeader.benefi
 
 case object TIMESTAMP extends ConstOp(0x42)(s => UInt256(s.env.blockHeader.unixTimestamp))
 
-case object NUMBER extends ConstOp(0x43)(s => UInt256(s.env.blockHeader.number))
+case object NUMBER extends ConstOp(0x43)(s => UInt256(s.env.blockHeader.number.value))
 
 case object DIFFICULTY
     extends ConstOp(0x44)(s =>
@@ -637,7 +638,7 @@ case object MSTORE8 extends OpCode(0x53, 2, 0, _.G_verylow):
 
 case object SSTORE extends OpCode(0x55, 2, 0, _.G_zero):
   protected def exec[S <: Storage[S], W <: WorldStateProxy[W, S]](state: ProgramState[W, S]): ProgramState[W, S] =
-    val currentBlockNumber = state.env.blockHeader.number
+    val currentBlockNumber = state.env.blockHeader.number.value
     val etcFork = state.config.blockchainConfig.etcForkForBlockNumber(currentBlockNumber)
     val ethFork = state.config.blockchainConfig.ethForkForBlockNumber(currentBlockNumber)
 
@@ -682,7 +683,7 @@ case object SSTORE extends OpCode(0x55, 2, 0, _.G_zero):
     val (Seq(offset, newValue), _) = state.stack.pop(2)
     val currentValue = state.storage.load(offset)
 
-    val currentBlockNumber = state.env.blockHeader.number
+    val currentBlockNumber = state.env.blockHeader.number.value
     val etcFork = state.config.blockchainConfig.etcForkForBlockNumber(currentBlockNumber)
     val ethFork = state.config.blockchainConfig.ethForkForBlockNumber(currentBlockNumber)
 

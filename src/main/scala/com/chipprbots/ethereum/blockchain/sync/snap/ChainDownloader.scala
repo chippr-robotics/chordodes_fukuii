@@ -461,10 +461,10 @@ class ChainDownloader private (
 
     // Find usable headers: skip any before our expected start, use what extends our chain
     val usableOpt: Option[Seq[BlockHeader]] =
-      if headers.head.number == expectedStart then Some(headers)
-      else if headers.head.number < expectedStart && headers.last.number >= expectedStart then
+      if headers.head.number.value == expectedStart then Some(headers)
+      else if headers.head.number.value < expectedStart && headers.last.number.value >= expectedStart then
         // Response overlaps — trim to the portion we need
-        val trimmed = headers.dropWhile(_.number < expectedStart)
+        val trimmed = headers.dropWhile(_.number.value < expectedStart)
         log.debug(
           "Chain download: trimmed overlapping headers {}-{} to start at {} ({} usable)",
           headers.head.number,
@@ -473,7 +473,7 @@ class ChainDownloader private (
           trimmed.size
         )
         Some(trimmed)
-      else if headers.head.number > expectedStart then
+      else if headers.head.number.value > expectedStart then
         // Gap — can't use without the intervening headers
         log.debug(
           "Chain download: peer {} sent headers starting at {} but we need {} (gap)",
@@ -522,7 +522,7 @@ class ChainDownloader private (
               blockchainWriter
                 .storeBlockHeader(header)
                 .and(blockchainWriter.storeChainWeight(header.hash, parentWeight.increase(header)))
-                .and(appStateStorage.putBackfillBestHeader(header.number))
+                .and(appStateStorage.putBackfillBestHeader(header.number.value))
                 .commit()
 
               bodiesQueue :+= header.hash.value
@@ -555,7 +555,7 @@ class ChainDownloader private (
       // Store received bodies + atomically advance the body cursor (#1169).
       val received = requestedHashes.zip(bodies)
       val highestBodyNumber = received
-        .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number) }
+        .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number.value) }
         .maxOption
         .getOrElse(BigInt(0))
       val cursorUpdate =
@@ -611,7 +611,7 @@ class ChainDownloader private (
         // ahead of disk.
         val receiptsByHash = requestedHashes.zip(receiptsByBlock)
         val highestReceiptNumber = receiptsByHash
-          .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number) }
+          .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number.value) }
           .maxOption
           .getOrElse(BigInt(0))
 
@@ -695,7 +695,7 @@ class ChainDownloader private (
         // Store complete receipts + advance backfill cursor (#1169 pattern)
         if completeByHash.nonEmpty then
           val highestReceiptNumber = completeByHash
-            .flatMap { case (h, _) => blockchainReader.getBlockHeaderByHash(BlockHash(h)).map(_.number) }
+            .flatMap { case (h, _) => blockchainReader.getBlockHeaderByHash(BlockHash(h)).map(_.number.value) }
             .maxOption
             .getOrElse(BigInt(0))
 

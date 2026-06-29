@@ -539,7 +539,7 @@ class EngineApiController(
       "receiptsRoot" -> JString(hex(header.receiptsRoot.value)),
       "logsBloom" -> JString(hex(header.logsBloom.value)),
       "prevRandao" -> JString(hex(header.mixHash.value)),
-      "blockNumber" -> JString(hexQ(header.number)),
+      "blockNumber" -> JString(hexQ(header.number.value)),
       "gasLimit" -> JString(hexQ(header.gasLimit.value)),
       "gasUsed" -> JString(hexQ(header.gasUsed.value)),
       "timestamp" -> JString(s"0x${header.unixTimestamp.toHexString}"),

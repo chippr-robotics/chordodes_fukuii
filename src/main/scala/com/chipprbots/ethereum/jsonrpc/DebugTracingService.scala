@@ -309,7 +309,11 @@ class DebugTracingService(
         block <- blockchainReader
           .getBlockByHash(BlockHash(req.blockHash))
           .toRight(JsonRpcError.InvalidParams(s"Block not found for hash ${req.blockHash.toHex}"))
-        _ <- Either.cond(block.header.number > 0, (), JsonRpcError.InvalidParams("Genesis block is not traceable"))
+        _ <- Either.cond(
+          block.header.number.value > 0,
+          (),
+          JsonRpcError.InvalidParams("Genesis block is not traceable")
+        )
         parentHeader <- blockchainReader
           .getBlockHeaderByHash(block.header.parentHash)
           .toRight(JsonRpcError.InvalidParams("Parent block header not found"))
@@ -362,7 +366,7 @@ class DebugTracingService(
                 stxLedger.simulateTransactionWithTracer(stx, block.header, Some(world), tracer)
                 tracer.getResult
               }
-              TraceChainBlockResult(block.header.number, block.header.hash.value, traces)
+              TraceChainBlockResult(block.header.number.value, block.header.hash.value, traces)
             }
           }
         }

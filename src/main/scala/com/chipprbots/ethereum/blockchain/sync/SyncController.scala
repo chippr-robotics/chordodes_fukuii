@@ -962,7 +962,7 @@ object SyncController:
                 .map(_.totalDifficulty.value)
                 .getOrElse(blockchainReader.genesisHeader.difficulty.value)
               val calibratedTD =
-                if peerMaxBlock > BigInt(0) then peerTD * bestBlock.header.number / peerMaxBlock
+                if peerMaxBlock > BigInt(0) then peerTD * bestBlock.header.number.value / peerMaxBlock
                 else peerTD
               if calibratedTD > genesisWeight * BigInt(1000) then
                 val storedTD: BigInt = blockchainReader
@@ -2387,7 +2387,7 @@ object SyncController:
 
           while !anchorFound && !abort do
             blockchainReader.getChainWeightByHash(cur.hash) match
-              case Some(cw) if cw.totalDifficulty.value > cur.number * MinTDPerBlock =>
+              case Some(cw) if cw.totalDifficulty.value > cur.number.value * MinTDPerBlock =>
                 anchorTD = cw.totalDifficulty.value
                 anchorFound = true
                 log.debug(

@@ -85,7 +85,7 @@ object TransactionReceiptResponse:
         transactionIndex = transactionIndex,
         transactionHash = stx.hash.value,
         blockHash = blockHeader.hash.value,
-        blockNumber = blockHeader.number,
+        blockNumber = blockHeader.number.value,
         address = txLog.loggerAddress,
         data = txLog.data,
         topics = txLog.logTopics,
@@ -114,7 +114,7 @@ object TransactionReceiptResponse:
     new TransactionReceiptResponse(
       transactionHash = stx.hash.value,
       transactionIndex = transactionIndex,
-      blockNumber = blockHeader.number,
+      blockNumber = blockHeader.number.value,
       blockHash = blockHeader.hash.value,
       from = signedTransactionSender,
       to = stx.tx.receivingAddress,
