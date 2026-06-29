@@ -173,7 +173,8 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
 
     if nonce > maxNonceValue then Left(TransactionSyntaxError(s"Invalid nonce: $nonce > $maxNonceValue"))
     else if nonce > eip2681NonceCap then Left(TransactionSyntaxError(s"EIP-2681: nonce $nonce >= 2^64-1"))
-    else if gasLimit > maxGasValue then Left(TransactionSyntaxError(s"Invalid gasLimit: $gasLimit > $maxGasValue"))
+    else if gasLimit > GasAmount(maxGasValue) then
+      Left(TransactionSyntaxError(s"Invalid gasLimit: $gasLimit > $maxGasValue"))
     else if gasPrice > maxGasValue then Left(TransactionSyntaxError(s"Invalid gasPrice: $gasPrice > $maxGasValue"))
     else if value > maxValue then Left(TransactionSyntaxError(s"Invalid value: $value > $maxValue"))
     else if signature.r > maxR then Left(TransactionSyntaxError(s"Invalid signatureRandom: ${signature.r} > $maxR"))
@@ -295,8 +296,8 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
       case _                       => 0
     val txIntrinsicGas =
       config.calcTransactionIntrinsicGas(tx.payload, tx.isContractInit, Transaction.accessList(tx), authListSize)
-    if stx.tx.gasLimit >= txIntrinsicGas then Right(SignedTransactionValid)
-    else Left(TransactionNotEnoughGasForIntrinsicError(stx.tx.gasLimit, txIntrinsicGas))
+    if stx.tx.gasLimit >= GasAmount(txIntrinsicGas) then Right(SignedTransactionValid)
+    else Left(TransactionNotEnoughGasForIntrinsicError(stx.tx.gasLimit.value, txIntrinsicGas))
 
   /** Validates the sender account balance contains at least the cost required in up-front payment.
     *
@@ -328,8 +329,8 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
     // maps London→olympiaBlockNumber, so we must NOT trip the Olympia gate there.
     val isOlympiaActivated = !isEth && blockHeaderNumber >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
     val isOsakaActivated = blockchainConfig.isOsakaTimestamp(blockHeaderTimestamp)
-    if (isOlympiaActivated || isOsakaActivated) && stx.tx.gasLimit > TxGasLimitCap then
-      Left(TransactionGasLimitExceedsCap(stx.tx.gasLimit, TxGasLimitCap))
+    if (isOlympiaActivated || isOsakaActivated) && stx.tx.gasLimit > GasAmount(TxGasLimitCap) then
+      Left(TransactionGasLimitExceedsCap(stx.tx.gasLimit.value, TxGasLimitCap))
     else Right(SignedTransactionValid)
 
   /** The sum of the transaction’s gas limit and the gas utilised in this block prior must be no greater than the
@@ -347,7 +348,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
   private def validateBlockHasEnoughGasLimitForTx(
       stx: SignedTransaction,
       accumGasUsed: BigInt,
-      blockGasLimit: BigInt
+      blockGasLimit: GasAmount
   ): Either[SignedTransactionError, SignedTransactionValid] =
-    if stx.tx.gasLimit + accumGasUsed <= blockGasLimit then Right(SignedTransactionValid)
-    else Left(TransactionGasLimitTooBigError(stx.tx.gasLimit, accumGasUsed, blockGasLimit))
+    if stx.tx.gasLimit + GasAmount(accumGasUsed) <= blockGasLimit then Right(SignedTransactionValid)
+    else Left(TransactionGasLimitTooBigError(stx.tx.gasLimit.value, accumGasUsed, blockGasLimit.value))

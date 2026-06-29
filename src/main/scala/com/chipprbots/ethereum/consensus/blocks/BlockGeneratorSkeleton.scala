@@ -58,8 +58,8 @@ abstract class BlockGeneratorSkeleton(
       logsBloom = BloomFilter.Empty,
       difficulty = difficultyCalc.calculateDifficulty(blockNumber, blockTimestamp, parent.header),
       number = blockNumber,
-      gasLimit = calculateGasLimit(parent.header.gasLimit, blockNumber),
-      gasUsed = 0,
+      gasLimit = GasAmount(calculateGasLimit(parent.header.gasLimit.value, blockNumber)),
+      gasUsed = GasAmount.Zero,
       unixTimestamp = blockTimestamp,
       extraData = blockchainConfig.daoForkConfig
         .flatMap(daoForkConfig => daoForkConfig.getExtraData(blockNumber))
@@ -113,7 +113,7 @@ abstract class BlockGeneratorSkeleton(
                 stateRoot = TrieRoot(stateRoot),
                 receiptsRoot = TrieRoot(buildMpt(receipts, Receipt.byteArraySerializable)),
                 logsBloom = BloomFilter(bloomFilter),
-                gasUsed = gasUsed
+                gasUsed = GasAmount(gasUsed)
               ),
               body = prepareBlock.body
             ),
@@ -124,7 +124,7 @@ abstract class BlockGeneratorSkeleton(
 
   protected def prepareTransactions(
       transactions: Seq[SignedTransaction],
-      blockGasLimit: BigInt,
+      blockGasLimit: GasAmount,
       blockBaseFee: BigInt = BigInt(0),
       blockNumber: BigInt = BigInt(0)
   )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransaction] =
@@ -168,7 +168,7 @@ abstract class BlockGeneratorSkeleton(
       .flatMap { case (_, txs) => txs }
 
     val transactionsForBlock: Seq[SignedTransaction] = sortedTransactions
-      .scanLeft((BigInt(0), None: Option[SignedTransaction])) { case ((accumulatedGas, _), stx) =>
+      .scanLeft((GasAmount.Zero, None: Option[SignedTransaction])) { case ((accumulatedGas, _), stx) =>
         (accumulatedGas + stx.tx.gasLimit, Some(stx))
       }
       .collect { case (gas, Some(stx)) => (gas, stx) }

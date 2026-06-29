@@ -260,7 +260,7 @@ object PendingTransactionsManager:
               accountsBySender.get(stx.senderAddress).flatten.exists { account =>
                 val tx = stx.tx.tx
                 val nonceValid = tx.nonce >= account.nonce.toBigInt && tx.nonce < account.nonce.toBigInt + 1024
-                val maxGasCost = tx.gasLimit * tx.gasPrice
+                val maxGasCost = (tx.gasLimit * tx.gasPrice).value
                 val totalCost = tx.value + maxGasCost
                 val balanceValid = account.balance.toBigInt >= totalCost
                 nonceValid && balanceValid

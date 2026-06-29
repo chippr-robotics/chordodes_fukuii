@@ -99,8 +99,8 @@ class BlockPreparator(
         )
 
       blockHeader.baseFee match
-        case Some(baseFee) if baseFee > 0 && blockHeader.gasUsed > 0 && treasuryAddress != Address(0) =>
-          val treasuryCredit = baseFee * blockHeader.gasUsed
+        case Some(baseFee) if baseFee > 0 && blockHeader.gasUsed > GasAmount.Zero && treasuryAddress != Address(0) =>
+          val treasuryCredit = baseFee * blockHeader.gasUsed.value
           log.debug(
             "Crediting baseFee revenue {} (baseFee={} * gasUsed={}) to treasury {}",
             treasuryCredit,
@@ -118,7 +118,7 @@ class BlockPreparator(
     * @return
     *   Upfront cost
     */
-  private[ledger] def calculateUpfrontGas(tx: Transaction): UInt256 = UInt256(tx.gasLimit * tx.gasPrice)
+  private[ledger] def calculateUpfrontGas(tx: Transaction): UInt256 = UInt256((tx.gasLimit * tx.gasPrice).value)
 
   /** v0 ≡ Tg (Tx gas limit) * Tp (Tx gas price) + Tv (Tx value). See YP equation number (65)
     *
@@ -171,7 +171,7 @@ class BlockPreparator(
     // Surfaces on hive `bcEIP1559/burnVerify_Cancun` which reads BALANCE inside
     // the contract to verify the burn invariant.
     val effectiveGasPrice = Transaction.effectiveGasPrice(stx.tx, blockHeader.baseFee)
-    val executionUpfront = stx.tx.gasLimit * effectiveGasPrice
+    val executionUpfront = (stx.tx.gasLimit * effectiveGasPrice).value
     val upfrontTotal = executionUpfront + blobGasCost
     worldStateProxy.saveAccount(
       senderAddress,
@@ -268,7 +268,7 @@ class BlockPreparator(
       case Some(true)  => 0
       case Some(false) => result.gasRemaining
       case None =>
-        val gasUsed = stx.tx.gasLimit - result.gasRemaining
+        val gasUsed = stx.tx.gasLimit.value - result.gasRemaining
         val blockchainConfigForEvm = BlockchainConfigForEvm(blockchainConfig)
         val etcFork = blockchainConfigForEvm.etcForkForBlockNumber(blockNumber)
         // EIP-3529: post-London refund cap is gasUsed/5 (not gasUsed/2)
@@ -401,7 +401,7 @@ class BlockPreparator(
         resultWithErrorHandling.copy(gasRefund = resultWithErrorHandling.gasRefund + authExistingAccountRefund)
       else resultWithErrorHandling
     val totalGasToRefundBase = calcTotalGasToRefund(stx, resultWithAuthRefund, blockHeader.number)
-    val executionGasBase = gasLimit - totalGasToRefundBase
+    val executionGasBase = gasLimit - GasAmount(totalGasToRefundBase)
 
     if DebugTrace.enabledForBlock(blockHeader.number) then
       val evmConfig = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
@@ -425,7 +425,7 @@ class BlockPreparator(
         (blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC &&
           blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber)
     val executionGasToPayToMiner =
-      if eip7623Active then executionGasBase.max(BlockPreparator.calcFloorDataGas(stx.tx.payload))
+      if eip7623Active then executionGasBase.max(GasAmount(BlockPreparator.calcFloorDataGas(stx.tx.payload)))
       else executionGasBase
     val totalGasToRefund = gasLimit - executionGasToPayToMiner
 
@@ -433,7 +433,7 @@ class BlockPreparator(
     // (post-EIP-1559: NOT maxFeePerGas — see comment there). So the refund only
     // needs to return the unused portion: (gasLimit - executionGas) * effectiveGasPrice.
     // No maxFee overpay to undo.
-    val refundAmount = totalGasToRefund * gasPrice
+    val refundAmount = totalGasToRefund.value * gasPrice
     val refundGasFn = pay(senderAddress, refundAmount.toUInt256, withTouch = false)
     // EIP-1559: miner receives only the priority fee (effectiveGasPrice - baseFee).
     // The baseFee portion is burned on ETH chains, or credited to treasury on ETC (ECIP-1111).
@@ -442,7 +442,11 @@ class BlockPreparator(
       case Some(_)                                       => UInt256.Zero // effectiveGasPrice < baseFee: no priority fee
       case None                                          => gasPrice
     val payMinerForGasFn =
-      pay(Address(blockHeader.beneficiary), (executionGasToPayToMiner * minerGasPrice).toUInt256, withTouch = true)
+      pay(
+        Address(blockHeader.beneficiary),
+        (executionGasToPayToMiner.value * minerGasPrice).toUInt256,
+        withTouch = true
+      )
 
     val worldAfterPayments = refundGasFn.andThen(payMinerForGasFn)(resultWithErrorHandling.world)
 
@@ -487,7 +491,7 @@ class BlockPreparator(
          | - Total Gas to Refund: $totalGasToRefund
          | - Execution gas paid to miner: $executionGasToPayToMiner""".stripMargin)
 
-    TxResult(world2, executionGasToPayToMiner, resultWithErrorHandling.logs, result.returnData, result.error)
+    TxResult(world2, executionGasToPayToMiner.value, resultWithErrorHandling.logs, result.returnData, result.error)
 
   // scalastyle:off method.length
   /** This functions executes all the signed transactions from a block (till one of those executions fails)

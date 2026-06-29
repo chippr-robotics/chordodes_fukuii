@@ -118,7 +118,7 @@ object TransactionResponse:
       to = stx.tx.receivingAddress.map(_.bytes),
       value = stx.tx.value,
       gasPrice = effectiveGasPrice,
-      gas = stx.tx.gasLimit,
+      gas = stx.tx.gasLimit.value,
       input = stx.tx.payload,
       `type` = Some(txType),
       chainId = txChainId,
