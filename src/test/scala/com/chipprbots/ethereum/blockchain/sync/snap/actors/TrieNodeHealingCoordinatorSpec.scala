@@ -392,9 +392,11 @@ class TrieNodeHealingCoordinatorSpec
     )
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
-    // The walk root is absent (empty storage), so StartTrieNodeHealing seeds the root via queueNodes
-    // (Besu-aligned top-down seeding). The QueueMissingNodes tasks are also queued. Dispatch follows.
-    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd] // task dispatched
+    // The walk root is absent (empty storage), so StartTrieNodeHealing first fires the seed-site guard
+    // (PR #1371, proven-live): it signals HealingRootUnservable and does NOT seed the root. The
+    // QueueMissingNodes tasks are still real and get dispatched to the peer below.
+    snapSyncController.expectMessage(SNAPSyncController.HealingRootUnservable(stateRoot))
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd] // queued task dispatched
 
     // ForceComplete while tasks are in-flight: abandon all, signal complete immediately
     coordinator ! TrieNodeHealingCoordinator.HealingForceComplete
@@ -591,6 +593,10 @@ class TrieNodeHealingCoordinatorSpec
     networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd] // reqId=1
     networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd] // reqId=2
     networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd] // reqId=3
+
+    // Absent walk root ⇒ the seed-site guard (PR #1371, proven-live) already signalled HealingRootUnservable to
+    // the controller. Drain it so the key expectNoMessage below is scoped strictly to the timeout→stateless behavior.
+    snapSyncController.expectMessage(SNAPSyncController.HealingRootUnservable(stateRoot))
 
     // Simulate 3 consecutive timeouts for the same peer (one per active request)
     coordinator ! TrieNodeHealingCoordinator.HealingRequestTimeout(BigInt(1))
@@ -1144,13 +1150,17 @@ class TrieNodeHealingCoordinatorSpec
   }
 
   // ========================================
-  // Seed guard (Besu-aligned top-down): an ABSENT walk root IS seeded via queueNodes so the network
-  // can fetch and reconstruct it. A PRESENT root restarts via local BFS as before.
+  // Complementary seed guard (PR #1371, proven-live; root-cause w98gfx4wn): an ABSENT walk root must NOT be
+  // seeded — seeding it stalls the heal at "exactly 1 node, healed=0" forever. Instead signal the controller
+  // (HealingRootUnservable) so it takes the lazy-heal handoff. A PRESENT root still heals normally.
   // ========================================
 
-  it should "seed the walk root into pendingTasks when the walk root's bytes are absent" taggedAs UnitTest in {
-    // Empty storage ⇒ isNodeInStorage(root) == false. The coordinator seeds the root via queueNodes
-    // (Besu-aligned top-down discovery) so the network can fetch it. pendingTasks == 1 after StartTrieNodeHealing.
+  it should "signal HealingRootUnservable (not seed the root) when the walk root's bytes are absent" taggedAs UnitTest in {
+    // Empty storage ⇒ isNodeInStorage(root) == false. Seeding the root here would stall the heal at
+    // "exactly 1 node, healed=0" forever (a root cannot be reconstructed from nothing, and fetching it
+    // against an advancing serve root never matches the content-hash gate). The seed-site guard (PR #1371)
+    // must instead signal the controller to hand off to lazy on-demand healing — and must do so for EVERY
+    // entry into healing, including the BootstrapComplete restart path that calls startStateHealing() directly.
     val stateRoot = kec256(ByteString("absent-walk-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
@@ -1168,12 +1178,13 @@ class TrieNodeHealingCoordinatorSpec
 
     coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
 
-    // The root was seeded: pendingTasks == 1 (the root hash itself is the first frontier entry).
+    // The controller is told the root is unservable (handoff signal carries the exact root).
+    snapSyncController.expectMessage(SNAPSyncController.HealingRootUnservable(stateRoot))
+
+    // The root was NOT seeded: pendingTasks stays 0 (no futile "exactly 1 node" frontier).
     val progressProbe = testKit.createTestProbe[HealingStatistics]()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(progressProbe.ref)
-    progressProbe.expectMessageType[HealingStatistics].pendingTasks shouldBe 1
-    // No HealingRootUnservable — the controller is not notified when the root is absent.
-    snapSyncController.expectNoMessage(1.second)
+    progressProbe.expectMessageType[HealingStatistics].pendingTasks shouldBe 0
   }
 
   it should "heal normally (no HealingRootUnservable) when the walk root IS present" taggedAs UnitTest in {
