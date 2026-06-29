@@ -99,7 +99,7 @@ class TransactionSpec
       1, // ethereum mainnet, used by the core-geth test
       3,
       1,
-      25000,
+      GasAmount(25000),
       toAddr,
       10,
       ByteString(Hex.decode("5544")),
@@ -130,7 +130,7 @@ class TransactionSpec
     val tx: LegacyTransaction = LegacyTransaction(
       3,
       1,
-      2000,
+      GasAmount(2000),
       toAddr,
       10,
       ByteString(Hex.decode("5544"))

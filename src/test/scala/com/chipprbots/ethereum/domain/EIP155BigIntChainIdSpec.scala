@@ -31,7 +31,7 @@ class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
     val tx = LegacyTransaction(
       nonce = 0,
       gasPrice = BigInt(20000000000L),
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Address("0x3535353535353535353535353535353535353535"),
       value = BigInt("1000000000000000000"),
       payload = ByteString.empty
@@ -68,7 +68,7 @@ class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
     val tx = LegacyTransaction(
       nonce = 5,
       gasPrice = BigInt(30000000000L),
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Address("0x1234567890123456789012345678901234567890"),
       value = BigInt("2000000000000000000"),
       payload = ByteString.empty
@@ -111,7 +111,7 @@ class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
     val tx = LegacyTransaction(
       nonce = 10,
       gasPrice = BigInt(100000000),
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Address("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"),
       value = BigInt("5000000000000000"),
       payload = ByteString.empty
@@ -151,7 +151,7 @@ class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
     val tx = LegacyTransaction(
       nonce = 0,
       gasPrice = BigInt(20000000000L),
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Address("0x3535353535353535353535353535353535353535"),
       value = BigInt("1000000000000000000"),
       payload = ByteString.empty
@@ -197,7 +197,7 @@ class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
     val tx = LegacyTransaction(
       nonce = 9,
       gasPrice = BigInt(20000000000L),
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Address("0x3535353535353535353535353535353535353535"),
       value = BigInt("1000000000000000000"),
       payload = ByteString.empty

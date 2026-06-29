@@ -7,6 +7,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.crypto.ECDSASignature
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.TransactionWithAccessList
 import com.chipprbots.ethereum.forkid.ForkId
@@ -97,7 +98,7 @@ class MessagesSerializationSpec extends AnyWordSpec with Matchers:
           chainId = 1,
           nonce = 1,
           gasPrice = 1,
-          gasLimit = 21000,
+          gasLimit = GasAmount(21000),
           receivingAddress = None,
           value = 0,
           payload = ByteString.empty,

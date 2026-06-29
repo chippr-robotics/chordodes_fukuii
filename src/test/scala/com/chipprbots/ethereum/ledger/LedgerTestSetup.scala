@@ -60,15 +60,15 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
   val defaultBlockHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     difficulty = Difficulty(1000000),
     number = blockchainConfig.forkBlockNumbers.homesteadBlockNumber + 1,
-    gasLimit = 1000000,
-    gasUsed = 0,
+    gasLimit = GasAmount(1000000),
+    gasUsed = GasAmount.Zero,
     unixTimestamp = 1486752441
   )
 
   val defaultTx: LegacyTransaction = LegacyTransaction(
     nonce = 42,
     gasPrice = 1,
-    gasLimit = 90000,
+    gasLimit = GasAmount(90000),
     receivingAddress = receiverAddress,
     value = 0,
     payload = ByteString.empty
@@ -183,8 +183,8 @@ trait BlockchainSetup extends TestSetup:
     beneficiary = minerAddress.bytes,
     receiptsRoot = Account.EmptyStorageRootHash,
     logsBloom = BloomFilter.Empty,
-    gasLimit = defaultGasLimit,
-    gasUsed = 0
+    gasLimit = GasAmount(defaultGasLimit.toBigInt),
+    gasUsed = GasAmount.Zero
   )
   val validBlockBodyWithNoTxs: BlockBody = BlockBody(Nil, Nil)
 
@@ -197,7 +197,7 @@ trait BlockchainSetup extends TestSetup:
 
   val validTx: LegacyTransaction = defaultTx.copy(
     nonce = initialOriginNonce,
-    gasLimit = defaultGasLimit,
+    gasLimit = GasAmount(defaultGasLimit.toBigInt),
     value = defaultValue
   )
   val validStxSignedByOrigin: SignedTransaction =
@@ -297,8 +297,8 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
   val defaultHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     difficulty = Difficulty(100),
     number = 1,
-    gasLimit = 1000000,
-    gasUsed = 0,
+    gasLimit = GasAmount(1000000),
+    gasUsed = GasAmount.Zero,
     unixTimestamp = 0
   )
 

@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
 import com.chipprbots.ethereum.vm.MockWorldState.PC
@@ -107,8 +108,8 @@ trait TestSetup:
   def prepareBlockHeader(blockNumber: BigInt): BlockHeader = BlockFixtures.ValidBlock.header.copy(
     difficulty = Difficulty(1000000),
     number = blockNumber,
-    gasLimit = 10000000,
-    gasUsed = 0,
+    gasLimit = GasAmount(10000000),
+    gasUsed = GasAmount.Zero,
     unixTimestamp = 0
   )
 

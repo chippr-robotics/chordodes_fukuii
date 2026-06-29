@@ -35,7 +35,7 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
     nonce = 0,
     maxPriorityFeePerGas = BigInt("1000000000"),
     maxFeePerGas = BigInt("2000000000"),
-    gasLimit = 21000,
+    gasLimit = GasAmount(21000),
     receivingAddress = Some(Address(Hex.decode("32be343b94f860124dc4fee278fdcbd38c102d88"))),
     value = BigInt(0),
     payload = ByteString.empty,
@@ -54,7 +54,7 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
   // Block header well into post-Spiral ETC — unixTimestamp has no Cancun in ETC config.
   private val etcBlockHeader = Fixtures.Blocks.Block3125369.header.copy(
     number = BigInt(21_000_000),
-    gasLimit = 8_000_000,
+    gasLimit = GasAmount(8_000_000),
     extraFields = HefPostOlympia(BigInt("1000000000"))
   )
 
@@ -120,7 +120,7 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
     val legacyTx = LegacyTransaction(
       nonce = 0,
       gasPrice = BigInt("2000000000"),
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Address(Hex.decode("32be343b94f860124dc4fee278fdcbd38c102d88")),
       value = BigInt(0),
       payload = ByteString.empty

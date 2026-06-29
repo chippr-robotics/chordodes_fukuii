@@ -45,8 +45,8 @@ class EIP1559FeeMarketSpec
 
   private val postMystiqueHeader = Fixtures.Blocks.ValidBlock.header.copy(
     number = BigInt(20_000_000),
-    gasLimit = BigInt(8_000_000),
-    gasUsed = 0,
+    gasLimit = GasAmount(BigInt(8_000_000)),
+    gasUsed = GasAmount.Zero,
     extraFields = HefPostOlympia(baseFee)
   )
 
@@ -68,7 +68,7 @@ class EIP1559FeeMarketSpec
       nonce = 0,
       maxPriorityFeePerGas = maxPriority,
       maxFeePerGas = maxFeePerGas,
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Some(Address(1)),
       value = BigInt(0),
       payload = ByteString.empty,
@@ -80,7 +80,7 @@ class EIP1559FeeMarketSpec
     val tx = LegacyTransaction(
       nonce = 0,
       gasPrice = gasPrice,
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Address(1),
       value = BigInt(0),
       payload = ByteString.empty

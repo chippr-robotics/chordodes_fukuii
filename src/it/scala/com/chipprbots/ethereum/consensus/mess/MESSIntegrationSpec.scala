@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.TrieRoot
 
 /** Integration test for MESS (ECIP-1100: Modified Exponential Subjective Scoring).
@@ -34,8 +35,8 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers:
       logsBloom = BloomFilter(ByteString.empty),
       difficulty = Difficulty(difficulty),
       number = number,
-      gasLimit = 0,
-      gasUsed = 0,
+      gasLimit = GasAmount.Zero,
+      gasUsed = GasAmount.Zero,
       unixTimestamp = timestamp,
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString.empty),

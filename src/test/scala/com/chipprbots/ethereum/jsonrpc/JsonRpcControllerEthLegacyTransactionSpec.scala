@@ -582,7 +582,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
         LegacyTransaction(
           nonce = 0,
           gasPrice = 123,
-          gasLimit = 123,
+          gasLimit = GasAmount(123),
           receivingAddress = Address("0x1234"),
           value = 0,
           payload = ByteString()

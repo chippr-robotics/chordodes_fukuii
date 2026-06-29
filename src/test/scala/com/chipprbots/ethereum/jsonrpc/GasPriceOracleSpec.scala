@@ -111,7 +111,7 @@ class GasPriceOracleSpec
     LegacyTransaction(
       nonce = 0,
       gasPrice = price,
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Some(Address(zeroAddr)),
       value = 0,
       payload = ByteString.empty

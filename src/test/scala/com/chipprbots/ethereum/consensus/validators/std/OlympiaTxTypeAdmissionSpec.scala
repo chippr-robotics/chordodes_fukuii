@@ -43,16 +43,16 @@ class OlympiaTxTypeAdmissionSpec
   private def preOlympiaHeader: BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
       number = olympiaBlock - 1,
-      gasLimit = BigInt(8_000_000),
-      gasUsed = 0,
+      gasLimit = GasAmount(BigInt(8_000_000)),
+      gasUsed = GasAmount.Zero,
       extraFields = HefEmpty
     )
 
   private def olympiaHeader: BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
       number = olympiaBlock,
-      gasLimit = BigInt(30_000_000),
-      gasUsed = 0,
+      gasLimit = GasAmount(BigInt(30_000_000)),
+      gasUsed = GasAmount.Zero,
       extraFields = HefPostOlympia(BigInt(1_000_000_000))
     )
 
@@ -62,7 +62,7 @@ class OlympiaTxTypeAdmissionSpec
       nonce = 0,
       maxPriorityFeePerGas = BigInt(1_000_000_000),
       maxFeePerGas = BigInt(2_000_000_000),
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Some(Address(1)),
       value = BigInt(0),
       payload = ByteString.empty,
@@ -84,7 +84,7 @@ class OlympiaTxTypeAdmissionSpec
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(1_000_000_000),
       maxFeePerGas = BigInt(2_000_000_000),
-      gasLimit = BigInt(50000),
+      gasLimit = GasAmount(50000),
       receivingAddress = Some(Address(1)),
       value = BigInt(0),
       payload = ByteString.empty,
@@ -97,7 +97,7 @@ class OlympiaTxTypeAdmissionSpec
     val tx = LegacyTransaction(
       nonce = 0,
       gasPrice = BigInt(1_000_000_000),
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Address(1),
       value = BigInt(0),
       payload = ByteString.empty
@@ -149,7 +149,7 @@ class OlympiaTxTypeAdmissionSpec
     val tx = LegacyTransaction(
       nonce = 0,
       gasPrice = BigInt(1_000_000_000),
-      gasLimit = 100000,
+      gasLimit = GasAmount(100000),
       receivingAddress = None,
       value = BigInt(0),
       payload = ByteString(0x60, 0x60)
@@ -161,7 +161,7 @@ class OlympiaTxTypeAdmissionSpec
       chainId = config.chainId,
       nonce = BigInt(0),
       gasPrice = BigInt(1_000_000_000),
-      gasLimit = BigInt(21000),
+      gasLimit = GasAmount(21000),
       receivingAddress = Some(Address(1)),
       value = BigInt(0),
       payload = ByteString.empty,

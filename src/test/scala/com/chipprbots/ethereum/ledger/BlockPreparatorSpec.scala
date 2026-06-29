@@ -47,7 +47,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         val tx: LegacyTransaction =
           defaultTx.copy(
             gasPrice = defaultGasPrice,
-            gasLimit = defaultGasLimit,
+            gasLimit = GasAmount(defaultGasLimit.toBigInt),
             receivingAddress = None,
             payload = ByteString.empty
           )
@@ -70,7 +70,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
         val tx: LegacyTransaction = defaultTx.copy(
           gasPrice = defaultGasPrice,
-          gasLimit = defaultGasLimit,
+          gasLimit = GasAmount(defaultGasLimit.toBigInt),
           receivingAddress = Some(originAddress),
           payload = ByteString.empty
         )
@@ -95,7 +95,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
         val tx: LegacyTransaction = defaultTx.copy(
           gasPrice = defaultGasPrice,
-          gasLimit = defaultGasLimit,
+          gasLimit = GasAmount(defaultGasLimit.toBigInt),
           receivingAddress = None,
           payload = ByteString.empty
         )
@@ -118,7 +118,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
         val tx: LegacyTransaction = defaultTx.copy(
           gasPrice = defaultGasPrice,
-          gasLimit = defaultGasLimit,
+          gasLimit = GasAmount(defaultGasLimit.toBigInt),
           receivingAddress = None,
           payload = ByteString.empty
         )
@@ -146,7 +146,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
         val tx: LegacyTransaction = defaultTx.copy(
           gasPrice = defaultGasLimit,
-          gasLimit = defaultGasLimit,
+          gasLimit = GasAmount(defaultGasLimit.toBigInt),
           receivingAddress = None,
           payload = ByteString.empty
         )
@@ -185,7 +185,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
       forAll(table) { (execGasUsed, gasRefundFromVM, error, gasUsed) =>
         val balanceDelta = UInt256(gasUsed * defaultGasPrice)
 
-        val tx = defaultTx.copy(gasPrice = defaultGasPrice, gasLimit = defaultGasLimit)
+        val tx = defaultTx.copy(gasPrice = defaultGasPrice, gasLimit = GasAmount(defaultGasLimit.toBigInt))
 
         val stx = SignedTransactionWithSender(
           SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId)),
@@ -198,7 +198,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
           createResult(
             context = c,
             gasUsed = execGasUsed,
-            gasLimit = defaultGasLimit,
+            gasLimit = defaultGasLimit.toBigInt,
             gasRefund = gasRefundFromVM,
             error = error
           )
@@ -356,7 +356,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
     val tx: LegacyTransaction = defaultTx.copy(
       gasPrice = defaultGasPrice,
-      gasLimit = defaultGasLimit,
+      gasLimit = GasAmount(defaultGasLimit.toBigInt),
       receivingAddress = None,
       payload = ByteString.empty
     )
@@ -376,7 +376,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
     val tx: LegacyTransaction = defaultTx.copy(
       gasPrice = defaultGasPrice,
-      gasLimit = defaultGasLimit,
+      gasLimit = GasAmount(defaultGasLimit.toBigInt),
       receivingAddress = None,
       payload = ByteString.empty
     )
@@ -404,7 +404,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
     val tx: LegacyTransaction = defaultTx.copy(
       gasPrice = defaultGasLimit,
-      gasLimit = defaultGasLimit,
+      gasLimit = GasAmount(defaultGasLimit.toBigInt),
       receivingAddress = None,
       payload = ByteString.empty
     )
@@ -444,7 +444,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         nonce = 1,
         maxPriorityFeePerGas = 1,
         maxFeePerGas = 1000,
-        gasLimit = 21000,
+        gasLimit = GasAmount(21000),
         receivingAddress = Some(receiverAddress),
         value = 0,
         payload = ByteString.empty,

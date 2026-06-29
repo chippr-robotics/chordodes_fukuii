@@ -82,8 +82,8 @@ object TestConverter:
       logsBloom = BloomFilter(ByteString(parseHex(testHeader.bloom))),
       difficulty = Difficulty(parseBigInt(testHeader.difficulty)),
       number = parseBigInt(testHeader.number),
-      gasLimit = parseBigInt(testHeader.gasLimit),
-      gasUsed = parseBigInt(testHeader.gasUsed),
+      gasLimit = GasAmount(parseBigInt(testHeader.gasLimit)),
+      gasUsed = GasAmount(parseBigInt(testHeader.gasUsed)),
       unixTimestamp = parseBigInt(testHeader.timestamp).toLong,
       extraData = ByteString(parseHex(testHeader.extraData)),
       mixHash = BlockHash(ByteString(parseHex(testHeader.mixHash))),
@@ -125,7 +125,7 @@ object TestConverter:
     // Default to 0 when absent — the dynamic-fee/blob branches never read this value.
     val nonce = parseBigInt(testTx.nonce)
     val gasPrice = testTx.gasPrice.map(parseBigInt).getOrElse(BigInt(0))
-    val gasLimit = parseBigInt(testTx.gasLimit)
+    val gasLimit = GasAmount(parseBigInt(testTx.gasLimit))
     val receivingAddress =
       if testTx.to.isEmpty || testTx.to == "0x" then None
       else Some(Address(ByteString(parseHex(testTx.to))))

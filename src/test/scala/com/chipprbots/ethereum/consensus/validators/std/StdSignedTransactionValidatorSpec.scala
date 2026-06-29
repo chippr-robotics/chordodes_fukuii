@@ -71,7 +71,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   private val initcodeTx: LegacyTransaction = LegacyTransaction(
     nonce = 0,
     gasPrice = BigInt("1000000000"),
-    gasLimit = BigInt("1000000"),
+    gasLimit = GasAmount(BigInt("1000000")),
     receivingAddress = None,
     value = BigInt(0),
     payload = overLimitPayload
@@ -88,7 +88,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     Account.empty(UInt256(0)).copy(balance = UInt256(BigInt("1000000000000000000")))
 
   private val baseHeader: BlockHeader =
-    Fixtures.Blocks.Block3125369.header.copy(gasLimit = BigInt("10000000"))
+    Fixtures.Blocks.Block3125369.header.copy(gasLimit = GasAmount(BigInt("10000000")))
 
   private def validate(stx: SignedTransaction, blockHeader: BlockHeader)(implicit cfg: BlockchainConfig) =
     StdSignedTransactionValidator.validate(
@@ -155,7 +155,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   private val wordCostTx: LegacyTransaction = LegacyTransaction(
     nonce = 0,
     gasPrice = BigInt("1000000000"),
-    gasLimit = BigInt(56213), // 56214 - 1: below post-Shanghai intrinsic, above pre-Shanghai
+    gasLimit = GasAmount(BigInt(56213)), // 56214 - 1: below post-Shanghai intrinsic, above pre-Shanghai
     receivingAddress = None,
     value = BigInt(0),
     payload = wordCostPayload
@@ -218,7 +218,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   // Cancun block header: excessBlobGas = 0 → blobBaseFee = 1
   private val cancunHeader: BlockHeader = baseHeader.copy(
     unixTimestamp = CancunTs + 1,
-    gasLimit = BigInt("30000000"),
+    gasLimit = GasAmount(BigInt("30000000")),
     extraFields = HefPostCancun(
       baseFee = BigInt(1_000_000_000L),
       withdrawalsRoot = ByteString(new Array[Byte](32)),
@@ -234,7 +234,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
       nonce = 0,
       maxPriorityFeePerGas = BigInt(0),
       maxFeePerGas = BigInt(2_000_000_000L),
-      gasLimit = BigInt(1_000_000),
+      gasLimit = GasAmount(BigInt(1_000_000)),
       receivingAddress = Some(Address(0L)),
       value = BigInt(0),
       payload = ByteString.empty,
@@ -310,7 +310,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     LegacyTransaction(
       nonce = n,
       gasPrice = BigInt("1000000000"),
-      gasLimit = BigInt("100000"),
+      gasLimit = GasAmount(BigInt("100000")),
       receivingAddress = Some(Address(0xcafe)),
       value = BigInt(0),
       payload = ByteString.empty

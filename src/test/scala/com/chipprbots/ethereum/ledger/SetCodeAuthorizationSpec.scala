@@ -41,8 +41,8 @@ class SetCodeAuthorizationSpec extends AnyFlatSpec with Matchers:
 
   private val olympiaHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     number = 2,
-    gasLimit = 30_000_000,
-    gasUsed = 0,
+    gasLimit = GasAmount(30_000_000),
+    gasUsed = GasAmount.Zero,
     extraFields = HefPostOlympia(BigInt(1_000_000_000))
   )
 
@@ -88,7 +88,7 @@ class SetCodeAuthorizationSpec extends AnyFlatSpec with Matchers:
       nonce = senderNonce,
       maxPriorityFeePerGas = BigInt(0),
       maxFeePerGas = BigInt(2_000_000_000),
-      gasLimit = BigInt(500_000),
+      gasLimit = GasAmount(500_000),
       receivingAddress = Some(Address(1)),
       value = BigInt(0),
       payload = ByteString.empty,

@@ -25,7 +25,7 @@ class BlockBodyWireFormatSpec extends AnyFlatSpec with Matchers:
       chainId = 1,
       nonce = 1,
       gasPrice = 1,
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = None,
       value = 0,
       payload = ByteString.empty,

@@ -392,7 +392,7 @@ class EthTxServiceSpec
         LegacyTransaction(
           nonce = 0,
           gasPrice = 123,
-          gasLimit = 123,
+          gasLimit = GasAmount(123),
           receivingAddress = Address("0x1234"),
           value = 0,
           payload = ByteString()
@@ -469,7 +469,7 @@ class EthTxServiceSpec
       LegacyTransaction(
         nonce = 2550,
         gasPrice = BigInt("20000000000"),
-        gasLimit = 3000000,
+        gasLimit = GasAmount(3000000),
         receivingAddress = None,
         value = 0,
         payload
