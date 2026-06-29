@@ -640,7 +640,13 @@ object NetworkPeerManagerActor:
             reader.getChainWeightByHash(ourBest.header.hash).foreach { ourWeight =>
               if peerTD > ourWeight.totalDifficulty.value then
                 val ratio = peerTD / ourWeight.totalDifficulty.value
-                if ratio > BigInt(10_000) then
+                // FRESH-NODE EXEMPTION (Bug 36): TD-PROXY-GAP must NOT fire when our best block is at
+                // genesis (number == 0). On a freshly-wiped node the genesis TD is the real chain
+                // difficulty, not a stale proxy, so the ratio vs a real peer's cumulative TD always
+                // exceeds 10K — firing would 5-min-blacklist every legitimate SNAP peer before the eager
+                // best-block probe runs, leaving pivot=0 forever. The #1373 Classic→Typed rewrite dropped
+                // this guard; restore it. (TD unwrapped via .value for the TotalDifficulty opaque type.)
+                if ratio > BigInt(10_000) && ourBest.header.number > 0 then
                   // TD-PROXY-GAP: stored TD is a genesis proxy from SNAP finalization.
                   chainWeightCalibrationTarget.foreach { target =>
                     target ! com.chipprbots.ethereum.blockchain.sync.SyncProtocol

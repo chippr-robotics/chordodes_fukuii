@@ -515,10 +515,11 @@ addCommandAlias(
 // Runs fast unit tests, excludes integration and slow tests.
 // SlowTest: legitimately too slow for the daily commit gate (runs in testStandard).
 // IntegrationTest: network-dependent or actor-choreography tests that belong in Tier 2+.
+// SyncTest: complex actor choreography (ADR-017) that times out under CI load.
 addCommandAlias(
   "testEssential",
   """; compile-all
-    |; testOnly -- -l SlowTest -l IntegrationTest
+    |; testOnly -- -l SlowTest -l IntegrationTest -l SyncTest
     |; rlp / test
     |; bytes / test
     |; crypto / test
@@ -528,10 +529,11 @@ addCommandAlias(
 // testStandard - Tier 2: Standard tests (< 30 minutes)
 // Runs unit and integration tests. Excludes only Tier 3 tests:
 // BenchmarkTest/EthereumTest: the 3-hour compliance suite — belongs in testComprehensive only.
+// SyncTest: timeout-prone actor choreography, excluded for the same reason testEssential excludes it (ADR-017).
 addCommandAlias(
   "testStandard",
   """; compile-all
-    |; testOnly -- -l BenchmarkTest -l EthereumTest
+    |; testOnly -- -l BenchmarkTest -l EthereumTest -l SyncTest
     |""".stripMargin
 )
 

@@ -39,6 +39,7 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.PeerActor.GetStatus
 import com.chipprbots.ethereum.network.PeerActor.Status.Handshaked
 import com.chipprbots.ethereum.network.PeerActor.StatusResponse
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguration
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshaker
@@ -117,6 +118,7 @@ class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with An
     val peerMessageBus = testKit.spawn(PeerEventBusActor.behavior(), s"peer-event-bus-${java.util.UUID.randomUUID()}")
     val knownNodesManager: TestProbe[KnownNodesManager.Command] = testKit.createTestProbe()
 
+    val peerManagerProbe1 = testKit.createTestProbe[PeerManagerActor.Command]()
     val peer: ActorRef[PeerActor.Command] = testKit.spawn(
       PeerActor.apply(
         new InetSocketAddress("127.0.0.1", 0),
@@ -125,7 +127,8 @@ class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with An
         peerMessageBus,
         knownNodesManager.ref,
         false,
-        handshaker
+        handshaker,
+        peerManagerProbe1.ref
       )
     )
 
@@ -362,7 +365,8 @@ class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with An
         peerMessageBus,
         knownNodesManager.ref,
         false,
-        Mocks.MockHandshakerAlwaysSucceeds(remoteStatus, 0, false)
+        Mocks.MockHandshakerAlwaysSucceeds(remoteStatus, 0, false),
+        testKit.createTestProbe[PeerManagerActor.Command]().ref
       )
     )
 
@@ -413,6 +417,7 @@ class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with An
     // on pre-handshake Disconnect. Verify via death-watch instead of parent message.
     val deathProbe = testKit.createTestProbe[Any]()
 
+    val peerManagerProbe2 = testKit.createTestProbe[PeerManagerActor.Command]()
     val peerUnderTest: ActorRef[PeerActor.Command] = testKit.spawn(
       PeerActor.apply(
         new InetSocketAddress("127.0.0.1", 0),
@@ -421,7 +426,8 @@ class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with An
         peerMessageBus,
         knownNodesManager.ref,
         false,
-        handshaker
+        handshaker,
+        peerManagerProbe2.ref
       )
     )
 
@@ -432,6 +438,10 @@ class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with An
 
     peerUnderTest ! RLPxConnectionHandler.MessageReceived(Disconnect(Reasons.AlreadyConnected))
 
+    // PeerActor fires PeerClosedConnectionCmd before stopping — verify the reason is forwarded
+    peerManagerProbe2.expectMessage(
+      PeerManagerActor.PeerClosedConnectionCmd("127.0.0.1", Reasons.AlreadyConnected.toLong)
+    )
     deathProbe.expectTerminated(peerUnderTest)
 
   trait BlockUtils:
@@ -544,6 +554,9 @@ class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with An
     val knownNodesManager: TestProbe[KnownNodesManager.Command] =
       testKit.createTestProbe[KnownNodesManager.Command]()
 
+    val peerManagerProbe: TestProbe[PeerManagerActor.Command] =
+      testKit.createTestProbe[PeerManagerActor.Command]()
+
     val peer: ActorRef[PeerActor.Command] = testKit.spawn(
       PeerActor.apply(
         new InetSocketAddress("127.0.0.1", 0),
@@ -552,7 +565,8 @@ class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with An
         peerMessageBus,
         knownNodesManager.ref,
         false,
-        handshaker
+        handshaker,
+        peerManagerProbe.ref
       )
     )
 

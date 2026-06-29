@@ -84,6 +84,7 @@ class BlockRangeUpdateDecodePathSpec
       val rlpxProbe = TestProbe()(cs)
       val eventBusProbe = TestProbe()(cs)
       val knownProbe = TestProbe()(cs)
+      val peerManagerProbe1 = TestProbe()(cs)
       val peer: TestActorRef[Nothing] = TestActorRef(
         PropsAdapter(
           PeerActor.apply(
@@ -93,7 +94,8 @@ class BlockRangeUpdateDecodePathSpec
             eventBusProbe.ref.toTyped[PeerEventBusActor.Command],
             knownProbe.ref.toTyped[KnownNodesManager.Command],
             false,
-            MockHandshakerAlwaysSucceeds(dummyStatus, BigInt(0), true)
+            MockHandshakerAlwaysSucceeds(dummyStatus, BigInt(0), true),
+            peerManagerProbe1.ref
           )
         )
       )(cs)
@@ -121,6 +123,7 @@ class BlockRangeUpdateDecodePathSpec
       val rlpxProbe = TestProbe()(cs)
       val eventBusProbe = TestProbe()(cs)
       val knownProbe = TestProbe()(cs)
+      val peerManagerProbe2 = TestProbe()(cs)
       val peer: TestActorRef[Nothing] = TestActorRef(
         PropsAdapter(
           PeerActor.apply(
@@ -130,7 +133,8 @@ class BlockRangeUpdateDecodePathSpec
             eventBusProbe.ref.toTyped[PeerEventBusActor.Command],
             knownProbe.ref.toTyped[KnownNodesManager.Command],
             false,
-            MockHandshakerAlwaysSucceeds(dummyStatus, BigInt(0), true)
+            MockHandshakerAlwaysSucceeds(dummyStatus, BigInt(0), true),
+            peerManagerProbe2.ref
           )
         )
       )(cs)

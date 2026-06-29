@@ -23,6 +23,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPe
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PublishCmd
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
 import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeComplete.HandshakeFailure
@@ -125,7 +126,8 @@ object PeerActor:
       peerEventBus: ActorRef[PeerEventBusCommand],
       knownNodesManager: ActorRef[KnownNodesManager.Command],
       incomingConnection: Boolean,
-      initHandshaker: Handshaker[R]
+      initHandshaker: Handshaker[R],
+      peerManagerRef: ActorRef[PeerManagerActor.Command]
   ): Behavior[Command] =
     Behaviors.withStash(100) { stash =>
       Behaviors.setup { context =>
@@ -138,6 +140,7 @@ object PeerActor:
           incomingConnection,
           initHandshaker,
           stash,
+          peerManagerRef,
           context
         ).waitingForInitialCommand()
       }
@@ -156,7 +159,8 @@ object PeerActor:
       incomingConnection: Boolean,
       handshaker: Handshaker[R],
       authHandshaker: AuthHandshaker,
-      capabilities: List[Capability]
+      capabilities: List[Capability],
+      peerManagerRef: ActorRef[PeerManagerActor.Command]
   ): org.apache.pekko.actor.Props =
     org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
       apply(
@@ -166,7 +170,8 @@ object PeerActor:
         peerEventBus,
         knownNodesManager,
         incomingConnection,
-        initHandshaker = handshaker
+        initHandshaker = handshaker,
+        peerManagerRef = peerManagerRef
       )
     )
   // scalastyle:on parameter.number
@@ -204,6 +209,7 @@ object PeerActor:
       incomingConnection: Boolean,
       initHandshaker: Handshaker[R],
       stash: StashBuffer[Command],
+      peerManagerRef: ActorRef[PeerManagerActor.Command],
       context: ActorContext[Command]
   ):
 
@@ -385,6 +391,9 @@ object PeerActor:
             Disconnect.reasonToString(reason)
           )
           rlpxConnection.uriOpt.foreach(uri => knownNodesManager ! KnownNodesManager.RemoveKnownNode(uri))
+          // Notify PeerManagerActor so the handshake-failure reason (e.g. IncompatibleP2pProtocolVersion)
+          // triggers getBlacklistDuration — prevents immediate reconnect to a newly-incompatible peer.
+          peerManagerRef ! PeerManagerActor.PeerClosedConnectionCmd(peerAddress.getHostString, reason.toLong)
           disconnectFromPeer(rlpxConnection, reason)
 
     // -----------------------------------------------------------------------
@@ -475,6 +484,11 @@ object PeerActor:
           rlpxConnection.uriOpt.foreach(uri => knownNodesManager ! KnownNodesManager.RemoveKnownNode(uri))
         case _ => // nothing
       log.debug(s"Received {}. Closing connection with peer ${peerAddress.getHostString}:${peerAddress.getPort}", d)
+      // Restore the reason-based blacklist path that PeerManagerActor.handleConnections expects.
+      // The Classic shell that forwarded PeerClosedConnection → PeerClosedConnectionCmd was removed
+      // in commit 0f802b01e; PeerActor must now send it directly so getBlacklistDuration() and the
+      // SNAP-aware lenient-blacklist logic fire for every peer-initiated disconnect with a reason.
+      peerManagerRef ! PeerManagerActor.PeerClosedConnectionCmd(peerAddress.getHostString, d.reason)
       status match
         case Handshaked =>
           // graceful stop — let the Disconnect wire message flush before stopping

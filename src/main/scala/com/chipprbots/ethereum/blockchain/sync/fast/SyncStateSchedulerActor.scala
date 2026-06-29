@@ -22,6 +22,8 @@ import com.chipprbots.ethereum.blockchain.sync.PeerListHelper
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
+import com.chipprbots.ethereum.blockchain.sync.RetryState
+import com.chipprbots.ethereum.blockchain.sync.RetryStrategy
 import com.chipprbots.ethereum.blockchain.sync.fast.LoadableBloomFilter.BloomFilterLoadingResult
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.CriticalError
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ProcessingStatistics
@@ -49,6 +51,10 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 // scalastyle:off number.of.methods
 object SyncStateSchedulerActor:
+
+  // Besu PipelineChainDownloader.PAUSE_AFTER_ERROR_DURATION analogue: the base pause applied after an
+  // InvalidStateResponse before retrying a Sync, grown exponentially (→ 30s) by uselessResponseRetryState.
+  val PauseAfterErrorDuration: FiniteDuration = 2.seconds
 
   sealed trait Command
 
@@ -208,6 +214,28 @@ object SyncStateSchedulerActor:
     private var consecutiveUselessResponses: Int = 0
     private val UselessResponseThreshold: Int = 20
 
+    /** Stall watchdog. `consecutiveUselessResponses` resets on any ProcessingSuccess, so even a trickle of one good
+      * response keeps it pinned at 0 — the existing self-restart never escalates and NetworkIncompatible never fires.
+      * This watchdog is the durable escape: if the saved-node count doesn't advance by StateStallMinProgress within
+      * StateStallTimeout, the peer pool can't serve our state requests (typical on ETH68-only ETC mainnet) so we emit
+      * NetworkIncompatible to fall back from fast sync to SNAP (FastSync consumes it → FallbackToSnapSync). Without
+      * this, fast-sync state download can stall indefinitely and that fallback consumer can never fire.
+      */
+    private var stallWatchdog: Option[(Long, Long)] = None // (savedSnapshot, timestampMs)
+    private val StateStallTimeout: FiniteDuration = 2.minutes
+    private val StateStallMinProgress: Long = 100L
+
+    // Exponential backoff for InvalidStateResponse errors.
+    // Besu: PipelineChainDownloader.PAUSE_AFTER_ERROR_DURATION = 2s.
+    // Prevents spinning on bad state responses; resets to PauseAfterErrorDuration on any success.
+    private var uselessResponseRetryState: RetryState = RetryState(
+      strategy = RetryStrategy(
+        initialDelay = SyncStateSchedulerActor.PauseAfterErrorDuration,
+        maxDelay = 30.seconds,
+        jitterFactor = 0.1
+      )
+    )
+
     private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
       ctx.messageAdapter[PeerRequestHandler.Result](WrappedPRHResult(_))
 
@@ -318,6 +346,8 @@ object SyncStateSchedulerActor:
       timers.startTimerAtFixedRate(PrintInfoKey, PrintInfo, 30.seconds)
       currentStateRoot = root.value
       consecutiveUselessResponses = 0
+      uselessResponseRetryState = uselessResponseRetryState.reset
+      stallWatchdog = None
       ctx.log.info("Starting state sync to root {} on block {}", ByteStringUtils.hash2string(root.value), bn)
       sync.initState(root.value) match
         case None =>
@@ -354,6 +384,35 @@ object SyncStateSchedulerActor:
       sync.persistBatch(currentState, targetBlock)
       restartRequester ! WaitingForNewTargetBlock
       idle(currentStats.addSaved(currentState.memBatch.size))
+
+    /** Stall-watchdog hook. Returns true if the watchdog has tripped and emitted NetworkIncompatible — the caller (the
+      * Sync handler) should return Behaviors.stopped and skip the current tick. Snapshots the saved-node count on the
+      * first call, then on each subsequent call either advances the snapshot (progress >= MinProgress) or escalates if
+      * the timeout elapsed without progress. Mirrors the Classic context.parent ! NetworkIncompatible; context.stop —
+      * here we send to the typed syncInitiator and let the caller stop the behavior.
+      */
+    private def checkStateStall(currentState: SyncSchedulerActorState): Boolean =
+      val savedNow = currentState.currentStats.saved
+      val nowMs = System.currentTimeMillis()
+      stallWatchdog match
+        case None =>
+          stallWatchdog = Some((savedNow, nowMs))
+          false
+        case Some((prevSaved, prevMs)) =>
+          val delta = savedNow - prevSaved
+          val elapsedMs = nowMs - prevMs
+          if delta >= StateStallMinProgress then
+            // Real progress — refresh snapshot.
+            stallWatchdog = Some((savedNow, nowMs))
+            false
+          else if elapsedMs >= StateStallTimeout.toMillis then
+            ctx.log.warn(
+              s"State download stalled: saved=$savedNow for ${elapsedMs}ms (Δ=$delta nodes < $StateStallMinProgress). " +
+                "Peer pool cannot serve our state requests. Emitting NetworkIncompatible to fall back from fast sync."
+            )
+            currentState.syncInitiator ! NetworkIncompatible
+            true
+          else false
 
     /** Check if a peer supports GetNodeData on the negotiated protocol. GetNodeData is available in ETH63-67 but
       * removed in ETH68 (EIP-4938). Only the negotiated (connection-level) capability matters.
@@ -513,6 +572,16 @@ object SyncStateSchedulerActor:
 
             // === State machine ===
 
+            // Stall watchdog: checkStateStall runs (side-effecting) ONLY under the same condition the original Sync
+            // arm called it — the `&&` short-circuits so it is evaluated exactly once per Sync tick when there is
+            // pending work and no restart is in flight. On a trip it has already emitted NetworkIncompatible to the
+            // syncInitiator (→ FastSync FallbackToSnapSync); stop the scheduler. This keeps the existing arm's body
+            // un-indented while reproducing Classic `if (checkStateStall(...)) () else { … }`.
+            case Sync
+                if currentState.hasRemainingPendingRequests && !currentState.restartHasBeenRequested
+                  && checkStateStall(currentState) =>
+              Behaviors.stopped
+
             case Sync if currentState.hasRemainingPendingRequests && !currentState.restartHasBeenRequested =>
               val freePeers = getFreePeers(currentState.currentDownloaderState)
               (currentState.getRequestToProcess, NonEmptyList.fromList(freePeers)) match
@@ -611,6 +680,7 @@ object SyncStateSchedulerActor:
 
             case ProcessingResult(Right(ProcessingSuccess(newState, newDownloaderState, newStats))) =>
               consecutiveUselessResponses = 0
+              uselessResponseRetryState = uselessResponseRetryState.reset
               ctx.log.debug(
                 "Finished processing mpt node batch. Got {} missing nodes. Missing queue has {} elements",
                 newState.numberOfPendingRequests,
@@ -651,6 +721,7 @@ object SyncStateSchedulerActor:
                           consecutiveUselessResponses
                         )
                         consecutiveUselessResponses = 0
+                        uselessResponseRetryState = uselessResponseRetryState.reset
                         handleRestart(
                           currentState.currentSchedulerState,
                           currentState.currentStats,
@@ -658,7 +729,12 @@ object SyncStateSchedulerActor:
                           replyTo
                         )
                       else
-                        ctx.self ! Sync
+                        // Besu PipelineChainDownloader pauses PAUSE_AFTER_ERROR_DURATION (2s) after failures; back off
+                        // exponentially (2s → 30s) so repeated bad-root responses don't hot-loop Sync (burning CPU and
+                        // getting peers blacklisted faster). Schedule the retry via SyncKey instead of an immediate self.
+                        val delay = uselessResponseRetryState.nextDelay
+                        uselessResponseRetryState = uselessResponseRetryState.recordAttempt
+                        timers.startSingleTimer(SyncKey, Sync, delay)
                         syncing(currentState.withNewDownloaderState(newDownloaderState))
 
                     case _ =>

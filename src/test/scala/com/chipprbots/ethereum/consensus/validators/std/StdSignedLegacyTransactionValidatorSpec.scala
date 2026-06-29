@@ -111,6 +111,30 @@ class StdSignedLegacyTransactionValidatorSpec extends AnyFlatSpec with Matchers:
       case _                               => fail()
   }
 
+  // EIP-2681 boundary (forge 2026-06-27): the cap is exactly 2^64-2 — the largest valid tx nonce.
+  // nonce == 2^64-1 would overflow uint64 on increment and must be rejected; nonce == 2^64-2 must
+  // pass the syntactic nonce check. Locking the boundary so the cap value cannot silently drift.
+  it should "accept nonce == 2^64-2 but reject nonce >= 2^64-1 (EIP-2681 boundary)" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    val eip2681Cap = BigInt(2).pow(64) - 2
+
+    // At the cap: the syntactic nonce check passes (any later failure is NOT a TransactionSyntaxError).
+    val atCap = signedTxBeforeHomestead.copy(tx = txBeforeHomestead.copy(nonce = eip2681Cap))
+    validateStx(atCap, fromBeforeHomestead = true) match
+      case Left(_: TransactionSyntaxError) => fail("nonce == 2^64-2 must pass the syntactic nonce check")
+      case _                               => succeed
+
+    // cap + 1 (2^64-1) and cap + 2 (2^64): rejected as syntactically invalid by EIP-2681.
+    Seq(eip2681Cap + 1, eip2681Cap + 2).foreach { badNonce =>
+      val tooHigh = signedTxBeforeHomestead.copy(tx = txBeforeHomestead.copy(nonce = badNonce))
+      validateStx(tooHigh, fromBeforeHomestead = true) match
+        case Left(_: TransactionSyntaxError) => succeed
+        case other => fail(s"nonce $badNonce must be rejected as TransactionSyntaxError, got $other")
+    }
+  }
+
   it should "report as syntactic invalid a tx with long gas limit" taggedAs (UnitTest, ConsensusTest) in {
     val invalidGasLimit = (0 until LegacyTransaction.GasLength + 1).map(_ => 1.toByte).toArray
     val signedTxWithInvalidGasLimit =
