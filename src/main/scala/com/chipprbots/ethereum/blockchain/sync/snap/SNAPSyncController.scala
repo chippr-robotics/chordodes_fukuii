@@ -370,6 +370,15 @@ private class SNAPSyncControllerImpl(
   // The serve root is considered stale when it is more than this many blocks behind the network head. Matches
   // SyncController.RecentRootMarginBlocks (64) so the refreshed root lands comfortably inside peers' serve window.
   private val HealingServeRootMarginBlocks: BigInt = BigInt(64)
+  // spec 009 T009/T014 (Moving-Root Delta Heal — BOUNDED re-peg last-resort). Under `movingRootDeltaHeal` the heal
+  // re-pegs the single heal root via refreshPivotInPlace (from maybeRequestHealingServeRoot). If a re-peg attempt
+  // during StateHealing finds NO suitable served root (refreshPivotInPlace's newPivotOpt.isEmpty branch), this counter
+  // increments; once it reaches the budget the controller takes the SAME fail-SAFE lazy-heal handoff (completeSnapSync
+  // → on-demand GetTrieNodes during block execution, anchor guard STILL enforced) rather than looping the 30s
+  // RetryPivotRefresh forever (the heal-churn #1371 fought). Fail-SAFE (never force-marks-done / weakens any gate),
+  // never fail-OPEN. Reset on any successful re-peg (completePivotRefreshWithStateRoot) and on entering healing.
+  private var healRepegNoRootAttempts: Int = 0
+  private val MaxHealRepegNoRootAttempts: Int = 10 // 10 × 30s ≈ 5 min of no servable root before the lazy handoff
   // Suppress duplicate ConnectToPeer for snap-server-peers for 60s after a send attempt.
   // Prevents the race where the reconnect timer fires within the 5s peersScanInterval
   // window after STATUS_EXCHANGE completes (peer in ETH handshake but not yet in handshakedPeers).
@@ -3533,6 +3542,7 @@ private class SNAPSyncControllerImpl(
       ctx.log.warn("startStateHealing called but healing coordinator already exists — ignoring duplicate")
     else
       trieWalkInProgress = false // Reset for fresh healing phase
+      healRepegNoRootAttempts = 0 // spec 009 T014: fresh healing phase — reset the bounded re-peg last-resort budget
       ctx.log.info(s"Starting state healing with batch size ${snapSyncConfig.healingBatchSize}")
 
       stateRoot.foreach { root =>
@@ -3986,14 +3996,44 @@ private class SNAPSyncControllerImpl(
           .filter(_ > 0)
 
     if newPivotOpt.isEmpty then
-      ctx.log.warn(
-        "Cannot refresh pivot: no suitable SNAP peers available. Scheduling retry in 30s."
-      )
-      // Don't restart or fallback — SNAP peers are intermittent on ETC mainnet.
-      // The serve window is ~28 min; peers will reappear when new blocks are mined.
-      // Restarting can't help with no peers, and it destroys all downloaded trie data.
-      timers.cancel(PivotBootstrapRetryKey)
-      timers.startSingleTimer(PivotBootstrapRetryKey, RetryPivotRefresh, 30.seconds)
+      // spec 009 T014 (Moving-Root Delta Heal — bounded re-peg last-resort). Under `movingRootDeltaHeal`, a re-peg
+      // during StateHealing that finds NO suitable served root counts against a budget; once exhausted, take the SAME
+      // fail-SAFE lazy-heal handoff the (now-rare) HealingRootUnservable signal uses — completeSnapSync() → on-demand
+      // GetTrieNodes during block execution. CONSTRAINT 1 (never fail-OPEN): completeSnapSync → finalizeSnapSync STILL
+      // enforces the snapStateRoot == pivotHeader.stateRoot anchor guard, so an incomplete state CANNOT finalize (a
+      // mismatch escalates to HealingImpossible/restart) — this is the lazy on-demand-heal handoff (FR-001/FR-008), not
+      // a forced completion. CONSTRAINT 2 (return-Behavior): completeSnapSync() returns a narrowing Behavior[Command]
+      // but refreshPivotInPlace is Unit; exactly as the HealingRootUnservable handler does, we call it for its side
+      // effects (currentPhase=Completed, syncController ! Done, child teardown) and discard the returned Behavior.
+      // Outside healing or flag OFF: the unbounded 30s-retry stays byte-identical (SNAP peers are intermittent on ETC).
+      if snapSyncConfig.movingRootDeltaHeal && currentPhase == StateHealing then
+        healRepegNoRootAttempts += 1
+        if healRepegNoRootAttempts >= MaxHealRepegNoRootAttempts then
+          ctx.log.warn(
+            s"[HEAL-REPEG] No servable root for $healRepegNoRootAttempts consecutive re-peg attempts (budget " +
+              s"$MaxHealRepegNoRootAttempts exhausted, ~${MaxHealRepegNoRootAttempts * 30}s). Taking the fail-safe " +
+              s"lazy-heal handoff (completeSnapSync) — missing nodes fetched on-demand via GetTrieNodes during block " +
+              s"execution; the anchor guard still gates finalization. NOT a false completion."
+          )
+          timers.cancel(PivotBootstrapRetryKey)
+          healRepegNoRootAttempts = 0
+          completeSnapSync()
+        else
+          ctx.log.warn(
+            s"Cannot re-peg heal root: no suitable SNAP peers available (attempt " +
+              s"$healRepegNoRootAttempts/$MaxHealRepegNoRootAttempts). Scheduling retry in 30s."
+          )
+          timers.cancel(PivotBootstrapRetryKey)
+          timers.startSingleTimer(PivotBootstrapRetryKey, RetryPivotRefresh, 30.seconds)
+      else
+        ctx.log.warn(
+          "Cannot refresh pivot: no suitable SNAP peers available. Scheduling retry in 30s."
+        )
+        // Don't restart or fallback — SNAP peers are intermittent on ETC mainnet.
+        // The serve window is ~28 min; peers will reappear when new blocks are mined.
+        // Restarting can't help with no peers, and it destroys all downloaded trie data.
+        timers.cancel(PivotBootstrapRetryKey)
+        timers.startSingleTimer(PivotBootstrapRetryKey, RetryPivotRefresh, 30.seconds)
     else
       val newPivotBlock = newPivotOpt.get
       val newPivotHeaderOpt = blockchainReader.getBlockHeaderByNumber(newPivotBlock)
@@ -4282,6 +4322,10 @@ private class SNAPSyncControllerImpl(
             bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodePivotRefreshed)
             // Healing coordinator: update root, clear pending tasks and stateless peers.
             // Then re-walk the trie with the new root to discover missing nodes.
+            // spec 009 T014: a successful re-peg landed a fresh served root — reset the bounded no-root budget so the
+            // lazy-heal last-resort only fires after a fresh run of consecutive empty re-peg attempts. Harmless flag-OFF
+            // (the budget is never incremented unless movingRootDeltaHeal && StateHealing).
+            healRepegNoRootAttempts = 0
             trieNodeHealingCoordinator.foreach { coordinator =>
               coordinator ! actors.TrieNodeHealingCoordinator.HealingPivotRefreshed(newStateRoot.value)
             }
