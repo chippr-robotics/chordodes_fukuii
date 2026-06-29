@@ -2389,6 +2389,10 @@ object TrieNodeHealingCoordinator:
       frontierBackpressureMaxWaitMs: Long = FrontierBackpressureMaxWaitMs,
       scopedHealVerification: Boolean = true,
       scopedHealMaxPaths: Int = DefaultScopedHealMaxPaths,
+      // spec 002 frontier persistence (Layer-2 mirror writes + completeness markers). Exposed here so production
+      // (SNAPSyncController, wired from sync.conf's healing-frontier-persistence) and tests can enable it. Defaults
+      // OFF to match the impl default and the spec-005 decoupling (store may be present for pruned-heal records only).
+      frontierPersistenceEnabled: Boolean = false,
       decoupledHealServeRoot: Boolean = false,
       decoupledHealMaxAttemptsNoRefresh: Int = DefaultDecoupledHealMaxAttemptsNoRefresh
   ): Behavior[Command] =
@@ -2419,6 +2423,7 @@ object TrieNodeHealingCoordinator:
           frontierBackpressureMaxWaitMs = frontierBackpressureMaxWaitMs,
           scopedHealVerification = scopedHealVerification,
           scopedHealMaxPaths = scopedHealMaxPaths,
+          frontierPersistenceEnabled = frontierPersistenceEnabled,
           decoupledHealServeRoot = decoupledHealServeRoot,
           decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh
         ).start()

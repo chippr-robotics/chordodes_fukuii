@@ -3564,6 +3564,12 @@ private class SNAPSyncControllerImpl(
                   frontierLowWater = snapSyncConfig.healingFrontierLowWater,
                   scopedHealVerification = snapSyncConfig.scopedHealVerification,
                   scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
+                  // Wire the spec-002 frontier-persistence flag from config (sync.conf: healing-frontier-persistence,
+                  // default true in base/sync.conf). The coordinator gates ALL Layer-2 frontier-mirror writes and the
+                  // completeness markers on this flag (it defaults OFF), and the store is now built whenever EITHER
+                  // persistence OR pruned-heal is enabled — so "store present" no longer implies "persistence wanted".
+                  // Without passing this explicitly the deployed (PR #1319) persisted-frontier resume goes dark.
+                  frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
                   decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
                   decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
                 )
@@ -3638,6 +3644,11 @@ private class SNAPSyncControllerImpl(
                     frontierLowWater = snapSyncConfig.healingFrontierLowWater,
                     scopedHealVerification = snapSyncConfig.scopedHealVerification,
                     scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
+                    // Wire the spec-002 frontier-persistence flag from config (sync.conf: healing-frontier-persistence,
+                    // default true in base/sync.conf). See the startStateHealing construction above — the coordinator
+                    // gates all Layer-2 mirror writes + completeness markers on this flag (default OFF), so it must be
+                    // passed explicitly or the deployed (PR #1319) persisted-frontier resume goes dark in production.
+                    frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
                     decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
                     decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
                   )

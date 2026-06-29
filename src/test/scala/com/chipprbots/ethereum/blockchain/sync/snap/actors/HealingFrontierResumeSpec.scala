@@ -111,6 +111,11 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
       batchSize = 16,
       snapSyncController = controllerProbe.ref,
       healingFrontierStorage = if persistence then Some(store) else None,
+      // spec 005 decoupling: the coordinator gates the Layer-2 frontier-mirror writes + completeness markers on
+      // `frontierPersistenceEnabled` (default OFF), separately from store PRESENCE. This suite exercises exactly
+      // those persistence behaviours, so the flag tracks `persistence` here (in production it is wired from
+      // sync.conf's healing-frontier-persistence). Without it the write-on-queue + marker set/clear specs go dark.
+      frontierPersistenceEnabled = persistence,
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, root, store, controllerProbe)

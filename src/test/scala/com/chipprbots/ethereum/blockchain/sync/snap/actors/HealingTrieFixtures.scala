@@ -74,6 +74,10 @@ object HealingTrieFixtures:
       frontierBackpressureMaxWaitMs: Long = TrieNodeHealingCoordinator.FrontierBackpressureMaxWaitMs,
       scopedHealVerification: Boolean = true,
       scopedHealMaxPaths: Int = TrieNodeHealingCoordinator.DefaultScopedHealMaxPaths,
+      // spec 002 frontier persistence. Default OFF to match the production constructor default and the spec-005
+      // decoupling (PrunedHealParitySpec / PrunedHealFallbackSpec rely on the default-off, store-present case). Specs
+      // that exercise the Layer-2 mirror writes / completeness markers (HealingFrontierResumeSpec) set this true.
+      frontierPersistenceEnabled: Boolean = false,
       decoupledHealServeRoot: Boolean = false,
       decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh
   )(implicit testKit: ActorTestKit): TypedActorRef[TrieNodeHealingCoordinator.Command] =
@@ -101,6 +105,7 @@ object HealingTrieFixtures:
         frontierBackpressureMaxWaitMs = frontierBackpressureMaxWaitMs,
         scopedHealVerification = scopedHealVerification,
         scopedHealMaxPaths = scopedHealMaxPaths,
+        frontierPersistenceEnabled = frontierPersistenceEnabled,
         decoupledHealServeRoot = decoupledHealServeRoot,
         decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh
       )
