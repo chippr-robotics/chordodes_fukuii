@@ -65,7 +65,7 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory:
 
     def mkTransaction(nonce: String, address: String, value: String): LegacyTransaction = LegacyTransaction(
       nonce = BigInt(nonce),
-      gasPrice = BigInt("20000000000"),
+      gasPrice = GasPrice(BigInt("20000000000")),
       gasLimit = GasAmount(BigInt("50000")),
       receivingAddress = Address(hash2ByteString(address)),
       value = BigInt(value),

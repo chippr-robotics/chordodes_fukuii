@@ -21,6 +21,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsRequest
@@ -75,7 +76,7 @@ class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with
         val fakeTransaction: SignedTransactionWithSender = SignedTransactionWithSender(
           LegacyTransaction(
             nonce = 0,
-            gasPrice = 123,
+            gasPrice = GasPrice(123),
             gasLimit = GasAmount(123),
             receivingAddress = Address("0x1234"),
             value = 0,

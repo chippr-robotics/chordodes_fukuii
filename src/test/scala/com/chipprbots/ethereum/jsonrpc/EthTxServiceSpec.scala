@@ -391,7 +391,7 @@ class EthTxServiceSpec
       val fakeTransaction = SignedTransactionWithSender(
         LegacyTransaction(
           nonce = 0,
-          gasPrice = 123,
+          gasPrice = GasPrice(123),
           gasLimit = GasAmount(123),
           receivingAddress = Address("0x1234"),
           value = 0,
@@ -468,7 +468,7 @@ class EthTxServiceSpec
     val contractCreatingTransaction: SignedTransaction = SignedTransaction(
       LegacyTransaction(
         nonce = 2550,
-        gasPrice = BigInt("20000000000"),
+        gasPrice = GasPrice(BigInt("20000000000")),
         gasLimit = GasAmount(3000000),
         receivingAddress = None,
         value = 0,

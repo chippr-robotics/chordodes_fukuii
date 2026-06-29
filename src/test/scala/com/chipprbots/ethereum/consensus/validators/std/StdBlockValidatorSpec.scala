@@ -92,7 +92,7 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers:
       SignedTransaction(
         tx = LegacyTransaction(
           nonce = BigInt("438550"),
-          gasPrice = BigInt("20000000000"),
+          gasPrice = GasPrice(BigInt("20000000000")),
           gasLimit = GasAmount(BigInt("50000")),
           receivingAddress = Address(ByteString(Hex.decode("ee4439beb5c71513b080bbf9393441697a29f478"))),
           value = BigInt("1265230129703017984"),
@@ -105,7 +105,7 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers:
       SignedTransaction(
         tx = LegacyTransaction(
           nonce = BigInt("438551"),
-          gasPrice = BigInt("20000000000"),
+          gasPrice = GasPrice(BigInt("20000000000")),
           gasLimit = GasAmount(BigInt("50000")),
           receivingAddress = Address(ByteString(Hex.decode("c68e9954c7422f479e344faace70c692217ea05b"))),
           value = BigInt("656010196207162880"),
@@ -118,7 +118,7 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers:
       SignedTransaction(
         tx = LegacyTransaction(
           nonce = BigInt("438552"),
-          gasPrice = BigInt("20000000000"),
+          gasPrice = GasPrice(BigInt("20000000000")),
           gasLimit = GasAmount(BigInt("50000")),
           receivingAddress = Address(ByteString(Hex.decode("19c5a95eeae4446c5d24363eab4355157e4f828b"))),
           value = BigInt("3725976610361427456"),
@@ -131,7 +131,7 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers:
       SignedTransaction(
         tx = LegacyTransaction(
           nonce = BigInt("438553"),
-          gasPrice = BigInt("20000000000"),
+          gasPrice = GasPrice(BigInt("20000000000")),
           gasLimit = GasAmount(BigInt("50000")),
           receivingAddress = Address(ByteString(Hex.decode("3435be928d783b7c48a2c3109cba0d97d680747a"))),
           value = BigInt("108516826677274384"),

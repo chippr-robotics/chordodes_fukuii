@@ -55,13 +55,13 @@ class OlympiaFeeMarketSpec
       "Type 0 (legacy): return gasPrice regardless of baseFee" taggedAs (UnitTest, OlympiaTest) in {
         val legacyTx = LegacyTransaction(
           nonce = 0,
-          gasPrice = BigInt(5_000_000_000L),
+          gasPrice = GasPrice(5_000_000_000L),
           gasLimit = GasAmount(21000),
           receivingAddress = Address(1),
           value = BigInt(0),
           payload = ByteString.empty
         )
-        Transaction.effectiveGasPrice(legacyTx, Some(BigInt(2_000_000_000L))) shouldBe legacyTx.gasPrice
+        Transaction.effectiveGasPrice(legacyTx, Some(BigInt(2_000_000_000L))) shouldBe legacyTx.gasPrice.value
       }
 
       "Type 2 (dynamic fee): return min(maxFee, baseFee + maxPriority) — uncapped case" taggedAs (
@@ -141,7 +141,7 @@ class OlympiaFeeMarketSpec
         val baseFee = BigInt(2_000_000_000L)
         val legacyTx = LegacyTransaction(
           nonce = 0,
-          gasPrice = gasPrice,
+          gasPrice = GasPrice(gasPrice),
           gasLimit = GasAmount(21000),
           receivingAddress = Address(1),
           value = BigInt(0),
@@ -265,7 +265,7 @@ class OlympiaFeeMarketSpec
         val baseFee = InitialBaseFee
         val legacyTx = LegacyTransaction(
           nonce = BigInt(0),
-          gasPrice = baseFee,
+          gasPrice = GasPrice(baseFee),
           gasLimit = GasAmount(BigInt(21_000)),
           receivingAddress = None,
           value = BigInt(0),

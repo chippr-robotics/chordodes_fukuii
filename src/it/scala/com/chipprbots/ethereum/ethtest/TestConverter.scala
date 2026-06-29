@@ -149,7 +149,7 @@ object TestConverter:
         TransactionWithAccessList(
           chainId = chainId,
           nonce = nonce,
-          gasPrice = gasPrice,
+          gasPrice = GasPrice(gasPrice),
           gasLimit = gasLimit,
           receivingAddress = receivingAddress,
           value = value,
@@ -197,7 +197,7 @@ object TestConverter:
         // Legacy transaction (or unknown type, default to legacy)
         LegacyTransaction(
           nonce = nonce,
-          gasPrice = gasPrice,
+          gasPrice = GasPrice(gasPrice),
           gasLimit = gasLimit,
           receivingAddress = receivingAddress,
           value = value,

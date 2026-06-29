@@ -214,7 +214,7 @@ class BlockExecutionSpec
 
         val transaction: Transaction = validStxSignedByOrigin.tx
         // Check valid world
-        val minerPaymentForTxs: UInt256 = UInt256((transaction.gasLimit * transaction.gasPrice).value)
+        val minerPaymentForTxs: UInt256 = UInt256(transaction.gasLimit.value * transaction.gasPrice.value)
         val changes: Seq[(Address, IncreaseNonce.type | UpdateBalance)] = Seq(
           originAddress -> IncreaseNonce,
           originAddress -> UpdateBalance(-minerPaymentForTxs), // Origin payment for tx execution and nonce increase
@@ -292,7 +292,7 @@ class BlockExecutionSpec
 
             val transaction = stx.tx.tx
             // Check valid world
-            val minerPaymentForTxs = UInt256((transaction.gasLimit * transaction.gasPrice).value)
+            val minerPaymentForTxs = UInt256(transaction.gasLimit.value * transaction.gasPrice.value)
             val changes = Seq(
               originAddress -> IncreaseNonce,
               originAddress -> UpdateBalance(-minerPaymentForTxs), // Origin payment for tx execution and nonce increase
@@ -563,7 +563,7 @@ class BlockExecutionSpec
         val Seq(receipt1, receipt2) = resultingReceipts
 
         // Check receipt1
-        val minerPaymentForTx1 = UInt256((transaction1.gasLimit * transaction1.gasPrice).value)
+        val minerPaymentForTx1 = UInt256(transaction1.gasLimit.value * transaction1.gasPrice.value)
         val changesTx1 = Seq(
           origin1Address -> IncreaseNonce,
           origin1Address -> UpdateBalance(-minerPaymentForTx1), // Origin payment for tx execution and nonce increase
@@ -579,7 +579,7 @@ class BlockExecutionSpec
         logsReceipt1 shouldBe Nil
 
         // Check receipt2
-        val minerPaymentForTx2 = UInt256((transaction2.gasLimit * transaction2.gasPrice).value)
+        val minerPaymentForTx2 = UInt256(transaction2.gasLimit.value * transaction2.gasPrice.value)
         val changesTx2 = Seq(
           origin2Address -> IncreaseNonce,
           origin2Address -> UpdateBalance(-minerPaymentForTx2), // Origin payment for tx execution and nonce increase

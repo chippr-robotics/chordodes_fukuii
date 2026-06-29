@@ -98,7 +98,7 @@ class TransactionSpec
     val tx: TransactionWithAccessList = TransactionWithAccessList(
       1, // ethereum mainnet, used by the core-geth test
       3,
-      1,
+      GasPrice(1),
       GasAmount(25000),
       toAddr,
       10,
@@ -129,7 +129,7 @@ class TransactionSpec
     val toAddr: Address = Address.apply("b94f5374fce5edbc8e2a8697c15331677e6ebf0b")
     val tx: LegacyTransaction = LegacyTransaction(
       3,
-      1,
+      GasPrice(1),
       GasAmount(2000),
       toAddr,
       10,

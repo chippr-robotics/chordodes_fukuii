@@ -119,7 +119,7 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
   it should "not affect validation of legacy transactions" taggedAs (UnitTest, ConsensusTest) in {
     val legacyTx = LegacyTransaction(
       nonce = 0,
-      gasPrice = BigInt("2000000000"),
+      gasPrice = GasPrice(BigInt("2000000000")),
       gasLimit = GasAmount(21000),
       receivingAddress = Address(Hex.decode("32be343b94f860124dc4fee278fdcbd38c102d88")),
       value = BigInt(0),
