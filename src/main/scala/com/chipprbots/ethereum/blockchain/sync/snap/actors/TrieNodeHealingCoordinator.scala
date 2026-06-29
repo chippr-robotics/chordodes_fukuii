@@ -408,13 +408,16 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
   // T020: number of serve-root refreshes engaged this coordinator lifetime (observability only).
   private var serveRootRefreshCount: Long = 0L
 
-  /** spec 004 T019: encode the leading 8 bytes of a root hash as a numeric "short label" gauge value so an operator can
-    * eyeball-correlate the walk-root / serve-root gauges with the `[HEAL]` log lines (which print 4 bytes). This is
-    * observation-only — never read by any walk / completeness / fetch decision. Empty ⇒ 0.
+  /** spec 004 T019: encode the leading 6 bytes of a root hash as a numeric "short label" gauge value so an operator can
+    * eyeball-correlate the walk-root / serve-root gauges with the `[HEAL]` log lines. This is observation-only — never
+    * read by any walk / completeness / fetch decision. Empty ⇒ 0. Six bytes (48 bits) is deliberate: it is always
+    * non-negative and is exactly representable in a Prometheus gauge's IEEE-754 double (53-bit mantissa). Eight bytes
+    * pushed the leading byte's high bit into the Long sign (rendering a spurious negative ~-3.7e18) AND exceeded the
+    * mantissa (the displayed double no longer matched the actual bytes).
     */
   private def shortRootLabel(root: ByteString): Long =
     var acc = 0L
-    val n = root.length.min(8)
+    val n = root.length.min(6)
     var i = 0
     while i < n do
       acc = (acc << 8) | (root(i) & 0xffL)

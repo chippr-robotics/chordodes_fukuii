@@ -263,8 +263,8 @@ object SNAPSyncMetrics extends MetricsContainer:
   // Distinguish the fixed completeness WALK root from the advancing SERVE root used to fetch missing nodes,
   // and report cross-root heals and currently-unservable tasks. These NEVER gate any consensus or completion
   // decision — pure instrumentation pushed by `TrieNodeHealingCoordinator`. The root gauges carry the leading
-  // 8 bytes of each root hash as an (unsigned-ish) long "short label" so an operator can eyeball-correlate them
-  // with the `[HEAL]` log lines (which print the first 4 bytes); 0 = not yet set / feature off.
+  // 6 bytes of each root hash as a non-negative long "short label" (always >= 0 and exactly representable as a
+  // Prometheus double) so an operator can eyeball-correlate them with the `[HEAL]` log lines; 0 = not yet set / off.
 
   /** 1 = decoupled serve-root is engaged (feature on); 0 = single-root (coupled) heal. */
   final private val HealingDecoupledEngagedGauge =

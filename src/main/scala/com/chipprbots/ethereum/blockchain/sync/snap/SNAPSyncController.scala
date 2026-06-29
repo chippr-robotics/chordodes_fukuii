@@ -5278,9 +5278,11 @@ case class SNAPSyncConfig(
     // FR-006 surfacing threshold: after this many unsatisfied heal attempts with no serve-root advance in
     // between, the coordinator surfaces the stuck task (log + metric). NEVER force-completes.
     decoupledHealMaxAttemptsNoRefresh: Int = 12,
-    // spec 009 (Moving-Root Delta Heal) — PLUMBING ONLY in this batch. No code reads this flag yet, so flag-ON and
-    // flag-OFF are byte-for-byte identical. Default true sets the intended ETC SNAP default once the behavior hunks
-    // land in later batches (single served heal root, seed-absent-root, re-peg, pruned completion).
+    // spec 009 (Moving-Root Delta Heal). Read by TrieNodeHealingCoordinator (single served heal root in
+    // requestNextBatch; seed-absent-root vs the HealingRootUnservable handoff in StartTrieNodeHealing; the
+    // HealingServeRootRefresh no-op) and by SNAPSyncController (re-peg trigger in maybeRequestHealingServeRoot;
+    // bounded last-resort in refreshPivotInPlace). Default true = the ETC SNAP default; flag-OFF restores the
+    // spec-004 decoupled serve-root path byte-for-byte (rollback path, FR-007).
     movingRootDeltaHeal: Boolean = true,
     stateValidationEnabled: Boolean = true,
     maxRetries: Int = 3,
