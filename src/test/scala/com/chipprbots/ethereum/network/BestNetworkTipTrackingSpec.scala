@@ -16,6 +16,7 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
@@ -59,7 +60,7 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers:
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(150), blockNum = 0))
 
     // NewBlock arrives with higher TD and exact block number
-    val newBlockHeader: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(1000))
+    val newBlockHeader: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BlockNumber(BigInt(1000)))
     val nb: NewBlock = NewBlock(Block(newBlockHeader, BlockBody(Nil, Nil)), BigInt(300))
     peersInfoHolder ! PeerEventCmd(MessageFromPeer(nb, peer1.id))
 
@@ -124,13 +125,13 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers:
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(1000), blockNum = BigInt(5000)))
 
     // High-TD NewBlock arrives first
-    val hdrHigh: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(5000))
+    val hdrHigh: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BlockNumber(BigInt(5000)))
     peersInfoHolder ! PeerEventCmd(
       MessageFromPeer(NewBlock(Block(hdrHigh, BlockBody(Nil, Nil)), BigInt(1500)), peer1.id)
     )
 
     // Lower-TD NewBlock — must NOT downgrade bestNetworkTip
-    val hdrLow: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(4800))
+    val hdrLow: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BlockNumber(BigInt(4800)))
     peersInfoHolder ! PeerEventCmd(MessageFromPeer(NewBlock(Block(hdrLow, BlockBody(Nil, Nil)), BigInt(100)), peer1.id))
 
     peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(

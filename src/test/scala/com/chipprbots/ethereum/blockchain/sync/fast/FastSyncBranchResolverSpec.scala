@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.BinarySearchSupport.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolver.SearchState
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -30,10 +31,10 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
   import Fixtures.Blocks.ValidBlock
 
   private def blocksMap(amount: Int, parent: Block): Map[BigInt, Block] =
-    BlockHelpers.generateChain(amount, parent).map(b => (b.number, b)).toMap
+    BlockHelpers.generateChain(amount, parent).map(b => (b.number.value, b)).toMap
 
   private def headersMap(amount: Int, parent: Block): Map[BigInt, BlockHeader] =
-    BlockHelpers.generateChain(amount, parent).map(b => (b.number, b.header)).toMap
+    BlockHelpers.generateChain(amount, parent).map(b => (b.number.value, b.header)).toMap
 
   private def headersList(blocksMap: Map[BigInt, Block]): List[BlockHeader] =
     blocksMap.values.map(_.header).toList
@@ -52,7 +53,8 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
       val mockedBlockchain = mock[BlockchainImpl]
       val mockedBlockchainReader = mock[BlockchainReader]
 
-      val headers = headersMap(amount = 3, parent = Block(ValidBlock.header.copy(number = 97), ValidBlock.body))
+      val headers =
+        headersMap(amount = 3, parent = Block(ValidBlock.header.copy(number = BlockNumber(97)), ValidBlock.body))
 
       inSequence {
         (() => mockedBlockchainReader.getBestBlockNumber).expects().returning(BigInt(100)).once()
@@ -78,7 +80,7 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
 
         // our: [..., 97, 98, 99, *100*]
         // peer: [..., 97, 98, 99, *100*, 101, 102]
-        val startBlock = Block(ValidBlock.header.copy(number = 97), ValidBlock.body)
+        val startBlock = Block(ValidBlock.header.copy(number = BlockNumber(97)), ValidBlock.body)
         val ourBlocks = blocksMap(amount = 3, parent = startBlock)
         val peerBlocks = ourBlocks ++ blocksMap(amount = 1, parent = ourBlocks(100))
 
@@ -97,7 +99,7 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
 
         // our: [..., *97*, 98, 99, 100]
         // peer: [..., *97*, 98x, 99x, 100, 101x]
-        val startBlock = Block(ValidBlock.header.copy(number = 96), ValidBlock.body)
+        val startBlock = Block(ValidBlock.header.copy(number = BlockNumber(96)), ValidBlock.body)
         val ourBlocks = blocksMap(amount = 4, parent = startBlock) // 97, 98, 99, 100
         val peerBlocks = blocksMap(amount = 4, parent = ourBlocks(97)) // 98, 99, 100, 101
 
@@ -125,7 +127,7 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
 
         // our: [..., 95, 96, 97, *98*, 99, 100]
         // peer: [..., 95, 96, 97, *98*, 99x, 100x, 101x]
-        val startBlock = Block(ValidBlock.header.copy(number = 95), ValidBlock.body)
+        val startBlock = Block(ValidBlock.header.copy(number = BlockNumber(95)), ValidBlock.body)
         val commonBlocks = blocksMap(amount = 3, parent = startBlock)
         val ourBlocks = commonBlocks ++ blocksMap(amount = 2, parent = commonBlocks(highestCommonBlock))
         val peerBlocks = blocksMap(amount = 3, parent = commonBlocks(highestCommonBlock))
@@ -149,8 +151,9 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
 
       // our: [..., 95, 96, 97, 98, 99, 100]
       // peer: [..., 95x, 96x, 97x, 98x, 99x, 100x]
-      val startBlock = Block(ValidBlock.header.copy(number = 95), ValidBlock.body)
-      val divergedStartBlock = Block(ValidBlock.header.copy(number = 95, nonce = ByteString("foo")), ValidBlock.body)
+      val startBlock = Block(ValidBlock.header.copy(number = BlockNumber(95)), ValidBlock.body)
+      val divergedStartBlock =
+        Block(ValidBlock.header.copy(number = BlockNumber(95), nonce = ByteString("foo")), ValidBlock.body)
       val ourBlocks = blocksMap(amount = 5, parent = startBlock)
       val peerBlocks = blocksMap(amount = 5, parent = divergedStartBlock)
 
@@ -194,8 +197,8 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         )
 
       val initialSearchState = SearchState(1, 10, dummyPeer)
-      val ours = blocksSaved.map(b => (b.number, b)).toMap
-      val peer = blocksSavedInPeer.map(b => (b.number, b)).toMap
+      val ours = blocksSaved.map(b => (b.number.value, b)).toMap
+      val peer = blocksSavedInPeer.map(b => (b.number.value, b)).toMap
 
       val req1 = BinarySearchSupport.blockHeaderNumberToRequest(
         initialSearchState.minBlockNumber,
@@ -272,8 +275,8 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         )
 
       val initialSearchState = SearchState(1, 8, dummyPeer)
-      val ours = blocksSaved.map(b => (b.number, b)).toMap
-      val peer = blocksSavedInPeer.map(b => (b.number, b)).toMap
+      val ours = blocksSaved.map(b => (b.number.value, b)).toMap
+      val peer = blocksSavedInPeer.map(b => (b.number.value, b)).toMap
 
       val req1 = BinarySearchSupport.blockHeaderNumberToRequest(
         initialSearchState.minBlockNumber,

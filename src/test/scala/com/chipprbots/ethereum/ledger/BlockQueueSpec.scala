@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.ChainWeight
@@ -187,7 +188,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory:
 
     val defaultHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
       difficulty = Difficulty(1000000),
-      number = 1,
+      number = BlockNumber(1),
       gasLimit = GasAmount(1000000),
       gasUsed = GasAmount.Zero,
       unixTimestamp = 0
@@ -201,6 +202,11 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory:
     ): Block =
       Block(
         defaultHeader
-          .copy(parentHash = BlockHash(parent), difficulty = Difficulty(difficulty), number = number, extraData = salt),
+          .copy(
+            parentHash = BlockHash(parent),
+            difficulty = Difficulty(difficulty),
+            number = BlockNumber(number),
+            extraData = salt
+          ),
         BlockBody.empty
       )

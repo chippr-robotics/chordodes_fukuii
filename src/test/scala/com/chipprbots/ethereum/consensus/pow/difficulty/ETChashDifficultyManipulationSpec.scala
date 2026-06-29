@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.TrieRoot
@@ -99,7 +100,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
       logsBloom = BloomFilter.Empty,
       difficulty = Difficulty(difficulty),
-      number = number,
+      number = BlockNumber(number),
       gasLimit = GasAmount(BigInt(8000000)),
       gasUsed = GasAmount.Zero,
       unixTimestamp = timestamp,

@@ -116,7 +116,7 @@ trait MinerSpecSetup
   val blockForMiningTimestamp: Long = System.currentTimeMillis()
 
   protected def getParentBlock(parentBlockNumber: Int): Block =
-    origin.copy(header = origin.header.copy(number = parentBlockNumber))
+    origin.copy(header = origin.header.copy(number = BlockNumber(parentBlockNumber)))
 
   def buildPoWConsensus(): PoWMining =
     val fukuiiConfig = Config.config

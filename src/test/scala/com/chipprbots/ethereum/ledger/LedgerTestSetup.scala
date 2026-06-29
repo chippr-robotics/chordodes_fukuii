@@ -59,7 +59,7 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
 
   val defaultBlockHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     difficulty = Difficulty(1000000),
-    number = blockchainConfig.forkBlockNumbers.homesteadBlockNumber + 1,
+    number = BlockNumber(blockchainConfig.forkBlockNumbers.homesteadBlockNumber + 1),
     gasLimit = GasAmount(1000000),
     gasUsed = GasAmount.Zero,
     unixTimestamp = 1486752441
@@ -191,7 +191,7 @@ trait BlockchainSetup extends TestSetup:
   blockchainWriter
     .storeBlockHeader(validBlockParentHeader)
     .and(blockchainWriter.storeBlockBody(validBlockParentHeader.hash, validBlockBodyWithNoTxs))
-    .and(storagesInstance.storages.appStateStorage.putBestBlockNumber(validBlockParentHeader.number))
+    .and(storagesInstance.storages.appStateStorage.putBestBlockNumber(validBlockParentHeader.number.value))
     .and(storagesInstance.storages.chainWeightStorage.put(validBlockParentHeader.hash.value, ChainWeight.zero))
     .commit()
 
@@ -234,7 +234,7 @@ trait DaoForkTestSetup extends TestSetup:
     override val range: Int = 10
     override val drainList: Seq[Address] = Seq(Address(1), Address(2), Address(3))
     override val forkBlockHash: ByteString = proDaoBlock.header.hash.value
-    override val forkBlockNumber: BigInt = proDaoBlock.header.number
+    override val forkBlockNumber: BigInt = proDaoBlock.header.number.value
     override val refundContract: Option[Address] = Some(Address(4))
     override val includeOnForkIdList: Boolean = false
 
@@ -296,13 +296,13 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
 
   val defaultHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     difficulty = Difficulty(100),
-    number = 1,
+    number = BlockNumber(1),
     gasLimit = GasAmount(1000000),
     gasUsed = GasAmount.Zero,
     unixTimestamp = 0
   )
 
-  val genesisHeader: BlockHeader = defaultHeader.copy(number = 0, extraData = ByteString("genesis"))
+  val genesisHeader: BlockHeader = defaultHeader.copy(number = BlockNumber(0), extraData = ByteString("genesis"))
 
   def getBlock(
       number: BigInt = 1,
@@ -313,7 +313,12 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
   ): Block =
     Block(
       defaultHeader
-        .copy(parentHash = BlockHash(parent), difficulty = Difficulty(difficulty), number = number, extraData = salt),
+        .copy(
+          parentHash = BlockHash(parent),
+          difficulty = Difficulty(difficulty),
+          number = BlockNumber(number),
+          extraData = salt
+        ),
       BlockBody(Nil, ommers)
     )
 

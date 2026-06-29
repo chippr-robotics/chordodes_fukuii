@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -23,9 +24,9 @@ class Eip3541Spec extends AnyWordSpec with Matchers:
 
   object fxt:
     val fakeHeaderPreMystique: BlockHeader =
-      BlockFixtures.ValidBlock.header.copy(number = Fixtures.MagnetoBlockNumber)
+      BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.MagnetoBlockNumber))
     val fakeHeaderMystique: BlockHeader =
-      BlockFixtures.ValidBlock.header.copy(number = Fixtures.MystiqueBlockNumber)
+      BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.MystiqueBlockNumber))
     val creatorAddr: Address = Address(0xcafe)
 
     def createContext(

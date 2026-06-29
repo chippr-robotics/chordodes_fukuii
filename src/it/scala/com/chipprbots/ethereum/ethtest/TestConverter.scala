@@ -81,7 +81,7 @@ object TestConverter:
       receiptsRoot = TrieRoot(ByteString(parseHex(testHeader.receiptTrie))),
       logsBloom = BloomFilter(ByteString(parseHex(testHeader.bloom))),
       difficulty = Difficulty(parseBigInt(testHeader.difficulty)),
-      number = parseBigInt(testHeader.number),
+      number = BlockNumber(parseBigInt(testHeader.number)),
       gasLimit = GasAmount(parseBigInt(testHeader.gasLimit)),
       gasUsed = GasAmount(parseBigInt(testHeader.gasUsed)),
       unixTimestamp = parseBigInt(testHeader.timestamp).toLong,

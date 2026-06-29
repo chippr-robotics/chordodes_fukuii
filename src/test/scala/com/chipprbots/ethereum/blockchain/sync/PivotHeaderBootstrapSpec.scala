@@ -17,6 +17,7 @@ import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.db.dataSource.DataSourceBatchUpdate
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
@@ -28,8 +29,8 @@ class PivotHeaderBootstrapSpec extends ScalaTestWithActorTestKit() with AnyFlatS
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   val targetBlock: BigInt = 1000
-  val correctHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = targetBlock)
-  val wrongHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BigInt(999))
+  val correctHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BlockNumber(targetBlock))
+  val wrongHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BlockNumber(999))
 
   val ds: EphemDataSource = EphemDataSource()
   val noopBatch: DataSourceBatchUpdate = DataSourceBatchUpdate(ds, Array.empty)

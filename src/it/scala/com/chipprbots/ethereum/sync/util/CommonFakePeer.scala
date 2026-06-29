@@ -39,6 +39,7 @@ import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
 import com.chipprbots.ethereum.db.storage.pruning.PruningMode
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Blockchain
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
@@ -313,11 +314,11 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   private def getMptForBlock(block: Block) =
     InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
-      bl.getBackingMptStorage(block.number),
+      bl.getBackingMptStorage(block.number.value),
       (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       blockchainConfig.accountStartNonce,
       block.header.stateRoot.value,
-      noEmptyAccounts = EvmConfig.forBlock(block.number, blockchainConfig).noEmptyAccounts,
+      noEmptyAccounts = EvmConfig.forBlock(block.number.value, blockchainConfig).noEmptyAccounts,
       ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
     )
 
@@ -383,7 +384,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy
   ): (Block, ChainWeight, InMemoryWorldStateProxy) =
     val newBlockNumber = parent.header.number + 1
-    val newWorld = updateWorldForBlock(newBlockNumber, parentWorld)
+    val newWorld = updateWorldForBlock(newBlockNumber.value, parentWorld)
     val newBlock = parent.copy(header =
       parent.header.copy(
         parentHash = parent.header.hash,
@@ -402,7 +403,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       val currentWorld = getMptForBlock(currentBestBlock)
 
       val newBlockNumber = currentBestBlock.header.number + 1
-      val newWorld = updateWorldForBlock(newBlockNumber, currentWorld)
+      val newWorld = updateWorldForBlock(newBlockNumber.value, currentWorld)
 
       // The child block is made invalid by not properly updating its parent hash.
       val childBlock =
@@ -434,7 +435,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       n: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
     IO(blockchainReader.getBestBlock).flatMap { block =>
-      if block.get.number >= n then IO(())
+      if block.get.number.value >= n then IO(())
       else generateValidBlock(block.get)(updateWorldForBlock).flatMap(_ => importBlocksUntil(n)(updateWorldForBlock))
     }
 
@@ -443,8 +444,8 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
     IO(blockchainReader.getBestBlock).flatMap { block =>
-      if block.get.number >= to then IO(())
-      else if block.get.number >= from then
+      if block.get.number.value >= to then IO(())
+      else if block.get.number.value >= from then
         generateInvalidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlocks(from, to)(updateWorldForBlock)
         )
@@ -460,8 +461,8 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
     IO(blockchainReader.getBestBlock).flatMap { block =>
-      if block.get.number >= to then IO(())
-      else if block.get.number >= from then
+      if block.get.number.value >= to then IO(())
+      else if block.get.number.value >= from then
         generateInvalidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlockNumbers(from, to)(updateWorldForBlock)
         )

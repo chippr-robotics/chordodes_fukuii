@@ -151,12 +151,12 @@ class TraceServiceSpec
       storagesInstance.storages.blockHeadersStorage
         .put(emptyBlock.header.parentHash.value, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
         .commit()
-      blockchainWriter.saveBestKnownBlocks(emptyBlock.header.hash, emptyBlock.header.number)
+      blockchainWriter.saveBestKnownBlocks(emptyBlock.header.hash, emptyBlock.header.number.value)
 
       val result: Either[JsonRpcError, TraceReplayBlockTransactionsResponse] = service
         .replayBlockTransactions(
           TraceReplayBlockTransactionsRequest(
-            BlockParam.WithNumber(emptyBlock.header.number),
+            BlockParam.WithNumber(emptyBlock.header.number.value),
             TraceOptions(trace = true)
           )
         )

@@ -92,7 +92,7 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory:
         receiptsRoot = TrieRoot(hash2ByteString("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d")),
         logsBloom = bloomFilter,
         difficulty = Difficulty(BigInt("14005986920576")),
-        number = 3125369,
+        number = BlockNumber(3125369),
         gasLimit = GasAmount(4699996),
         gasUsed = GasAmount(84000),
         unixTimestamp = 1486131165,

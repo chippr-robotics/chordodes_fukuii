@@ -107,7 +107,7 @@ class SyncControllerSpec
       val children = syncController.children
       assert(storagesInstance.storages.appStateStorage.isFastSyncDone())
       assert(children.exists(ref => ref.path.name.startsWith("regular-sync")))
-      assert(blockchainReader.getBestBlockNumber == defaultPivotBlockHeader.number)
+      assert(blockchainReader.getBestBlockNumber == defaultPivotBlockHeader.number.value)
     }
   }
 
@@ -141,7 +141,7 @@ class SyncControllerSpec
       // switch to regular download
       val children = syncController.children
       assert(children.exists(ref => ref.path.name.startsWith("regular-sync")))
-      assert(blockchainReader.getBestBlockNumber == defaultPivotBlockHeader.number)
+      assert(blockchainReader.getBestBlockNumber == defaultPivotBlockHeader.number.value)
     }
   }
 
@@ -170,7 +170,7 @@ class SyncControllerSpec
         // safeDownloadTarget must exceed bestBlockHeaderNumber so FastSync enqueues headers
         // beyond 399500. The Typed FastSync caps header fetches at safeDownloadTarget via
         // enqueueHeadersIfNeeded; the Classic version did not have this guard.
-        safeDownloadTarget = beforeRestartPivot.number + syncConfig.fastSyncBlockValidationX
+        safeDownloadTarget = (beforeRestartPivot.number + syncConfig.fastSyncBlockValidationX).value
       )
     )
 
@@ -207,7 +207,7 @@ class SyncControllerSpec
             blockHeader: BlockHeader,
             getBlockHeaderByHash: GetBlockHeaderByHash
         )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-          if blockHeader.number == invalidBlockNNumber then Left(HeaderParentNotFoundError)
+          if blockHeader.number.value == invalidBlockNNumber then Left(HeaderParentNotFoundError)
           else Right(BlockHeaderValid)
 
         override def validateHeaderOnly(blockHeader: BlockHeader)(implicit
@@ -293,7 +293,7 @@ class SyncControllerSpec
             blockHeader: BlockHeader,
             getBlockHeaderByHash: GetBlockHeaderByHash
         )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-          if blockHeader.number != 399500 + 10 then Right(BlockHeaderValid)
+          if blockHeader.number.value != 399500 + 10 then Right(BlockHeaderValid)
           else Left(HeaderParentNotFoundError)
 
         override def validateHeaderOnly(blockHeader: BlockHeader)(implicit
@@ -335,7 +335,7 @@ class SyncControllerSpec
       someTimePasses()
       val syncState = storagesInstance.storages.fastSyncStateStorage.getSyncState().get
       syncState.pivotBlock shouldBe newPivot
-      syncState.safeDownloadTarget shouldEqual newPivot.number + syncConfig.fastSyncBlockValidationX
+      syncState.safeDownloadTarget shouldEqual (newPivot.number + syncConfig.fastSyncBlockValidationX).value
       syncState.blockBodiesQueue.isEmpty shouldBe true
       syncState.receiptsQueue.isEmpty shouldBe true
       syncState.bestBlockHeaderNumber shouldBe (newBest - syncConfig.fastSyncBlockValidationN)
@@ -469,7 +469,7 @@ class SyncControllerSpec
         // switch to regular download
         val children = syncController.children
         assert(children.exists(ref => ref.path.name.startsWith("regular-sync")))
-        assert(blockchainReader.getBestBlockNumber == defaultPivotBlockHeader.number)
+        assert(blockchainReader.getBestBlockNumber == defaultPivotBlockHeader.number.value)
       }
   }
 
@@ -533,7 +533,7 @@ class SyncControllerSpec
       val children = syncController.children
       assert(storagesInstance.storages.appStateStorage.isFastSyncDone())
       assert(children.exists(ref => ref.path.name.startsWith("regular-sync")))
-      assert(blockchainReader.getBestBlockNumber == newPivot.number)
+      assert(blockchainReader.getBestBlockNumber == newPivot.number.value)
     }
   }
 
@@ -647,7 +647,7 @@ class SyncControllerSpec
     val pivotNum = BigInt(100)
     val rootA = ByteString(Array.fill[Byte](32)(0x11)) // stored in pivot header
     val rootB = ByteString(Array.fill[Byte](32)(0x22)) // snapSyncStateRoot — differs from rootA
-    val pivotHeader = baseBlockHeader.copy(number = pivotNum, stateRoot = TrieRoot(rootA))
+    val pivotHeader = baseBlockHeader.copy(number = BlockNumber(pivotNum), stateRoot = TrieRoot(rootA))
 
     // Both roots present in MPT — triggers SC-1a symmetric case
     seedMptNode(testSetup, rootA, rootB)
@@ -677,7 +677,7 @@ class SyncControllerSpec
     val pivotNum = BigInt(100)
     val rootA = ByteString(Array.fill[Byte](32)(0x33)) // stored in pivot header, NOT in MPT
     val rootB = ByteString(Array.fill[Byte](32)(0x44)) // finalizedRoot, present in MPT
-    val pivotHeader = baseBlockHeader.copy(number = pivotNum, stateRoot = TrieRoot(rootA))
+    val pivotHeader = baseBlockHeader.copy(number = BlockNumber(pivotNum), stateRoot = TrieRoot(rootA))
 
     // Only rootB in MPT — pivotRootExists=false → finalized substitution path
     seedMptNode(testSetup, rootB)
@@ -860,7 +860,7 @@ class SyncControllerSpec
         // assumes headers are correct chain
         headers.foldLeft(new BlockchainData(Map.empty, Map.empty, Map.empty)) { (state, header) =>
           state.copy(
-            headers = state.headers + (header.number -> header),
+            headers = state.headers + (header.number.value -> header),
             bodies = state.bodies + (header.hash.value -> BlockBody.empty),
             receipts = state.receipts + (header.hash.value -> Seq.empty)
           )
@@ -902,7 +902,9 @@ class SyncControllerSpec
               if msg.underlyingMsg.block.isRight =>
             val requestId = msg.underlyingMsg.requestId
             blockchainWriter.storeBlockHeader(pivotHeader).commit()
-            storagesInstance.storages.blockNumberMappingStorage.put(pivotHeader.number, pivotHeader.hash.value).commit()
+            storagesInstance.storages.blockNumberMappingStorage
+              .put(pivotHeader.number.value, pivotHeader.hash.value)
+              .commit()
             sender ! MessageFromPeer(ETHPackets.BlockHeaders(requestId, Seq(pivotHeader)), peer)
             this
 
@@ -911,7 +913,7 @@ class SyncControllerSpec
             val underlyingMessage = msg.underlyingMsg
             val requestId = underlyingMessage.requestId
             val requestedBlockNumber = underlyingMessage.block.swap.toOption.get
-            if requestedBlockNumber == pivotHeader.number then
+            if requestedBlockNumber == pivotHeader.number.value then
               // pivot block
               sender ! MessageFromPeer(ETHPackets.BlockHeaders(requestId, Seq(pivotHeader)), peer)
             else
@@ -1052,7 +1054,7 @@ class SyncControllerSpec
 
     val defaultPivotBlockHeader: BlockHeader =
       baseBlockHeader.copy(
-        number = defaultExpectedPivotBlock,
+        number = BlockNumber(defaultExpectedPivotBlock),
         stateRoot = TrieRoot(ByteString(Hex.decode(defaultStateRoot)))
       )
 
@@ -1070,16 +1072,17 @@ class SyncControllerSpec
         )
       )
 
-    val beforeRestartPivot: BlockHeader = defaultPivotBlockHeader.copy(number = defaultExpectedPivotBlock - 1)
+    val beforeRestartPivot: BlockHeader =
+      defaultPivotBlockHeader.copy(number = BlockNumber(defaultExpectedPivotBlock - 1))
     val defaultStateBeforeNodeRestart: SyncState = defaultState.copy(
       pivotBlock = beforeRestartPivot,
       bestBlockHeaderNumber = defaultExpectedPivotBlock,
-      nextBlockToFullyValidate = beforeRestartPivot.number + syncConfig.fastSyncBlockValidationX
+      nextBlockToFullyValidate = (beforeRestartPivot.number + syncConfig.fastSyncBlockValidationX).value
     )
 
     def getHeaders(from: BigInt, number: BigInt): Seq[BlockHeader] =
       val headers = (from until from + number).toSeq.map { nr =>
-        defaultPivotBlockHeader.copy(number = nr)
+        defaultPivotBlockHeader.copy(number = BlockNumber(nr))
       }
 
       def genChain(

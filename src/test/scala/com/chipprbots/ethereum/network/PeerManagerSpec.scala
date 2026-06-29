@@ -34,6 +34,7 @@ import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
@@ -279,7 +280,7 @@ class PeerManagerSpec
     probe.expectMsgClass(classOf[PeerActor.ConnectTo])
 
     val baseBlockHeader: BlockHeader = Fixtures.Blocks.Block3125369.header
-    val header: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber + 4)
+    val header: BlockHeader = baseBlockHeader.copy(number = BlockNumber(initialPeerInfo.maxBlockNumber + 4))
     val block: NewBlock = NewBlock(Block(header, BlockBody(Nil, Nil)), 300)
 
     peerManager ! PeerManagerActor.SendMessageCmd(block, PeerId(probe.ref.path.name))
@@ -1031,7 +1032,7 @@ class PeerManagerSpec
       remoteStatus = peerStatus,
       chainWeight = peerStatus.chainWeight,
       forkAccepted = false,
-      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number,
+      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number.value,
       bestBlockHash = peerStatus.bestHash
     )
 

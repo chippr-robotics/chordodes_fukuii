@@ -13,6 +13,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.Fixtures.Blocks
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.UInt256.*
@@ -272,7 +273,7 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       val defaultWorld: MockWorldState = MockWorldState().saveAccount(senderAddr, senderAcc)
 
       val blockHeader = Blocks.ValidBlock.header.copy(
-        number = forkBlockHeight
+        number = BlockNumber(forkBlockHeight)
       )
 
       val vm = new TestVM

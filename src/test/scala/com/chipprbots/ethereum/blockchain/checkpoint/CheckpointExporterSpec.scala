@@ -21,6 +21,7 @@ import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.TrieRoot
@@ -91,7 +92,8 @@ class CheckpointExporterSpec
       val stateRoot: ByteString = ByteString(accountTrie.getRootHash)
 
       // Header with the constructed stateRoot — use a fixture for the bulk and override stateRoot.
-      val header: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(stateRoot = TrieRoot(stateRoot), number = 100)
+      val header: BlockHeader =
+        Fixtures.Blocks.Block3125369.header.copy(stateRoot = TrieRoot(stateRoot), number = BlockNumber(100))
       val weight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(42))
       sourceWriter.storeBlockHeader(header).and(sourceWriter.storeChainWeight(header.hash, weight)).commit()
 
@@ -103,7 +105,7 @@ class CheckpointExporterSpec
         sourceReader,
         chainId = 1337L
       )
-      val exportResult: ExportResult = exporter.exportArchive(header.number, outputPath).value
+      val exportResult: ExportResult = exporter.exportArchive(header.number.value, outputPath).value
       exportResult.nodesExported should be > 0L
       exportResult.bytecodesExported shouldBe 2L
 
@@ -115,7 +117,7 @@ class CheckpointExporterSpec
         targetStorages.storages.appStateStorage
       )
       val importResult: ImportResult = importer.importFromFile(outputPath, Some(1337L)).value
-      importResult.blockNumber shouldBe header.number
+      importResult.blockNumber shouldBe header.number.value
       importResult.nodesImported shouldBe exportResult.nodesExported
       importResult.bytecodesImported shouldBe exportResult.bytecodesExported
 
@@ -144,9 +146,9 @@ class CheckpointExporterSpec
       targetStorages.storages.evmCodeStorage.get(codeBHash).map(_.toArray.toSeq) shouldBe Some(codeB.toArray.toSeq)
 
       // Header + best-block + chain weight + done-markers
-      targetReader.getBlockHeaderByNumber(header.number).value shouldBe header
+      targetReader.getBlockHeaderByNumber(header.number.value).value shouldBe header
       targetReader.getChainWeightByHash(header.hash).value shouldBe weight
-      targetStorages.storages.appStateStorage.getBestBlockNumber() shouldBe header.number
+      targetStorages.storages.appStateStorage.getBestBlockNumber() shouldBe header.number.value
       targetStorages.storages.appStateStorage.isSnapSyncDone() shouldBe true
 
     "fail cleanly when the requested block is missing" taggedAs UnitTest in new Setup:
@@ -183,7 +185,8 @@ class CheckpointExporterSpec
           .put(crypto.kec256(addr2), Account(nonce = UInt256(1), balance = UInt256(1)))
       val stateRoot: ByteString = ByteString(accountTrie.getRootHash)
 
-      val header: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(stateRoot = TrieRoot(stateRoot), number = 100)
+      val header: BlockHeader =
+        Fixtures.Blocks.Block3125369.header.copy(stateRoot = TrieRoot(stateRoot), number = BlockNumber(100))
       val weight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(42))
       sourceWriter.storeBlockHeader(header).and(sourceWriter.storeChainWeight(header.hash, weight)).commit()
 
@@ -195,7 +198,7 @@ class CheckpointExporterSpec
         sourceReader,
         chainId = 1L
       )
-      val exportResult: ExportResult = exporter.exportArchive(header.number, outputPath).value
+      val exportResult: ExportResult = exporter.exportArchive(header.number.value, outputPath).value
       exportResult.nodesExported should be > 0L
 
       // Import into a fresh (ArchivePruning) storage and re-derive the same trie.
@@ -206,7 +209,7 @@ class CheckpointExporterSpec
         targetStorages.storages.appStateStorage
       )
       val importResult: ImportResult = importer.importFromFile(outputPath, Some(1L)).value
-      importResult.blockNumber shouldBe header.number
+      importResult.blockNumber shouldBe header.number.value
 
       val importedTrie: MerklePatriciaTrie[Array[Byte], Account] = MerklePatriciaTrie[Array[Byte], Account](
         stateRoot.toArray,

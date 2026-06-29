@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.consensus.pow.validators.MockedPowBlockHeaderVali
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderBaseFeeError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderExtraFieldsError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderGasLimitError
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
@@ -57,7 +58,7 @@ class OlympiaBlockHeaderValidationSpec
 
   private def preOlympiaHeader(number: BigInt, timestamp: Long = 1000L): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      number = number,
+      number = BlockNumber(number),
       gasLimit = GasAmount(BigInt(8_000_000)),
       gasUsed = GasAmount.Zero,
       unixTimestamp = timestamp,
@@ -69,7 +70,7 @@ class OlympiaBlockHeaderValidationSpec
   private def firstOlympiaHeader(timestamp: Long, baseFee: BigInt): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
       parentHash = preOlympiaHeader(olympiaBlock - 1).hash,
-      number = olympiaBlock,
+      number = BlockNumber(olympiaBlock),
       gasLimit = GasAmount(OneStepFrom8M),
       gasUsed = GasAmount.Zero,
       unixTimestamp = timestamp,
@@ -161,7 +162,7 @@ class OlympiaBlockHeaderValidationSpec
         val expectedBaseFee = BaseFeeCalculator.calcBaseFee(firstBlock, config)
         val secondBlock = Fixtures.Blocks.ValidBlock.header.copy(
           parentHash = firstBlock.hash,
-          number = olympiaBlock + 1,
+          number = BlockNumber(olympiaBlock + 1),
           gasLimit = GasAmount(TwoStepsFrom8M),
           gasUsed = GasAmount.Zero,
           unixTimestamp = 2000L,
@@ -176,7 +177,7 @@ class OlympiaBlockHeaderValidationSpec
         val firstBlock = firstOlympiaHeader(timestamp = 1000L, baseFee = InitialBaseFee)
         val missingFee = Fixtures.Blocks.ValidBlock.header.copy(
           parentHash = firstBlock.hash,
-          number = olympiaBlock + 1,
+          number = BlockNumber(olympiaBlock + 1),
           gasLimit = GasAmount(TwoStepsFrom8M),
           gasUsed = GasAmount.Zero,
           unixTimestamp = 2000L,

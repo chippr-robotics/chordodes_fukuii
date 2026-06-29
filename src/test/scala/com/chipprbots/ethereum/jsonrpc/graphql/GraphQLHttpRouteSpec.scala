@@ -211,7 +211,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     val block: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
     val weight: ChainWeight = ChainWeight.totalDifficultyOnly(block.header.difficulty.value)
     blockchainWriter.storeBlock(block).and(blockchainWriter.storeChainWeight(block.header.hash, weight)).commit()
-    blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
+    blockchainWriter.saveBestKnownBlocks(block.hash, block.number.value)
 
 /** Mockable controller — matches the pattern in JsonRpcHttpServerSpec. */
 class MockableJsonRpcControllerForGraphQL extends JsonRpcBaseController with ApisBase with Logger:

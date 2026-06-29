@@ -150,7 +150,7 @@ class EthBlocksServiceSpec
     blockResponse.hash shouldBe None
     blockResponse.nonce shouldBe None
     blockResponse.miner shouldBe None
-    blockResponse.number shouldBe blockToRequest.header.number
+    blockResponse.number shouldBe blockToRequest.header.number.value
 
   it should "answer eth_getBlockByNumber with the latest block pending block is requested and there are no pending ones" taggedAs (
     UnitTest,
@@ -160,7 +160,7 @@ class EthBlocksServiceSpec
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
       .commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.header.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.header.number.value)
 
     (() => blockGenerator.getPendingBlockAndState).expects().returns(None)
 
@@ -179,7 +179,7 @@ class EthBlocksServiceSpec
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
       .commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: BlockByNumberRequest =
       BlockByNumberRequest(BlockParam.WithNumber(blockToRequestNumber), fullTxs = true)
@@ -198,7 +198,7 @@ class EthBlocksServiceSpec
 
   it should "answer eth_getBlockByNumber with the block response correctly when it's chain weight is not taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: BlockByNumberRequest =
       BlockByNumberRequest(BlockParam.WithNumber(blockToRequestNumber), fullTxs = true)
@@ -221,7 +221,7 @@ class EthBlocksServiceSpec
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
       .commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: BlockByNumberRequest =
       BlockByNumberRequest(BlockParam.WithNumber(blockToRequestNumber), fullTxs = true)
@@ -236,11 +236,11 @@ class EthBlocksServiceSpec
 
   it should "get transaction count by block number" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val response: ServiceResponse[GetBlockTransactionCountByNumberResponse] =
       ethBlocksService.getBlockTransactionCountByNumber(
-        GetBlockTransactionCountByNumberRequest(BlockParam.WithNumber(blockToRequest.header.number))
+        GetBlockTransactionCountByNumberRequest(BlockParam.WithNumber(blockToRequest.header.number.value))
       )
 
     response.unsafeRunSync() shouldEqual Right(
@@ -249,7 +249,7 @@ class EthBlocksServiceSpec
 
   it should "get transaction count by latest block number" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.header.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.header.number.value)
 
     val response: ServiceResponse[GetBlockTransactionCountByNumberResponse] =
       ethBlocksService.getBlockTransactionCountByNumber(GetBlockTransactionCountByNumberRequest(BlockParam.Latest))
@@ -271,7 +271,7 @@ class EthBlocksServiceSpec
     RPCTest
   ) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val uncleIndexToRequest = 0
     val request: UncleByBlockHashAndIndexRequest =
@@ -283,7 +283,7 @@ class EthBlocksServiceSpec
 
   it should "answer eth_getUncleByBlockHashAndIndex with None when there's no uncle taggedAs (UnitTest, RPCTest) in the requested index" in new TestSetup:
     blockchainWriter.storeBlock(blockToRequestWithUncles).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequestWithUncles.hash, blockToRequestWithUncles.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequestWithUncles.hash, blockToRequestWithUncles.number.value)
 
     val uncleIndexToRequest = 0
     val request: UncleByBlockHashAndIndexRequest =
@@ -392,7 +392,7 @@ class EthBlocksServiceSpec
     RPCTest
   ) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequestWithUncles).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequestWithUncles.hash, blockToRequestWithUncles.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequestWithUncles.hash, blockToRequestWithUncles.number.value)
 
     val uncleIndexToRequest = 0
     val request: UncleByBlockNumberAndIndexRequest =
@@ -413,7 +413,7 @@ class EthBlocksServiceSpec
       .storeBlock(blockToRequestWithUncles)
       .and(blockchainWriter.storeChainWeight(uncle.hash, uncleWeight))
       .commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequestWithUncles.hash, blockToRequestWithUncles.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequestWithUncles.hash, blockToRequestWithUncles.number.value)
 
     val uncleIndexToRequest = 0
     val request: UncleByBlockNumberAndIndexRequest =
@@ -428,7 +428,7 @@ class EthBlocksServiceSpec
 
   it should "get uncle count by block number" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val response: ServiceResponse[GetUncleCountByBlockNumberResponse] =
       ethBlocksService.getUncleCountByBlockNumber(GetUncleCountByBlockNumberRequest(BlockParam.Latest))
@@ -462,7 +462,7 @@ class EthBlocksServiceSpec
     )
 
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
-    val blockToRequestNumber = blockToRequest.header.number
+    val blockToRequestNumber = blockToRequest.header.number.value
     val blockToRequestHash = blockToRequest.header.hash.value
     val blockWeight: ChainWeight = ChainWeight.totalDifficultyOnly(blockToRequest.header.difficulty.value)
 

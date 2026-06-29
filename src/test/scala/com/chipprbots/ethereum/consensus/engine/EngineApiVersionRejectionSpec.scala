@@ -21,6 +21,7 @@ import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancu
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
@@ -68,7 +69,7 @@ class EngineApiVersionRejectionSpec extends AnyWordSpec with Matchers:
       receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
       difficulty = Difficulty.Zero,
-      number = 1,
+      number = BlockNumber(1),
       gasLimit = GasAmount(30000000),
       gasUsed = GasAmount(0),
       unixTimestamp = timestamp,

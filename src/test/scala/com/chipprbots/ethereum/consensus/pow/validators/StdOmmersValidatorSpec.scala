@@ -14,6 +14,7 @@ import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.GasAmount
@@ -157,7 +158,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         )
       ),
       difficulty = Difficulty(BigInt("17864037202")),
-      number = 94,
+      number = BlockNumber(94),
       gasLimit = GasAmount(5000),
       gasUsed = GasAmount.Zero,
       unixTimestamp = 1438270431,
@@ -186,7 +187,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         )
       ),
       difficulty = Difficulty(BigInt("17864037202")),
-      number = 94,
+      number = BlockNumber(94),
       gasLimit = GasAmount(5000),
       gasUsed = GasAmount.Zero,
       unixTimestamp = 1438270431,
@@ -213,7 +214,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         )
       ),
       difficulty = Difficulty(BigInt("17864037202")),
-      number = 94,
+      number = BlockNumber(94),
       gasLimit = GasAmount(5000),
       gasUsed = GasAmount.Zero,
       unixTimestamp = 1438270431,
@@ -245,7 +246,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         ),
         difficulty = Difficulty(BigInt("17829189056")),
-        number = 90,
+        number = BlockNumber(90),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1438270422,
@@ -276,7 +277,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         ),
         difficulty = Difficulty(BigInt("17837894714")),
-        number = 91,
+        number = BlockNumber(91),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1438270425,
@@ -307,7 +308,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         ),
         difficulty = Difficulty(BigInt("17846604623")),
-        number = 92,
+        number = BlockNumber(92),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1438270427,
@@ -338,7 +339,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         ),
         difficulty = Difficulty(BigInt("17855318785")),
-        number = 93,
+        number = BlockNumber(93),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1438270430,
@@ -369,7 +370,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
               )
             ),
             difficulty = Difficulty(BigInt("17837894714")),
-            number = 91,
+            number = BlockNumber(91),
             gasLimit = GasAmount(5000),
             gasUsed = GasAmount.Zero,
             unixTimestamp = 1438270425,
@@ -402,7 +403,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         ),
         difficulty = Difficulty(BigInt("17864037202")),
-        number = 94,
+        number = BlockNumber(94),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1438270431,
@@ -433,7 +434,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
               )
             ),
             difficulty = Difficulty(BigInt("17829189056")),
-            number = 90,
+            number = BlockNumber(90),
             gasLimit = GasAmount(5000),
             gasUsed = GasAmount.Zero,
             unixTimestamp = 1438270421,
@@ -466,7 +467,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         ),
         difficulty = Difficulty(BigInt("17872759876")),
-        number = 95,
+        number = BlockNumber(95),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1438270433,
@@ -497,7 +498,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         ),
         difficulty = Difficulty(BigInt("17881486809")),
-        number = 96,
+        number = BlockNumber(96),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1438270435,
@@ -529,7 +530,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
           )
         ),
         difficulty = Difficulty(BigInt("17820487647")),
-        number = 89,
+        number = BlockNumber(89),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1438270418,
@@ -552,4 +553,4 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
       .and(blockchainWriter.storeBlock(block95))
       .and(blockchainWriter.storeBlock(block96))
       .commit()
-    blockchainWriter.saveBestKnownBlocks(block96.hash, block96.number)
+    blockchainWriter.saveBestKnownBlocks(block96.hash, block96.number.value)

@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -36,13 +37,14 @@ class ETCForkEVMSpec extends AnyWordSpec with Matchers:
 
   // ── Block headers at representative heights ───────────────────────────────
 
-  val hdrAtlantis: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = 0)
-  val hdrPhoenix: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = Fixtures.PhoenixBlockNumber)
-  val hdrMystique: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = Fixtures.MystiqueBlockNumber)
-  val hdrSpiral: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = Fixtures.SpiralBlockNumber)
+  val hdrAtlantis: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = BlockNumber(0))
+  val hdrPhoenix: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.PhoenixBlockNumber))
+  val hdrMystique: BlockHeader =
+    BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.MystiqueBlockNumber))
+  val hdrSpiral: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.SpiralBlockNumber))
   val hdrOlympia: BlockHeader =
     BlockFixtures.ValidBlock.header.copy(
-      number = Fixtures.OlympiaBlockNumber,
+      number = BlockNumber(Fixtures.OlympiaBlockNumber),
       extraFields = HefPostOlympia(BigInt("1000000000")) // 1 Gwei base fee
     )
 

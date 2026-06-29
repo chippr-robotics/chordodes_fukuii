@@ -276,7 +276,7 @@ trait ObjectGenerators:
     receiptsRoot = TrieRoot(receiptsRoot),
     logsBloom = BloomFilter(logsBloom),
     difficulty = Difficulty(difficultyRaw),
-    number = number,
+    number = BlockNumber(number),
     gasLimit = GasAmount(gasLimit),
     gasUsed = GasAmount(gasUsed),
     unixTimestamp = unixTimestamp,

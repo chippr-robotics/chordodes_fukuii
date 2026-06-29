@@ -8,6 +8,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
@@ -36,7 +37,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
       receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
       logsBloom = BloomFilter.Empty,
       difficulty = difficulty,
-      number = number,
+      number = BlockNumber(number),
       gasLimit = GasAmount(BigInt(8000000)),
       gasUsed = GasAmount.Zero,
       unixTimestamp = timestamp,

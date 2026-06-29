@@ -42,7 +42,7 @@ class OlympiaTxTypeAdmissionSpec
 
   private def preOlympiaHeader: BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      number = olympiaBlock - 1,
+      number = BlockNumber(olympiaBlock - 1),
       gasLimit = GasAmount(BigInt(8_000_000)),
       gasUsed = GasAmount.Zero,
       extraFields = HefEmpty
@@ -50,7 +50,7 @@ class OlympiaTxTypeAdmissionSpec
 
   private def olympiaHeader: BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      number = olympiaBlock,
+      number = BlockNumber(olympiaBlock),
       gasLimit = GasAmount(BigInt(30_000_000)),
       gasUsed = GasAmount.Zero,
       extraFields = HefPostOlympia(BigInt(1_000_000_000))

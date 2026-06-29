@@ -69,7 +69,7 @@ object FastSyncItSpecUtils:
         val bestStateRoot = bestBlock.header.stateRoot
         MptTraversals.parseTrieIntoMemory(
           HashNode(bestStateRoot.toArray),
-          storagesInstance.storages.stateStorage.getBackingStorage(bestBlock.number)
+          storagesInstance.storages.stateStorage.getBackingStorage(bestBlock.number.value)
         )
       }.toOption
 
@@ -107,14 +107,14 @@ object FastSyncItSpecUtils:
         val syncState =
           SyncState(
             pivotBlock = currentBest,
-            lastFullBlockNumber = currentBest.number,
-            safeDownloadTarget = safeTarget,
+            lastFullBlockNumber = currentBest.number.value,
+            safeDownloadTarget = safeTarget.value,
             blockBodiesQueue = Seq(),
             receiptsQueue = Seq(),
             downloadedNodesCount = 0,
             totalNodesCount = 0,
-            bestBlockHeaderNumber = currentBest.number,
-            nextBlockToFullyValidate = nextToValidate
+            bestBlockHeaderNumber = currentBest.number.value,
+            nextBlockToFullyValidate = nextToValidate.value
           )
         storagesInstance.storages.fastSyncStateStorage.putSyncState(syncState)
       }.map(_ => ())

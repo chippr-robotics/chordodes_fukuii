@@ -138,7 +138,7 @@ class JsonRpcControllerSpec
       remoteStatus = peerStatus,
       chainWeight = peerStatus.chainWeight,
       forkAccepted = true,
-      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number,
+      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number.value,
       bestBlockHash = peerStatus.bestHash
     )
     val peers: List[PeerInfo] = List(initialPeerInfo)

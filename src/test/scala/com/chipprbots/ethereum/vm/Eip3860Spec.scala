@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
@@ -36,9 +37,9 @@ class Eip3860Spec extends AnyWordSpec with Matchers:
 
   object fxt:
     val fakeHeaderPreSpiral: BlockHeader =
-      BlockFixtures.ValidBlock.header.copy(number = Fixtures.MystiqueBlockNumber)
+      BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.MystiqueBlockNumber))
     val fakeHeaderSpiral: BlockHeader =
-      BlockFixtures.ValidBlock.header.copy(number = Fixtures.SpiralBlockNumber)
+      BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.SpiralBlockNumber))
     val creatorAddr: Address = Address(0xcafe)
     val secureRandom = new SecureRandom()
     val keyPair: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
