@@ -1588,7 +1588,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
           // Inline child discovery — Besu/geth aligned scheduler approach.
           // Each healed node is decoded to find missing children; queue them directly
           // without waiting for a full 3h trie walk. Walk becomes validation-only.
-          taskByHash.get(nodeHash).foreach(task => discoverMissingChildren(nodeData, task.pathset))
+          taskByHash.get(nodeHash).foreach(task => discoverMissingChildren(nodeData, task.pathset, nodeHash))
         else
           log.debug(
             s"Healing response node not in request set (unexpected): ${Hex.toHexString(nodeHash.take(4).toArray)}"
@@ -2205,7 +2205,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
     * B3 FIX: branch children are checked with a single multiGetNodes call instead of up to 16 serial isNodeInStorage
     * calls on the actor thread. Extension child uses the same pattern for consistency.
     */
-  private def discoverMissingChildren(nodeData: ByteString, pathset: Seq[ByteString]): Unit =
+  private def discoverMissingChildren(nodeData: ByteString, pathset: Seq[ByteString], nodeHash: ByteString): Unit =
     import com.chipprbots.ethereum.mpt.{MptTraversals, BranchNode, ExtensionNode, HashNode, LeafNode}
     import com.chipprbots.ethereum.mpt.HexPrefix
     import com.chipprbots.ethereum.domain.Account
@@ -2286,6 +2286,45 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
             log.info(
               s"[HEAL-DISCOVER] Inline children queued: $childrenDiscoveredTotal total " +
                 s"(+${newEntries.size} from this node, pending: ${pendingTasks.size})"
+            )
+
+        // spec 005 C3b/D2/T009/T012 — heal-side subtree-complete SEED (consensus-load-bearing; the single highest
+        // chain-split risk of this port). Stage this just-healed node's OWN hash as a subtree-complete candidate IFF
+        // its subtree is durably closed by INDUCTION: every hash-referenced child is PRESENT on disk AND itself
+        // recorded subtree-complete (isSubtreeComplete). The isSubtreeComplete clause is load-bearing — mere PRESENCE is
+        // NEVER enough: a download-mosaic node can be present yet its subtree incomplete, so seeding on presence alone
+        // would write a false record → the pruned descent would skip a real hole → false completion → divergent
+        // finalized state. "present AND recorded" SUBSUMES "no missing child" and "no pending child": a still-pending /
+        // in-flight child is either absent (fails isNodeInStorage) or present-but-unrecorded (fails isSubtreeComplete).
+        // For a leaf (no hash children) the closure is VACUOUS — the inductive BASE (PrunedHealCrashSafetySpec T-3).
+        // Inline children carry NO hash references (a 32-byte hash makes a node ≥32 bytes, so it is never inlined), so
+        // direct HashNode children + the account-leaf storage root are the COMPLETE set of subtree roots under this
+        // node. Gated on prunedEnabled (else inert ⇒ OFF-path byte-identical). STAGED only — the durable record is
+        // written by writeDurableSubtreeRecords strictly AFTER mptStorage.persist() (D3 record-after-persist); a crash
+        // before the flush drops the in-memory candidate ⇒ safe descend. The `newEntries.isEmpty` pre-gate is a cheap
+        // necessary short-circuit (a found missing non-pending child means not closed); the forall over actual
+        // storage+record state is the AUTHORITATIVE gate and can never false-record regardless of pending/filter state.
+        if prunedEnabled && newEntries.isEmpty then
+          val subtreeRoots: Seq[ByteString] = decoded match
+            case branch: BranchNode =>
+              branch.children.collect { case hn: HashNode => ByteString(hn.hashNode) }.toSeq
+            case ext: ExtensionNode =>
+              ext.next match
+                case hn: HashNode => Seq(ByteString(hn.hashNode))
+                case _            => Seq.empty
+            case leaf: LeafNode if !isStorageTrie =>
+              Account(leaf.value).toOption match
+                case Some(account) if account.storageRoot != Account.EmptyStorageRootHash =>
+                  Seq(account.storageRoot.value)
+                case _ => Seq.empty
+            case _ => Seq.empty
+          val subtreeClosed =
+            subtreeRoots.forall(c => isNodeInStorage(c) && healingFrontierStorage.exists(_.isSubtreeComplete(c)))
+          if subtreeClosed then
+            pendingSubtreeRecords += nodeHash
+            log.debug(
+              s"[HEAL-VERIFY-PRUNED] Staged subtree-complete candidate ${Hex.toHexString(nodeHash.take(4).toArray)} " +
+                s"(${subtreeRoots.size} child subtree(s) present+recorded) — durable record written post-flush (D3)."
             )
       catch
         case NonFatal(e) =>
