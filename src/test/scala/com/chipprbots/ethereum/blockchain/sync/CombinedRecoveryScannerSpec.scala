@@ -105,7 +105,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite:
       )
     )
 
-  test("sequential sharded scan finds exactly the single-pass gaps", UnitTest, SyncTest) {
+  test("sequential sharded scan finds exactly the single-pass gaps", UnitTest) {
     val f = new Fixture
     val root = gappyState(f)
     val (refCode, refStorage) = referenceGaps(f, root)
@@ -117,7 +117,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite:
     assert(r.missingStorageTries.size == r.missingStorageTries.distinct.size, "no duplicate storage gaps")
   }
 
-  test("parallel sharded scan (concurrency=4) finds exactly the single-pass gaps", UnitTest, SyncTest) {
+  test("parallel sharded scan (concurrency=4) finds exactly the single-pass gaps", UnitTest) {
     val f = new Fixture
     val root = gappyState(f)
     val (refCode, refStorage) = referenceGaps(f, root)
@@ -135,8 +135,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite:
 
   test(
     "resumes from the last completed shard after a crash, same final gaps, no re-scan of done shards",
-    UnitTest,
-    SyncTest
+    UnitTest
   ) {
     val f = new Fixture
     // One account per nibble 1..8 → 8 shards, each with a missing storage gap.
@@ -179,7 +178,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite:
     assert(resumed.missingStorageTries.toSet == refStorage)
   }
 
-  test("a storage root shared across shards is reported once (cross-shard dedup)", UnitTest, SyncTest) {
+  test("a storage root shared across shards is reported once (cross-shard dedup)", UnitTest) {
     val f = new Fixture
     val sharedRoot = f.missingStorageRoot(99)
     // Two accounts, forced into DIFFERENT shards (nibble 1 vs 15), both missing the SAME storage root.
@@ -203,7 +202,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite:
     assert(r.missingStorageTries.size == 1)
   }
 
-  test("a complete checkpoint skips the scan and returns persisted gaps (download resume)", UnitTest, SyncTest) {
+  test("a complete checkpoint skips the scan and returns persisted gaps (download resume)", UnitTest) {
     val f = new Fixture
     val root = gappyState(f)
     val app = new AppStateStorage(EphemDataSource())
@@ -218,7 +217,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite:
     assert(again.missingStorageTries.toSet == full.missingStorageTries.toSet)
   }
 
-  test("empty trie → no gaps and no checkpoint persisted", UnitTest, SyncTest) {
+  test("empty trie → no gaps and no checkpoint persisted", UnitTest) {
     val f = new Fixture
     val app = new AppStateStorage(EphemDataSource())
     val r =

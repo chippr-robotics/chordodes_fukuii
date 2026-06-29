@@ -75,14 +75,14 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
 
   // ─── T5.1 Historical peer used after disconnect ────────────────────────────
   "calibratePivotTD formula" should
-    "interpolate correctly from a single ETH68 peer above the pivot" taggedAs (UnitTest, SyncTest) in {
+    "interpolate correctly from a single ETH68 peer above the pivot" taggedAs (UnitTest) in {
       val result = calcPivotTD(Seq((peerTD_high, peerBlock_a)), pivotBlock, genesisTD)
       val expected = peerTD_high * pivotBlock / peerBlock_a
       result shouldBe Some(expected)
     }
 
   // ─── T5.2 Higher-TD peer wins ─────────────────────────────────────────────
-  it should "choose the higher-TD peer when two candidates are above the pivot" taggedAs (UnitTest, SyncTest) in {
+  it should "choose the higher-TD peer when two candidates are above the pivot" taggedAs (UnitTest) in {
     val peerTD_low = BigInt("20000000000000000000000")
     val peerBlock_b = BigInt(24000000)
     val candidates = Seq((peerTD_low, peerBlock_b), (peerTD_high, peerBlock_a))
@@ -93,18 +93,18 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
   }
 
   // ─── T5.3 Peer with peerBlock=0 is filtered out ───────────────────────────
-  it should "return None for a peer at peerBlock=0 (ETH68_BOOTSTRAP guard)" taggedAs (UnitTest, SyncTest) in {
+  it should "return None for a peer at peerBlock=0 (ETH68_BOOTSTRAP guard)" taggedAs (UnitTest) in {
     val result = calcPivotTD(Seq((peerTD_high, BigInt(0))), pivotBlock, genesisTD)
     result shouldBe None
   }
 
   // ─── T5.5 Only ETH69 peers: return None ───────────────────────────────────
-  it should "return None when no candidates are provided (pure ETH69 network)" taggedAs (UnitTest, SyncTest) in {
+  it should "return None when no candidates are provided (pure ETH69 network)" taggedAs (UnitTest) in {
     calcPivotTD(Seq.empty, pivotBlock, genesisTD) shouldBe None
   }
 
   // ─── T5.6 Peer behind pivot: filtered out ─────────────────────────────────
-  it should "exclude a peer whose peerBlock is at or below the pivot block" taggedAs (UnitTest, SyncTest) in {
+  it should "exclude a peer whose peerBlock is at or below the pivot block" taggedAs (UnitTest) in {
     val behindPivot = pivotBlock - BigInt(1)
     calcPivotTD(Seq((peerTD_high, behindPivot)), pivotBlock, genesisTD) shouldBe None
     calcPivotTD(Seq((peerTD_high, pivotBlock)), pivotBlock, genesisTD) shouldBe None
@@ -112,28 +112,25 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
 
   // ─── T6.1 ETH68_BOOTSTRAP: peerBlock=0 excluded ───────────────────────────
   "ETH68_BOOTSTRAP regression" should
-    "exclude a peer at peerBlock=0 from contributing to calibration" taggedAs (UnitTest, SyncTest) in {
+    "exclude a peer at peerBlock=0 from contributing to calibration" taggedAs (UnitTest) in {
       // Using peerTD directly (peerBlock=0) would overstate pivot TD by ~(peerBlock-pivot)*avgDiff
       calcPivotTD(Seq((peerTD_high, BigInt(0))), pivotBlock, genesisTD) shouldBe None
     }
 
   // ─── T6.2 ETH68_BOOTSTRAP: peerBlock exactly pivot-1 excluded ─────────────
-  it should "exclude a peer at peerBlock = pivotBlock-1 (no excess TD to interpolate from)" taggedAs (
-    UnitTest,
-    SyncTest
-  ) in {
+  it should "exclude a peer at peerBlock = pivotBlock-1 (no excess TD to interpolate from)" taggedAs (UnitTest) in {
     calcPivotTD(Seq((peerTD_high, pivotBlock - BigInt(1))), pivotBlock, genesisTD) shouldBe None
   }
 
   // ─── T6.3 Direct peerTD (without interpolation) would be wrong ────────────
-  it should "not use peerTD directly — interpolation must reduce it to pivot level" taggedAs (UnitTest, SyncTest) in {
+  it should "not use peerTD directly — interpolation must reduce it to pivot level" taggedAs (UnitTest) in {
     val result = calcPivotTD(Seq((peerTD_high, peerBlock_a)), pivotBlock, genesisTD)
     // Direct peerTD = 24e21; interpolated = 24e21 * 20M / 25M = 19.2e21
     result.foreach(_ should be < peerTD_high)
   }
 
   // ─── T6.4 Interpolation math: verify exact value ──────────────────────────
-  it should "compute peerTD * pivotBlock / peerBlock exactly (not peerTD directly)" taggedAs (UnitTest, SyncTest) in {
+  it should "compute peerTD * pivotBlock / peerBlock exactly (not peerTD directly)" taggedAs (UnitTest) in {
     // peerTD=24e21, peerBlock=24M, pivot=20M → 24e21 * 20M / 24M = 20e21 (20% reduction)
     val peerTD_24 = BigInt("24000000000000000000000")
     val peerBlock = BigInt(24000000)
@@ -145,10 +142,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
   }
 
   // ─── T6.5 Tier 2 overestimate is bounded ──────────────────────────────────
-  it should "document Tier 2 overestimate: peerTD with peerMaxBlock=0 is ~0.05% above true TD" taggedAs (
-    UnitTest,
-    SyncTest
-  ) in {
+  it should "document Tier 2 overestimate: peerTD with peerMaxBlock=0 is ~0.05% above true TD" taggedAs (UnitTest) in {
     // bestBlock=20000, peerTD=24e21, peerMaxBlock=0 → tier 2 uses peerTD directly
     // True TD at block 20000 is much lower, but tier 2 is a temporary overestimate until
     // a NewBlock with exact blockNum arrives and updates to tier 1. The overestimate is

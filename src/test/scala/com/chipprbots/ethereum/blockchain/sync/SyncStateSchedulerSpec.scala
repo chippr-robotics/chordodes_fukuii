@@ -39,10 +39,7 @@ class SyncStateSchedulerSpec
     with EitherValues
     with ScalaCheckPropertyChecks
     with SuperSlow:
-  "SyncStateScheduler" should "sync with mptTrie with one account (1 leaf node)" taggedAs (
-    UnitTest,
-    SyncTest
-  ) in new TestSetup:
+  "SyncStateScheduler" should "sync with mptTrie with one account (1 leaf node)" taggedAs (UnitTest) in new TestSetup:
     val prov = getTrieProvider
     val worldHash: ByteString = prov.buildWorld(Seq(MptNodeData(Address(1), None, Seq(), 20)))
     val (syncStateScheduler, _, _, _, schedulerDb) = buildScheduler()
@@ -61,7 +58,7 @@ class SyncStateSchedulerSpec
     assert(state.numberOfPendingRequests == 0)
     assert(schedulerDb.storages.nodeStorage.get(missingNodes.head).isDefined)
 
-  it should "sync with mptTrie with one account with code and storage" taggedAs (UnitTest, SyncTest) in new TestSetup:
+  it should "sync with mptTrie with one account with code and storage" taggedAs (UnitTest) in new TestSetup:
     val prov = getTrieProvider
     val worldHash: ByteString = prov.buildWorld(
       Seq(MptNodeData(Address(1), Some(ByteString(1, 2, 3)), Seq((1, 1)), 20))
@@ -80,7 +77,7 @@ class SyncStateSchedulerSpec
     // 1 leaf node + 1 code + 1 storage
     assert(schedulerDb.dataSource.storage.size == 3)
 
-  it should "not request already known lead nodes" taggedAs (UnitTest, SyncTest) in new TestSetup:
+  it should "not request already known lead nodes" taggedAs (UnitTest) in new TestSetup:
     val prov = getTrieProvider
     val worldHash: ByteString = prov.buildWorld(
       Seq(
@@ -110,10 +107,7 @@ class SyncStateSchedulerSpec
     // branch got 3 leaf nodes, but we already known 2 of them, so there are pending requests only for: 1 branch + 1 unknown leaf
     assert(state1a.numberOfPendingRequests == 2)
 
-  it should "sync with mptTrie with 2 accounts with different code and storage" taggedAs (
-    UnitTest,
-    SyncTest
-  ) in new TestSetup:
+  it should "sync with mptTrie with 2 accounts with different code and storage" taggedAs (UnitTest) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes
     val worldHash: ByteString = prov.buildWorld(
@@ -156,7 +150,7 @@ class SyncStateSchedulerSpec
     assert(state9.numberOfPendingRequests == 0)
     assert(schedulerDb.dataSource.storage.size == 7)
 
-  it should "should not request already known code or storage" taggedAs (UnitTest, SyncTest) in new TestSetup:
+  it should "should not request already known code or storage" taggedAs (UnitTest) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes, two different account with same code and same storage
     val worldHash: ByteString = prov.buildWorld(
@@ -187,7 +181,7 @@ class SyncStateSchedulerSpec
     // 1 branch node + 2 leaf node + 1 code + 1 storage (code and storage are shared by 2 leaf nodes)
     assert(schedulerDb.dataSource.storage.size == 5)
 
-  it should "should return error when processing unrequested response" taggedAs (UnitTest, SyncTest) in new TestSetup:
+  it should "should return error when processing unrequested response" taggedAs (UnitTest) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes, two different account with same code and same storage
     val worldHash: ByteString = prov.buildWorld(
@@ -204,10 +198,7 @@ class SyncStateSchedulerSpec
     assert(result1.isLeft)
     assert(result1.left.value == NotRequestedItem)
 
-  it should "should return error when processing already processed response" taggedAs (
-    UnitTest,
-    SyncTest
-  ) in new TestSetup:
+  it should "should return error when processing already processed response" taggedAs (UnitTest) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes, two different account with same code and same storage
     val worldHash: ByteString = prov.buildWorld(
@@ -230,7 +221,7 @@ class SyncStateSchedulerSpec
     assert(result2.isLeft)
     assert(result2.left.value == AlreadyProcessedItem)
 
-  it should "should return critical error when node is malformed" taggedAs (UnitTest, SyncTest) in new TestSetup:
+  it should "should return critical error when node is malformed" taggedAs (UnitTest) in new TestSetup:
     val prov = getTrieProvider
     // root is branch with 2 leaf nodes, two different account with same code and same storage
     val worldHash: ByteString = prov.buildWorld(
@@ -253,7 +244,7 @@ class SyncStateSchedulerSpec
 
   // Long running test generating random mpt tries and checking that scheduler is able to correctly
   // traverse them
-  it should "sync whole trie when receiving all nodes from remote side" taggedAs (UnitTest, SyncTest) in new TestSetup:
+  it should "sync whole trie when receiving all nodes from remote side" taggedAs (UnitTest) in new TestSetup:
     val nodeDataGen: Gen[List[MptNodeData]] = genMultipleNodeData(
       superSlow(2000).getOrElse(20) // use smaller test set for CI as it is super slow there
     )

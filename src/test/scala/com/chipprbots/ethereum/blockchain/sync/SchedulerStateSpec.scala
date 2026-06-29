@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.StateNode
 import com.chipprbots.ethereum.testing.Tags.*
 
 class SchedulerStateSpec extends AnyFlatSpec with Matchers:
-  "SchedulerState" should "schedule node hashes for retrieval" taggedAs (UnitTest, SyncTest) in new TestSetup:
+  "SchedulerState" should "schedule node hashes for retrieval" taggedAs (UnitTest) in new TestSetup:
     val stateWithRequest: SchedulerState = schedulerState.schedule(request1)
     assert(stateWithRequest != schedulerState)
     assert(stateWithRequest.getPendingRequestByHash(request1.nodeHash).contains(request1))

@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   */
 class CombinedRecoveryScanSpec extends AnyFunSuite:
 
-  test("combined scan finds exactly the missing bytecodes and storage tries in one pass", UnitTest, SyncTest) {
+  test("combined scan finds exactly the missing bytecodes and storage tries in one pass", UnitTest) {
     val ds = EphemDataSource()
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(ds)
     val mpt = stateStorage.getBackingStorage(0)
@@ -100,7 +100,7 @@ class CombinedRecoveryScanSpec extends AnyFunSuite:
     assert(scan.missingStorageTries.size == 2, s"unexpected storage-gap count: ${scan.missingStorageTries.size}")
   }
 
-  test("combined scan reports no gaps when the state is complete", UnitTest, SyncTest) {
+  test("combined scan reports no gaps when the state is complete", UnitTest) {
     val ds = EphemDataSource()
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(ds)
     val mpt = stateStorage.getBackingStorage(0)

@@ -35,6 +35,9 @@ object MockVmInput:
       receivingAddress: Option[Address] = None,
       nonce: BigInt = 0
   ): SignedTransaction =
-    new MockTransaction(LegacyTransaction(nonce, GasPrice(gasPrice), gasLimit, receivingAddress, value, payload), senderAddress)
+    new MockTransaction(
+      LegacyTransaction(nonce, GasPrice(gasPrice), gasLimit, receivingAddress, value, payload),
+      senderAddress
+    )
 
   def blockHeader: BlockHeader = BlockFixtures.ValidBlock.header
