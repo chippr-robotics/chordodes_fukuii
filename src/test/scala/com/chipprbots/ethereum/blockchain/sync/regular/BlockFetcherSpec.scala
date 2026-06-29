@@ -368,6 +368,33 @@ class BlockFetcherSpec
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
       }
       testKit.stop(blockFetcher)
+
+    // P9: context.watchWith — ChildStopped is delivered as a typed FetchCommand instead of Terminated
+    "should continue processing after receiving ChildStopped from a watched child" taggedAs (
+      UnitTest,
+      SyncTest
+    ) in new TestSetup:
+      startFetcher()
+
+      // Drain the initial in-flight GetBlockHeaders request and reply with empty headers so
+      // inFlightHeaders returns to 0 (the slot must be free before TickFetch can dispatch again).
+      val initReplyTo: ActorRef[PeersClient.ResponseMessage] = peersClient.expectMsgPF() {
+        case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, replyTo) if msg.block == Left(1) =>
+          replyTo
+      }
+      initReplyTo ! PeersClient.Response(fakePeer, ETHPackets.BlockHeaders(BigInt(0), List.empty))
+
+      // Inject ChildStopped directly — simulates watchWith delivery when a child terminates.
+      // The fetcher must absorb the message without crashing (Behaviors.same).
+      blockFetcher ! BlockFetcher.ChildStopped("headers-fetcher")
+
+      // Fetcher must remain alive and responsive: TickFetch re-evaluates dispatch and sends
+      // another GetBlockHeaders when the slot is available.
+      blockFetcher ! BlockFetcher.TickFetch
+      peersClient.expectMsgPF() {
+        case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
+      }
+      testKit.stop(blockFetcher)
   }
 
   trait TestSetup extends TestSyncConfig:
