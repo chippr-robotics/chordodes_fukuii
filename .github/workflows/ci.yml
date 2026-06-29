@@ -109,7 +109,7 @@ jobs:
         if: github.base_ref != 'staging' && github.ref != 'refs/heads/staging'
         run: |
           echo "=========================================="
-          echo "Running Standard Tests with Coverage (< 30 minutes)"
+          echo "Running Standard Tests with Coverage (coverage-instrumented double-run; ~45-60 min)"
           echo "=========================================="
           set -o pipefail
           # Run tests with coverage in a single sbt session
@@ -123,7 +123,13 @@ jobs:
           }
         env:
           FUKUII_DEV: true
-        timeout-minutes: 45
+        # Coverage-instrumented double-run (testEssential + testStandard). At 0.7.0 (#1326)
+        # this took 42.7 min — already at the edge of the old 45-min cap — and the suite has
+        # since grown past it, so PRs into main failed at the cap with all tests PASSING (pure
+        # wall-clock, not a correctness failure). Raised to 90 min (~2x the historical run) to
+        # absorb suite growth + coverage/runner variance with headroom. Follow-up: split the
+        # coverage run or shard Tier 2 to bring it back down.
+        timeout-minutes: 90
       
       - name: Validate KPI Baselines
         run: |
