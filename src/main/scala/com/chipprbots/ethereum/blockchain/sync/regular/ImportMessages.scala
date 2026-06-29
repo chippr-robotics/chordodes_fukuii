@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.event.Logging.*
+import org.apache.pekko.event.Logging.{DebugLevel, ErrorLevel, InfoLevel, LogLevel, WarningLevel}
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.Block
