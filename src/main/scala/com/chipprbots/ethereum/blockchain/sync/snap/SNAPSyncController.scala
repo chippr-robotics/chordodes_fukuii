@@ -3720,7 +3720,14 @@ private class SNAPSyncControllerImpl(
     * an empty one).
     */
   private def maybeRequestHealingServeRoot(): Unit =
-    if snapSyncConfig.decoupledHealServeRoot &&
+    // spec 009 T009/C4 (moving-root re-peg trigger): the staleness MATH below is shared with the spec-004 serve-root
+    // path; only the ACTION differs by flag. Flag OFF (decoupledHealServeRoot): push a HealingServeRootRefresh (moves
+    // the coordinator's SERVE root only; the walk root and the controller's stateRoot/pivot are untouched). Flag ON
+    // (movingRootDeltaHeal): re-peg the SINGLE heal root via refreshPivotInPlace → completePivotRefreshWithStateRoot →
+    // HealingPivotRefreshed, moving the controller's stateRoot/pivotBlock AND the coordinator's heal root IN LOCKSTEP
+    // against a canonical header stateRoot. The pendingPivotRefresh.isEmpty guard below also prevents stacking a second
+    // re-peg header bootstrap while one is in flight.
+    if (snapSyncConfig.decoupledHealServeRoot || snapSyncConfig.movingRootDeltaHeal) &&
       currentPhase == StateHealing &&
       trieNodeHealingCoordinator.isDefined &&
       !healingServeRootRequestInFlight &&
@@ -3742,13 +3749,28 @@ private class SNAPSyncControllerImpl(
             case Some(lastBlock) => (networkBest - lastBlock) > (HealingServeRootMarginBlocks * 2)
             case None            => true
           if stale then
-            healingServeRootRequestInFlight = true
-            ctx.log.info(
-              s"[HEAL-SERVE-ROOT] Requesting newest-servable serve root: networkBest=$networkBest target=$target " +
-                s"(margin=$HealingServeRootMarginBlocks, lastServeBlock=${lastHealingServeRootBlock.getOrElse("none")}). " +
-                s"Routing via parent RecentRoot bootstrap."
-            )
-            syncController ! SNAPSyncController.RequestHealingServeRoot
+            if snapSyncConfig.movingRootDeltaHeal then
+              // spec 009 T009/C4: re-peg the single heal root to a fresh served root. refreshPivotInPlace selects a
+              // canonical header (networkBest − margin), fetches it, and emits HealingPivotRefreshed via
+              // completePivotRefreshWithStateRoot — moving completeness AND fetch (one root) while RETAINING every
+              // persisted verified node and resetting verificationPassComplete so a fresh pruned descent gates
+              // completion against the new root. Record the block so the cadence (≤ once per window) matches the
+              // serve-root path; the actual root lands when the refresh settles.
+              lastHealingServeRootBlock = Some(target)
+              ctx.log.info(
+                s"[HEAL-REPEG] Heal root stale (networkBest=$networkBest, target=$target, " +
+                  s"margin=$HealingServeRootMarginBlocks, lastRepegBlock=${lastHealingServeRootBlock.getOrElse("none")}) " +
+                  s"— re-pegging the single heal root via refreshPivotInPlace (spec 009 moving-root delta heal)."
+              )
+              refreshPivotInPlace("spec009 moving-root re-peg: heal root stale")
+            else
+              healingServeRootRequestInFlight = true
+              ctx.log.info(
+                s"[HEAL-SERVE-ROOT] Requesting newest-servable serve root: networkBest=$networkBest target=$target " +
+                  s"(margin=$HealingServeRootMarginBlocks, lastServeBlock=${lastHealingServeRootBlock.getOrElse("none")}). " +
+                  s"Routing via parent RecentRoot bootstrap."
+              )
+              syncController ! SNAPSyncController.RequestHealingServeRoot
         }
       }
 
