@@ -4,7 +4,7 @@ import org.apache.pekko.actor.typed.{ActorRef as TypedActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 import scala.concurrent.duration.FiniteDuration
-import scala.reflect.ClassTag
+import scala.reflect.TypeTest
 
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
@@ -41,7 +41,7 @@ object PeerRequestHandler:
     * `RequestFailed` then stops. Callers pass an explicit `replyTo` because `context.parent` is unavailable in Pekko
     * Typed.
     */
-  def behavior[RequestMsg <: Message, ResponseMsg <: Message: ClassTag](
+  def behavior[RequestMsg <: Message, ResponseMsg <: Message](
       peer: Peer,
       responseTimeout: FiniteDuration,
       networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
@@ -49,7 +49,7 @@ object PeerRequestHandler:
       requestMsg: RequestMsg,
       responseMsgCode: Int,
       replyTo: TypedActorRef[Result]
-  )(implicit toSerializable: RequestMsg => MessageSerializable): Behavior[Command] =
+  )(using tt: TypeTest[Any, ResponseMsg], toSerializable: RequestMsg => MessageSerializable): Behavior[Command] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
         val startTime = System.currentTimeMillis()
