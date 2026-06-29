@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.faucet
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.PreRestart
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.util.ByteString
 
@@ -35,10 +36,28 @@ object FaucetHandler:
   def apply(walletService: WalletService, config: FaucetConfig, shutdown: () => Unit)(using
       runtime: IORuntime
   ): Behavior[Command] =
-    Behaviors.setup { ctx =>
-      ctx.self ! Command.Initialize
-      unavailable(walletService, config, shutdown)
-    }
+    // P19: FaucetSupervisor restarts this handler with backoff on any Exception (a WalletException stops it instead).
+    // On PreRestart we drop the unlocked wallet held in the `available` state; the restarted instance re-sends
+    // Initialize and re-derives the wallet from the keystore, so cleanup is the warning log only (no open handles).
+    Behaviors.intercept(() =>
+      new org.apache.pekko.actor.typed.BehaviorSignalInterceptor[Command]():
+        override def aroundSignal(
+            c: org.apache.pekko.actor.typed.TypedActorContext[Command],
+            signal: org.apache.pekko.actor.typed.Signal,
+            target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Command]
+        ): Behavior[Command] =
+          if signal == PreRestart then
+            c.asScala.log.warn(
+              "{} received PreRestart — dropping unlocked wallet; will re-initialize from keystore",
+              c.asScala.self.path.name
+            )
+          target(c, signal)
+    )(
+      Behaviors.setup { ctx =>
+        ctx.self ! Command.Initialize
+        unavailable(walletService, config, shutdown)
+      }
+    )
 
   private[faucet] def testBehavior(walletService: WalletService, config: FaucetConfig, shutdown: () => Unit)(using
       runtime: IORuntime

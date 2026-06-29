@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.PreRestart
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -122,7 +123,13 @@ object PivotBlockSelector:
               RetryStrategy(initialDelay = syncConfig.startRetryInterval, maxDelay = 60.seconds, jitterFactor = 0.0)
           )
         )
-        new Impl(
+        // P19: on PreRestart the supervisor is about to recreate this actor. `Behaviors.withTimers` cancels our
+        // scheduled timers automatically, but the BlockHeaders subscription we registered with the peer event bus
+        // (`blockHeadersAdapter`) is external state that would otherwise survive as a stale adapter ref — the bus
+        // would keep routing BlockHeaders to a defunct adapter. Unsubscribe it here so the restarted instance starts
+        // from a clean subscription set. The `peerDisconnectedAdapter` held by PeerListHelper is dropped with the
+        // helper instance on restart, so only the BlockHeaders subscription needs explicit release.
+        val behavior = new Impl(
           ctx,
           timers,
           networkPeerManager,
@@ -138,6 +145,21 @@ object PivotBlockSelector:
           getCanonicalHeaderByNumber,
           validateHeaderPoW
         ).idle(initialState)
+        Behaviors.intercept(() =>
+          new org.apache.pekko.actor.typed.BehaviorSignalInterceptor[Command]():
+            override def aroundSignal(
+                c: org.apache.pekko.actor.typed.TypedActorContext[Command],
+                signal: org.apache.pekko.actor.typed.Signal,
+                target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Command]
+            ): Behavior[Command] =
+              if signal == PreRestart then
+                c.asScala.log.warn(
+                  "{} received PreRestart — releasing peer-event-bus BlockHeaders subscription",
+                  c.asScala.self.path.name
+                )
+                peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
+              target(c, signal)
+        )(behavior)
       }
     }
 
