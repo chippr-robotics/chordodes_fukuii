@@ -236,6 +236,10 @@ object SyncStateSchedulerActor:
     /** Live Typed refs to PeerRequestHandler children, keyed by PeerId for explicit unwatch. */
     private var activeHandlers: Map[PeerId, TypedActorRef[PeerRequestHandler.Command]] = Map.empty
 
+    // Monotonically increasing counter that makes each PeerRequestHandler child name unique within
+    // this scheduler's lifetime, preventing name collisions when the same peer gets sequential batches.
+    private var requestSeq: Int = 0
+
     // Static SLF4J logger for IO-fiber callbacks — ctx.log is actor-thread-only.
     private val fiberLog = org.slf4j.LoggerFactory.getLogger(getClass)
 
@@ -407,6 +411,7 @@ object SyncStateSchedulerActor:
 
     /** Spawns a PeerRequestHandler child, registers a death-watch, and tracks the ref. */
     private def requestNodes(request: PeerRequest): Unit =
+      requestSeq += 1
       val useSnap = peerUsesSnap(request.peer)
       ctx.log.debug(
         "Requesting {} nodes from peer {} via {}",
@@ -425,7 +430,7 @@ object SyncStateSchedulerActor:
             case None =>
               Seq(ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false)))
         }
-        ctx.spawnAnonymous(
+        ctx.spawn(
           PeerRequestHandler.behavior[GetTrieNodes, TrieNodes](
             request.peer,
             syncConfig.peerResponseTimeout,
@@ -440,10 +445,11 @@ object SyncStateSchedulerActor:
             responseMsgCode = SNAP.Codes.TrieNodesCode,
             replyTo = prhResultAdapter,
             requestId = 0
-          )
+          ),
+          s"state-trie-request-${request.peer.id.value}-$requestSeq"
         )
       else
-        ctx.spawnAnonymous(
+        ctx.spawn(
           PeerRequestHandler.behavior[GetNodeData, NodeData](
             request.peer,
             syncConfig.peerResponseTimeout,
@@ -453,7 +459,8 @@ object SyncStateSchedulerActor:
             responseMsgCode = Codes.NodeDataCode,
             replyTo = prhResultAdapter,
             requestId = 0
-          )
+          ),
+          s"state-nodedata-request-${request.peer.id.value}-$requestSeq"
         )
       ctx.watchWith(handler, RequestTerminated(request.peer))
       activeHandlers = activeHandlers.updated(request.peer.id, handler)

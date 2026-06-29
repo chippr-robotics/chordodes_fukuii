@@ -200,6 +200,10 @@ object FastSyncBranchResolverActor:
     private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
       context.messageAdapter[PeerRequestHandler.Result](PeerRequestResult(_))
 
+    // Monotonically increasing counter that makes each PeerRequestHandler child name unique within
+    // this resolver's lifetime, even when the same peer is used across multiple binary-search steps.
+    private var requestSeq: Int = 0
+
     private def log = context.log
 
     /** Shared peer-list / scan handling for every state. Returns `Some(next)` if the message was handled. */
@@ -350,7 +354,8 @@ object FastSyncBranchResolverActor:
         .get(peer.id)
         .exists(peerWithInfo => Capability.usesRequestId(peerWithInfo.peerInfo.remoteStatus.capability))
 
-      val handler = context.spawnAnonymous(
+      requestSeq += 1
+      val handler = context.spawn(
         PeerRequestHandler.behavior[ETH68GetBlockHeaders, ETH68BlockHeaders](
           peer,
           syncConfig.peerResponseTimeout,
@@ -361,7 +366,8 @@ object FastSyncBranchResolverActor:
           responseMsgCode = Codes.BlockHeadersCode,
           replyTo = prhResultAdapter,
           requestId = 0
-        )
+        ),
+        s"branch-resolver-header-request-${peer.id.value}-$requestSeq"
       )
       context.watchWith(handler, HandlerTerminated(handler))
       handler

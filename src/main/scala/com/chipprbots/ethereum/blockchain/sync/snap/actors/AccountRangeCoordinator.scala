@@ -300,6 +300,10 @@ private class AccountRangeCoordinatorImpl(
   private[actors] val workers = mutable.ArrayBuffer[WorkerRef]()
   private[actors] val idleWorkers = mutable.LinkedHashSet.empty[WorkerRef]
 
+  // Monotonically increasing counter for unique worker child names. Workers can be removed and
+  // re-created; using the set size would produce duplicate names when replacements are spawned.
+  private var workerSeq: Int = 0
+
   // #1184: dispatch-stalled detector — silent peers (no FIN/RST) leave activeTasks slots
   // held forever; the worker→TaskFailed cascade depends on a response that never arrives.
   // Track time-of-last-progress and fire `CheckDispatchStalled` periodically; when
@@ -1020,7 +1024,8 @@ private class AccountRangeCoordinatorImpl(
     math.max(concurrency, knownAvailablePeers.count(!isPeerStateless(_))) * maxInFlightPerPeer
 
   private def createWorker(): WorkerRef =
-    val worker: WorkerRef = ctx.spawnAnonymous(
+    workerSeq += 1
+    val worker: WorkerRef = ctx.spawn(
       Behaviors
         .supervise(
           AccountRangeWorker(
@@ -1030,6 +1035,7 @@ private class AccountRangeCoordinatorImpl(
           )
         )
         .onFailure[Throwable](SupervisorStrategy.restart.withLimit(5, 1.minute)),
+      s"account-range-worker-$workerSeq",
       org.apache.pekko.actor.typed.Props.empty.withDispatcherFromConfig("sync-dispatcher")
     )
     // Typed death watch — delivers WorkerTerminated(worker) to our mailbox if the worker stops.
