@@ -46,13 +46,14 @@ class DecoupledHealObservabilitySpec
   private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessageCmd): SNAP.GetTrieNodes =
     send.message.underlyingMsg.asInstanceOf[SNAP.GetTrieNodes]
 
-  /** Mirror of `TrieNodeHealingCoordinator.shortRootLabel`: the leading (up to) 8 bytes of a root packed big-endian
+  /** Mirror of `TrieNodeHealingCoordinator.shortRootLabel`: the leading (up to) 6 bytes of a root packed big-endian
     * into a Long. Replicated here so a gauge observation can be tied to a specific, distinct root value (the gauges are
-    * global singletons; matching the exact short label proves THIS coordinator wrote it).
+    * global singletons; matching the exact short label proves THIS coordinator wrote it). Six bytes (48 bits) keeps the
+    * label non-negative and exactly representable as a Prometheus double — must stay in lockstep with production.
     */
   private def shortRootLabel(root: ByteString): Long =
     var acc = 0L
-    val n = root.length.min(8)
+    val n = root.length.min(6)
     var i = 0
     while i < n do
       acc = (acc << 8) | (root(i) & 0xffL)
