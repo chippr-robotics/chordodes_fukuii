@@ -40,6 +40,12 @@ class OlympiaBlockHeaderValidationSpec
     _.copy(olympiaBlockNumber = olympiaBlock)
   )
 
+  // ETH / Hive regime: baseFeeFloor = 0 (Big0). Under this floor the EIP-1559 decrease-branch
+  // off-by-one becomes observable end-to-end through header validation.
+  private val configFloorZero: BlockchainConfig = blockchainConfig
+    .withUpdatedForkBlocks(_.copy(olympiaBlockNumber = olympiaBlock))
+    .copy(baseFeeFloor = BigInt(0))
+
   private val InitialBaseFee: BigInt = BaseFeeCalculator.InitialBaseFee
   private val baseExtraData: ByteString = ByteString("test".getBytes)
 
@@ -180,6 +186,44 @@ class OlympiaBlockHeaderValidationSpec
         val result = validate(missingFee, firstBlock)
         result shouldBe a[Left[?, ?]]
         result.left.toOption.get shouldBe a[HeaderExtraFieldsError]
+      }
+    }
+
+    // End-to-end reproduction of the EIP-1559 decrease-branch off-by-one (block-146 / consume-rlp
+    // block-1 rejection). Under baseFeeFloor = 0 an empty parent block (gasUsed = 0) holds its tiny
+    // base fee: the raw 1/8 delta integer-floors to 0, so the child must declare the SAME base fee.
+    // The historical bug applied .max(1) on the decrease branch, expecting 6 instead of 7 and
+    // rejecting the valid child with INVALID_BASE_FEE_PER_GAS (have 7, want 6, parentGasUsed 0).
+    "block is post-Olympia under baseFeeFloor = 0 (ETH/Hive regime)" should {
+      "accept a child holding baseFee = 7 when its empty parent's baseFee = 7 (decrease holds, no off-by-one)" taggedAs (
+        UnitTest,
+        OlympiaTest,
+        ConsensusTest
+      ) in {
+        val hiveGasLimit = BigInt(37699104) // gasTarget = 18_849_552
+        val emptyParent = Fixtures.Blocks.ValidBlock.header.copy(
+          number = olympiaBlock,
+          gasLimit = hiveGasLimit,
+          gasUsed = 0,
+          unixTimestamp = 1000L,
+          difficulty = Difficulty.Zero,
+          extraData = baseExtraData,
+          extraFields = HefPostOlympia(BigInt(7))
+        )
+        // Sanity: the held base fee the calculator derives for the child is exactly 7 (not 6).
+        BaseFeeCalculator.calcBaseFee(emptyParent, configFloorZero) shouldBe BigInt(7)
+
+        val child = Fixtures.Blocks.ValidBlock.header.copy(
+          parentHash = emptyParent.hash,
+          number = olympiaBlock + 1,
+          gasLimit = hiveGasLimit, // constant gasLimit: |diff| = 0 < parent/1024, valid
+          gasUsed = 0,
+          unixTimestamp = 2000L,
+          difficulty = Difficulty.Zero,
+          extraData = baseExtraData,
+          extraFields = HefPostOlympia(BigInt(7))
+        )
+        MockedPowBlockHeaderValidator.validate(child, emptyParent)(configFloorZero) shouldBe Right(BlockHeaderValid)
       }
     }
   }
