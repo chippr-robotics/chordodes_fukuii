@@ -1783,6 +1783,23 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
     val visitedCount = new java.util.concurrent.atomic.AtomicLong(0L)
     val frontierCount = new java.util.concurrent.atomic.AtomicLong(0L)
 
+    // --- spec 005 (Pruned descend-and-stop oracle, C2/T006/T014) ---
+    // The store is consulted ONLY when `prunedEnabled` (config on AND Hash scheme AND store present). When pruning is
+    // disabled, `prunedStore` is None and the oracle below is inert — the walk descends EVERY present child exactly as
+    // today (byte-identical full walk). The oracle's contract (FR-001/FR-004, never-false-prune): a present child X is
+    // pruned (treated as a verified leaf, NOT enqueued, so its whole subtree is skipped) IFF `prunedEnabled` AND X has
+    // a durable subtree-complete record. A present-but-not-recorded child and any missing child are ALWAYS descended /
+    // emitted — pruning narrows the walk only where completeness is durably proven, never where it is merely assumed.
+    // Returns true when the child was pruned (caller must NOT enqueue it). Increments the pruned-subtree counter on a
+    // hit. `markIfNew` has already de-duplicated the child, so each pruned subtree is counted once per walk.
+    val prunedStore: Option[HealingFrontierStorage] = if prunedEnabled then healingFrontierStorage else None
+    def pruneIfSubtreeComplete(childHash: ByteString): Boolean =
+      prunedStore.exists { store =>
+        val recorded = store.isSubtreeComplete(childHash)
+        if recorded then prunedSubtreeCount.incrementAndGet()
+        recorded
+      }
+
     // --- spec 002 US2 observability (observation-only, FR-006/FR-007/FR-008) ---
     // Per-level coarse-phase timers (nanos) accumulated across chunks/sub-ranges, and re-walk inflation
     // counters. These are read and reset at each level boundary. They are pure instrumentation: they never
@@ -1848,13 +1865,16 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
                             // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
                             childRefsSeen.incrementAndGet()
                             if markIfNew(childHash) then
-                              distinctEnqueued.incrementAndGet()
-                              val childNibbles = nibbles :+ i.toByte
-                              val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
-                              val childPathset =
-                                if entry.isStorage then Seq(pathset.head.toArray, childCompact.toArray)
-                                else Seq(childCompact.toArray)
-                              nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                              // spec 005 C2/T006: prune a present, recorded-complete child — do NOT enqueue it, so its
+                              // whole subtree is skipped (descend-and-stop). Else descend exactly as today.
+                              if !pruneIfSubtreeComplete(childHash) then
+                                distinctEnqueued.incrementAndGet()
+                                val childNibbles = nibbles :+ i.toByte
+                                val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
+                                val childPathset =
+                                  if entry.isStorage then Seq(pathset.head.toArray, childCompact.toArray)
+                                  else Seq(childCompact.toArray)
+                                nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
                           case _ =>
 
                     case ext: ExtensionNode =>
@@ -1864,13 +1884,15 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
                           // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
                           childRefsSeen.incrementAndGet()
                           if markIfNew(childHash) then
-                            distinctEnqueued.incrementAndGet()
-                            val childNibbles = nibbles ++ ext.sharedKey.toArray
-                            val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
-                            val childPathset =
-                              if entry.isStorage then Seq(pathset.head.toArray, childCompact.toArray)
-                              else Seq(childCompact.toArray)
-                            nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                            // spec 005 C2/T006: prune a present, recorded-complete child (descend-and-stop); else descend.
+                            if !pruneIfSubtreeComplete(childHash) then
+                              distinctEnqueued.incrementAndGet()
+                              val childNibbles = nibbles ++ ext.sharedKey.toArray
+                              val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
+                              val childPathset =
+                                if entry.isStorage then Seq(pathset.head.toArray, childCompact.toArray)
+                                else Seq(childCompact.toArray)
+                              nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
                         case _ =>
 
                     case leaf: LeafNode if !entry.isStorage =>
@@ -1881,20 +1903,23 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
                         if account.storageRoot != Account.EmptyStorageRootHash &&
                           markIfNew(account.storageRoot.value)
                         then
-                          distinctEnqueued.incrementAndGet()
-                          val allNibbles = nibbles ++ leaf.key.toArray
-                          if allNibbles.length == 64 then
-                            val accountHashBytes =
-                              allNibbles.grouped(2).map(g => ((g(0) << 4) | g(1)).toByte).toArray
-                            val accountHash = ByteString(accountHashBytes)
-                            val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-                            nextBuf += (
-                              (
-                                account.storageRoot.toArray,
-                                Seq(accountHash.toArray, emptyStoragePath.toArray),
-                                true
+                          // spec 005 C2/T006: prune a present, recorded-complete storage-trie root (descend-and-stop) —
+                          // do NOT enqueue the storage subtree. Else descend it exactly as today.
+                          if !pruneIfSubtreeComplete(account.storageRoot.value) then
+                            distinctEnqueued.incrementAndGet()
+                            val allNibbles = nibbles ++ leaf.key.toArray
+                            if allNibbles.length == 64 then
+                              val accountHashBytes =
+                                allNibbles.grouped(2).map(g => ((g(0) << 4) | g(1)).toByte).toArray
+                              val accountHash = ByteString(accountHashBytes)
+                              val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
+                              nextBuf += (
+                                (
+                                  account.storageRoot.toArray,
+                                  Seq(accountHash.toArray, emptyStoragePath.toArray),
+                                  true
+                                )
                               )
-                            )
                       }
 
                     case _ => // storage trie leaf, NullNode, inline HashNode

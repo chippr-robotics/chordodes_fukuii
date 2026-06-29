@@ -123,6 +123,12 @@ class CleanRebuildEarlyCompletionSpec
       batchSize = 16,
       snapSyncController = controllerProbe.ref,
       healingFrontierStorage = Some(store),
+      // spec 005 default-off gating: markComplete() (FrontierRebuildComplete + HealingCheckCompletion) is gated on
+      // frontierPersistenceEnabled. This fixture's docstring states "Persistence is ON" and T-1/T-4 assert the CF `g`
+      // completeness marker (store.isComplete) is set on the clean early-completion path; that marker is written only
+      // when persistence is enabled. Must be explicit here — the param defaults to false. Test-only: production gating
+      // is left untouched (FR-005 byte-parity stays default-off). Dropped by the #1373 Classic→Typed fixture rewrite.
+      frontierPersistenceEnabled = true,
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, root, store, controllerProbe)
