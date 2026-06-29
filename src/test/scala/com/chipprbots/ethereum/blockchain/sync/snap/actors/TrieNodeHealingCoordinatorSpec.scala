@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.{FishingOutcomes, ScalaTestWithActorTestKit}
 
 import java.nio.ByteBuffer
 
@@ -1216,3 +1216,306 @@ class TrieNodeHealingCoordinatorSpec
     // The unservable handoff must NEVER fire on a present root.
     snapSyncController.expectNoMessage(300.millis)
   }
+
+  // ─── spec 009 (Moving-Root Delta Heal) flag-ON behavioral coverage ───────────────────────────────────────────────
+  //
+  // These tests spawn the coordinator with `movingRootDeltaHeal = true`. The factory/impl default is `false`, so every
+  // test ABOVE keeps exercising the spec-004 flag-OFF path unchanged (flag-OFF is byte-identical to pre-spec-009).
+
+  /** Extract the underlying `GetTrieNodes` from a captured `SendMessageCmd` (the coordinator wraps the request in a
+    * `GetTrieNodesEnc`, a `MessageSerializable`; `underlyingMsg` is the original message).
+    */
+  private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessageCmd): SNAP.GetTrieNodes =
+    send.message.underlyingMsg.asInstanceOf[SNAP.GetTrieNodes]
+
+  private def healPendingTasks(
+      coordinator: org.apache.pekko.actor.typed.ActorRef[TrieNodeHealingCoordinator.Command]
+  ): Int =
+    val probe = testKit.createTestProbe[HealingStatistics]()
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
+    probe.expectMessageType[HealingStatistics].pendingTasks
+
+  /** True iff the node's bytes are readable from storage (the same gate the coordinator uses via `isNodeInStorage`). */
+  private def isInStorage(storage: TestMptStorage, hash: ByteString): Boolean =
+    try
+      storage.get(hash.toArray); true
+    catch case _: com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException => false
+
+  "Moving-root delta heal (spec 009 US2, C1)" should
+    "store served root + internal nodes when the fetch root == heal root (content gate matches by construction)" taggedAs UnitTest in {
+      // C1 (the spec-004 wrong-axis fix): under the flag the GetTrieNodes fetch root is collapsed to the completeness
+      // root `stateRoot`, so a peer serving that exact root returns nodes whose keccak == the requested task hash → the
+      // content-hash gate (byte-untouched) ACCEPTS and persists them. No "non-matching hash" drops. We drive the full
+      // 2-node delta to completion and assert both served nodes were accepted by the gate (via ProgressNodesHealed).
+      val fx = MovingRootDeltaHealFixtures.deltaTrie()
+      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
+      val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
+      val coordinator = HealingTrieFixtures.spawnCoordinator(
+        stateRoot = fx.rootHash,
+        networkPeerManager = networkPeerManager.ref,
+        requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+        mptStorage = fx.storage,
+        batchSize = 16,
+        snapSyncController = snapSyncController.ref,
+        healingWriterEcOverride = Some(classicSystem.dispatcher),
+        movingRootDeltaHeal = true
+      )
+
+      // Heal start: absent root ⇒ seed-from-absent-root (C2) enqueues the root and a peer makes it dispatch.
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
+      val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+      val peer = PeerTestHelpers.createTestPeer("md-c1-peer", peerProbe.ref.toClassic)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+
+      // First request fetches the root (empty-path) against the heal root.
+      val send1 = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](3.seconds)
+      val req1 = getTrieNodesOf(send1)
+      req1.rootHash shouldBe fx.rootHash // fetch root == heal root (C1)
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = req1.requestId, nodes = Seq(fx.rootNode.encoded))
+      )
+
+      // The root passed the content gate — the controller is told ≥ 1 node healed (NOT dropped). Sum healed-progress
+      // across the drain (the gate-acceptance signal, deterministic; the async durable flush is racy under suite load).
+      var healedTotal = 0L
+      snapSyncController.fishForMessage(3.seconds) {
+        case SNAPSyncController.ProgressNodesHealed(c) =>
+          healedTotal += c
+          if healedTotal >= 1L then FishingOutcomes.complete else FishingOutcomes.continue
+        case _ => FishingOutcomes.continueAndIgnore
+      }
+
+      // Second request fetches the discovered child, again against the heal root.
+      val send2 = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](3.seconds)
+      val req2 = getTrieNodesOf(send2)
+      req2.rootHash shouldBe fx.rootHash
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = req2.requestId, nodes = Seq(fx.childNode.encoded))
+      )
+
+      // The child also passed the content gate — total healed reaches the full 2-node delta with NO drops.
+      snapSyncController.fishForMessage(3.seconds) {
+        case SNAPSyncController.ProgressNodesHealed(c) =>
+          healedTotal += c
+          if healedTotal >= 2L then FishingOutcomes.complete else FishingOutcomes.continue
+        case _ => FishingOutcomes.continueAndIgnore
+      }
+      healedTotal shouldBe 2L // both served nodes accepted by the content-hash gate (fetch root == heal root, C1)
+    }
+
+  "Moving-root delta heal (spec 009 US2, C2)" should
+    "fetch an absent heal root (NOT hand off HealingRootUnservable) and seed the frontier" taggedAs UnitTest in {
+      // C2: under the flag an absent heal root is SEEDED as a frontier task (empty-path) and fetched against the single
+      // served root — NOT handed off to lazy healing. This is the same seed HealingPivotRefreshed performs.
+      val fx = MovingRootDeltaHealFixtures.deltaTrie()
+      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
+      val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
+      val coordinator = HealingTrieFixtures.spawnCoordinator(
+        stateRoot = fx.rootHash,
+        networkPeerManager = networkPeerManager.ref,
+        requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+        mptStorage = fx.storage,
+        batchSize = 16,
+        snapSyncController = snapSyncController.ref,
+        healingWriterEcOverride = Some(classicSystem.dispatcher),
+        movingRootDeltaHeal = true
+      )
+
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
+
+      // The root was SEEDED (frontier == 1), NOT handed off.
+      eventually(timeout(5.seconds), interval(100.millis))(healPendingTasks(coordinator) shouldBe 1)
+      // The default unservable handoff must NOT fire under the flag.
+      snapSyncController.expectNoMessage(300.millis)
+
+      // With a peer, the seeded root is fetched (empty-path GetTrieNodes carrying the heal root).
+      val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+      val peer = PeerTestHelpers.createTestPeer("md-c2-peer", peerProbe.ref.toClassic)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+      val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](3.seconds)
+      val req = getTrieNodesOf(send)
+      req.rootHash shouldBe fx.rootHash
+      req.paths.head shouldBe Seq(MovingRootDeltaHealFixtures.emptyPath) // empty-path root seed
+    }
+
+  "Moving-root delta heal (spec 009 US3, C4 re-peg retains nodes)" should
+    "preserve persisted verified nodes across HealingPivotRefreshed and not grow the frontier" taggedAs UnitTest in {
+      // C4: heal the root against root A so it is durably persisted, then re-peg to a different root. HealingPivotRefreshed
+      // clears ONLY in-memory frontier — it MUST NOT delete trie nodes. Assert the healed root is STILL readable from
+      // storage after the re-peg, and the post-re-peg pending count ≤ pre + the one new-root seed.
+      val fx = MovingRootDeltaHealFixtures.deltaTrie()
+      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
+      val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
+      val coordinator = HealingTrieFixtures.spawnCoordinator(
+        stateRoot = fx.rootHash,
+        networkPeerManager = networkPeerManager.ref,
+        requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+        mptStorage = fx.storage,
+        batchSize = 16,
+        snapSyncController = snapSyncController.ref,
+        healingWriterEcOverride = Some(classicSystem.dispatcher),
+        movingRootDeltaHeal = true
+      )
+
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
+      val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+      val peer = PeerTestHelpers.createTestPeer("md-c4-peer", peerProbe.ref.toClassic)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+
+      // Serve the root — it passes the content gate (acceptance via ProgressNodesHealed) and the flush makes it durable.
+      val send1 = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](3.seconds)
+      val req1 = getTrieNodesOf(send1)
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = req1.requestId, nodes = Seq(fx.rootNode.encoded))
+      )
+      snapSyncController.fishForMessage(3.seconds) {
+        case SNAPSyncController.ProgressNodesHealed(c) =>
+          if c >= 1L then FishingOutcomes.complete else FishingOutcomes.continueAndIgnore
+        case _ => FishingOutcomes.continueAndIgnore
+      }
+      // The root is durably in storage before the re-peg (the node whose survival we assert).
+      eventually(timeout(5.seconds), interval(100.millis))(isInStorage(fx.storage, fx.rootHash) shouldBe true)
+
+      // Re-peg to a DIFFERENT root (distinct from fx.rootHash) — the production stale-move signal.
+      val newRoot = kec256(ByteString("md-c4-repeg-new-root"))
+      newRoot should not be fx.rootHash
+      coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(newRoot)
+
+      // INVARIANT (T010/C4): the re-peg cleared in-memory frontier + the optional mirror CF, but DID NOT delete any
+      // persisted trie node. The previously-healed ROOT node remains readable — content-addressed, reusable under newRoot.
+      eventually(timeout(5.seconds), interval(100.millis))(isInStorage(fx.storage, fx.rootHash) shouldBe true)
+      isInStorage(fx.storage, fx.rootHash) shouldBe true // still present after the re-peg settles
+      // Post-re-peg the frontier is at most the (absent) new-root seed (≤ 1) — no re-download of the completed subtree.
+      healPendingTasks(coordinator) should be <= 1
+    }
+
+  "Moving-root delta heal (spec 009 US3, C5 sound completion)" should
+    "NOT complete on delta-discovery alone when a present node has an absent child — only after the gap is healed" taggedAs UnitTest in {
+      // C5 (THE consensus invariant): the download mosaic can leave a PRESENT interior node whose grandchild is ABSENT.
+      // Pure delta-discovery does not descend into a present node, so it would declare pending==0 with a real hole — a
+      // false completion. The PRUNED DESCENT (the rebuild/verification BFS, with NO subtree-complete records so nothing
+      // is pruned) DECODES the present interior node and emits the absent grandchild as a frontier entry, so isComplete
+      // stays false and StateHealingComplete is WITHHELD until the gap is healed and a clean descent passes.
+      val fx = MovingRootDeltaHealFixtures.incompleteSubtree()
+      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
+      val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
+      val coordinator = HealingTrieFixtures.spawnCoordinator(
+        stateRoot = fx.rootHash,
+        networkPeerManager = networkPeerManager.ref,
+        requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+        mptStorage = fx.storage,
+        batchSize = 16,
+        snapSyncController = snapSyncController.ref,
+        healingWriterEcOverride = Some(classicSystem.dispatcher),
+        movingRootDeltaHeal = true
+      )
+
+      // Sanity: the descent target is genuinely a download-mosaic gap — interior present, grandchild absent.
+      isInStorage(fx.storage, fx.presentInteriorHash) shouldBe true
+      isInStorage(fx.storage, fx.absentGrandchildHash) shouldBe false
+
+      // Root is PRESENT ⇒ StartTrieNodeHealing runs the descent (rebuild BFS), which descends into the present interior
+      // node and finds the absent grandchild → enqueues it.
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
+
+      // The descent re-enqueued the absent grandchild: pending becomes ≥ 1 and completion is NOT declared.
+      eventually(timeout(5.seconds), interval(100.millis))(healPendingTasks(coordinator) should be >= 1)
+      // No StateHealingComplete is sent while the gap is open — delta-discovery alone does NOT close it.
+      snapSyncController.expectNoMessage(500.millis)
+      healPendingTasks(coordinator) should be >= 1
+
+      // Now heal the gap: a peer arrives, the seeded grandchild is fetched, and we serve its bytes (kec256 matches).
+      val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+      val peer = PeerTestHelpers.createTestPeer("md-c5-peer", peerProbe.ref.toClassic)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
+      val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](3.seconds)
+      val req = getTrieNodesOf(send)
+      req.rootHash shouldBe fx.rootHash // fetch root == heal root (single root)
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = req.requestId, nodes = Seq(fx.grandchildServed.encoded))
+      )
+
+      // The grandchild is now present; a later clean descent finds zero absent and completion IS declared.
+      eventually(timeout(5.seconds), interval(100.millis))(
+        isInStorage(fx.storage, fx.absentGrandchildHash) shouldBe true
+      )
+      snapSyncController.fishForMessage(10.seconds) {
+        case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+        case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+        case _                                         => FishingOutcomes.continueAndIgnore
+      }
+    }
+
+  "Moving-root delta heal (spec 009 US1, T016b flag-OFF byte-unchanged)" should
+    "take the spec-004 HealingRootUnservable handoff for an absent root when the flag is OFF" taggedAs UnitTest in {
+      // T016b: flag OFF ⇒ the legacy spec-004 decoupled path is byte-unchanged. An absent heal root is NOT seeded; the
+      // coordinator signals HealingRootUnservable (the spec-004 lazy-heal handoff) exactly as before spec 009. This is
+      // the direct A/B contrast to the flag-ON C2 test (which SEEDS the same absent root instead) — the single fork.
+      val fx = MovingRootDeltaHealFixtures.deltaTrie() // same absent-root fixture as the flag-ON C2 test
+      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
+      val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
+      val coordinator = HealingTrieFixtures.spawnCoordinator(
+        stateRoot = fx.rootHash,
+        networkPeerManager = networkPeerManager.ref,
+        requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+        mptStorage = fx.storage,
+        batchSize = 16,
+        snapSyncController = snapSyncController.ref,
+        healingWriterEcOverride = Some(classicSystem.dispatcher),
+        movingRootDeltaHeal = false // flag OFF — spec-004 path
+      )
+
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
+
+      // Flag OFF: the absent root is NOT seeded — the spec-004 handoff fires (byte-identical to pre-spec-009).
+      snapSyncController.expectMessage(3.seconds, SNAPSyncController.HealingRootUnservable(fx.rootHash))
+      // And no frontier task was seeded (the seed-from-absent-root behavior is gated entirely behind the flag).
+      healPendingTasks(coordinator) shouldBe 0
+    }
+
+  "Moving-root delta heal (spec 009 US1, T016c A/B parity)" should
+    "reach completion against the SAME root under flag OFF and flag ON for an already-complete trie (no divergent root)" taggedAs UnitTest in {
+      // T016c (SC-005 unit proxy): for a controlled fixture whose trie is already fully present locally (root present,
+      // zero missing nodes), BOTH the flag-OFF (spec-004) and the flag-ON (moving-root) paths run the SAME pruned
+      // descent from the SAME present root, find zero absent, and declare StateHealingComplete against that one root —
+      // identical outcome, no divergent finalized root. The present-and-complete trie removes the absent-root fork
+      // (where the two paths legitimately differ — seed vs handoff) and isolates the shared completion gate.
+      def runAlreadyCompleteHeal(flag: Boolean): Unit =
+        // A minimal already-complete trie: a single account leaf IS the root (no children), present on disk.
+        val storage = new TestMptStorage()
+        val leaf =
+          com.chipprbots.ethereum.mpt.LeafNode(
+            ByteString(Array[Byte](0x0a, 0x0b, 0x0c)),
+            ByteString(com.chipprbots.ethereum.domain.Account.empty().toBytes)
+          )
+        storage.putNode(leaf)
+        val rootHash = ByteString(leaf.hash)
+
+        val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
+        val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
+        val coordinator = HealingTrieFixtures.spawnCoordinator(
+          stateRoot = rootHash,
+          networkPeerManager = networkPeerManager.ref,
+          requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+          mptStorage = storage,
+          batchSize = 16,
+          snapSyncController = snapSyncController.ref,
+          healingWriterEcOverride = Some(classicSystem.dispatcher),
+          movingRootDeltaHeal = flag
+        )
+
+        coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(rootHash)
+        coordinator ! TrieNodeHealingCoordinator.HealingCheckCompletion
+
+        // Both paths: the present root + empty delta ⇒ a clean pruned descent ⇒ completion against THIS root.
+        snapSyncController.fishForMessage(10.seconds) {
+          case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+          case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+          case _                                         => FishingOutcomes.continueAndIgnore
+        }
+        // The root the heal completed against is unchanged — no re-peg, no divergent finalized root.
+        isInStorage(storage, rootHash) shouldBe true
+
+      runAlreadyCompleteHeal(flag = false) // spec-004 path completes against the present root
+      runAlreadyCompleteHeal(flag = true) // moving-root path completes against the SAME present root — parity
+    }
