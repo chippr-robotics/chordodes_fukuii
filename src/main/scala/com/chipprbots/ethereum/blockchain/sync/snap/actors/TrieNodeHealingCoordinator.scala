@@ -956,6 +956,14 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
         )
         stateRoot = newStateRoot
         flushRawNodesSync() // Flush any buffered nodes before clearing state
+        // spec 009 T010/C4 — RE-PEG-RETAINS-NODES INVARIANT (consensus-load-bearing): a re-peg MUST NOT delete any
+        // persisted trie node. Content-addressed verified nodes (keccak-keyed) carry over unchanged under the new root
+        // (~99.9% shared), so every node healed against the old root stays valid under `newStateRoot` and the
+        // post-re-peg delta only SHRINKS. The ONLY state cleared on this path is in-memory frontier (pendingTasks /
+        // pendingHashSet / activeRequests, below) plus the OPTIONAL frontier-mirror CF via clearPersistedFrontier(),
+        // which operates solely on `healingFrontierStorage` (CF 'g' — frontier mirror + completeness/subtree records)
+        // and NEVER touches the trie-node store `mptStorage`. If a future edit makes a re-peg drop trie nodes it is a
+        // consensus bug (a referenced node could go missing under the new root → false completion / import fault).
         clearPersistedFrontier() // Layer 2: old-root frontier is stale after refresh — reseed (below) repopulates it
         clearHealedPathsSet() // spec 003 C1/F5: old-root healed paths are stale — clear before next gate
         pendingTasks.clear() // Will be re-populated by root reseed + inline discovery / trie walk from controller
@@ -1019,7 +1027,14 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
       // unchanged walk root (FR-001), so byte-for-byte completion parity with the coupled path is preserved by
       // construction. No-op when the feature is disabled (the fetch would ignore `serveRoot` anyway, but skipping
       // keeps the observability/counter state inert so the OFF path is byte-identical to today, SC-006).
-      if !decoupledHealServeRoot then
+      if movingRootDeltaHeal then
+        // spec 009 T014/FR-010: under moving-root delta heal the serve root IS the walk root (the fetch collapses to
+        // `stateRoot` in requestNextBatch, T005), so the spec-004 serve-root machinery is SUPERSEDED. The controller
+        // re-pegs via HealingPivotRefreshed and stops requesting serve roots (H-S6/H-S2), but a late in-flight
+        // HealingServeRootRefresh could still arrive — treat it as a documented no-op (serveRoot / serveRootRefreshCount
+        // stay inert). Flag OFF: byte-identical to the spec-004 path below (kept one release for A/B, FR-007).
+        log.debug("[HEAL] HealingServeRootRefresh ignored — single moving root (spec 009)")
+      else if !decoupledHealServeRoot then
         log.debug("[HEAL-SERVE-ROOT] HealingServeRootRefresh ignored — decoupled-heal-serve-root disabled")
       else if newServeRoot.isEmpty || newServeRoot == serveRoot then
         // T011 U2: never adopt an empty/zero serve root; a same-root refresh is a no-op (no counter churn).

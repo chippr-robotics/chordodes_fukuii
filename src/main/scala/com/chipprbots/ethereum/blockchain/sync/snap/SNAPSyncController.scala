@@ -852,21 +852,31 @@ private class SNAPSyncControllerImpl(
       // the in-flight latch so a later tick can retry.
       case SNAPSyncController.HealingServeRoot(blockNumber, rootOpt) =>
         healingServeRootRequestInFlight = false
-        rootOpt match
-          case Some(root) if root.value.nonEmpty =>
-            lastHealingServeRootBlock = Some(blockNumber)
-            ctx.log.info(
-              s"[HEAL-SERVE-ROOT] Pushing newest-servable serve root ${root.value.take(4).toHex} (block $blockNumber) " +
-                s"to healing coordinator (walk root unchanged)."
-            )
-            trieNodeHealingCoordinator.foreach(
-              _ ! actors.TrieNodeHealingCoordinator.HealingServeRootRefresh(root.value)
-            )
-          case _ =>
-            ctx.log.info(
-              "[HEAL-SERVE-ROOT] Parent could not fetch a newest-servable root (no peers / bootstrap failed). " +
-                "Keeping the current serve root; will retry on a later healing tick."
-            )
+        // spec 009 T014/FR-010: under moving-root delta heal the stale-move trigger re-pegs the single heal root via
+        // refreshPivotInPlace → HealingPivotRefreshed (H-S6), NOT a serve-root push, so this reply is no longer
+        // solicited on the flag path. A late HealingServeRoot (e.g. an in-flight RequestHealingServeRoot from before the
+        // flag engaged) must NOT push a HealingServeRootRefresh — under single-root heal the serve root IS the walk root
+        // and a serve-root-only move would be meaningless. Flag OFF: byte-identical to the spec-004 push below.
+        if snapSyncConfig.movingRootDeltaHeal then
+          ctx.log.debug(
+            "[HEAL] late HealingServeRoot reply ignored — moving-root delta heal re-pegs via HealingPivotRefreshed"
+          )
+        else
+          rootOpt match
+            case Some(root) if root.value.nonEmpty =>
+              lastHealingServeRootBlock = Some(blockNumber)
+              ctx.log.info(
+                s"[HEAL-SERVE-ROOT] Pushing newest-servable serve root ${root.value.take(4).toHex} (block $blockNumber) " +
+                  s"to healing coordinator (walk root unchanged)."
+              )
+              trieNodeHealingCoordinator.foreach(
+                _ ! actors.TrieNodeHealingCoordinator.HealingServeRootRefresh(root.value)
+              )
+            case _ =>
+              ctx.log.info(
+                "[HEAL-SERVE-ROOT] Parent could not fetch a newest-servable root (no peers / bootstrap failed). " +
+                  "Keeping the current serve root; will retry on a later healing tick."
+              )
         Behaviors.same
 
       case EnsureSnapServerPeersConnected =>
@@ -1422,6 +1432,13 @@ private class SNAPSyncControllerImpl(
       // during block execution (BlockImporter/StateNodeFetcher, with real parent-root context) — the established
       // post-SNAP regular-sync fallback. This converges to a REAL Completed/regular-sync state; it is NOT a silent
       // skip-and-mark-done (finalizeSnapSync still enforces the snapStateRoot == pivotHeader.stateRoot anchor guard).
+      //
+      // spec 009 FR-001/FR-008: under `movingRootDeltaHeal` this handler is the BOUNDED last-resort, NOT the default.
+      // The coordinator's absent-root branch SEEDS the served root and fetches it (batch-2 T006) instead of emitting
+      // HealingRootUnservable, so under the flag this is reached only when the controller's own re-peg budget is
+      // exhausted (refreshPivotInPlace's MaxHealRepegNoRootAttempts, batch-4 H-S7) — that branch calls completeSnapSync()
+      // directly (the same handoff below). This handler stays for the flag-OFF path (where the coordinator still emits
+      // HealingRootUnservable) and as a defensive catch; either way it is fail-SAFE (anchor-guard gated), never fail-open.
       case HealingRootUnservable(root) if currentPhase == StateHealing =>
         ctx.log.warn(
           s"[HEAL-ROOT-UNSERVABLE] Heal walk root ${root.toHex.take(16)} is absent from local storage and cannot be " +
