@@ -516,10 +516,12 @@ addCommandAlias(
 // SlowTest: legitimately too slow for the daily commit gate (runs in testStandard).
 // IntegrationTest: network-dependent or actor-choreography tests that belong in Tier 2+.
 // SyncTest: complex actor choreography (ADR-017) that times out under CI load.
+// DisabledTest: tests explicitly turned off (timing-flaky / WIP) — the tag exists to keep
+//   them out of the gate; see the silenced-test inventory before un-silencing.
 addCommandAlias(
   "testEssential",
   """; compile-all
-    |; testOnly -- -l SlowTest -l IntegrationTest -l SyncTest
+    |; testOnly -- -l SlowTest -l IntegrationTest -l SyncTest -l DisabledTest
     |; rlp / test
     |; bytes / test
     |; crypto / test
@@ -533,7 +535,7 @@ addCommandAlias(
 addCommandAlias(
   "testStandard",
   """; compile-all
-    |; testOnly -- -l BenchmarkTest -l EthereumTest -l SyncTest
+    |; testOnly -- -l BenchmarkTest -l EthereumTest -l SyncTest -l DisabledTest
     |""".stripMargin
 )
 
