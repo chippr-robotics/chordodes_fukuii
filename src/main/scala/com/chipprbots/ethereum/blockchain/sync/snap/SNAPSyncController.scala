@@ -3571,7 +3571,8 @@ private class SNAPSyncControllerImpl(
                   // Without passing this explicitly the deployed (PR #1319) persisted-frontier resume goes dark.
                   frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
                   decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
-                  decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
+                  decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh,
+                  movingRootDeltaHeal = snapSyncConfig.movingRootDeltaHeal
                 )
               )
               .onFailure[Throwable](
@@ -3650,7 +3651,8 @@ private class SNAPSyncControllerImpl(
                     // passed explicitly or the deployed (PR #1319) persisted-frontier resume goes dark in production.
                     frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
                     decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
-                    decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
+                    decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh,
+                    movingRootDeltaHeal = snapSyncConfig.movingRootDeltaHeal
                   )
                 )
                 .onFailure[Throwable](
@@ -5193,6 +5195,10 @@ case class SNAPSyncConfig(
     // FR-006 surfacing threshold: after this many unsatisfied heal attempts with no serve-root advance in
     // between, the coordinator surfaces the stuck task (log + metric). NEVER force-completes.
     decoupledHealMaxAttemptsNoRefresh: Int = 12,
+    // spec 009 (Moving-Root Delta Heal) — PLUMBING ONLY in this batch. No code reads this flag yet, so flag-ON and
+    // flag-OFF are byte-for-byte identical. Default true sets the intended ETC SNAP default once the behavior hunks
+    // land in later batches (single served heal root, seed-absent-root, re-peg, pruned completion).
+    movingRootDeltaHeal: Boolean = true,
     stateValidationEnabled: Boolean = true,
     maxRetries: Int = 3,
     timeout: FiniteDuration = 30.seconds,
@@ -5327,6 +5333,9 @@ object SNAPSyncConfig:
         if snapConfig.hasPath("decoupled-heal-max-attempts-no-refresh") then
           snapConfig.getInt("decoupled-heal-max-attempts-no-refresh")
         else 12,
+      movingRootDeltaHeal =
+        if snapConfig.hasPath("moving-root-delta-heal") then snapConfig.getBoolean("moving-root-delta-heal")
+        else true,
       stateValidationEnabled = snapConfig.getBoolean("state-validation-enabled"),
       maxRetries = snapConfig.getInt("max-retries"),
       timeout = snapConfig.getDuration("timeout").toMillis.millis,

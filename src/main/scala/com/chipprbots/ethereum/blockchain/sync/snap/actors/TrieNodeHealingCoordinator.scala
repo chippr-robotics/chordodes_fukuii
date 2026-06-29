@@ -83,7 +83,14 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
     decoupledHealServeRoot: Boolean = false,
     // FR-006 surfacing threshold: after this many unsatisfied attempts with no serve-root advance, surface (log +
     // metric). Never force-completes.
-    decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh
+    decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh,
+    // spec 009 (Moving-Root Delta Heal) — PLUMBING ONLY in this batch. No code reads this flag yet, so flag-ON and
+    // flag-OFF are byte-for-byte identical. Behavior (single served heal root for completeness AND fetch,
+    // seed-absent-root, re-peg, pruned completion) lands in later batches. Impl default false (bare construction stays
+    // neutral); the production default-on flows from SNAPSyncConfig via the spawn sites.
+    // @annotation.unused: this batch is plumbing-only — nothing in the impl body reads the flag yet, so the strict
+    // Scala-3 unused-param check would (correctly) reject it. Remove the annotation in the batch that wires behavior.
+    @annotation.unused movingRootDeltaHeal: Boolean = false
 ):
 
   import TrieNodeHealingCoordinator.*
@@ -2423,7 +2430,9 @@ object TrieNodeHealingCoordinator:
       // OFF to match the impl default and the spec-005 decoupling (store may be present for pruned-heal records only).
       frontierPersistenceEnabled: Boolean = false,
       decoupledHealServeRoot: Boolean = false,
-      decoupledHealMaxAttemptsNoRefresh: Int = DefaultDecoupledHealMaxAttemptsNoRefresh
+      decoupledHealMaxAttemptsNoRefresh: Int = DefaultDecoupledHealMaxAttemptsNoRefresh,
+      // spec 009 (Moving-Root Delta Heal) — plumbing only; no behavior reads it yet (see impl ctor).
+      movingRootDeltaHeal: Boolean = false
   ): Behavior[Command] =
     Behaviors.setup { context =>
       Behaviors.withTimers { timers =>
@@ -2455,7 +2464,8 @@ object TrieNodeHealingCoordinator:
           prunedHealVerification = prunedHealVerification,
           frontierPersistenceEnabled = frontierPersistenceEnabled,
           decoupledHealServeRoot = decoupledHealServeRoot,
-          decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh
+          decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh,
+          movingRootDeltaHeal = movingRootDeltaHeal
         ).start()
       }
     }
