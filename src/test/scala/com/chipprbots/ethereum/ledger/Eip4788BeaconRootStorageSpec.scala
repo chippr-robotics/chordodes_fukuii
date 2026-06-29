@@ -73,8 +73,8 @@ class Eip4788BeaconRootStorageSpec extends AnyFlatSpec with Matchers:
     def makeBlock(beaconRoot: ByteString, timestamp: Long = CancunTs): Block = Block(
       header = Fixtures.Blocks.ValidBlock.header.copy(
         unixTimestamp = timestamp,
-        gasLimit = 8_000_000,
-        gasUsed = 0,
+        gasLimit = GasAmount(8_000_000),
+        gasUsed = GasAmount.Zero,
         extraFields = HefPostCancun(
           baseFee = BigInt(1),
           withdrawalsRoot = ByteString(Array.fill(32)(0x00.toByte)),
@@ -114,8 +114,8 @@ class Eip4788BeaconRootStorageSpec extends AnyFlatSpec with Matchers:
     val preCancunBlock = Block(
       header = Fixtures.Blocks.ValidBlock.header.copy(
         unixTimestamp = CancunTs,
-        gasLimit = 8_000_000,
-        gasUsed = 0
+        gasLimit = GasAmount(8_000_000),
+        gasUsed = GasAmount.Zero
         // HefEmpty by default — no parentBeaconBlockRoot
       ),
       body = BlockBody(Nil, Nil)

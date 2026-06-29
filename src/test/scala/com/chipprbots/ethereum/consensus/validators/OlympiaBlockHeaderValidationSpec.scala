@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -57,8 +58,8 @@ class OlympiaBlockHeaderValidationSpec
   private def preOlympiaHeader(number: BigInt, timestamp: Long = 1000L): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
       number = number,
-      gasLimit = BigInt(8_000_000),
-      gasUsed = 0,
+      gasLimit = GasAmount(BigInt(8_000_000)),
+      gasUsed = GasAmount.Zero,
       unixTimestamp = timestamp,
       difficulty = Difficulty.Zero,
       extraData = baseExtraData,
@@ -69,8 +70,8 @@ class OlympiaBlockHeaderValidationSpec
     Fixtures.Blocks.ValidBlock.header.copy(
       parentHash = preOlympiaHeader(olympiaBlock - 1).hash,
       number = olympiaBlock,
-      gasLimit = OneStepFrom8M,
-      gasUsed = 0,
+      gasLimit = GasAmount(OneStepFrom8M),
+      gasUsed = GasAmount.Zero,
       unixTimestamp = timestamp,
       difficulty = Difficulty.Zero,
       extraData = baseExtraData,
@@ -87,7 +88,7 @@ class OlympiaBlockHeaderValidationSpec
         val parent = preOlympiaHeader(olympiaBlock - 2, timestamp = 1000L)
         val child = preOlympiaHeader(olympiaBlock - 1, timestamp = 2000L).copy(
           parentHash = parent.hash,
-          gasLimit = BigInt(8_000_000)
+          gasLimit = GasAmount(BigInt(8_000_000))
         )
         validate(child, parent) shouldBe Right(BlockHeaderValid)
       }
@@ -96,7 +97,7 @@ class OlympiaBlockHeaderValidationSpec
         val parent = preOlympiaHeader(olympiaBlock - 2, timestamp = 1000L)
         val wrongChild = preOlympiaHeader(olympiaBlock - 1, timestamp = 2000L).copy(
           parentHash = parent.hash,
-          gasLimit = BigInt(8_000_000),
+          gasLimit = GasAmount(BigInt(8_000_000)),
           extraFields = HefPostOlympia(InitialBaseFee)
         )
         val result = validate(wrongChild, parent)
@@ -131,7 +132,7 @@ class OlympiaBlockHeaderValidationSpec
       ) in {
         val parent = preOlympiaHeader(olympiaBlock - 1, timestamp = 1000L)
         val bigJump = firstOlympiaHeader(timestamp = 2000L, baseFee = InitialBaseFee).copy(
-          gasLimit = BigInt(16_000_000)
+          gasLimit = GasAmount(BigInt(16_000_000))
         )
         val result = validate(bigJump, parent)
         result shouldBe Left(HeaderGasLimitError)
@@ -141,7 +142,7 @@ class OlympiaBlockHeaderValidationSpec
         val parent = preOlympiaHeader(olympiaBlock - 1, timestamp = 1000L)
         val noFeeChild = preOlympiaHeader(olympiaBlock, timestamp = 2000L).copy(
           parentHash = parent.hash,
-          gasLimit = OneStepFrom8M,
+          gasLimit = GasAmount(OneStepFrom8M),
           extraFields = HefEmpty
         )
         val result = validate(noFeeChild, parent)
@@ -161,8 +162,8 @@ class OlympiaBlockHeaderValidationSpec
         val secondBlock = Fixtures.Blocks.ValidBlock.header.copy(
           parentHash = firstBlock.hash,
           number = olympiaBlock + 1,
-          gasLimit = TwoStepsFrom8M,
-          gasUsed = 0,
+          gasLimit = GasAmount(TwoStepsFrom8M),
+          gasUsed = GasAmount.Zero,
           unixTimestamp = 2000L,
           difficulty = Difficulty.Zero,
           extraData = baseExtraData,
@@ -176,8 +177,8 @@ class OlympiaBlockHeaderValidationSpec
         val missingFee = Fixtures.Blocks.ValidBlock.header.copy(
           parentHash = firstBlock.hash,
           number = olympiaBlock + 1,
-          gasLimit = TwoStepsFrom8M,
-          gasUsed = 0,
+          gasLimit = GasAmount(TwoStepsFrom8M),
+          gasUsed = GasAmount.Zero,
           unixTimestamp = 2000L,
           difficulty = Difficulty.Zero,
           extraData = baseExtraData,

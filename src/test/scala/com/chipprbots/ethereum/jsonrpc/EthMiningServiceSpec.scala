@@ -35,6 +35,7 @@ import com.chipprbots.ethereum.consensus.pow.difficulty.EthashDifficultyCalculat
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
@@ -541,8 +542,8 @@ class EthMiningServiceSpec
         logsBloom = BloomFilter(ByteString.empty),
         difficulty = Difficulty(difficulty),
         number = 0,
-        gasLimit = 16733003,
-        gasUsed = 0,
+        gasLimit = GasAmount(16733003),
+        gasUsed = GasAmount.Zero,
         unixTimestamp = 1494604900,
         extraData = ByteString.empty,
         mixHash = BlockHash(ByteString.empty),
@@ -565,8 +566,8 @@ class EthMiningServiceSpec
         logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
         difficulty = Difficulty(difficulty),
         number = 1,
-        gasLimit = 16733003,
-        gasUsed = 0,
+        gasLimit = GasAmount(16733003),
+        gasUsed = GasAmount.Zero,
         unixTimestamp = 1494604913,
         extraData = ByteString(Hex.decode("6d696e6564207769746820657463207363616c61")),
         mixHash = BlockHash(ByteString.empty),

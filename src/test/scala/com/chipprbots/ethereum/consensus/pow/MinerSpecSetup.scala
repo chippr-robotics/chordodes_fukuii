@@ -100,7 +100,7 @@ trait MinerSpecSetup
     tx = LegacyTransaction(
       nonce = BigInt("438553"),
       gasPrice = BigInt("20000000000"),
-      gasLimit = BigInt("50000"),
+      gasLimit = GasAmount(BigInt("50000")),
       receivingAddress = Address(ByteString(Hex.decode("3435be928d783b7c48a2c3109cba0d97d680747a"))),
       value = BigInt("108516826677274384"),
       payload = ByteString.empty
@@ -181,8 +181,8 @@ trait MinerSpecSetup
         logsBloom = parentHeader.logsBloom,
         difficulty = difficultyCalc.calculateDifficulty(1, blockForMiningTimestamp, parentHeader),
         number = parentHeader.number + 1,
-        gasLimit = calculateGasLimit(UInt256(parentHeader.gasLimit)),
-        gasUsed = BigInt(0),
+        gasLimit = GasAmount(calculateGasLimit(UInt256(parentHeader.gasLimit.value)).toBigInt),
+        gasUsed = GasAmount.Zero,
         unixTimestamp = blockForMiningTimestamp,
         extraData = miningConfig.headerExtraData,
         mixHash = BlockHash(ByteString.empty),

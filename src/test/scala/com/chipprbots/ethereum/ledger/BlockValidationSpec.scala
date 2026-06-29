@@ -66,7 +66,7 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory:
     def mkTransaction(nonce: String, address: String, value: String): LegacyTransaction = LegacyTransaction(
       nonce = BigInt(nonce),
       gasPrice = BigInt("20000000000"),
-      gasLimit = BigInt("50000"),
+      gasLimit = GasAmount(BigInt("50000")),
       receivingAddress = Address(hash2ByteString(address)),
       value = BigInt(value),
       payload = ByteString.empty
@@ -93,8 +93,8 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory:
         logsBloom = bloomFilter,
         difficulty = Difficulty(BigInt("14005986920576")),
         number = 3125369,
-        gasLimit = 4699996,
-        gasUsed = 84000,
+        gasLimit = GasAmount(4699996),
+        gasUsed = GasAmount(84000),
         unixTimestamp = 1486131165,
         extraData = hash2ByteString("d5830104098650617269747986312e31332e30826c69"),
         mixHash = BlockHash(hash2ByteString("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a")),
@@ -142,4 +142,4 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory:
     )
 
     val stateRootHash: ByteString = block.header.stateRoot.value
-    val gasUsed: BigInt = block.header.gasUsed
+    val gasUsed: BigInt = block.header.gasUsed.value

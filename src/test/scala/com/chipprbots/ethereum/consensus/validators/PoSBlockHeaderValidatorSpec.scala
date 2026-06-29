@@ -19,6 +19,7 @@ import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -65,7 +66,7 @@ class PoSBlockHeaderValidatorSpec
       difficulty = Difficulty.Zero,
       nonce = EmptyNonce,
       ommersHash = BlockHash(BlockHeader.EmptyOmmers),
-      gasUsed = 0,
+      gasUsed = GasAmount.Zero,
       unixTimestamp = HeaderTs,
       extraData = baseExtraData,
       extraFields = HefPostCancun(

@@ -8,6 +8,7 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -40,8 +41,8 @@ class OlympiaBaseFeeSpec
   ): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
       number = number,
-      gasLimit = gasLimit,
-      gasUsed = gasUsed,
+      gasLimit = GasAmount(gasLimit),
+      gasUsed = GasAmount(gasUsed),
       extraFields = extraFields
     )
 

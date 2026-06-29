@@ -12,6 +12,7 @@ import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.TrieRoot
@@ -75,8 +76,8 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(1000),
     number = 100,
-    gasLimit = 1024000, // 1024 * 1000 — easy math for bound calculations
-    gasUsed = 0,
+    gasLimit = GasAmount(1024000), // 1024 * 1000 — easy math for bound calculations
+    gasUsed = GasAmount.Zero,
     unixTimestamp = 1000000,
     extraData = ByteString.empty,
     mixHash = BlockHash(ByteString(Hex.decode("00" * 32))),
@@ -91,7 +92,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
     parentHeader.copy(
       parentHash = parentHeader.hash,
       number = parentHeader.number + 1,
-      gasLimit = gasLimit,
+      gasLimit = GasAmount(gasLimit),
       unixTimestamp = parentHeader.unixTimestamp + 13,
       difficulty = parentHeader.difficulty
     )
@@ -145,11 +146,11 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
 
   it should "reject gas limit below MinGasLimit (5000)" taggedAs (UnitTest, ConsensusTest) in {
     // Even if within parent bounds, must be >= MinGasLimit
-    val smallParent = parentHeader.copy(gasLimit = 5100, number = 100)
+    val smallParent = parentHeader.copy(gasLimit = GasAmount(5100), number = 100)
     val child = smallParent.copy(
       parentHash = smallParent.hash,
       number = 101,
-      gasLimit = 4999,
+      gasLimit = GasAmount(4999),
       unixTimestamp = smallParent.unixTimestamp + 13,
       difficulty = smallParent.difficulty
     )
@@ -159,11 +160,11 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
   it should "accept gas limit at exactly MinGasLimit (5000)" taggedAs (UnitTest, ConsensusTest) in {
     // Parent at 5001, bound = 5001/1024 = 4, valid range = [4998, 5004]
     // gasLimit 5000 is within range AND >= MinGasLimit
-    val smallParent = parentHeader.copy(gasLimit = 5001, number = 100)
+    val smallParent = parentHeader.copy(gasLimit = GasAmount(5001), number = 100)
     val child = smallParent.copy(
       parentHash = smallParent.hash,
       number = 101,
-      gasLimit = 5000,
+      gasLimit = GasAmount(5000),
       unixTimestamp = smallParent.unixTimestamp + 13,
       difficulty = smallParent.difficulty
     )
@@ -177,11 +178,11 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
     ConsensusTest
   ) in {
     // ETC mainnet targets 8M gas limit. Bound = 8000000/1024 = 7812
-    val etcParent = parentHeader.copy(gasLimit = 8000000, number = 13000000)
+    val etcParent = parentHeader.copy(gasLimit = GasAmount(8000000), number = 13000000)
     val child = etcParent.copy(
       parentHash = etcParent.hash,
       number = 13000001,
-      gasLimit = 8007000, // within +7812 bound
+      gasLimit = GasAmount(8007000), // within +7812 bound
       unixTimestamp = etcParent.unixTimestamp + 13,
       difficulty = etcParent.difficulty
     )
@@ -191,11 +192,11 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
   // ===== MaxGasLimit (EIP-106) =====
 
   it should "reject gas limit above Long.MaxValue when EIP-106 is active" taggedAs (UnitTest, ConsensusTest) in {
-    val largeParent = parentHeader.copy(gasLimit = Long.MaxValue, number = 100)
+    val largeParent = parentHeader.copy(gasLimit = GasAmount(Long.MaxValue), number = 100)
     val child = largeParent.copy(
       parentHash = largeParent.hash,
       number = 101,
-      gasLimit = BigInt(Long.MaxValue) + 1,
+      gasLimit = GasAmount(BigInt(Long.MaxValue) + 1),
       unixTimestamp = largeParent.unixTimestamp + 13,
       difficulty = largeParent.difficulty
     )
@@ -223,7 +224,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
   )
 
   // Parent at 8M for Spiral-epoch tests — bound = 8M/1024 = 7812.
-  private val spiralParent = parentHeader.copy(gasLimit = 8_000_000, number = 100)
+  private val spiralParent = parentHeader.copy(gasLimit = GasAmount(8_000_000), number = 100)
 
   private def validateEtc(child: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] =
     implicit val cfg: BlockchainConfig = etcBlockchainConfig
@@ -237,7 +238,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
     val child = spiralParent.copy(
       parentHash = spiralParent.hash,
       number = 101,
-      gasLimit = 7_999_999,
+      gasLimit = GasAmount(7_999_999),
       unixTimestamp = spiralParent.unixTimestamp + 13,
       difficulty = spiralParent.difficulty
     )
@@ -252,7 +253,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
     val child = spiralParent.copy(
       parentHash = spiralParent.hash,
       number = 101,
-      gasLimit = 8_000_000,
+      gasLimit = GasAmount(8_000_000),
       unixTimestamp = spiralParent.unixTimestamp + 13,
       difficulty = spiralParent.difficulty
     )
@@ -263,9 +264,9 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
   // Block 600 > olympiaBlockNumber(500): extraFields = HefPostOlympia required.
   // gasUsed = gasLimit/2 (= gas target) so EIP-1559 baseFee stays constant across parent→child.
   private val olympiaParent = parentHeader.copy(
-    gasLimit = 60_000_000,
+    gasLimit = GasAmount(60_000_000),
     number = 600,
-    gasUsed = 30_000_000,
+    gasUsed = GasAmount(30_000_000),
     extraFields = HefPostOlympia(BigInt(1_000_000_000))
   )
 
@@ -281,7 +282,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
     val child = olympiaParent.copy(
       parentHash = olympiaParent.hash,
       number = 601,
-      gasLimit = 59_999_999,
+      gasLimit = GasAmount(59_999_999),
       unixTimestamp = olympiaParent.unixTimestamp + 13,
       difficulty = olympiaParent.difficulty
     )
@@ -296,7 +297,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
     val child = olympiaParent.copy(
       parentHash = olympiaParent.hash,
       number = 601,
-      gasLimit = 60_000_000,
+      gasLimit = GasAmount(60_000_000),
       unixTimestamp = olympiaParent.unixTimestamp + 13,
       difficulty = olympiaParent.difficulty
     )

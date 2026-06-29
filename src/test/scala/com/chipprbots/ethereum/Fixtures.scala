@@ -42,8 +42,8 @@ object Fixtures:
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
         difficulty = Difficulty(BigInt("14005986920576")),
         number = 3125369,
-        gasLimit = 4699996,
-        gasUsed = 84000,
+        gasLimit = GasAmount(4699996),
+        gasUsed = GasAmount(84000),
         unixTimestamp = 1486131165,
         extraData = ByteString(Hex.decode("d5830104098650617269747986312e31332e30826c69")),
         mixHash = BlockHash(ByteString(Hex.decode("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a"))),
@@ -56,7 +56,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("438550"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("50000"),
+              gasLimit = GasAmount(BigInt("50000")),
               receivingAddress = Address(ByteString(Hex.decode("ee4439beb5c71513b080bbf9393441697a29f478"))),
               value = BigInt("1265230129703017984"),
               payload = ByteString.empty
@@ -70,7 +70,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("438551"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("50000"),
+              gasLimit = GasAmount(BigInt("50000")),
               receivingAddress = Address(ByteString(Hex.decode("c68e9954c7422f479e344faace70c692217ea05b"))),
               value = BigInt("656010196207162880"),
               payload = ByteString.empty
@@ -84,7 +84,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("438552"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("50000"),
+              gasLimit = GasAmount(BigInt("50000")),
               receivingAddress = Address(ByteString(Hex.decode("19c5a95eeae4446c5d24363eab4355157e4f828b"))),
               value = BigInt("3725976610361427456"),
               payload = ByteString.empty
@@ -98,7 +98,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("438553"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("50000"),
+              gasLimit = GasAmount(BigInt("50000")),
               receivingAddress = Address(ByteString(Hex.decode("3435be928d783b7c48a2c3109cba0d97d680747a"))),
               value = BigInt("108516826677274384"),
               payload = ByteString.empty
@@ -137,8 +137,8 @@ object Fixtures:
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
         difficulty = Difficulty(BigInt("17179869184")),
         number = 0,
-        gasLimit = 5000,
-        gasUsed = 0,
+        gasLimit = GasAmount(5000),
+        gasUsed = GasAmount(0),
         unixTimestamp = 0,
         extraData = ByteString(Hex.decode("11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa")),
         mixHash = BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
@@ -169,8 +169,8 @@ object Fixtures:
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
         difficulty = Difficulty(BigInt("62413376722602")),
         number = 1920000,
-        gasLimit = 4712384,
-        gasUsed = 84000,
+        gasLimit = GasAmount(4712384),
+        gasUsed = GasAmount(84000),
         unixTimestamp = 1469020839,
         extraData = ByteString(Hex.decode("e4b883e5bda9e7a59ee4bb99e9b1bc")),
         mixHash = BlockHash(ByteString(Hex.decode("c52daa7054babe515b17ee98540c0889cf5e1595c5dd77496997ca84a68c8da1"))),
@@ -182,7 +182,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("1"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("21000"),
+              gasLimit = GasAmount(BigInt("21000")),
               receivingAddress = Address(ByteString(Hex.decode("53d284357ec70ce289d6d64134dfac8e511c8a3d"))),
               value = BigInt("10046680000000000000"),
               payload = ByteString.empty
@@ -196,7 +196,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("1"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("21000"),
+              gasLimit = GasAmount(BigInt("21000")),
               receivingAddress = Address(ByteString(Hex.decode("53d284357ec70ce289d6d64134dfac8e511c8a3d"))),
               value = BigInt("20093780000000000000"),
               payload = ByteString.empty
@@ -210,7 +210,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("1"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("21000"),
+              gasLimit = GasAmount(BigInt("21000")),
               receivingAddress = Address(ByteString(Hex.decode("53d284357ec70ce289d6d64134dfac8e511c8a3d"))),
               value = BigInt("1502561962583879700"),
               payload = ByteString.empty
@@ -224,7 +224,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("1"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("21000"),
+              gasLimit = GasAmount(BigInt("21000")),
               receivingAddress = Address(ByteString(Hex.decode("53d284357ec70ce289d6d64134dfac8e511c8a3d"))),
               value = BigInt("1022338440000000000"),
               payload = ByteString.empty
@@ -263,8 +263,8 @@ object Fixtures:
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
         difficulty = Difficulty(BigInt("62413376722602")),
         number = 1920000,
-        gasLimit = 4712384,
-        gasUsed = 84000,
+        gasLimit = GasAmount(4712384),
+        gasUsed = GasAmount(84000),
         unixTimestamp = 1469020840,
         extraData = ByteString(Hex.decode("64616f2d686172642d666f726b")),
         mixHash = BlockHash(ByteString(Hex.decode("5b5acbf4bf305f948bd7be176047b20623e1417f75597341a059729165b92397"))),
@@ -276,7 +276,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("1"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("21000"),
+              gasLimit = GasAmount(BigInt("21000")),
               receivingAddress = Address(ByteString(Hex.decode("53d284357ec70ce289d6d64134dfac8e511c8a3d"))),
               value = BigInt("1502561962583879700"),
               payload = ByteString.empty
@@ -290,7 +290,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("1"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("21000"),
+              gasLimit = GasAmount(BigInt("21000")),
               receivingAddress = Address(ByteString(Hex.decode("53d284357ec70ce289d6d64134dfac8e511c8a3d"))),
               value = BigInt("10046680000000000000"),
               payload = ByteString.empty
@@ -304,7 +304,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("1"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("21000"),
+              gasLimit = GasAmount(BigInt("21000")),
               receivingAddress = Address(ByteString(Hex.decode("53d284357ec70ce289d6d64134dfac8e511c8a3d"))),
               value = BigInt("20093780000000000000"),
               payload = ByteString.empty
@@ -318,7 +318,7 @@ object Fixtures:
             tx = LegacyTransaction(
               nonce = BigInt("1"),
               gasPrice = BigInt("20000000000"),
-              gasLimit = BigInt("21000"),
+              gasLimit = GasAmount(BigInt("21000")),
               receivingAddress = Address(ByteString(Hex.decode("53d284357ec70ce289d6d64134dfac8e511c8a3d"))),
               value = BigInt("1022338440000000000"),
               payload = ByteString.empty
@@ -356,8 +356,8 @@ object Fixtures:
         logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
         difficulty = Difficulty(BigInt("62382916183238")),
         number = 1919999,
-        gasLimit = 4707788,
-        gasUsed = 0,
+        gasLimit = GasAmount(4707788),
+        gasUsed = GasAmount(0),
         unixTimestamp = 1469020838,
         extraData = ByteString(Hex.decode("4477617266506f6f6c")),
         mixHash = BlockHash(ByteString(Hex.decode("7f9ac1ddeafff0f926ed9887b8cf7d50c3f919d902e618b957022c46c8b404a6"))),

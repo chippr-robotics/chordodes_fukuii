@@ -8,6 +8,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -29,7 +30,7 @@ class ImportMessagesSpec extends AnyWordSpec with Matchers:
 
     "produce InfoLevel with txs, gas, uncles, number, and peer fields" taggedAs (UnitTest, StateTest) in {
       val block =
-        Block(BlockHelpers.defaultHeader.copy(number = BigInt(42), gasUsed = 1_000_000), BlockBody(Nil, Nil))
+        Block(BlockHelpers.defaultHeader.copy(number = BigInt(42), gasUsed = GasAmount(1_000_000)), BlockBody(Nil, Nil))
       val msgs = new NewBlockImportMessages(block, testPeer)
 
       val (level, msg) = msgs.importedToTheTop()

@@ -11,6 +11,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -187,8 +188,8 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory:
     val defaultHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
       difficulty = Difficulty(1000000),
       number = 1,
-      gasLimit = 1000000,
-      gasUsed = 0,
+      gasLimit = GasAmount(1000000),
+      gasUsed = GasAmount.Zero,
       unixTimestamp = 0
     )
 

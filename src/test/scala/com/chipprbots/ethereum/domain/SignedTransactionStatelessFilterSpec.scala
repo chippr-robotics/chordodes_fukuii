@@ -69,7 +69,7 @@ class SignedTransactionStatelessFilterSpec extends AnyFlatSpec with Matchers:
     tx = LegacyTransaction(
       nonce = 0,
       gasPrice = BigInt("1000000000"),
-      gasLimit = gasLimit,
+      gasLimit = GasAmount(gasLimit),
       receivingAddress = None, // contract creation
       value = BigInt(0),
       payload = initcode
@@ -109,7 +109,7 @@ class SignedTransactionStatelessFilterSpec extends AnyFlatSpec with Matchers:
       tx = LegacyTransaction(
         nonce = 0,
         gasPrice = BigInt("1000000000"),
-        gasLimit = callGasLimit,
+        gasLimit = GasAmount(callGasLimit),
         receivingAddress = Some(Address(0xcafe)),
         value = BigInt(0),
         payload = initcode
@@ -131,7 +131,7 @@ class SignedTransactionStatelessFilterSpec extends AnyFlatSpec with Matchers:
       tx = LegacyTransaction(
         nonce = n,
         gasPrice = BigInt("1000000000"),
-        gasLimit = BigInt(21000),
+        gasLimit = GasAmount(21000),
         receivingAddress = Some(Address(0xcafe)),
         value = BigInt(0),
         payload = ByteString.empty
