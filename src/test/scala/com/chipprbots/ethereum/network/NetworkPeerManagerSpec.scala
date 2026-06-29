@@ -20,6 +20,7 @@ import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.PeerActor.DisconnectPeer
@@ -67,10 +68,10 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
 
     // given
     val newBlockWeight: ChainWeight = ChainWeight.totalDifficultyOnly(300)
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = peer1Info.maxBlockNumber + 4)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peer1Info.maxBlockNumber + 4))
     val firstBlock: NewBlock = NewBlock(Block(firstHeader, BlockBody(Nil, Nil)), newBlockWeight.totalDifficulty.value)
 
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = peer2Info.maxBlockNumber + 2)
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peer2Info.maxBlockNumber + 2))
     val secondBlock: NewBlock = NewBlock(Block(secondHeader, BlockBody(Nil, Nil)), newBlockWeight.totalDifficulty.value)
 
     // when
@@ -89,8 +90,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = peer1Info.maxBlockNumber + 4)
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = peer1Info.maxBlockNumber + 2)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peer1Info.maxBlockNumber + 4))
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peer1Info.maxBlockNumber + 2))
 
     // when
     peersInfoHolder ! PeerEventCmd(
@@ -264,7 +265,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
     requestSender.expectMsg(HandshakedPeers(Map(freshPeer -> freshPeerInfo.copy(maxBlockNumber = 0))))
 
     val newMaxBlock: BigInt = freshPeerInfo.maxBlockNumber + 1
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = newMaxBlock)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(newMaxBlock))
 
     // Fresh peer received best block
     peersInfoHolder ! PeerEventCmd(MessageFromPeer(BlockHeaders(BigInt(0), Seq(firstHeader)), freshPeer.id))
@@ -406,7 +407,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
     // Probe response arrives via the existing BlockHeadersCode subscription. The
     // header carries the bestHash from STATUS and a real block number; updateMaxBlock
     // should pick up the number and write it into PeerInfo.maxBlockNumber.
-    val probeReply: BlockHeader = baseBlockHeader.copy(number = 24463116)
+    val probeReply: BlockHeader = baseBlockHeader.copy(number = BlockNumber(24463116))
     peersInfoHolder ! PeerEventCmd(MessageFromPeer(BlockHeaders(BigInt(0), Seq(probeReply)), peer1.id))
 
     peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
@@ -508,7 +509,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
       remoteStatus = peerStatus,
       chainWeight = peerStatus.chainWeight,
       forkAccepted = false,
-      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number,
+      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number.value,
       bestBlockHash = peerStatus.bestHash
     )
 
@@ -524,7 +525,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
       )
       basePeerInfo.copy(
         remoteStatus = genesisStatus,
-        maxBlockNumber = Fixtures.Blocks.Genesis.header.number,
+        maxBlockNumber = Fixtures.Blocks.Genesis.header.number.value,
         bestBlockHash = genesisHash
       )
 
@@ -774,7 +775,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
       MessageFromPeer(
         BlockRangeUpdate(
           earliestBlock = BigInt(0),
-          latestBlock = advancingBlock.number,
+          latestBlock = advancingBlock.number.value,
           latestBlockHash = advancingBlock.hash.value
         ),
         peer1.id

@@ -96,7 +96,7 @@ class EthServiceSpec
 
   it should "execute call and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val worldStateProxy: InMemoryWorldStateProxy = InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
@@ -125,7 +125,7 @@ class EthServiceSpec
 
   it should "execute estimateGas and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     // `estimateGas` now runs a revert-check simulateTransaction FIRST, then a
     // binarySearchGasEstimation if the tx doesn't revert. Stub both halves.

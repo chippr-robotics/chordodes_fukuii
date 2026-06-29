@@ -87,7 +87,7 @@ class GasPriceOracleSpec
       baseFeeOpt: Option[BigInt]
   ): BlockHeader =
     fixtureHeader.copy(
-      number = number,
+      number = BlockNumber(number),
       beneficiary = coinbase,
       extraFields = baseFeeOpt.fold[HeaderExtraFields](HefEmpty)(HefPostOlympia.apply)
     )

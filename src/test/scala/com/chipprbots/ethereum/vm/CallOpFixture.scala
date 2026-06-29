@@ -8,6 +8,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.vm.MockWorldState.*
@@ -161,7 +162,7 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState):
     .saveAccount(extAddr, accountWithCode(returnSingleByteProgram.code))
     .saveCode(extAddr, returnSingleByteProgram.code)
 
-  val fakeHeader: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = 0, unixTimestamp = 0)
+  val fakeHeader: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = BlockNumber(0), unixTimestamp = 0)
 
   lazy val context: PC = ProgramContext(
     callerAddr = callerAddr,

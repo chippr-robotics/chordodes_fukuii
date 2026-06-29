@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
@@ -36,7 +37,7 @@ object PoWBlockHeaderValidatorSpec:
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("989772")),
-    number = 20,
+    number = BlockNumber(20),
     gasLimit = GasAmount(131620495),
     gasUsed = GasAmount.Zero,
     unixTimestamp = 1486752441,

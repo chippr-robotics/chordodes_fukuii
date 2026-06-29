@@ -132,7 +132,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     ConsensusTest
   ) in {
     implicit val cfg: BlockchainConfig = etcConfig
-    val etcHeader = baseHeader.copy(number = BigInt(21_000_000), unixTimestamp = ShanghaiTs + 1)
+    val etcHeader = baseHeader.copy(number = BlockNumber(BigInt(21_000_000)), unixTimestamp = ShanghaiTs + 1)
     validate(signedInitcodeTx, etcHeader) match
       case Left(_: TransactionInitCodeSizeError) => fail("EIP-3860 must not be active on ETC")
       case _                                     => succeed
@@ -188,7 +188,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     // etcMystiqueConfig has Mystique fee schedule active at block 0 but no shanghaiTimestamp,
     // so eip3860Enabled stays false. Intrinsic = 21000+32000+200*16+0 = 56200 ≤ 56213 → accepted.
     implicit val cfg: BlockchainConfig = etcMystiqueConfig
-    val etcHeader = baseHeader.copy(number = BigInt(21_000_000), unixTimestamp = ShanghaiTs + 1)
+    val etcHeader = baseHeader.copy(number = BlockNumber(BigInt(21_000_000)), unixTimestamp = ShanghaiTs + 1)
     validate(signedWordCostTx, etcHeader) match
       case Left(_: TransactionNotEnoughGasForIntrinsicError) =>
         fail("EIP-3860 word cost must not apply on ETC pre-Olympia")

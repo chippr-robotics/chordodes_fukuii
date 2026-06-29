@@ -25,6 +25,7 @@ import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -73,7 +74,7 @@ class SpiralToOlympiaGasTransitionSpec
 
   private def spiralHeader(number: BigInt, gasLimit: BigInt, timestamp: Long): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      number = number,
+      number = BlockNumber(number),
       gasLimit = GasAmount(gasLimit),
       gasUsed = GasAmount.Zero,
       unixTimestamp = timestamp,
@@ -91,7 +92,7 @@ class SpiralToOlympiaGasTransitionSpec
   ): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
       parentHash = BlockHash(parentHash),
-      number = number,
+      number = BlockNumber(number),
       gasLimit = GasAmount(gasLimit),
       gasUsed = GasAmount.Zero,
       unixTimestamp = timestamp,

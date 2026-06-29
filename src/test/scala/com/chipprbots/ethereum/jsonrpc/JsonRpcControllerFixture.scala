@@ -37,6 +37,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
@@ -272,7 +273,7 @@ class JsonRpcControllerFixture(implicit
   val blockHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     logsBloom = BloomFilter.Empty,
     difficulty = Difficulty(10),
-    number = 2,
+    number = BlockNumber(2),
     gasLimit = GasAmount.Zero,
     gasUsed = GasAmount.Zero,
     unixTimestamp = 0
@@ -284,7 +285,7 @@ class JsonRpcControllerFixture(implicit
       Fixtures.Blocks.Block3125369.body
     )
 
-  val parentBlock: Block = Block(blockHeader.copy(number = 1), BlockBody.empty)
+  val parentBlock: Block = Block(blockHeader.copy(number = BlockNumber(1)), BlockBody.empty)
 
   val r: ByteString = ByteString(Hex.decode("a3f20717a250c2b0b729b7e5becbff67fdaef7e0699da4de7ca5895b02a170a1"))
   val s: ByteString = ByteString(Hex.decode("2d887fd3b17bfdce3481f10bea41f45ba9f709d39ce8325427b57afcfc994cee"))

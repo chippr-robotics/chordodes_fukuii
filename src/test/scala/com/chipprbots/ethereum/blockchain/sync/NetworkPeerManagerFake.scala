@@ -153,4 +153,4 @@ object NetworkPeerManagerFake:
       RLPList(List.fill(count)(RLPList())*)
 
     def blockMatchesStart(block: Block, startingBlock: Either[BigInt, ByteString]): Boolean =
-      startingBlock.fold(nr => block.number == nr, hash => block.hash.value == hash)
+      startingBlock.fold(nr => block.number.value == nr, hash => block.hash.value == hash)

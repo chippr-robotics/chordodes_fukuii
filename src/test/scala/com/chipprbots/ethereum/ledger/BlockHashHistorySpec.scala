@@ -70,7 +70,7 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers:
 
     def makeBlock(number: BigInt, parentHash: ByteString, isOlympia: Boolean = true): Block = Block(
       header = Fixtures.Blocks.ValidBlock.header.copy(
-        number = number,
+        number = BlockNumber(number),
         parentHash = BlockHash(parentHash),
         gasLimit = GasAmount(8_000_000),
         gasUsed = GasAmount.Zero,

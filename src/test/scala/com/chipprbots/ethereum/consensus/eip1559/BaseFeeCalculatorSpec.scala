@@ -7,6 +7,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
@@ -44,7 +45,7 @@ class BaseFeeCalculatorSpec
       case Some(fee) => HefPostOlympia(fee)
       case None      => HefEmpty
     Fixtures.Blocks.ValidBlock.header.copy(
-      number = number,
+      number = BlockNumber(number),
       gasLimit = GasAmount(gasLimit),
       gasUsed = GasAmount(gasUsed),
       extraFields = extraFields

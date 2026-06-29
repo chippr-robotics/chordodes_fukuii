@@ -19,6 +19,7 @@ import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.mpt.ExtensionNode
@@ -114,14 +115,14 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
 
   it should "return block headers by block number" taggedAs (UnitTest) in new TestSetup:
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = 4)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(3))
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(4))
 
     blockchainWriter
       .storeBlockHeader(firstHeader)
       .and(blockchainWriter.storeBlockHeader(secondHeader))
-      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = 5)))
-      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = 6)))
+      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = BlockNumber(5))))
+      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = BlockNumber(6))))
       .commit()
 
     // when
@@ -138,8 +139,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
     UnitTest
   ) in new TestSetup:
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = 4)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(3))
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(4))
 
     blockchainWriter
       .storeBlockHeader(firstHeader)
@@ -158,13 +159,13 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
 
   it should "return block headers by block number in reverse order" taggedAs (UnitTest) in new TestSetup:
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = 2)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(3))
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(2))
 
     blockchainWriter
       .storeBlockHeader(firstHeader)
       .and(blockchainWriter.storeBlockHeader(secondHeader))
-      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = 1)))
+      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = BlockNumber(1))))
       .commit()
 
     // when
@@ -179,14 +180,14 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
 
   it should "return block headers by block hash" taggedAs (UnitTest) in new TestSetup:
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = 4)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(3))
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(4))
 
     blockchainWriter
       .storeBlockHeader(firstHeader)
       .and(blockchainWriter.storeBlockHeader(secondHeader))
-      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = 5)))
-      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = 6)))
+      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = BlockNumber(5))))
+      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = BlockNumber(6))))
       .commit()
 
     // when
@@ -201,15 +202,15 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
 
   it should "return block headers by block hash when skipping headers" taggedAs (UnitTest) in new TestSetup:
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = 5)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(3))
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(5))
 
     blockchainWriter
       .storeBlockHeader(firstHeader)
-      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = 4)))
+      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = BlockNumber(4))))
       .and(blockchainWriter.storeBlockHeader(secondHeader))
-      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = 6)))
-      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = 7)))
+      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = BlockNumber(6))))
+      .and(blockchainWriter.storeBlockHeader(baseBlockHeader.copy(number = BlockNumber(7))))
       .commit()
 
     // when
@@ -229,8 +230,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
     UnitTest
   ) in new TestSetup:
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = 1)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(3))
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(1))
 
     blockchainWriter
       .storeBlockHeader(firstHeader)
@@ -251,8 +252,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
     UnitTest
   ) in new TestSetup:
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = 1)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(3))
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(1))
 
     blockchainWriter
       .storeBlockHeader(firstHeader)
@@ -273,8 +274,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
     UnitTest
   ) in new TestSetup:
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = 4)
-    val secondHeader: BlockHeader = baseBlockHeader.copy(number = 2)
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(4))
+    val secondHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(2))
 
     blockchainWriter
       .storeBlockHeader(firstHeader)

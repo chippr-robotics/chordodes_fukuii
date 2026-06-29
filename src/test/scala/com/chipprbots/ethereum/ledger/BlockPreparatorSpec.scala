@@ -104,7 +104,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
           Address(originKeyPair)
         )
         val header: BlockHeader =
-          defaultBlockHeader.copy(number = blockchainConfig.forkBlockNumbers.byzantiumBlockNumber - 1)
+          defaultBlockHeader.copy(number = BlockNumber(blockchainConfig.forkBlockNumbers.byzantiumBlockNumber - 1))
 
         val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
           mining.blockPreparator.executeTransactions(Seq(stx.tx), initialWorld, header)
@@ -126,7 +126,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         val header: BlockHeader =
           defaultBlockHeader.copy(
             beneficiary = minerAddress.bytes,
-            number = blockchainConfig.forkBlockNumbers.byzantiumBlockNumber
+            number = BlockNumber(blockchainConfig.forkBlockNumbers.byzantiumBlockNumber)
           )
 
         val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
@@ -157,7 +157,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         val header: BlockHeader =
           defaultBlockHeader.copy(
             beneficiary = minerAddress.bytes,
-            number = blockchainConfig.forkBlockNumbers.byzantiumBlockNumber
+            number = BlockNumber(blockchainConfig.forkBlockNumbers.byzantiumBlockNumber)
           )
 
         val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
@@ -362,7 +362,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     )
     val stx: SignedTransaction = SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId))
     val header: BlockHeader =
-      defaultBlockHeader.copy(number = blockchainConfig.forkBlockNumbers.byzantiumBlockNumber - 1)
+      defaultBlockHeader.copy(number = BlockNumber(blockchainConfig.forkBlockNumbers.byzantiumBlockNumber - 1))
 
     val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
       mining.blockPreparator.executeTransactions(Seq(stx), initialWorld, header)
@@ -384,7 +384,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     val header: BlockHeader =
       defaultBlockHeader.copy(
         beneficiary = minerAddress.bytes,
-        number = blockchainConfig.forkBlockNumbers.byzantiumBlockNumber
+        number = BlockNumber(blockchainConfig.forkBlockNumbers.byzantiumBlockNumber)
       )
 
     val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
@@ -412,7 +412,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     val header: BlockHeader =
       defaultBlockHeader.copy(
         beneficiary = minerAddress.bytes,
-        number = blockchainConfig.forkBlockNumbers.byzantiumBlockNumber
+        number = BlockNumber(blockchainConfig.forkBlockNumbers.byzantiumBlockNumber)
       )
 
     val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =

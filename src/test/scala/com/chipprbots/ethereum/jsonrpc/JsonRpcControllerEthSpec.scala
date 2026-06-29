@@ -156,11 +156,11 @@ class JsonRpcControllerEthSpec
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(blockToRequest.header.hash, blockWeight))
       .commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getBlockByNumber",
-      List(JString(s"0x${Hex.toHexString(blockToRequest.header.number.toByteArray)}"), JBool(false))
+      List(JString(s"0x${Hex.toHexString(blockToRequest.header.number.value.toByteArray)}"), JBool(false))
     )
     val response: JsonRpcResponse = jsonRpcController.handleRequest(request).unsafeRunSync()
 
@@ -180,11 +180,11 @@ class JsonRpcControllerEthSpec
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(blockToRequest.header.hash, blockWeight))
       .commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getBlockByNumber",
-      List(JString(s"0x${Hex.toHexString(blockToRequest.header.number.toByteArray)}"), JBool(false))
+      List(JString(s"0x${Hex.toHexString(blockToRequest.header.number.value.toByteArray)}"), JBool(false))
     )
     val response: JsonRpcResponse = jsonRpcController.handleRequest(request).unsafeRunSync()
 
@@ -228,12 +228,12 @@ class JsonRpcControllerEthSpec
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, BlockBody(Nil, Seq(uncle)))
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getUncleByBlockNumberAndIndex",
       List(
-        JString(s"0x${Hex.toHexString(blockToRequest.header.number.toByteArray)}"),
+        JString(s"0x${Hex.toHexString(blockToRequest.header.number.value.toByteArray)}"),
         JString(s"0x${Hex.toHexString(BigInt(0).toByteArray)}")
       )
     )
@@ -370,9 +370,9 @@ class JsonRpcControllerEthSpec
 
   it should "eth_gasPrice" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture:
     private val block: Block =
-      Block(Fixtures.Blocks.Block3125369.header.copy(number = 42), Fixtures.Blocks.Block3125369.body)
+      Block(Fixtures.Blocks.Block3125369.header.copy(number = BlockNumber(42)), Fixtures.Blocks.Block3125369.body)
     blockchainWriter.storeBlock(block).commit()
-    blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
+    blockchainWriter.saveBestKnownBlocks(block.hash, block.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest("eth_gasPrice")
 

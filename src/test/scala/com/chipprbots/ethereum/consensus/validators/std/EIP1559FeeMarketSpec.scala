@@ -44,7 +44,7 @@ class EIP1559FeeMarketSpec
   private val priorityFee = BigInt("2000000000") // 2 gwei
 
   private val postMystiqueHeader = Fixtures.Blocks.ValidBlock.header.copy(
-    number = BigInt(20_000_000),
+    number = BlockNumber(BigInt(20_000_000)),
     gasLimit = GasAmount(BigInt(8_000_000)),
     gasUsed = GasAmount.Zero,
     extraFields = HefPostOlympia(baseFee)

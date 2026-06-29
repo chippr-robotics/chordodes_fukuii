@@ -68,7 +68,8 @@ class FilterManagerSpec
     val createResp: NewFilterResponse = createProbe.expectMessageType[NewFilterResponse]
 
     val logs1: Seq[TxLogEntry] = Seq(TxLogEntry(Address("0x4567"), Nil, ByteString()))
-    val bh1: BlockHeader = blockHeader.copy(number = 1, logsBloom = BloomFilter(LedgerBloomFilter.create(logs1)))
+    val bh1: BlockHeader =
+      blockHeader.copy(number = BlockNumber(1), logsBloom = BloomFilter(LedgerBloomFilter.create(logs1)))
 
     val logs2: Seq[TxLogEntry] = Seq(
       TxLogEntry(
@@ -77,14 +78,16 @@ class FilterManagerSpec
         ByteString(Hex.decode("99aaff"))
       )
     )
-    val bh2: BlockHeader = blockHeader.copy(number = 2, logsBloom = BloomFilter(LedgerBloomFilter.create(logs2)))
+    val bh2: BlockHeader =
+      blockHeader.copy(number = BlockNumber(2), logsBloom = BloomFilter(LedgerBloomFilter.create(logs2)))
 
-    val bh3: BlockHeader = blockHeader.copy(number = 3, logsBloom = BloomFilter(LedgerBloomFilter.create(Nil)))
+    val bh3: BlockHeader =
+      blockHeader.copy(number = BlockNumber(3), logsBloom = BloomFilter(LedgerBloomFilter.create(Nil)))
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3).twice()
-    blockchainReader.getBlockHeaderByNumber.expects(bh1.number).returning(Some(bh1))
-    blockchainReader.getBlockHeaderByNumber.expects(bh2.number).returning(Some(bh2))
-    blockchainReader.getBlockHeaderByNumber.expects(bh3.number).returning(Some(bh3))
+    blockchainReader.getBlockHeaderByNumber.expects(bh1.number.value).returning(Some(bh1))
+    blockchainReader.getBlockHeaderByNumber.expects(bh2.number.value).returning(Some(bh2))
+    blockchainReader.getBlockHeaderByNumber.expects(bh3.number.value).returning(Some(bh3))
 
     val bb2: BlockBody = BlockBody(
       transactionList = Seq(
@@ -130,7 +133,7 @@ class FilterManagerSpec
       transactionIndex = 0,
       transactionHash = bb2.transactionList.head.hash.value,
       blockHash = bh2.hash.value,
-      blockNumber = bh2.number,
+      blockNumber = bh2.number.value,
       address = Address(0x1234),
       data = ByteString(Hex.decode("99aaff")),
       topics = logs2.head.logTopics,
@@ -162,7 +165,7 @@ class FilterManagerSpec
     ) // address doesn't match
 
     val bh4: BlockHeader =
-      blockHeader.copy(number = 4, logsBloom = BloomFilter(LedgerBloomFilter.create(Seq(log4_1, log4_2))))
+      blockHeader.copy(number = BlockNumber(4), logsBloom = BloomFilter(LedgerBloomFilter.create(Seq(log4_1, log4_2))))
 
     blockchainReader.getBlockHeaderByNumber.expects(BigInt(4)).returning(Some(bh4))
 
@@ -248,10 +251,11 @@ class FilterManagerSpec
         ByteString(Hex.decode("99aaff"))
       )
     )
-    val bh: BlockHeader = blockHeader.copy(number = 1, logsBloom = BloomFilter(LedgerBloomFilter.create(logs)))
+    val bh: BlockHeader =
+      blockHeader.copy(number = BlockNumber(1), logsBloom = BloomFilter(LedgerBloomFilter.create(logs)))
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(1).anyNumberOfTimes()
-    blockchainReader.getBlockHeaderByNumber.expects(bh.number).returning(Some(bh))
+    blockchainReader.getBlockHeaderByNumber.expects(bh.number.value).returning(Some(bh))
     val bb: BlockBody = BlockBody(
       transactionList = Seq(
         SignedTransaction(
@@ -292,7 +296,8 @@ class FilterManagerSpec
         ByteString(Hex.decode("99aaff"))
       )
     )
-    val bh2: BlockHeader = blockHeader.copy(number = 2, logsBloom = BloomFilter(LedgerBloomFilter.create(logs2)))
+    val bh2: BlockHeader =
+      blockHeader.copy(number = BlockNumber(2), logsBloom = BloomFilter(LedgerBloomFilter.create(logs2)))
     val blockTransactions2: Seq[SignedTransaction] = Seq(
       SignedTransaction(
         tx = LegacyTransaction(
@@ -336,7 +341,7 @@ class FilterManagerSpec
       transactionIndex = 0,
       transactionHash = bb.transactionList.head.hash.value,
       blockHash = bh.hash.value,
-      blockNumber = bh.number,
+      blockNumber = bh.number.value,
       address = Address(0x1234),
       data = ByteString(Hex.decode("99aaff")),
       topics = logs.head.logTopics,
@@ -348,7 +353,7 @@ class FilterManagerSpec
       transactionIndex = 0,
       transactionHash = block2.body.transactionList.head.hash.value,
       blockHash = block2.header.hash.value,
-      blockNumber = block2.header.number,
+      blockNumber = block2.header.number.value,
       address = Address(0x1234),
       data = ByteString(Hex.decode("99aaff")),
       topics = logs2.head.logTopics,
@@ -375,9 +380,9 @@ class FilterManagerSpec
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(6)
 
-    val bh4: BlockHeader = blockHeader.copy(number = 4)
-    val bh5: BlockHeader = blockHeader.copy(number = 5)
-    val bh6: BlockHeader = blockHeader.copy(number = 6)
+    val bh4: BlockHeader = blockHeader.copy(number = BlockNumber(4))
+    val bh5: BlockHeader = blockHeader.copy(number = BlockNumber(5))
+    val bh6: BlockHeader = blockHeader.copy(number = BlockNumber(6))
 
     blockchainReader.getBlockHeaderByNumber.expects(BigInt(4)).returning(Some(bh4))
     blockchainReader.getBlockHeaderByNumber.expects(BigInt(5)).returning(Some(bh5))
@@ -522,7 +527,7 @@ class FilterManagerSpec
         )
       ),
       difficulty = Difficulty(BigInt("17864037202")),
-      number = 1,
+      number = BlockNumber(1),
       gasLimit = GasAmount(5000),
       gasUsed = GasAmount.Zero,
       unixTimestamp = 1438270431,

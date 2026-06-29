@@ -143,10 +143,10 @@ class EthashBlockHeaderValidatorSpec
 
   it should "return a failure if created based on invalid number" taggedAs (UnitTest, ConsensusTest) in {
     forAll(longGen) { number =>
-      val blockHeader = validBlockHeader.copy(number = number)
+      val blockHeader = validBlockHeader.copy(number = BlockNumber(number))
       val parent = Block(validParentBlockHeader, validParentBlockBody)
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, parent.header)
-      if number != validParentBlockHeader.number + 1 then
+      if BlockNumber(number) != validParentBlockHeader.number + 1 then
         assert(validateResult == Left(HeaderNumberError) || validateResult == Left(HeaderDifficultyError))
       else assert(validateResult == Right(BlockHeaderValid))
     }
@@ -203,13 +203,13 @@ class EthashBlockHeaderValidatorSpec
   ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
       validParentBlockHeader.copy(
-        number = 5000101,
+        number = BlockNumber(5000101),
         unixTimestamp = 1513175023,
         difficulty = Difficulty(BigInt("22627021745803"))
       )
     val parent: Block = Block(parentHeader, parentBody)
 
-    val blockNumber: BigInt = parentHeader.number + 1
+    val blockNumber: BigInt = (parentHeader.number + 1).value
     val blockTimestamp: Long = parentHeader.unixTimestamp + 6
 
     val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
@@ -223,13 +223,13 @@ class EthashBlockHeaderValidatorSpec
   ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
       validParentBlockHeader.copy(
-        number = 5899999,
+        number = BlockNumber(5899999),
         unixTimestamp = 1525176000,
         difficulty = Difficulty(BigInt("22627021745803"))
       )
     val parent: Block = Block(parentHeader, parentBody)
 
-    val blockNumber: BigInt = parentHeader.number + 1
+    val blockNumber: BigInt = (parentHeader.number + 1).value
     val blockTimestamp: Long = parentHeader.unixTimestamp + 6
 
     val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
@@ -243,7 +243,7 @@ class EthashBlockHeaderValidatorSpec
   ) in new EphemBlockchainTestSetup:
     val parent: Block = Block(afterRewardReductionParentBlockHeader, parentBody)
 
-    val blockNumber: BigInt = afterRewardReductionBlockHeader.number
+    val blockNumber: BigInt = afterRewardReductionBlockHeader.number.value
     val blockTimestamp: Long = afterRewardReductionBlockHeader.unixTimestamp
 
     val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
@@ -272,13 +272,13 @@ class EthashBlockHeaderValidatorSpec
 
     val parentHeader: BlockHeader =
       validParentBlockHeader.copy(
-        number = 9200000 - 1,
+        number = BlockNumber(9200000 - 1),
         unixTimestamp = 1525176000,
         difficulty = Difficulty(BigInt("22627021745803"))
       )
     val parent: Block = Block(parentHeader, parentBody)
 
-    val blockNumber: BigInt = parentHeader.number + 1
+    val blockNumber: BigInt = (parentHeader.number + 1).value
     val blockTimestamp: Long = parentHeader.unixTimestamp + 6
 
     val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)(
@@ -307,7 +307,7 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("20626433633447")),
-    number = 3582022,
+    number = BlockNumber(3582022),
     gasLimit = GasAmount(4700036),
     gasUsed = GasAmount.Zero,
     unixTimestamp = 1492735637,
@@ -326,7 +326,7 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("5fa90473cd08a08fc766329651d81bb6e4ef2bb330cf90c3025927a3bafe0c57"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("20616098743527")),
-    number = 3582021,
+    number = BlockNumber(3582021),
     gasLimit = GasAmount(4699925),
     gasUsed = GasAmount(1005896),
     unixTimestamp = 1492735634,
@@ -345,7 +345,7 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("3482399171761329")),
-    number = 5863375,
+    number = BlockNumber(5863375),
     gasLimit = GasAmount(7999992),
     gasUsed = GasAmount(7998727),
     unixTimestamp = 1530104899,
@@ -364,7 +364,7 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("3480699544328087")),
-    number = 5863374,
+    number = BlockNumber(5863374),
     gasLimit = GasAmount(7992222),
     gasUsed = GasAmount(7980470),
     unixTimestamp = 1530104893,
@@ -383,7 +383,7 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("989772")),
-    number = 20,
+    number = BlockNumber(20),
     gasLimit = GasAmount(131620495),
     gasUsed = GasAmount.Zero,
     unixTimestamp = 1486752441,
@@ -402,7 +402,7 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("989289")),
-    number = 19,
+    number = BlockNumber(19),
     gasLimit = GasAmount(131749155),
     gasUsed = GasAmount.Zero,
     unixTimestamp = 1486752440,
@@ -436,7 +436,7 @@ class EthashBlockHeaderValidatorSpec
         override val drainList: Seq[Address] = Nil
         override val forkBlockHash: ByteString =
           if supportsDaoFork then ProDaoForkBlock.header.hash.value else DaoForkBlock.header.hash.value
-        override val forkBlockNumber: BigInt = DaoForkBlock.header.number
+        override val forkBlockNumber: BigInt = DaoForkBlock.header.number.value
         override val refundContract: Option[Address] = None
         override val includeOnForkIdList: Boolean = false
       ),
@@ -463,7 +463,7 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("62230570926948")),
-    number = 1920008,
+    number = BlockNumber(1920008),
     gasLimit = GasAmount(4707788),
     gasUsed = GasAmount.Zero,
     unixTimestamp = 1469021025,
@@ -488,7 +488,7 @@ class EthashBlockHeaderValidatorSpec
       )
     ),
     difficulty = Difficulty(BigInt("62230571058020")),
-    number = 1920009,
+    number = BlockNumber(1920009),
     gasLimit = GasAmount(4712384),
     gasUsed = GasAmount(109952),
     unixTimestamp = 1469021040,
@@ -513,7 +513,7 @@ class EthashBlockHeaderValidatorSpec
       )
     ),
     difficulty = Difficulty(BigInt("62230571189092")),
-    number = 1920010,
+    number = BlockNumber(1920010),
     gasLimit = GasAmount(4712388),
     gasUsed = GasAmount(114754),
     unixTimestamp = 1469021050,

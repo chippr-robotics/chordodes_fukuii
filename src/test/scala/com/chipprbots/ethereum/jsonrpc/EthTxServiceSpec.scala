@@ -196,11 +196,11 @@ class EthTxServiceSpec
 
   it should "return average gas price" taggedAs (UnitTest, RPCTest) in new TestSetup:
     private val block: Block =
-      Block(Fixtures.Blocks.Block3125369.header.copy(number = 42), Fixtures.Blocks.Block3125369.body)
+      Block(Fixtures.Blocks.Block3125369.header.copy(number = BlockNumber(42)), Fixtures.Blocks.Block3125369.body)
     blockchainWriter
       .storeBlock(block)
       .commit()
-    blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
+    blockchainWriter.saveBestKnownBlocks(block.hash, block.number.value)
 
     val response: ServiceResponse[GetGasPriceResponse] = ethTxService.getGetGasPrice(GetGasPriceRequest())
     response.unsafeRunSync() shouldEqual Right(GetGasPriceResponse(BigInt("20000000000")))
@@ -210,7 +210,7 @@ class EthTxServiceSpec
     RPCTest
   ) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val txIndex: Int = 1
     val request: GetTransactionByBlockNumberAndIndexRequest =
@@ -230,7 +230,7 @@ class EthTxServiceSpec
 
     val txIndex: Int = blockToRequest.body.transactionList.length + 42
     val request: GetTransactionByBlockNumberAndIndexRequest =
-      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number), txIndex)
+      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number.value), txIndex)
     val response: GetTransactionByBlockNumberAndIndexResponse =
       ethTxService.getTransactionByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
@@ -244,7 +244,10 @@ class EthTxServiceSpec
 
     val txIndex: Int = 1
     val request: GetTransactionByBlockNumberAndIndexRequest =
-      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number - 42), txIndex)
+      GetTransactionByBlockNumberAndIndexRequest(
+        BlockParam.WithNumber(blockToRequest.header.number.value - 42),
+        txIndex
+      )
     val response: GetTransactionByBlockNumberAndIndexResponse =
       ethTxService.getTransactionByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
@@ -255,7 +258,7 @@ class EthTxServiceSpec
     RPCTest
   ) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val txIndex: Int = 1
     val request: GetTransactionByBlockNumberAndIndexRequest =
@@ -274,7 +277,7 @@ class EthTxServiceSpec
 
     val txIndex: Int = blockToRequest.body.transactionList.length + 42
     val request: GetTransactionByBlockNumberAndIndexRequest =
-      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number), txIndex)
+      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number.value), txIndex)
     val response: RawTransactionResponse =
       ethTxService.getRawTransactionByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
@@ -288,7 +291,10 @@ class EthTxServiceSpec
 
     val txIndex: Int = 1
     val request: GetTransactionByBlockNumberAndIndexRequest =
-      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number - 42), txIndex)
+      GetTransactionByBlockNumberAndIndexRequest(
+        BlockParam.WithNumber(blockToRequest.header.number.value - 42),
+        txIndex
+      )
     val response: RawTransactionResponse =
       ethTxService.getRawTransactionByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
@@ -352,7 +358,7 @@ class EthTxServiceSpec
     // eth_getTransactionReceipt now requires the block to be on the canonical chain
     // (block.number <= bestBlockNumber). Promote the fixture block to best so the
     // receipt surfaces — mirrors what ChainImporter/BlockImporter do on real imports.
-    blockchainWriter.saveBestKnownBlocks(blockWithTx.header.hash, blockWithTx.header.number)
+    blockchainWriter.saveBestKnownBlocks(blockWithTx.header.hash, blockWithTx.header.number.value)
 
     val request: GetTransactionReceiptRequest = GetTransactionReceiptRequest(contractCreatingTransaction.hash.value)
     val response: ServiceResponse[GetTransactionReceiptResponse] = ethTxService.getTransactionReceipt(request)

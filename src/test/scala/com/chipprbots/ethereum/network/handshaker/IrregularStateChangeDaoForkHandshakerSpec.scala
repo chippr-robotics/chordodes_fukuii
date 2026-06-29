@@ -328,7 +328,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     // Advance blockchain to a low block number
     val lowBlockNumber: BigInt = BigInt(1000)
-    val lowBlock: Block = firstBlock.copy(header = firstBlock.header.copy(number = lowBlockNumber))
+    val lowBlock: Block = firstBlock.copy(header = firstBlock.header.copy(number = BlockNumber(lowBlockNumber)))
     val lowBlockWeight: ChainWeight = genesisWeight.increase(lowBlock.header)
     blockchainWriter.save(lowBlock, Nil, lowBlockWeight, saveAsBestBlock = true)
 
@@ -373,7 +373,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     // Advance blockchain to a high block number
     val highBlockNumber: BigInt = BigInt(19200000)
-    val highBlock: Block = firstBlock.copy(header = firstBlock.header.copy(number = highBlockNumber))
+    val highBlock: Block = firstBlock.copy(header = firstBlock.header.copy(number = BlockNumber(highBlockNumber)))
     val highBlockWeight: ChainWeight = genesisWeight.increase(highBlock.header)
     blockchainWriter.save(highBlock, Nil, highBlockWeight, saveAsBestBlock = true)
 
@@ -441,7 +441,9 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     val initHandshakerWithResolver: NetworkHandshaker = NetworkHandshaker(networkHandshakerConfigurationWithResolver)
 
     val firstBlock: Block =
-      genesisBlock.copy(header = genesisBlock.header.copy(parentHash = genesisBlock.header.hash, number = 1))
+      genesisBlock.copy(header =
+        genesisBlock.header.copy(parentHash = genesisBlock.header.hash, number = BlockNumber(1))
+      )
 
   trait LocalPeerSetup extends TestSetup:
     val localHello: Hello = Hello(
@@ -453,7 +455,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     )
 
     val localGetBlockHeadersRequest: GetBlockHeaders =
-      GetBlockHeaders(BigInt(0), Left(forkBlockHeader.number), maxHeaders = 1, skip = 0, reverse = false)
+      GetBlockHeaders(BigInt(0), Left(forkBlockHeader.number.value), maxHeaders = 1, skip = 0, reverse = false)
 
   // Formerly LocalPeerETH63Setup — updated to ETH68 since ETH62-67 are retired
   // Formerly LocalPeerETH63Setup — updated to ETH68 since ETH62-67 are retired

@@ -71,7 +71,7 @@ class LegacyTransactionHistoryServiceSpec
     val blockTx1Receipts = Seq(LegacyReceipt(HashOutcome(ByteString("foo")), 42, BloomFilter(ByteString.empty), Nil))
 
     val blockWithTxs2and3 = Block(
-      Fixtures.Blocks.Block3125369.header.copy(number = 3125370),
+      Fixtures.Blocks.Block3125369.header.copy(number = BlockNumber(3125370)),
       Fixtures.Blocks.Block3125369.body.copy(transactionList = Seq(tx2, tx3))
     )
     val blockTx2And3Receipts = Seq(
@@ -105,7 +105,7 @@ class LegacyTransactionHistoryServiceSpec
           .and(blockchainWriter.storeBlock(blockWithTxs2and3))
           .and(blockchainWriter.storeReceipts(blockWithTxs2and3.hash, blockTx2And3Receipts))
           .commit()
-        blockchainWriter.saveBestKnownBlocks(blockWithTxs2and3.hash, blockWithTxs2and3.number)
+        blockchainWriter.saveBestKnownBlocks(blockWithTxs2and3.hash, blockWithTxs2and3.number.value)
       }
       response <- transactionHistoryService.getAccountTransactions(address, BigInt(3125360) to BigInt(3125370))
     yield assert(response === expectedTxs)

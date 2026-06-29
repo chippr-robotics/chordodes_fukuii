@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.UInt256
 
 import MockWorldState.*
@@ -28,7 +29,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
   // scalastyle:off
   object fxt:
     val fakeHeader: BlockHeader =
-      BlockFixtures.ValidBlock.header.copy(number = blockchainConfig.constantinopleBlockNumber - 1)
+      BlockFixtures.ValidBlock.header.copy(number = BlockNumber(blockchainConfig.constantinopleBlockNumber - 1))
     val addresWithRevert: Address = Address(10)
     val creatorAddr: Address = Address(0xcafe)
     val salt = UInt256.Zero

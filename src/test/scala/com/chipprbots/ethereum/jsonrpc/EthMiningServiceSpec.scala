@@ -41,6 +41,7 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.getEncodedWithoutNonce
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransaction
@@ -198,7 +199,7 @@ class EthMiningServiceSpec
     import scala.concurrent.Await
     val response: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
 
-    response shouldEqual Right(GetWorkResponse(powHash, seedHash, target, block.header.number))
+    response shouldEqual Right(GetWorkResponse(powHash, seedHash, target, block.header.number.value))
 
   it should "generate and submit work when generating block for mining with restricted ethash generator" taggedAs (
     UnitTest,
@@ -541,7 +542,7 @@ class EthMiningServiceSpec
         receiptsRoot = TrieRoot(ByteString.empty),
         logsBloom = BloomFilter(ByteString.empty),
         difficulty = Difficulty(difficulty),
-        number = 0,
+        number = BlockNumber(0),
         gasLimit = GasAmount(16733003),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1494604900,
@@ -565,7 +566,7 @@ class EthMiningServiceSpec
           TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
         difficulty = Difficulty(difficulty),
-        number = 1,
+        number = BlockNumber(1),
         gasLimit = GasAmount(16733003),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 1494604913,

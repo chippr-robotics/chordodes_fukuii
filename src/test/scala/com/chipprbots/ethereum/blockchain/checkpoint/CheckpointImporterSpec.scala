@@ -46,13 +46,13 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       val result: ImportResult =
         importer.importFromStream(new ByteArrayInputStream(bytes), Some(checkpointChainId)).value
 
-      result.blockNumber shouldBe header.blockHeader.number
+      result.blockNumber shouldBe header.blockHeader.number.value
       result.nodesImported shouldBe nodes.length
       result.bytecodesImported shouldBe bytecodes.length
 
       // Best-block pointers
       val best: BlockInfo = freshStorage.storages.appStateStorage.getBestBlockInfo()
-      best.number shouldBe header.blockHeader.number
+      best.number shouldBe header.blockHeader.number.value
       best.hash shouldBe header.blockHeader.hash.value
 
       // Phase flags set so SNAP isn't re-entered
@@ -61,7 +61,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       freshStorage.storages.appStateStorage.isStorageRecoveryDone() shouldBe true
 
       // Header retrievable
-      blockReader.getBlockHeaderByNumber(header.blockHeader.number).value shouldBe header.blockHeader
+      blockReader.getBlockHeaderByNumber(header.blockHeader.number.value).value shouldBe header.blockHeader
 
       // SerializingMptStorage.get decodes RLP, so it can't verify our random-byte fixtures.
       // Verify via the underlying NodeStorage directly.
@@ -137,7 +137,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
           freshStorage.storages.appStateStorage
         )
         val result = importer.importFromFile(tmp, Some(checkpointChainId)).value
-        result.blockNumber shouldBe header.blockHeader.number
+        result.blockNumber shouldBe header.blockHeader.number.value
         result.nodesImported shouldBe nodes.length
       finally Files.deleteIfExists(tmp)
   }

@@ -40,7 +40,7 @@ class SetCodeAuthorizationSpec extends AnyFlatSpec with Matchers:
   )
 
   private val olympiaHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
-    number = 2,
+    number = BlockNumber(2),
     gasLimit = GasAmount(30_000_000),
     gasUsed = GasAmount.Zero,
     extraFields = HefPostOlympia(BigInt(1_000_000_000))

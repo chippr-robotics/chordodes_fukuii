@@ -26,6 +26,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SyncRespo
 import com.chipprbots.ethereum.db.components.EphemDataSourceComponent
 import com.chipprbots.ethereum.db.components.Storages
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
@@ -253,7 +254,7 @@ class SyncStateSchedulerSpec
       val worldHash = prov.buildWorld(nodeData)
       val (scheduler, schedulerBlockchain, schedulerBlockchainWriter, schedulerBlockchainReader, allStorages) =
         buildScheduler()
-      val header = Fixtures.Blocks.ValidBlock.header.copy(stateRoot = TrieRoot(worldHash), number = 1)
+      val header = Fixtures.Blocks.ValidBlock.header.copy(stateRoot = TrieRoot(worldHash), number = BlockNumber(1))
       schedulerBlockchainWriter.storeBlockHeader(header).commit()
       schedulerBlockchainWriter.saveBestKnownBlocks(header.hash, 1)
       var state = scheduler.initState(worldHash).get

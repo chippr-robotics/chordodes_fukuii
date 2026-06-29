@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.GasAmount
@@ -129,7 +130,7 @@ class RestrictedEthashBlockHeaderValidatorSpec
         TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
       logsBloom = BloomFilter(ByteStringUtils.string2hash("00" * 256)),
       difficulty = Difficulty(BigInt("131520")),
-      number = 10,
+      number = BlockNumber(10),
       gasLimit = GasAmount(5030),
       gasUsed = GasAmount.Zero,
       unixTimestamp = 1605514463,
@@ -155,7 +156,7 @@ class RestrictedEthashBlockHeaderValidatorSpec
         TrieRoot(ByteStringUtils.string2hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
       logsBloom = BloomFilter(ByteStringUtils.string2hash("00" * 256)),
       difficulty = Difficulty(BigInt("131584")),
-      number = 11,
+      number = BlockNumber(11),
       gasLimit = GasAmount(5033),
       gasUsed = GasAmount.Zero,
       unixTimestamp = 1605514466,

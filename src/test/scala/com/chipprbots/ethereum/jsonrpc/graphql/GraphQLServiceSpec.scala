@@ -65,12 +65,12 @@ class GraphQLServiceSpec
 
   it should "answer { block { number hash } } for the latest block" in new GraphQLTestSetup:
     blockchainWriter.storeBlock(block).and(blockchainWriter.storeChainWeight(block.header.hash, weight)).commit()
-    blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
+    blockchainWriter.saveBestKnownBlocks(block.hash, block.number.value)
 
     val (status, body) = service.execute("{ block { number hash } }", None, None).unsafeRunSync()
     status shouldBe 200
     val data: ACursor = body.hcursor.downField("data").downField("block")
-    data.downField("number").as[String].toOption.get shouldBe "0x" + block.header.number.toString(16)
+    data.downField("number").as[String].toOption.get shouldBe "0x" + block.header.number.value.toString(16)
     val gotHash: String = data.downField("hash").as[String].toOption.get
     gotHash shouldBe "0x" + block.header.hash.toArray.map("%02x".format(_)).mkString
 
@@ -89,7 +89,7 @@ class GraphQLServiceSpec
 
   it should "reject queries exceeding the configured depth" in new GraphQLTestSetup(maxDepth = 3):
     blockchainWriter.storeBlock(block).and(blockchainWriter.storeChainWeight(block.header.hash, weight)).commit()
-    blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
+    blockchainWriter.saveBestKnownBlocks(block.hash, block.number.value)
 
     val deep =
       "{ block { parent { parent { parent { parent { number } } } } } }"

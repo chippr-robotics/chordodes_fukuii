@@ -53,7 +53,7 @@ class EIP7825GasCapSpec
   def makeHeader(number: BigInt): BlockHeader =
     val extraFields = if number >= olympiaBlock then HefPostOlympia(BigInt(1000000000)) else HefEmpty
     Fixtures.Blocks.ValidBlock.header.copy(
-      number = number,
+      number = BlockNumber(number),
       gasLimit = GasAmount(BigInt(100_000_000)),
       gasUsed = GasAmount.Zero,
       extraFields = extraFields

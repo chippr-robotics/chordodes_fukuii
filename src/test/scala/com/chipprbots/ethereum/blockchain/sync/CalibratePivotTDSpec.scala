@@ -388,7 +388,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
 
     /** Store a best block with a specific stored chain weight (simulate pre-Fix-A state). */
     def setupBestBlockWithTD(blockNum: BigInt, storedTD: BigInt): Unit =
-      val hdr = Fixtures.Blocks.Genesis.header.copy(number = blockNum)
+      val hdr = Fixtures.Blocks.Genesis.header.copy(number = BlockNumber(blockNum))
       val blk = Block(hdr, BlockBody(Nil, Nil))
       blockchainWriter.save(
         blk,
@@ -401,7 +401,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
     def setBestBlockHeader(hdr: BlockHeader): Unit =
       blockchainWriter.storeBlockHeader(hdr).commit()
       storagesInstance.storages.appStateStorage
-        .putBestBlockInfo(BlockInfo(hdr.hash.value, hdr.number))
+        .putBestBlockInfo(BlockInfo(hdr.hash.value, hdr.number.value))
         .commit()
 
     def buildParentHashChain(startNum: Int, length: Int): Vector[BlockHeader] =
@@ -410,7 +410,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
       for i <- 0 until length do
         val n = startNum + i
         val h = Fixtures.Blocks.Genesis.header.copy(
-          number = BigInt(n),
+          number = BlockNumber(n),
           parentHash = prev.hash,
           nonce = org.apache.pekko.util.ByteString(Array.fill(8)(n.toByte))
         )

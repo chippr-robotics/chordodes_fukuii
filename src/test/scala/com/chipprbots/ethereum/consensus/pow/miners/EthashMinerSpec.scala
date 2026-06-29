@@ -56,12 +56,12 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
   ) in new TestSetup:
     val epochLength: Int = EthashUtils.EPOCH_LENGTH_BEFORE_ECIP_1099
     val parent29998: Int = epochLength - 2 // 29998, mined block will be 29999 (last block of the epoch)
-    val parentBlock29998: Block = origin.copy(header = origin.header.copy(number = parent29998))
+    val parentBlock29998: Block = origin.copy(header = origin.header.copy(number = BlockNumber(parent29998)))
     setBlockForMining(parentBlock29998)
     executeTest(parentBlock29998)
 
     val parent29999: Int = epochLength - 1 // 29999, mined block will be 30000 (first block of the new epoch)
-    val parentBlock29999: Block = origin.copy(header = origin.header.copy(number = parent29999))
+    val parentBlock29999: Block = origin.copy(header = origin.header.copy(number = BlockNumber(parent29999)))
     setBlockForMining(parentBlock29999)
     executeTest(parentBlock29999)
 
@@ -69,7 +69,7 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
     val epochLength: Int = EthashUtils.EPOCH_LENGTH_BEFORE_ECIP_1099
     val parentBlockNumber: Int =
       2 * epochLength - 2 // 59998, mined block will be 59999 (last block of the current epoch)
-    val parentBlock: Block = origin.copy(header = origin.header.copy(number = parentBlockNumber))
+    val parentBlock: Block = origin.copy(header = origin.header.copy(number = BlockNumber(parentBlockNumber)))
     setBlockForMining(parentBlock)
 
     executeTest(parentBlock)
@@ -89,7 +89,7 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
     override val origin: Block = Block(
       Fixtures.Blocks.Genesis.header.copy(
         difficulty = Difficulty(UInt256(Hex.decode("0400")).toBigInt),
-        number = 0,
+        number = BlockNumber(0),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 0
       ),

@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
@@ -29,25 +30,25 @@ class OlympiaBaseFeeOpcodeSpec extends AnyWordSpec with Matchers:
     val callerAddr: Address = Address(0xca11)
 
     val headerPreOlympia: BlockHeader =
-      BlockFixtures.ValidBlock.header.copy(number = Fixtures.SpiralBlockNumber)
+      BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.SpiralBlockNumber))
 
     val baseFeeValue: BigInt = BigInt(7)
 
     val headerWithBaseFee: BlockHeader =
       BlockFixtures.ValidBlock.header.copy(
-        number = Fixtures.OlympiaBlockNumber,
+        number = BlockNumber(Fixtures.OlympiaBlockNumber),
         extraFields = HefPostOlympia(baseFeeValue)
       )
 
     val headerWithLargeBaseFee: BlockHeader =
       BlockFixtures.ValidBlock.header.copy(
-        number = Fixtures.OlympiaBlockNumber,
+        number = BlockNumber(Fixtures.OlympiaBlockNumber),
         extraFields = HefPostOlympia(BigInt("1000000000")) // 1 Gwei
       )
 
     val headerWithZeroBaseFee: BlockHeader =
       BlockFixtures.ValidBlock.header.copy(
-        number = Fixtures.OlympiaBlockNumber,
+        number = BlockNumber(Fixtures.OlympiaBlockNumber),
         extraFields = HefPostOlympia(BigInt(0))
       )
 

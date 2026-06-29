@@ -65,7 +65,7 @@ class BlockExecutionSpec
           )
         )
 
-        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(block1.header.number)
+        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(block1.header.number.value)
         val newMining: TestMining = mining.withVM(vm).withValidators(mockValidators)
         override lazy val blockValidation =
           new BlockValidation(newMining, blockchainReader, BlockQueue(blockchainReader, syncConfig))
@@ -106,7 +106,7 @@ class BlockExecutionSpec
             addressesToDelete = defaultAddressesToDelete
           )
         )
-        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(block2.header.number)
+        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(block2.header.number.value)
         val newMining: TestMining = mining.withVM(mockVm).withValidators(mockValidators)
         override lazy val blockValidation =
           new BlockValidation(newMining, blockchainReader, BlockQueue(blockchainReader, syncConfig))
@@ -140,7 +140,7 @@ class BlockExecutionSpec
             addressesToDelete = defaultAddressesToDelete
           )
         )
-        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(chain.last.number)
+        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(chain.last.number.value)
         val newMining: TestMining = mining.withVM(mockVm).withValidators(mockValidators)
         override lazy val blockValidation =
           new BlockValidation(newMining, blockchainReader, BlockQueue(blockchainReader, syncConfig))
@@ -364,14 +364,14 @@ class BlockExecutionSpec
         val ommersAddresses = (0 until ommersSize).map(i => Address(i.toByte +: Hex.decode("10")))
 
         val blockReward =
-          mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number, ommersSize)
+          mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number.value, ommersSize)
 
         val changes = Seq(
           minerAddress -> UpdateBalance(UInt256(blockReward))
         ) ++ ommersAddresses.map { ommerAddress =>
           val ommerReward = mining.blockPreparator.blockRewardCalculator.calculateOmmerRewardForInclusion(
-            validBlockHeader.number,
-            validBlockHeader.number - ommersBlockDifference
+            validBlockHeader.number.value,
+            validBlockHeader.number.value - ommersBlockDifference
           )
           ommerAddress -> UpdateBalance(UInt256(ommerReward))
         }
@@ -382,7 +382,7 @@ class BlockExecutionSpec
         val blockBodyWithOmmers = validBlockBodyWithNoTxs.copy(
           uncleNodesList = ommersAddresses.map(ommerAddress =>
             defaultBlockHeader.copy(
-              number = blockHeader.number - ommersBlockDifference,
+              number = BlockNumber(blockHeader.number.value - ommersBlockDifference),
               beneficiary = ommerAddress.bytes
             )
           )
@@ -425,7 +425,7 @@ class BlockExecutionSpec
       )
 
       val blockReward: BigInt =
-        mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number, 0)
+        mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number.value, 0)
 
       val changes: Seq[(Address, UpdateBalance)] = Seq(
         minerAddress -> UpdateBalance(UInt256(blockReward)) // Paying miner for block processing
@@ -474,7 +474,7 @@ class BlockExecutionSpec
       )
 
       val blockReward: BigInt =
-        mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number, 0)
+        mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number.value, 0)
 
       val changes: Seq[(Address, UpdateBalance)] =
         Seq(minerAddress -> UpdateBalance(UInt256(blockReward))) // Paying miner for block processing
@@ -598,7 +598,7 @@ class BlockExecutionSpec
         InMemoryWorldStateProxy.persistState(resultingWorldState).stateRootHash shouldBe expectedStateRootTx2
 
         val blockReward: BigInt =
-          mining.blockPreparator.blockRewardCalculator.calculateMiningReward(block.header.number, 0)
+          mining.blockPreparator.blockRewardCalculator.calculateMiningReward(block.header.number.value, 0)
         val changes = Seq(
           minerAddress -> UpdateBalance(UInt256(blockReward))
         )

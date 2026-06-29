@@ -10,6 +10,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.FreeSpecBase
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.metrics.MetricsConfig
 import com.chipprbots.ethereum.sync.util.RegularSyncItSpecUtils.FakePeer
@@ -126,7 +127,7 @@ class E2ESyncSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll:
           val peer1BestBlock = peer1.blockchainReader.getBestBlock.get
           val peer2BestBlock = peer2.blockchainReader.getBestBlock.get
           peer1BestBlock.hash shouldBe peer2BestBlock.hash
-          peer2BestBlock.number shouldBe blockNumber
+          peer2BestBlock.number shouldBe BlockNumber(blockNumber)
       }
 
       "should handle block exchange with multiple peers" taggedAs (
@@ -147,7 +148,7 @@ class E2ESyncSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll:
           val peer1BestBlock = peer1.blockchainReader.getBestBlock.get
           val peer2BestBlock = peer2.blockchainReader.getBestBlock.get
           peer1BestBlock.hash shouldBe peer2BestBlock.hash
-          peer2BestBlock.number shouldBe blockNumber
+          peer2BestBlock.number shouldBe BlockNumber(blockNumber)
       }
 
       "should exchange blocks incrementally as they are created" taggedAs (
@@ -193,7 +194,7 @@ class E2ESyncSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll:
           val peer1BestBlock = peer1.blockchainReader.getBestBlock.get
           val peer2BestBlock = peer2.blockchainReader.getBestBlock.get
           peer1BestBlock.hash shouldBe peer2BestBlock.hash
-          peer2BestBlock.number shouldBe blockNumber
+          peer2BestBlock.number shouldBe BlockNumber(blockNumber)
       }
     }
 
@@ -310,7 +311,7 @@ class E2ESyncSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll:
         yield
           // Verify blocks are persisted
           val bestBlock = peer2.blockchainReader.getBestBlock.get
-          bestBlock.number shouldBe blockNumber
+          bestBlock.number shouldBe BlockNumber(blockNumber)
 
           // Verify we can retrieve any block from storage
           for i <- 1 to blockNumber do
@@ -392,7 +393,7 @@ class E2ESyncSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll:
         yield
           // Verify sync completed successfully despite any partial downloads
           val peer2BestBlock = peer2.blockchainReader.getBestBlock.get
-          peer2BestBlock.number shouldBe blockNumber
+          peer2BestBlock.number shouldBe BlockNumber(blockNumber)
       }
     }
 

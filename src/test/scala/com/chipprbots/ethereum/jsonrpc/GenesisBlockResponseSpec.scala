@@ -12,6 +12,7 @@ import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.GasAmount
@@ -37,7 +38,7 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers:
         TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
       difficulty = Difficulty(BigInt("131072")),
-      number = 0,
+      number = BlockNumber(0),
       gasLimit = GasAmount(BigInt("8000000")),
       gasUsed = GasAmount.Zero,
       unixTimestamp = 1701302272L,
@@ -78,7 +79,7 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers:
         TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
       difficulty = Difficulty(BigInt("131072")),
-      number = 0,
+      number = BlockNumber(0),
       gasLimit = GasAmount(BigInt("8000000")),
       gasUsed = GasAmount.Zero,
       unixTimestamp = 1701302272L,

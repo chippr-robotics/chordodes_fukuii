@@ -11,6 +11,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -380,7 +381,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers:
       receiptsRoot = TrieRoot(hash32),
       logsBloom = BloomFilter(bloom256),
       difficulty = Difficulty(1),
-      number = 0,
+      number = BlockNumber(0),
       gasLimit = GasAmount(1000000),
       gasUsed = GasAmount(0),
       unixTimestamp = 0,

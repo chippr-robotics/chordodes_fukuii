@@ -23,7 +23,7 @@ class ChainWeightSpec extends AnyFlatSpec with Matchers:
       receiptsRoot = TrieRoot(ByteString.empty),
       logsBloom = BloomFilter(ByteString.empty),
       difficulty = Difficulty(difficulty),
-      number = number,
+      number = BlockNumber(number),
       gasLimit = GasAmount.Zero,
       gasUsed = GasAmount.Zero,
       unixTimestamp = 0,

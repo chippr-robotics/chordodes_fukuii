@@ -22,6 +22,7 @@ import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.TrieRoot
 
 class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
@@ -251,7 +252,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
       receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
       difficulty = Difficulty.Zero,
-      number = 9876543,
+      number = BlockNumber(9876543),
       gasLimit = GasAmount(30000000),
       gasUsed = GasAmount(0),
       unixTimestamp = 1700000000,
@@ -1293,7 +1294,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
       receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
       difficulty = Difficulty.Zero,
-      number = BigInt(5187023),
+      number = BlockNumber(BigInt(5187023)),
       gasLimit = GasAmount(BigInt(30000000)),
       gasUsed = GasAmount(BigInt(0)),
       unixTimestamp = 1700000000L, // well above shanghaiTimestamp=1677557088

@@ -235,14 +235,14 @@ class PoWMiningCoordinatorSpec
     override val origin: Block = Block(
       Fixtures.Blocks.Genesis.header.copy(
         difficulty = Difficulty(UInt256(Hex.decode("0400")).toBigInt),
-        number = 0,
+        number = BlockNumber(0),
         gasUsed = GasAmount.Zero,
         unixTimestamp = 0
       ),
       Fixtures.Blocks.ValidBlock.body
     )
 
-    val parentBlock: Block = origin.copy(header = origin.header.copy(number = parentBlockNumber))
+    val parentBlock: Block = origin.copy(header = origin.header.copy(number = BlockNumber(parentBlockNumber)))
 
     val getTransactionFromPoolTimeout: FiniteDuration = 5.seconds
 

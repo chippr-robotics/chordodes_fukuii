@@ -42,7 +42,7 @@ class OlympiaFeeMarketSpec
 
   private def olympiaParent(gasLimit: BigInt, gasUsed: BigInt, baseFee: BigInt): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      number = olympiaBlock,
+      number = BlockNumber(olympiaBlock),
       gasLimit = GasAmount(gasLimit),
       gasUsed = GasAmount(gasUsed),
       extraFields = HefPostOlympia(baseFee)

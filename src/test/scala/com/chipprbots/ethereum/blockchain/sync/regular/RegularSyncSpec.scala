@@ -130,7 +130,10 @@ class RegularSyncSpec
 
         val sub136 = peerEventBus.expectMsgType[SubscribeCmd]
         sub136.subscriber ! MessageFromPeer(
-          NewBlock(testBlocks.last, ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value),
+          NewBlock(
+            testBlocks.last,
+            ChainWeight.totalDifficultyOnly(testBlocks.last.number.value).totalDifficulty.value
+          ),
           defaultPeer.id
         )
 
@@ -190,7 +193,10 @@ class RegularSyncSpec
           bodiesSender ! PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), testBlocksChunked.head.bodies))
 
           blockFetcher ! MessageFromPeer(
-            NewBlock(testBlocks.last, ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value),
+            NewBlock(
+              testBlocks.last,
+              ChainWeight.totalDifficultyOnly(testBlocks.last.number.value).totalDifficulty.value
+            ),
             defaultPeer.id
           )
           // Headers from a much later chunk — HeadersNotMatchingWaitingHeaders fires.
@@ -212,7 +218,7 @@ class RegularSyncSpec
 
         peersClient.expectMsgEq(blockHeadersChunkRequest(0)).replyTo ! PeersClient.Response(
           defaultPeer,
-          BlockHeaders(BigInt(0), testBlocks.headers.filter(_.number % 2 == 0))
+          BlockHeaders(BigInt(0), testBlocks.headers.filter(_.number.value % 2 == 0))
         )
         peersClient.fishForSpecificMessage() { case PeersClient.Request(_: ETHGetBlockHeaders, _, _, _) =>
           ()
@@ -354,9 +360,9 @@ class RegularSyncSpec
         SyncTest
       ) in sync(
         new Fixture:
-          val capturedBest: BigInt = testBlocks.last.number // 20
+          val capturedBest: BigInt = testBlocks.last.number.value // 20
           val lca: BigInt = BigInt(10)
-          val lcaHeader: BlockHeader = testBlocks.find(_.number == lca).get.header
+          val lcaHeader: BlockHeader = testBlocks.find(_.number.value == lca).get.header
           val masterPeer: Peer = defaultPeer
 
           override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
@@ -441,7 +447,7 @@ class RegularSyncSpec
         new Fixture:
           override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
           override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
-          (() => blockchainReader.getBestBlockNumber).when().onCall(() => bestBlock.number)
+          (() => blockchainReader.getBestBlockNumber).when().onCall(() => bestBlock.number.value)
           (() => blockchainReader.getSnapSyncPivotBlock).when().returns(None) // no SNAP sync pivot
           override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
           (consensusAdapter
@@ -473,7 +479,7 @@ class RegularSyncSpec
               // Handle ETH68/69 GetBlockHeaders
               case PeersClient.Request(ETHGetBlockHeaders(_, Left(nr), maxHeaders, _, _), _, _, replyTo)
                   if nr >= alternativeBranch.numberAtUnsafe(syncConfig.blocksBatchSize) && !didResponseWithNewBranch =>
-                val responseHeaders = alternativeBranch.headers.filter(_.number >= nr).take(maxHeaders.toInt)
+                val responseHeaders = alternativeBranch.headers.filter(_.number.value >= nr).take(maxHeaders.toInt)
                 replyTo ! PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), responseHeaders))
                 Some(new BranchResolutionAutoPilot(true, alternativeBlocks))
               // Handle ETH68/69 GetBlockBodies
@@ -495,7 +501,7 @@ class RegularSyncSpec
           sub383.subscriber ! MessageFromPeer(
             NewBlock(
               alternativeBlocks.last,
-              ChainWeight.totalDifficultyOnly(alternativeBlocks.last.number).totalDifficulty.value
+              ChainWeight.totalDifficultyOnly(alternativeBlocks.last.number.value).totalDifficulty.value
             ),
             defaultPeer.id
           )
@@ -508,7 +514,7 @@ class RegularSyncSpec
       new Fixture:
         override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
         override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
-        (() => blockchainReader.getBestBlockNumber).when().onCall(() => bestBlock.number)
+        (() => blockchainReader.getBestBlockNumber).when().onCall(() => bestBlock.number.value)
         (() => blockchainReader.getSnapSyncPivotBlock).when().returns(None) // no SNAP sync pivot
         override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
         (consensusAdapter
@@ -558,7 +564,7 @@ class RegularSyncSpec
         sub445.subscriber ! MessageFromPeer(
           NewBlock(
             originalBranch.last,
-            ChainWeight.totalDifficultyOnly(originalBranch.last.number).totalDifficulty.value
+            ChainWeight.totalDifficultyOnly(originalBranch.last.number.value).totalDifficulty.value
           ),
           defaultPeer.id
         )
@@ -567,7 +573,10 @@ class RegularSyncSpec
 
         // As node will be on top, we have to re-trigger the fetching process by simulating a block from the fork being broadcasted
         blockFetcher ! MessageFromPeer(
-          NewBlock(betterBranch.last, ChainWeight.totalDifficultyOnly(betterBranch.last.number).totalDifficulty.value),
+          NewBlock(
+            betterBranch.last,
+            ChainWeight.totalDifficultyOnly(betterBranch.last.number.value).totalDifficulty.value
+          ),
           defaultPeer.id
         )
         awaitCond(bestBlock == betterBranch.last, 5.seconds)
@@ -737,7 +746,10 @@ class RegularSyncSpec
 
         val sub598 = peerEventBus.expectMsgType[SubscribeCmd]
         sub598.subscriber ! MessageFromPeer(
-          NewBlock(testBlocks.last, ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value),
+          NewBlock(
+            testBlocks.last,
+            ChainWeight.totalDifficultyOnly(testBlocks.last.number.value).totalDifficulty.value
+          ),
           defaultPeer.id
         )
 
@@ -784,7 +796,7 @@ class RegularSyncSpec
         goToTop()
 
         blockFetcher !
-          MessageFromPeer(NewBlockHashes(List(BlockHash(newBlock.hash.value, newBlock.number))), defaultPeer.id)
+          MessageFromPeer(NewBlockHashes(List(BlockHash(newBlock.hash.value, newBlock.number.value))), defaultPeer.id)
 
         peersClient.expectMsgPF() { case PeersClient.Request(ETHGetBlockHeaders(_, _, _, _, _), _, _, _) =>
           true
@@ -803,7 +815,10 @@ class RegularSyncSpec
 
         val sub665 = peerEventBus.expectMsgType[SubscribeCmd]
         sub665.subscriber ! MessageFromPeer(
-          NewBlock(testBlocks.last, ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value),
+          NewBlock(
+            testBlocks.last,
+            ChainWeight.totalDifficultyOnly(testBlocks.last.number.value).totalDifficulty.value
+          ),
           defaultPeer.id
         )
 
@@ -902,7 +917,7 @@ class RegularSyncSpec
             sub766.subscriber ! MessageFromPeer(
               NewBlock(
                 testBlocks.last,
-                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number.value).totalDifficulty.value
               ),
               defaultPeer.id
             )
@@ -929,7 +944,7 @@ class RegularSyncSpec
             sub796.subscriber ! MessageFromPeer(
               NewBlock(
                 testBlocks.last,
-                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number.value).totalDifficulty.value
               ),
               defaultPeer.id
             )
@@ -941,7 +956,7 @@ class RegularSyncSpec
           }
           status <- pollForStatus(_.syncing)
         yield
-          val lastBlock = testBlocks.last.number
+          val lastBlock = testBlocks.last.number.value
           assert(status === Status.Syncing(5, Progress(5, lastBlock), None))
       }
 
@@ -956,7 +971,7 @@ class RegularSyncSpec
             sub824.subscriber ! MessageFromPeer(
               NewBlock(
                 testBlocks.last,
-                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number.value).totalDifficulty.value
               ),
               defaultPeer.id
             )
@@ -967,7 +982,7 @@ class RegularSyncSpec
             )
           }
           status <- pollForStatus(_.syncing)
-          lastBlock = testBlocks.last.number
+          lastBlock = testBlocks.last.number.value
         yield assert(status === Status.Syncing(0, Progress(0, lastBlock), None))
       }
 
@@ -986,7 +1001,7 @@ class RegularSyncSpec
             sub854.subscriber ! MessageFromPeer(
               NewBlock(
                 testBlocks.last,
-                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number.value).totalDifficulty.value
               ),
               defaultPeer.id
             )
