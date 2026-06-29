@@ -56,7 +56,8 @@ class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config
           peerEventBus = peerEventBus,
           requestMsg = Ping(),
           responseMsgCode = Pong.code,
-          replyTo = replyTo.ref
+          replyTo = replyTo.ref,
+          requestId = 0
         ),
         s"prh-${java.util.UUID.randomUUID()}"
       )
@@ -91,7 +92,7 @@ class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config
 
     manualTime.timePasses(3.seconds)
 
-    replyTo.expectMessage(PeerRequestHandler.RequestFailed(peer, "request timeout"))
+    replyTo.expectMessage(PeerRequestHandler.RequestFailed(0, peer, "request timeout"))
 
   it should "reply RequestFailed when the peer disconnects before the response arrives" taggedAs (
     UnitTest,
@@ -103,7 +104,7 @@ class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config
 
     peerEventBus ! PublishCmd(PeerDisconnected(peerId))
 
-    replyTo.expectMessage(PeerRequestHandler.RequestFailed(peer, "connection closed"))
+    replyTo.expectMessage(PeerRequestHandler.RequestFailed(0, peer, "connection closed"))
 
   it should "ignore a response from a different peer" taggedAs (UnitTest, NetworkTest) in new Fixtures:
     val npmProbe = TestProbe()(testKit.system.toClassic)

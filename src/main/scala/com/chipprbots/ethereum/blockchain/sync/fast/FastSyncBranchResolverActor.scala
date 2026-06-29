@@ -226,13 +226,13 @@ object FastSyncBranchResolverActor:
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match
-            case PeerRequestResult(ResponseReceived(peer, ETH68BlockHeaders(_, headers), timeTaken))
+            case PeerRequestResult(ResponseReceived(_, peer, ETH68BlockHeaders(_, headers), timeTaken))
                 if peer == masterPeer =>
               if headers.size == recentHeadersSize then
                 log.debug("Received {} block headers from peer {} in {} ms", headers.size, masterPeer.id, timeTaken)
                 handleRecentBlockHeadersResponse(headers, masterPeer, bestBlockNumber)
               else handleInvalidResponse(peer, requestHandler)
-            case PeerRequestResult(RequestFailed(peer, reason)) =>
+            case PeerRequestResult(RequestFailed(_, peer, reason)) =>
               handleRequestFailure(peer, requestHandler, reason)
             case HandlerTerminated(ref) if ref == requestHandler =>
               handlePeerTermination(masterPeer, ref)
@@ -248,7 +248,7 @@ object FastSyncBranchResolverActor:
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match
-            case PeerRequestResult(ResponseReceived(peer, ETH68BlockHeaders(_, headers), durationMs))
+            case PeerRequestResult(ResponseReceived(_, peer, ETH68BlockHeaders(_, headers), durationMs))
                 if peer == searchState.masterPeer =>
               context.unwatch(requestHandler)
               headers.toList match
@@ -258,7 +258,7 @@ object FastSyncBranchResolverActor:
                 case _ =>
                   log.warn(ReceivedWrongHeaders, blockHeaderNumberToSearch, headers.map(_.number))
                   handleInvalidResponse(peer, requestHandler)
-            case PeerRequestResult(RequestFailed(peer, reason)) =>
+            case PeerRequestResult(RequestFailed(_, peer, reason)) =>
               handleRequestFailure(peer, requestHandler, reason)
             case HandlerTerminated(ref) if ref == requestHandler =>
               handlePeerTermination(searchState.masterPeer, ref)
@@ -341,7 +341,8 @@ object FastSyncBranchResolverActor:
           requestMsg =
             ETH68GetBlockHeaders(ETHPackets.nextRequestId, Left(fromBlock), amount, skip = 0, reverse = false),
           responseMsgCode = Codes.BlockHeadersCode,
-          replyTo = prhResultAdapter
+          replyTo = prhResultAdapter,
+          requestId = 0
         )
       )
       context.watchWith(handler, HandlerTerminated(handler))

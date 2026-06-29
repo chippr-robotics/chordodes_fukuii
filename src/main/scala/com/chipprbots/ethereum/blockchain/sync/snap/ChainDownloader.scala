@@ -243,7 +243,7 @@ class ChainDownloader private (
             Behaviors.same
 
           // --- Header responses ---
-          case PeerResult(ResponseReceived(peer, ETHPackets.BlockHeaders(_, headers), _)) =>
+          case PeerResult(ResponseReceived(_, peer, ETHPackets.BlockHeaders(_, headers), _)) =>
             headerRequestPeers -= peer.id
             if headers.nonEmpty then
               emptyHeaderPeers -= peer.id
@@ -253,7 +253,7 @@ class ChainDownloader private (
               log.debug("Empty headers from {} — excluding from header dispatch", peer.id)
             dispatchRequests()
 
-          case PeerResult(RequestFailed(peer, reason)) =>
+          case PeerResult(RequestFailed(_, peer, reason)) =>
             headerRequestPeers -= peer.id
             bodyRequestPeers -= peer.id
             receiptRequestPeers -= peer.id
@@ -262,7 +262,7 @@ class ChainDownloader private (
             dispatchRequests()
 
           // --- Body responses ---
-          case PeerResult(ResponseReceived(peer, ETHPackets.BlockBodies(_, bodies), _)) =>
+          case PeerResult(ResponseReceived(_, peer, ETHPackets.BlockBodies(_, bodies), _)) =>
             bodyRequestPeers.get(peer.id).foreach { case (_, requestedHashes) =>
               bodyRequestPeers -= peer.id
               handleBodies(peer, requestedHashes, bodies)
@@ -270,7 +270,7 @@ class ChainDownloader private (
             dispatchRequests()
 
           // --- Receipt responses ---
-          case PeerResult(ResponseReceived(peer, eth66Receipts: ETHPackets.Receipts68, _)) =>
+          case PeerResult(ResponseReceived(_, peer, eth66Receipts: ETHPackets.Receipts68, _)) =>
             receiptRequestPeers.get(peer.id).foreach { case (_, requestedHashes) =>
               receiptRequestPeers -= peer.id
               handleReceipts(peer, requestedHashes, eth66Receipts)
@@ -278,7 +278,7 @@ class ChainDownloader private (
             dispatchRequests()
 
           // ETH70 partial receipt delivery
-          case PeerResult(ResponseReceived(peer, receipts70: ETHPackets.Receipts70, _)) =>
+          case PeerResult(ResponseReceived(_, peer, receipts70: ETHPackets.Receipts70, _)) =>
             receiptRequestPeers.get(peer.id).foreach { case (_, requestedHashes) =>
               receiptRequestPeers -= peer.id
               handleReceipts70(peer, requestedHashes, receipts70)
@@ -380,7 +380,8 @@ class ChainDownloader private (
             peerEventBus,
             requestMsg,
             Codes.BlockHeadersCode,
-            replyTo = prhResultAdapter
+            replyTo = prhResultAdapter,
+            requestId = 0
           ),
         s"chain-headers-${bestHeaderNumber + 1}-${System.nanoTime()}"
       )
@@ -401,7 +402,8 @@ class ChainDownloader private (
             peerEventBus,
             requestMsg,
             Codes.BlockBodiesCode,
-            replyTo = prhResultAdapter
+            replyTo = prhResultAdapter,
+            requestId = 0
           ),
         s"chain-bodies-${System.nanoTime()}"
       )
@@ -429,7 +431,8 @@ class ChainDownloader private (
               peerEventBus,
               requestMsg,
               Codes.ReceiptsCode,
-              replyTo = prhResultAdapter
+              replyTo = prhResultAdapter,
+              requestId = 0
             ),
           s"chain-receipts-eth70-${System.nanoTime()}"
         )
@@ -444,7 +447,8 @@ class ChainDownloader private (
               peerEventBus,
               requestMsg,
               Codes.ReceiptsCode,
-              replyTo = prhResultAdapter
+              replyTo = prhResultAdapter,
+              requestId = 0
             ),
           s"chain-receipts-${System.nanoTime()}"
         )
