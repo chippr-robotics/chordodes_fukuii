@@ -96,7 +96,7 @@ class OlympiaTxTypeAdmissionSpec
   private def signLegacy(): SignedTransaction =
     val tx = LegacyTransaction(
       nonce = 0,
-      gasPrice = BigInt(1_000_000_000),
+      gasPrice = GasPrice(1_000_000_000),
       gasLimit = GasAmount(21000),
       receivingAddress = Address(1),
       value = BigInt(0),
@@ -148,7 +148,7 @@ class OlympiaTxTypeAdmissionSpec
   private def signLegacyContractCreate(): SignedTransaction =
     val tx = LegacyTransaction(
       nonce = 0,
-      gasPrice = BigInt(1_000_000_000),
+      gasPrice = GasPrice(1_000_000_000),
       gasLimit = GasAmount(100000),
       receivingAddress = None,
       value = BigInt(0),
@@ -160,7 +160,7 @@ class OlympiaTxTypeAdmissionSpec
     val tx = TransactionWithAccessList(
       chainId = config.chainId,
       nonce = BigInt(0),
-      gasPrice = BigInt(1_000_000_000),
+      gasPrice = GasPrice(1_000_000_000),
       gasLimit = GasAmount(21000),
       receivingAddress = Some(Address(1)),
       value = BigInt(0),

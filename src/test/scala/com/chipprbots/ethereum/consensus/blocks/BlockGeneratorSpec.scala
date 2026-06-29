@@ -323,7 +323,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
 
     val transaction1: LegacyTransaction = LegacyTransaction(
       nonce = 0,
-      gasPrice = 1,
+      gasPrice = GasPrice(1),
       gasLimit = GasAmount(1000000),
       receivingAddress = None,
       value = 0,
@@ -433,7 +433,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
 
     val failingTransaction: LegacyTransaction = LegacyTransaction(
       nonce = 0,
-      gasPrice = 1,
+      gasPrice = GasPrice(1),
       gasLimit = GasAmount(txGasLimit),
       receivingAddress = Address(testAddress),
       value = txTransfer,
@@ -482,7 +482,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     ConsensusTest
   ) in new TestSetup:
     val txWitSameNonceButLowerGasPrice: SignedTransaction = SignedTransaction
-      .sign(transaction.copy(gasPrice = signedTransaction.tx.gasPrice - 1), keyPair, Some(BigInt(0x3d)))
+      .sign(transaction.copy(gasPrice = GasPrice(signedTransaction.tx.gasPrice.value - 1)), keyPair, Some(BigInt(0x3d)))
 
     val pendingBlock: PendingBlock =
       blockGenerator
@@ -531,7 +531,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     val txTransfer = 9000
     val transaction: LegacyTransaction = LegacyTransaction(
       nonce = 0,
-      gasPrice = 1,
+      gasPrice = GasPrice(1),
       gasLimit = GasAmount(txGasLimit),
       receivingAddress = Address(testAddress),
       value = txTransfer,
@@ -541,7 +541,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     val typedTransaction: TypedTransaction = TransactionWithAccessList(
       chainId = 61, // ethereum classic mainnet
       nonce = 0,
-      gasPrice = 1,
+      gasPrice = GasPrice(1),
       gasLimit = GasAmount(txGasLimit),
       receivingAddress = Address(testAddress),
       value = txTransfer,

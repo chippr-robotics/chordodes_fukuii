@@ -99,7 +99,7 @@ trait MinerSpecSetup
   val txToMine: SignedTransaction = SignedTransaction(
     tx = LegacyTransaction(
       nonce = BigInt("438553"),
-      gasPrice = BigInt("20000000000"),
+      gasPrice = GasPrice(BigInt("20000000000")),
       gasLimit = GasAmount(BigInt("50000")),
       receivingAddress = Address(ByteString(Hex.decode("3435be928d783b7c48a2c3109cba0d97d680747a"))),
       value = BigInt("108516826677274384"),

@@ -136,7 +136,7 @@ trait ObjectGenerators:
     payload <- byteStringOfLengthNGen(256)
   yield LegacyTransaction(
     nonce,
-    gasPrice,
+    GasPrice(gasPrice),
     GasAmount(gasLimit),
     receivingAddress,
     value,
@@ -155,7 +155,7 @@ trait ObjectGenerators:
   yield TransactionWithAccessList(
     chainId,
     nonce,
-    gasPrice,
+    GasPrice(gasPrice),
     GasAmount(gasLimit),
     receivingAddress,
     value,

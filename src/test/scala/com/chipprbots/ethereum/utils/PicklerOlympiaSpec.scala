@@ -75,7 +75,7 @@ class PicklerOlympiaSpec extends AnyFlatSpec with Matchers:
   "Mixed transaction types" should "roundtrip in sequence" taggedAs (OlympiaTest, UnitTest) in {
     val legacy: Transaction = LegacyTransaction(
       nonce = BigInt(0),
-      gasPrice = BigInt(20000000000L),
+      gasPrice = GasPrice(BigInt(20000000000L)),
       gasLimit = GasAmount(21000),
       receivingAddress = Address(1),
       value = BigInt(1000),

@@ -14,9 +14,15 @@ import com.chipprbots.ethereum.testing.Tags.*
   */
 class KzgCellProofsSpec extends AnyFunSuite with BeforeAndAfterAll with Matchers:
 
-  // Load once per JVM via the shared fixture; never free here. Freeing the process-global native setup
-  // in afterAll races with KzgPointEvaluationSpec when suites run concurrently (parallelExecution = true).
-  override def beforeAll(): Unit = KzgTestSetup.ensureLoaded()
+  override def beforeAll(): Unit =
+    try
+      CKZG4844JNI.loadNativeLibrary()
+      CKZG4844JNI.loadTrustedSetupFromResource("/trusted_setup.txt", classOf[CKZG4844JNI], 0L)
+    catch case _: Exception => () // already loaded by a prior test class in the same JVM
+
+  override def afterAll(): Unit =
+    try CKZG4844JNI.freeTrustedSetup()
+    catch case _: Exception => ()
 
   // A zero-filled blob: all 4096 field elements are 0, which is a valid BLS12-381 field element.
   private lazy val zeroBlobBytes: Array[Byte] = Array.fill[Byte](CKZG4844JNI.BYTES_PER_BLOB)(0)

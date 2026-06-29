@@ -79,7 +79,7 @@ class EIP1559FeeMarketSpec
   private def signLegacy(gasPrice: BigInt): SignedTransaction =
     val tx = LegacyTransaction(
       nonce = 0,
-      gasPrice = gasPrice,
+      gasPrice = GasPrice(gasPrice),
       gasLimit = GasAmount(21000),
       receivingAddress = Address(1),
       value = BigInt(0),

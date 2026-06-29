@@ -67,7 +67,7 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
 
   val defaultTx: LegacyTransaction = LegacyTransaction(
     nonce = 42,
-    gasPrice = 1,
+    gasPrice = GasPrice(1),
     gasLimit = GasAmount(90000),
     receivingAddress = receiverAddress,
     value = 0,
@@ -90,8 +90,8 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
   val defaultAddressesToDelete: Set[Address] =
     Set(Address(Hex.decode("01")), Address(Hex.decode("02")), Address(Hex.decode("03")))
   val defaultLogs: Seq[TxLogEntry] = Seq(defaultLog.copy(loggerAddress = defaultAddressesToDelete.head))
-  val defaultGasPrice: UInt256 = 10
-  val defaultGasLimit: UInt256 = 1000000
+  val defaultGasPrice: GasPrice = GasPrice(10)
+  val defaultGasLimit: UInt256  = 1000000
   val defaultValue: BigInt = 1000
 
   val emptyWorld: InMemoryWorldStateProxy = InMemoryWorldStateProxy(

@@ -145,7 +145,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         val testMining: Mining = newTestMining(vm = mockVM)
 
         val tx: LegacyTransaction = defaultTx.copy(
-          gasPrice = defaultGasLimit,
+          gasPrice = GasPrice(defaultGasLimit.toBigInt),
           gasLimit = GasAmount(defaultGasLimit.toBigInt),
           receivingAddress = None,
           payload = ByteString.empty
@@ -183,7 +183,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         )
 
       forAll(table) { (execGasUsed, gasRefundFromVM, error, gasUsed) =>
-        val balanceDelta = UInt256(gasUsed * defaultGasPrice)
+        val balanceDelta = UInt256(gasUsed * defaultGasPrice.value)
 
         val tx = defaultTx.copy(gasPrice = defaultGasPrice, gasLimit = GasAmount(defaultGasLimit.toBigInt))
 
@@ -267,7 +267,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
       createResult(pc, defaultGasLimit, defaultGasLimit, 0, None, returnData = ByteString("contract code"))
     )
 
-    val tx: LegacyTransaction = defaultTx.copy(gasPrice = 0, receivingAddress = None, payload = inputData)
+    val tx: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice.Zero, receivingAddress = None, payload = inputData)
     val stx: SignedTransaction = SignedTransaction.sign(tx, newAccountKeyPair, Some(blockchainConfig.chainId))
 
     val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
@@ -303,10 +303,10 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
             if stx.tx.receivingAddress.contains(Address(42)) then Right(SignedTransactionValid)
             else Left(TransactionSignatureError)
 
-    val tx1: LegacyTransaction = defaultTx.copy(gasPrice = 42, receivingAddress = Some(Address(42)))
-    val tx2: LegacyTransaction = defaultTx.copy(gasPrice = 43, receivingAddress = Some(Address(43)))
-    val tx3: LegacyTransaction = defaultTx.copy(gasPrice = 43, receivingAddress = Some(Address(43)))
-    val tx4: LegacyTransaction = defaultTx.copy(gasPrice = 42, receivingAddress = Some(Address(42)))
+    val tx1: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(42), receivingAddress = Some(Address(42)))
+    val tx2: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(43), receivingAddress = Some(Address(43)))
+    val tx3: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(43), receivingAddress = Some(Address(43)))
+    val tx4: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(42), receivingAddress = Some(Address(42)))
     val stx1: SignedTransaction = SignedTransaction.sign(tx1, newAccountKeyPair, Some(blockchainConfig.chainId))
     val stx2: SignedTransaction = SignedTransaction.sign(tx2, newAccountKeyPair, Some(blockchainConfig.chainId))
     val stx3: SignedTransaction = SignedTransaction.sign(tx3, newAccountKeyPair, Some(blockchainConfig.chainId))
@@ -340,8 +340,8 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
           )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
             Left(TransactionSignatureError)
 
-    val tx1: LegacyTransaction = defaultTx.copy(gasPrice = 42, receivingAddress = Some(Address(42)))
-    val tx2: LegacyTransaction = defaultTx.copy(gasPrice = 42, receivingAddress = Some(Address(42)))
+    val tx1: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(42), receivingAddress = Some(Address(42)))
+    val tx2: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(42), receivingAddress = Some(Address(42)))
     val stx1: SignedTransaction = SignedTransaction.sign(tx1, newAccountKeyPair, Some(blockchainConfig.chainId))
     val stx2: SignedTransaction = SignedTransaction.sign(tx2, newAccountKeyPair, Some(blockchainConfig.chainId))
 
@@ -403,7 +403,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     val testMining: Mining = newTestMining(vm = mockVM)
 
     val tx: LegacyTransaction = defaultTx.copy(
-      gasPrice = defaultGasLimit,
+      gasPrice = GasPrice(defaultGasLimit.toBigInt),
       gasLimit = GasAmount(defaultGasLimit.toBigInt),
       receivingAddress = None,
       payload = ByteString.empty

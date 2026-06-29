@@ -70,7 +70,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   // Contract creation (receivingAddress = None) with oversized initcode.
   private val initcodeTx: LegacyTransaction = LegacyTransaction(
     nonce = 0,
-    gasPrice = BigInt("1000000000"),
+    gasPrice = GasPrice(BigInt("1000000000")),
     gasLimit = GasAmount(BigInt("1000000")),
     receivingAddress = None,
     value = BigInt(0),
@@ -154,7 +154,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
 
   private val wordCostTx: LegacyTransaction = LegacyTransaction(
     nonce = 0,
-    gasPrice = BigInt("1000000000"),
+    gasPrice = GasPrice(BigInt("1000000000")),
     gasLimit = GasAmount(BigInt(56213)), // 56214 - 1: below post-Shanghai intrinsic, above pre-Shanghai
     receivingAddress = None,
     value = BigInt(0),
@@ -309,7 +309,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   private def signedTxWithNonce(n: BigInt): SignedTransaction = SignedTransaction(
     LegacyTransaction(
       nonce = n,
-      gasPrice = BigInt("1000000000"),
+      gasPrice = GasPrice(BigInt("1000000000")),
       gasLimit = GasAmount(BigInt("100000")),
       receivingAddress = Some(Address(0xcafe)),
       value = BigInt(0),

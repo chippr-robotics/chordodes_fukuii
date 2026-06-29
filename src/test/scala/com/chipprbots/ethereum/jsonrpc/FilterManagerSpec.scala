@@ -91,7 +91,7 @@ class FilterManagerSpec
         SignedTransaction(
           tx = LegacyTransaction(
             nonce = 0,
-            gasPrice = 123,
+            gasPrice = GasPrice(123),
             gasLimit = GasAmount(123),
             receivingAddress = Address("0x1234"),
             value = 0,
@@ -171,7 +171,7 @@ class FilterManagerSpec
         SignedTransaction(
           tx = LegacyTransaction(
             nonce = 0,
-            gasPrice = 123,
+            gasPrice = GasPrice(123),
             gasLimit = GasAmount(123),
             receivingAddress = Address("0x1234"),
             value = 0,
@@ -182,7 +182,7 @@ class FilterManagerSpec
         SignedTransaction(
           tx = LegacyTransaction(
             nonce = 0,
-            gasPrice = 123,
+            gasPrice = GasPrice(123),
             gasLimit = GasAmount(123),
             receivingAddress = Address("0x123456"),
             value = 0,
@@ -257,7 +257,7 @@ class FilterManagerSpec
         SignedTransaction(
           tx = LegacyTransaction(
             nonce = 0,
-            gasPrice = 123,
+            gasPrice = GasPrice(123),
             gasLimit = GasAmount(123),
             receivingAddress = Address("0x1234"),
             value = 0,
@@ -297,7 +297,7 @@ class FilterManagerSpec
       SignedTransaction(
         tx = LegacyTransaction(
           nonce = 0,
-          gasPrice = 321,
+          gasPrice = GasPrice(321),
           gasLimit = GasAmount(321),
           receivingAddress = Address("0x1234"),
           value = 0,
@@ -401,7 +401,7 @@ class FilterManagerSpec
 
     val tx: LegacyTransaction = LegacyTransaction(
       nonce = 0,
-      gasPrice = 123,
+      gasPrice = GasPrice(123),
       gasLimit = GasAmount(123),
       receivingAddress = Address("0x1234"),
       value = 0,
@@ -436,7 +436,7 @@ class FilterManagerSpec
 
     val tx: LegacyTransaction = LegacyTransaction(
       nonce = 0,
-      gasPrice = 123,
+      gasPrice = GasPrice(123),
       gasLimit = GasAmount(123),
       receivingAddress = Address("0x1234"),
       value = 0,
