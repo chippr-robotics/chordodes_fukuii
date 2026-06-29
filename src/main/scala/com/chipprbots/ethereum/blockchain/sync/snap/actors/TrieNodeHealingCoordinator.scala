@@ -2414,6 +2414,10 @@ object TrieNodeHealingCoordinator:
       frontierBackpressureMaxWaitMs: Long = FrontierBackpressureMaxWaitMs,
       scopedHealVerification: Boolean = true,
       scopedHealMaxPaths: Int = DefaultScopedHealMaxPaths,
+      // spec 005 pruned descend-and-stop. Exposed through the factory (the #1373 typed rewrite dropped this forward)
+      // so PrunedHealFallbackSpec's flag-OFF case can drive `prunedEnabled = false`. Production omits it and keeps the
+      // impl default (true) ⇒ byte-for-byte no-op. `prunedEnabled` also requires Hash scheme + a present frontier store.
+      prunedHealVerification: Boolean = true,
       // spec 002 frontier persistence (Layer-2 mirror writes + completeness markers). Exposed here so production
       // (SNAPSyncController, wired from sync.conf's healing-frontier-persistence) and tests can enable it. Defaults
       // OFF to match the impl default and the spec-005 decoupling (store may be present for pruned-heal records only).
@@ -2448,6 +2452,7 @@ object TrieNodeHealingCoordinator:
           frontierBackpressureMaxWaitMs = frontierBackpressureMaxWaitMs,
           scopedHealVerification = scopedHealVerification,
           scopedHealMaxPaths = scopedHealMaxPaths,
+          prunedHealVerification = prunedHealVerification,
           frontierPersistenceEnabled = frontierPersistenceEnabled,
           decoupledHealServeRoot = decoupledHealServeRoot,
           decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh
