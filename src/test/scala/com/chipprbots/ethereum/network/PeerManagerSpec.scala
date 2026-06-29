@@ -378,7 +378,7 @@ class PeerManagerSpec
 
     start()
 
-    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, discardReplyRef)
     assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 
@@ -422,7 +422,7 @@ class PeerManagerSpec
     start()
 
     // Register and handshake the maintained peer (outgoing)
-    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, discardReplyRef)
     assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
     createdPeers(0).probe.reply(
@@ -480,7 +480,7 @@ class PeerManagerSpec
 
     start()
 
-    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, discardReplyRef)
     assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
     // Outbound actor is pending (nodeId = None in connectedPeers).
@@ -502,7 +502,7 @@ class PeerManagerSpec
 
     start()
 
-    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, discardReplyRef)
     assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 
@@ -544,7 +544,7 @@ class PeerManagerSpec
     start()
 
     // Outbound actor created, pending in pendingMaintainedConnections
-    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, discardReplyRef)
     assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 
@@ -581,7 +581,7 @@ class PeerManagerSpec
     start()
 
     // Step 1: outbound initiated for the maintained peer
-    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, discardReplyRef)
     assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 
@@ -646,7 +646,7 @@ class PeerManagerSpec
     // Step 1: outbound dials out for the maintained peer.
     // AddMaintainedPeer publishes MaintainedPeersChanged to peerEventBus — drain it so
     // the final expectNoMessage assertion does not see a stale message.
-    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, discardReplyRef)
     peerEventBus.fishForMessage(3.seconds, "waiting for MaintainedPeersChanged") {
       case PublishCmd(PeerEvent.MaintainedPeersChanged(_)) => true
       case _                                               => false
@@ -959,6 +959,13 @@ class PeerManagerSpec
   trait TestSetup:
     def testScheduler: ExplicitlyTriggeredScheduler =
       classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
+
+    // In the pre-#1373 Classic API, AddMaintainedPeer was fire-and-forget: `sender()` returned deadLetters
+    // (not null) when called with no sender. The #1373 typed rewrite introduced AddMaintainedPeerCmd with an
+    // explicit `replyTo: typed.ActorRef[AddMaintainedPeerResponse]`. Tests that don't care about the response
+    // must supply a valid (non-null) discard target — Actor.noSender is null in Pekko and NPEs the actor.
+    lazy val discardReplyRef: typed.ActorRef[PeerManagerActor.AddMaintainedPeerResponse] =
+      testKit.createTestProbe[PeerManagerActor.AddMaintainedPeerResponse]().ref
 
     case class TestPeer(peer: Peer, probe: TestProbe)
     var createdPeers: Seq[TestPeer] = Seq.empty

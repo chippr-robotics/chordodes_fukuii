@@ -132,6 +132,11 @@ class ScopedVerificationFallbackSpec
       batchSize = 64,
       snapSyncController = controller.ref,
       healingFrontierStorage = Some(store),
+      // The completeness marker (markComplete/clearComplete) IS a frontier-persistence feature — the F5 guard
+      // verifies a differing-root HealingPivotRefreshed clears it (via clearPersistedFrontier → store.clearComplete),
+      // which is gated on this flag in production. Proven-live at PR #1371; the #1373 typed rewrite dropped this
+      // fixture parameter, leaving clearComplete dark and F5 unable to observe the marker clear.
+      frontierPersistenceEnabled = true,
       healingWriterEcOverride = Some(ec),
       scopedHealVerification = scoped,
       scopedHealMaxPaths = maxPaths

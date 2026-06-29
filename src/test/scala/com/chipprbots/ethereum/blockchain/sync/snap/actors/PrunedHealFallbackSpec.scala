@@ -116,7 +116,8 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
       stateRoot: ByteString,
       storage: TestMptStorage,
       storageScheme: StorageScheme,
-      seedPathRoot: Boolean = false
+      seedPathRoot: Boolean = false,
+      prunedHealVerification: Boolean = true
   )(
       body: (
           ActorRef[TrieNodeHealingCoordinator.Command],
@@ -151,7 +152,8 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
       healingFrontierStorage = Some(store),
       healingWriterEcOverride = Some(ec),
       storageScheme = storageScheme,
-      pathNodeStorageOpt = pathNodeStorageOpt
+      pathNodeStorageOpt = pathNodeStorageOpt,
+      prunedHealVerification = prunedHealVerification
     )
     try body(coordinator, store, controller)
     finally
@@ -179,7 +181,12 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
     "take the full-trie walk and NOT prune a recorded subtree when the flag is OFF" taggedAs UnitTest in {
       val storage = new TestMptStorage()
       val (root, subtreeRoot) = presentSubtree(storage)
-      withVerificationFixture(root, storage, storageScheme = StorageScheme.Hash) { (coordinator, store, controller) =>
+      withVerificationFixture(
+        root,
+        storage,
+        storageScheme = StorageScheme.Hash,
+        prunedHealVerification = false
+      ) { (coordinator, store, controller) =>
         store.markSubtreeComplete(subtreeRoot) // a record EXISTS, but the flag is off ⇒ it must be ignored
         SNAPSyncMetrics.setHealingPrunedVerification(-1L)
         SNAPSyncMetrics.setHealingPrunedSubtrees(-1L)

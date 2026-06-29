@@ -83,6 +83,12 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers:
 
   /** Run block in an isolated thread; return None if it exceeds timeoutMs. Prevents the test suite from hanging when
     * Phase 3 stalls.
+    *
+    * NOTE: the catch-case body MUST be on its own indented lines. The previous single-line form `catch case _:
+    * TimeoutException => f.cancel(true); None` mis-parsed under Scala 3 significant indentation: the trailing `None`
+    * bound to the OUTER `try` block instead of the catch case, so `Some(f.get(...))` was computed-then-discarded and
+    * this helper returned `None` UNCONDITIONALLY — making every timeout-wrapped assertion (`result shouldBe defined`)
+    * fail regardless of the result.
     */
   private def runWithTimeout[T](timeoutMs: Long)(block: => T): Option[T] =
     val ex = Executors.newSingleThreadExecutor()
@@ -90,7 +96,10 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers:
       val callable: Callable[T] = () => block
       val f: JFuture[T] = ex.submit(callable)
       try Some(f.get(timeoutMs, TimeUnit.MILLISECONDS))
-      catch case _: java.util.concurrent.TimeoutException => f.cancel(true); None
+      catch
+        case _: java.util.concurrent.TimeoutException =>
+          f.cancel(true)
+          None
     finally ex.shutdown()
 
   // ── Shared large fixtures (built once, reused across groups 1-2) ─────────────

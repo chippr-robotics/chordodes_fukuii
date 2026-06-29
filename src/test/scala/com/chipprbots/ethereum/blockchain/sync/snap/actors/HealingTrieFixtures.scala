@@ -74,6 +74,9 @@ object HealingTrieFixtures:
       frontierBackpressureMaxWaitMs: Long = TrieNodeHealingCoordinator.FrontierBackpressureMaxWaitMs,
       scopedHealVerification: Boolean = true,
       scopedHealMaxPaths: Int = TrieNodeHealingCoordinator.DefaultScopedHealMaxPaths,
+      // spec 005 pruned descend-and-stop. Restored test seam (the #1373 typed rewrite dropped this thread-through) so
+      // PrunedHealFallbackSpec can spawn a flag-OFF coordinator. Defaults true to match the impl/factory default.
+      prunedHealVerification: Boolean = true,
       // spec 002 frontier persistence. Default OFF to match the production constructor default and the spec-005
       // decoupling (PrunedHealParitySpec / PrunedHealFallbackSpec rely on the default-off, store-present case). Specs
       // that exercise the Layer-2 mirror writes / completeness markers (HealingFrontierResumeSpec) set this true.
@@ -105,6 +108,7 @@ object HealingTrieFixtures:
         frontierBackpressureMaxWaitMs = frontierBackpressureMaxWaitMs,
         scopedHealVerification = scopedHealVerification,
         scopedHealMaxPaths = scopedHealMaxPaths,
+        prunedHealVerification = prunedHealVerification,
         frontierPersistenceEnabled = frontierPersistenceEnabled,
         decoupledHealServeRoot = decoupledHealServeRoot,
         decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh
