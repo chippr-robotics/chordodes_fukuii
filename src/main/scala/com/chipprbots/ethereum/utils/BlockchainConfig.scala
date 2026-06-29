@@ -53,7 +53,7 @@ case class BlockchainConfig(
     messConfig: MESSConfig = MESSConfig(),
     treasuryAddress: Address = Address(0),
     baseFeeFloor: BigInt = BigInt(0),
-    minTip: BigInt = BigInt(1),
+    minTip: BigInt = BigInt(1000000000),
     networkType: NetworkType = NetworkType.ETC,
     terminalTotalDifficulty: Option[BigInt] = None,
     forkTimestamps: ForkTimestamps = ForkTimestamps()
