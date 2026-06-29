@@ -93,9 +93,9 @@ class BlockPreparator(
     else
       if treasuryAddress == Address(0) && blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC
       then
-        log.error(
-          "Olympia is active at block {} but treasury address is zero — baseFee revenue will not be credited",
-          blockHeader.number
+        throw new IllegalStateException(
+          s"OLYMPIA SAFETY: treasury address is zero at block ${blockHeader.number}. " +
+            "Set treasury-address in chain config before activating Olympia."
         )
 
       blockHeader.baseFee match
