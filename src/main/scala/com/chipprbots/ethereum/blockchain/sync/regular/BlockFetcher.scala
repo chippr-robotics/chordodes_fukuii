@@ -67,21 +67,21 @@ class BlockFetcher(
       HeadersFetcher(peersClient, syncConfig, context.self),
       "headers-fetcher"
     )
-  context.watch(headersFetcher)
+  context.watchWith(headersFetcher, ChildStopped("headers-fetcher"))
 
   val bodiesFetcher: ActorRef[BodiesFetcher.BodiesFetcherCommand] =
     context.spawn(
       BodiesFetcher(peersClient, syncConfig, context.self),
       "bodies-fetcher"
     )
-  context.watch(bodiesFetcher)
+  context.watchWith(bodiesFetcher, ChildStopped("bodies-fetcher"))
 
   val stateNodeFetcher: ActorRef[StateNodeFetcher.StateNodeFetcherCommand] =
     context.spawn(
       StateNodeFetcher(peersClient, syncConfig, context.self),
       "state-node-fetcher"
     )
-  context.watch(stateNodeFetcher)
+  context.watchWith(stateNodeFetcher, ChildStopped("state-node-fetcher"))
 
   override def onMessage(message: FetchCommand): Behavior[FetchCommand] =
     message match
@@ -490,6 +490,10 @@ class BlockFetcher(
         val newState = state.withLastBlock(blockNr).withPossibleNewTopAt(blockNr)
         fetchBlocks(newState)
 
+      case ChildStopped(name) =>
+        log.warn("BlockFetcher child actor '{}' terminated unexpectedly", name)
+        Behaviors.same
+
       case msg =>
         log.debug("Block fetcher received unhandled message {}", msg)
         Behaviors.unhandled
@@ -697,6 +701,7 @@ object BlockFetcher:
     )
 
   sealed trait FetchCommand
+  final case class ChildStopped(name: String) extends FetchCommand
   final case class Start(importer: ActorRef[BlockImporter.Command], fromBlock: BigInt) extends FetchCommand
   final case class FetchStateNode(
       hash: ByteString,
