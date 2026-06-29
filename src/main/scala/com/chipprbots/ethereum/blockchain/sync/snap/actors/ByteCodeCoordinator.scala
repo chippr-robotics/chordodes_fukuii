@@ -125,6 +125,10 @@ private class ByteCodeCoordinatorImpl(
   private val maxWorkers = 32
   private[actors] val idleWorkers = mutable.LinkedHashSet.empty[WorkerRef]
 
+  // Monotonically increasing counter for unique worker child names. Workers can be removed and
+  // re-created; using the set size would produce duplicate names when replacements are spawned.
+  private var workerSeq: Int = 0
+
   // Sentinel: when true, no more AddByteCodeTasks will arrive (all accounts downloaded).
   // Completion is only reported after this is set AND pending+active tasks drain.
   // Geth-aligned: coordinators run from start, tasks arrive inline during account download.
@@ -664,7 +668,8 @@ private class ByteCodeCoordinatorImpl(
       snapSyncController ! SNAPSyncController.ByteCodeSyncComplete
 
   private def createWorker(): WorkerRef =
-    val worker: WorkerRef = context.spawnAnonymous(
+    workerSeq += 1
+    val worker: WorkerRef = context.spawn(
       Behaviors
         .supervise(
           ByteCodeWorker(
@@ -674,6 +679,7 @@ private class ByteCodeCoordinatorImpl(
           )
         )
         .onFailure[Throwable](SupervisorStrategy.restart.withLimit(5, 1.minute)),
+      s"bytecode-worker-$workerSeq",
       org.apache.pekko.actor.typed.Props.empty.withDispatcherFromConfig("sync-dispatcher")
     )
     // Typed watch: on worker stop, deliver WorkerTerminated(worker) instead of a raw Terminated signal.
