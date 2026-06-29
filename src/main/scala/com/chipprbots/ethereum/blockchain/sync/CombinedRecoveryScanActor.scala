@@ -9,6 +9,8 @@ import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 
+import org.slf4j.LoggerFactory
+
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
@@ -48,6 +50,7 @@ object CombinedRecoveryScanActor:
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] =
     Behaviors.setup { ctx =>
+      val asyncLog = LoggerFactory.getLogger(getClass)
       ctx.log.info(
         s"CombinedRecoveryScanActor starting: parallel single-pass scan " +
           s"(stateRoot=${stateRoot.take(4).toArray.map("%02x".format(_)).mkString}..., " +
@@ -68,7 +71,7 @@ object CombinedRecoveryScanActor:
       ) {
         case Success(result) => ScanDone(result)
         case Failure(ex) =>
-          ctx.log.error("Combined recovery scan failed — reporting no gaps; regular sync will fetch on-demand", ex)
+          asyncLog.error("Combined recovery scan failed — reporting no gaps; regular sync will fetch on-demand", ex)
           ScanDone(RecoveryScanResult(Vector.empty, Vector.empty))
       }
       Behaviors.receiveMessage { case ScanDone(result) =>

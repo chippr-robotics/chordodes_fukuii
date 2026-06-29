@@ -16,6 +16,7 @@ import scala.util.Failure
 import scala.util.Success
 
 import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 import com.chipprbots.ethereum.db.storage.AppStateStorage
@@ -150,6 +151,7 @@ object BytecodeRecoveryActor:
       coordinatorForTesting: Option[ActorRef]
   ): Behavior[Command] =
     Behaviors.setup { ctx =>
+      val asyncLog = LoggerFactory.getLogger(getClass)
       preloaded match
         case Some(missing) =>
           ctx.self ! ScanResult(missing)
@@ -165,7 +167,7 @@ object BytecodeRecoveryActor:
           ) {
             case Success(result) => ScanResult(result)
             case Failure(ex) =>
-              ctx.log.error("Bytecode recovery scan failed", ex)
+              asyncLog.error("Bytecode recovery scan failed", ex)
               ScanResult(Seq.empty)
           }
       Behaviors.receiveMessage {

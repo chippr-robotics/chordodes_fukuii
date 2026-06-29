@@ -16,6 +16,7 @@ import scala.util.Failure
 import scala.util.Success
 
 import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import com.chipprbots.ethereum.blockchain.sync.ProgressMilestones
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
@@ -174,6 +175,7 @@ object StorageRecoveryActor:
       coordinatorForTesting: Option[ActorRef]
   ): Behavior[Command] =
     Behaviors.setup { ctx =>
+      val asyncLog = LoggerFactory.getLogger(getClass)
       preloaded match
         case Some(missing) =>
           ctx.self ! ScanResult(missing)
@@ -187,7 +189,7 @@ object StorageRecoveryActor:
           ) {
             case Success(result) => ScanResult(result)
             case Failure(ex) =>
-              ctx.log.error("Storage recovery scan failed", ex)
+              asyncLog.error("Storage recovery scan failed", ex)
               ScanResult(Seq.empty)
           }
       Behaviors.receiveMessage {
