@@ -10,6 +10,7 @@ import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.concurrent.blocking
 import scala.concurrent.duration.*
 import scala.concurrent.duration.Duration
 import scala.jdk.CollectionConverters.*
@@ -300,7 +301,12 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
       )
       while pendingBackpressure.get() > frontierLowWater &&
         System.currentTimeMillis() - startWait < frontierBackpressureMaxWaitMs
-      do Thread.sleep(200)
+      do
+        // blocking{} lets a ForkJoin-backed EC (e.g. the test injected EC) compensate with a spare
+        // thread while parked here. On the production healing-writer-dispatcher (fixed thread pool)
+        // this is a no-op, but documents that the sleep is intentionally blocking — consistent with
+        // the Await.result(blocking{...}) pattern already used in rebuildFrontierBFS.
+        blocking { Thread.sleep(200) }
       val waitedMs = System.currentTimeMillis() - startWait
       if pendingBackpressure.get() > frontierLowWater then
         log.warn(
