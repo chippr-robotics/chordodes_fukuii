@@ -29,7 +29,7 @@ class StdSignedLegacyTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   val txBeforeHomestead: LegacyTransaction = LegacyTransaction(
     nonce = 81,
     gasPrice = BigInt("60000000000"),
-    gasLimit = 21000,
+    gasLimit = GasAmount(21000),
     receivingAddress = Address(Hex.decode("32be343b94f860124dc4fee278fdcbd38c102d88")),
     value = BigInt("1143962220000000000"),
     payload = ByteString.empty
@@ -45,7 +45,7 @@ class StdSignedLegacyTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   val txAfterHomestead: LegacyTransaction = LegacyTransaction(
     nonce = 1631,
     gasPrice = BigInt("30000000000"),
-    gasLimit = 21000,
+    gasLimit = GasAmount(21000),
     receivingAddress = Address(Hex.decode("1e0cf4971f42462823b122a9a0a2206902b51132")),
     value = BigInt("1050230460000000000"),
     payload = ByteString.empty
@@ -66,10 +66,10 @@ class StdSignedLegacyTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     Account.empty(UInt256(txAfterHomestead.nonce)).copy(balance = senderBalance)
 
   val blockHeaderBeforeHomestead: BlockHeader =
-    Fixtures.Blocks.Block3125369.header.copy(number = 1100000, gasLimit = 4700000)
+    Fixtures.Blocks.Block3125369.header.copy(number = 1100000, gasLimit = GasAmount(4700000))
 
   val blockHeaderAfterHomestead: BlockHeader =
-    Fixtures.Blocks.Block3125369.header.copy(number = 1200003, gasLimit = 4710000)
+    Fixtures.Blocks.Block3125369.header.copy(number = 1200003, gasLimit = GasAmount(4710000))
 
   val accumGasUsed = 0 // Both are the first tx in the block
 
@@ -138,7 +138,7 @@ class StdSignedLegacyTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   it should "report as syntactic invalid a tx with long gas limit" taggedAs (UnitTest, ConsensusTest) in {
     val invalidGasLimit = (0 until LegacyTransaction.GasLength + 1).map(_ => 1.toByte).toArray
     val signedTxWithInvalidGasLimit =
-      signedTxBeforeHomestead.copy(tx = txBeforeHomestead.copy(gasLimit = BigInt(invalidGasLimit)))
+      signedTxBeforeHomestead.copy(tx = txBeforeHomestead.copy(gasLimit = GasAmount(BigInt(invalidGasLimit))))
     validateStx(signedTxWithInvalidGasLimit, fromBeforeHomestead = true) match
       case Left(_: TransactionSyntaxError) => succeed
       case _                               => fail()
@@ -211,7 +211,7 @@ class StdSignedLegacyTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     val txIntrinsicGas = EvmConfig
       .forBlock(blockHeaderAfterHomestead.number, blockchainConfig)
       .calcTransactionIntrinsicGas(txAfterHomestead.payload, txAfterHomestead.isContractInit, Nil)
-    val txWithInvalidGasLimit = txAfterHomestead.copy(gasLimit = txIntrinsicGas / 2)
+    val txWithInvalidGasLimit = txAfterHomestead.copy(gasLimit = GasAmount(txIntrinsicGas / 2))
     val signedTxWithInvalidGasLimit = signedTxAfterHomestead.copy(tx = txWithInvalidGasLimit)
     validateStx(signedTxWithInvalidGasLimit, fromBeforeHomestead = false) match
       case Left(_: TransactionNotEnoughGasForIntrinsicError) => succeed
@@ -235,7 +235,8 @@ class StdSignedLegacyTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "report as invalid a tx with too high gas limit for block gas limit" taggedAs (UnitTest, ConsensusTest) in {
-    val txWithInvalidGasLimit = txAfterHomestead.copy(gasLimit = blockHeaderAfterHomestead.gasLimit + 1)
+    val txWithInvalidGasLimit =
+      txAfterHomestead.copy(gasLimit = GasAmount(blockHeaderAfterHomestead.gasLimit.value + 1))
     val signedTxWithInvalidGasLimit = signedTxAfterHomestead.copy(tx = txWithInvalidGasLimit)
     validateStx(signedTxWithInvalidGasLimit, fromBeforeHomestead = false) match
       case Left(_: TransactionGasLimitTooBigError) => succeed

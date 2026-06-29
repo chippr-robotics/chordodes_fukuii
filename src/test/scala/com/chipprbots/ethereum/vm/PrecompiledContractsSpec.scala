@@ -12,6 +12,7 @@ import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
@@ -33,8 +34,8 @@ class PrecompiledContractsSpec extends AnyFunSuite with Matchers with ScalaCheck
     val fakeHeader = BlockFixtures.ValidBlock.header.copy(
       difficulty = Difficulty.Zero,
       number = blockNumber,
-      gasLimit = 0,
-      gasUsed = 0,
+      gasLimit = GasAmount.Zero,
+      gasUsed = GasAmount.Zero,
       unixTimestamp = 0
     )
 

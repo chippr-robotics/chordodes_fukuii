@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.Fixtures as CommonFixtures
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
 import com.chipprbots.ethereum.domain.UInt256
@@ -33,7 +34,7 @@ class ProgramContextEffectiveGasPriceSpec extends AnyFlatSpec with Matchers:
       nonce = 0,
       maxPriorityFeePerGas = maxPriorityFeePerGas,
       maxFeePerGas = maxFeePerGas,
-      gasLimit = 100000,
+      gasLimit = GasAmount(100000),
       receivingAddress = Some(Address(ByteString(Array.fill[Byte](20)(0xcc.toByte)))),
       value = 0,
       payload = ByteString.empty,

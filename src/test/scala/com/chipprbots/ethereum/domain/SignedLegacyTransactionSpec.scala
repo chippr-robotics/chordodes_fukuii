@@ -87,7 +87,7 @@ class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBeha
     val legacyTransaction = LegacyTransaction(
       nonce = 9,
       gasPrice = 20 * BigInt(10).pow(9),
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Address("0x3535353535353535353535353535353535353535"),
       value = BigInt(10).pow(18),
       payload = ByteString.empty

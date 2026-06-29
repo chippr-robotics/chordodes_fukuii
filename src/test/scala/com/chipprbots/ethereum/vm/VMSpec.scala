@@ -153,8 +153,8 @@ class VMSpec extends AnyWordSpec with ScalaCheckPropertyChecks with Matchers:
     val blockHeader: BlockHeader = BlockFixtures.ValidBlock.header.copy(
       difficulty = Difficulty(1000000),
       number = 1,
-      gasLimit = 10000000,
-      gasUsed = 0,
+      gasLimit = GasAmount(10000000),
+      gasUsed = GasAmount.Zero,
       unixTimestamp = 0
     )
 

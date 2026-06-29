@@ -37,6 +37,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.keystore.KeyStore
@@ -272,8 +273,8 @@ class JsonRpcControllerFixture(implicit
     logsBloom = BloomFilter.Empty,
     difficulty = Difficulty(10),
     number = 2,
-    gasLimit = 0,
-    gasUsed = 0,
+    gasLimit = GasAmount.Zero,
+    gasUsed = GasAmount.Zero,
     unixTimestamp = 0
   )
 

@@ -51,7 +51,7 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger:
 
     // Execute transaction with gasLimit lesser by one that estimated minimum
     val errorExecResult: TxResult = mining.blockPreparator.executeTransaction(
-      stx.copy(tx = Transaction.withGasLimit(estimationResult - 1)(stx.tx)),
+      stx.copy(tx = Transaction.withGasLimit(GasAmount(estimationResult - 1))(stx.tx)),
       fromAddress,
       genesisHeader,
       worldWithAccount
@@ -227,11 +227,13 @@ trait ScenarioSetup extends EphemBlockchainTestSetup:
 
   val block: Block = someGenesisBlock.toBlock
   val genesisBlock: Block =
-    block.copy(header = block.header.copy(stateRoot = TrieRoot(worldWithAccount.stateRootHash), gasLimit = 1000000))
+    block.copy(header =
+      block.header.copy(stateRoot = TrieRoot(worldWithAccount.stateRootHash), gasLimit = GasAmount(1000000))
+    )
   val genesisHash: ByteString = genesisBlock.header.hash.value
   val genesisHeader: BlockHeader = genesisBlock.header
   val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesisHeader)
-  val lastBlockGasLimit: BigInt = genesisBlock.header.gasLimit
+  val lastBlockGasLimit: GasAmount = genesisBlock.header.gasLimit
 
   blockchainWriter
     .storeBlock(genesisBlock)
