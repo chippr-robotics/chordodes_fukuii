@@ -324,7 +324,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
         // thread while parked here. On the production healing-writer-dispatcher (fixed thread pool)
         // this is a no-op, but documents that the sleep is intentionally blocking — consistent with
         // the Await.result(blocking{...}) pattern already used in rebuildFrontierBFS.
-        blocking { Thread.sleep(200) }
+        blocking(Thread.sleep(200))
       val waitedMs = System.currentTimeMillis() - startWait
       if pendingBackpressure.get() > frontierLowWater then
         log.warn(

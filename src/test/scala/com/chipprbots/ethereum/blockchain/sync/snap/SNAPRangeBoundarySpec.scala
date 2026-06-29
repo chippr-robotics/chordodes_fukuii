@@ -24,21 +24,21 @@ class SNAPRangeBoundarySpec extends AnyFunSuite with ScalaCheckPropertyChecks:
   // AccountTask — property: partition invariants for any concurrency 1-64
   // -----------------------------------------------------------------------
 
-  test("createInitialTasks: first task starts at 0x00..00 for any concurrency", UnitTest, SyncTest) {
+  test("createInitialTasks: first task starts at 0x00..00 for any concurrency", UnitTest) {
     forAll(Gen.choose(1, 64)) { (n: Int) =>
       val tasks = AccountTask.createInitialTasks(dummyRoot, n)
       assert(tasks.head.next == zeroHash, s"First task at concurrency=$n starts at ${tasks.head.next} not zero")
     }
   }
 
-  test("createInitialTasks: last task ends at MaxHash for any concurrency", UnitTest, SyncTest) {
+  test("createInitialTasks: last task ends at MaxHash for any concurrency", UnitTest) {
     forAll(Gen.choose(1, 64)) { (n: Int) =>
       val tasks = AccountTask.createInitialTasks(dummyRoot, n)
       assert(tasks.last.last == maxHash, s"Last task at concurrency=$n ends at ${tasks.last.last} not MaxHash")
     }
   }
 
-  test("createInitialTasks: ranges are perfectly contiguous for any concurrency", UnitTest, SyncTest) {
+  test("createInitialTasks: ranges are perfectly contiguous for any concurrency", UnitTest) {
     forAll(Gen.choose(2, 64)) { (n: Int) =>
       val tasks = AccountTask.createInitialTasks(dummyRoot, n)
       tasks.sliding(2).foreach { pair =>
@@ -49,7 +49,7 @@ class SNAPRangeBoundarySpec extends AnyFunSuite with ScalaCheckPropertyChecks:
     }
   }
 
-  test("createInitialTasks: all tasks have strictly positive remainingKeyspace", UnitTest, SyncTest) {
+  test("createInitialTasks: all tasks have strictly positive remainingKeyspace", UnitTest) {
     forAll(Gen.choose(1, 64)) { (n: Int) =>
       val tasks = AccountTask.createInitialTasks(dummyRoot, n)
       tasks.foreach { t =>
@@ -58,7 +58,7 @@ class SNAPRangeBoundarySpec extends AnyFunSuite with ScalaCheckPropertyChecks:
     }
   }
 
-  test("createInitialTasks: all tasks initially not done, not pending, requeueCount=0", UnitTest, SyncTest) {
+  test("createInitialTasks: all tasks initially not done, not pending, requeueCount=0", UnitTest) {
     forAll(Gen.choose(1, 32)) { (n: Int) =>
       val tasks = AccountTask.createInitialTasks(dummyRoot, n)
       tasks.foreach { t =>
@@ -74,13 +74,13 @@ class SNAPRangeBoundarySpec extends AnyFunSuite with ScalaCheckPropertyChecks:
   // AccountTask — remainingKeyspace clamping when next >= last
   // -----------------------------------------------------------------------
 
-  test("remainingKeyspace is 0 when next == last (empty range)", UnitTest, SyncTest) {
+  test("remainingKeyspace is 0 when next == last (empty range)", UnitTest) {
     val h = ByteString(Array.fill(32)(0x42.toByte))
     val t = AccountTask(next = h, last = h, rootHash = dummyRoot)
     assert(t.remainingKeyspace == BigInt(0))
   }
 
-  test("remainingKeyspace clamps to 0 when next > last (inverted range)", UnitTest, SyncTest) {
+  test("remainingKeyspace clamps to 0 when next > last (inverted range)", UnitTest) {
     // next=MaxHash, last=ZeroHash is an inverted range; clamping must return 0, not negative
     val t = AccountTask(next = maxHash, last = zeroHash, rootHash = dummyRoot)
     assert(t.remainingKeyspace == BigInt(0), s"Expected 0 for inverted range, got ${t.remainingKeyspace}")
@@ -90,7 +90,7 @@ class SNAPRangeBoundarySpec extends AnyFunSuite with ScalaCheckPropertyChecks:
   // StorageTask — createContinuation: increment arithmetic at mid-range values
   // -----------------------------------------------------------------------
 
-  test("createContinuation: next advances by exactly 1 from the last-slot hash", UnitTest, SyncTest) {
+  test("createContinuation: next advances by exactly 1 from the last-slot hash", UnitTest) {
     val original = StorageTask.createStorageTask(
       accountHash = ByteString(Array.fill(32)(0xaa.toByte)),
       storageRoot = dummyRoot
@@ -102,7 +102,7 @@ class SNAPRangeBoundarySpec extends AnyFunSuite with ScalaCheckPropertyChecks:
     assert(cont.next == expected, s"Expected next=${expected}, got ${cont.next}")
   }
 
-  test("createContinuation: preserves last, accountHash, storageRoot from original", UnitTest, SyncTest) {
+  test("createContinuation: preserves last, accountHash, storageRoot from original", UnitTest) {
     val acct = ByteString(Array.fill(32)(0xcc.toByte))
     val sroot = ByteString(Array.fill(32)(0xdd.toByte))
     val original = StorageTask.createStorageTask(acct, sroot)

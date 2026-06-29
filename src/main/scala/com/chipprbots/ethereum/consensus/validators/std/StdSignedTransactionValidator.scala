@@ -166,7 +166,8 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
     else if nonce > eip2681NonceCap then Left(TransactionSyntaxError(s"EIP-2681: nonce $nonce >= 2^64-1"))
     else if gasLimit > GasAmount(maxGasValue) then
       Left(TransactionSyntaxError(s"Invalid gasLimit: $gasLimit > $maxGasValue"))
-    else if gasPrice.value > maxGasValue then Left(TransactionSyntaxError(s"Invalid gasPrice: $gasPrice > $maxGasValue"))
+    else if gasPrice.value > maxGasValue then
+      Left(TransactionSyntaxError(s"Invalid gasPrice: $gasPrice > $maxGasValue"))
     else if value > maxValue then Left(TransactionSyntaxError(s"Invalid value: $value > $maxValue"))
     else if signature.r > maxR then Left(TransactionSyntaxError(s"Invalid signatureRandom: ${signature.r} > $maxR"))
     else if signature.s > maxS then Left(TransactionSyntaxError(s"Invalid signature: ${signature.s} > $maxS"))

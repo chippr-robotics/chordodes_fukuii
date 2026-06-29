@@ -67,7 +67,14 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger:
     val transferValue = 2
 
     val tx: LegacyTransaction =
-      LegacyTransaction(0, GasPrice.Zero, lastBlockGasLimit, existingEmptyAccountAddres, transferValue, ByteString.empty)
+      LegacyTransaction(
+        0,
+        GasPrice.Zero,
+        lastBlockGasLimit,
+        existingEmptyAccountAddres,
+        transferValue,
+        ByteString.empty
+      )
     val fakeSignature: ECDSASignature = ECDSASignature(0, 0, 0)
     val stx: SignedTransaction = SignedTransaction(tx, fakeSignature)
 
@@ -85,7 +92,14 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger:
     val transferValue = 2
 
     val tx: LegacyTransaction =
-      LegacyTransaction(0, GasPrice.Zero, lastBlockGasLimit, existingEmptyAccountAddres, transferValue, ByteString.empty)
+      LegacyTransaction(
+        0,
+        GasPrice.Zero,
+        lastBlockGasLimit,
+        existingEmptyAccountAddres,
+        transferValue,
+        ByteString.empty
+      )
     val fakeSignature: ECDSASignature = ECDSASignature(0, 0, 0)
     val stxFromAddress: SignedTransactionWithSender =
       SignedTransactionWithSender(SignedTransaction(tx, fakeSignature), fromAddress)
