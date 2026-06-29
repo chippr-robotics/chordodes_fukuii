@@ -168,7 +168,7 @@ class TxPoolService(
             case Eq     => tx.receivingAddress.contains(Address(f.value))
             case _      => false
         case "gas" =>
-          compareNumerically(tx.gasLimit, f.predicate, BigInt(f.value.stripPrefix("0x"), 16))
+          compareNumerically(tx.gasLimit.value, f.predicate, BigInt(f.value.stripPrefix("0x"), 16))
         case "gasPrice" =>
           compareNumerically(tx.gasPrice, f.predicate, BigInt(f.value.stripPrefix("0x"), 16))
         case "value" =>

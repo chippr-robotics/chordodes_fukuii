@@ -618,7 +618,7 @@ object SignedTransactionWithSender:
           case _                       => 0
         val intrinsicGas =
           config.calcTransactionIntrinsicGas(tx.payload, tx.isContractInit, Transaction.accessList(tx), authListSize)
-        tx.gasLimit >= intrinsicGas
+        tx.gasLimit.value >= intrinsicGas
     }
 
   private def recoverSenders(

@@ -219,7 +219,7 @@ class EngineApiService(
           Some(s"invalid block number: expected ${parent.number + 1} got ${block.header.number}")
         else if block.header.unixTimestamp <= parent.unixTimestamp then
           Some(s"invalid timestamp: ${block.header.unixTimestamp} <= parent ${parent.unixTimestamp}")
-        else if block.header.gasLimit < BigInt(5000) then
+        else if block.header.gasLimit < GasAmount(5000) then
           Some(s"gas limit below minimum: ${block.header.gasLimit} < 5000")
         else
           // EIP-1559 gas limit bounds: |gasLimit - parent.gasLimit| < parent.gasLimit / 1024
@@ -603,10 +603,12 @@ class EngineApiService(
                         if parent.header.number == 0 then parentBaseFee
                         else if parent.header.gasUsed == parentGasTarget then parentBaseFee
                         else if parent.header.gasUsed > parentGasTarget then
-                          val delta = parentBaseFee * (parent.header.gasUsed - parentGasTarget) / parentGasTarget / 8
+                          val delta =
+                            parentBaseFee * (parent.header.gasUsed - parentGasTarget).value / parentGasTarget.value / 8
                           parentBaseFee + (if delta == BigInt(0) then BigInt(1) else delta)
                         else
-                          val delta = parentBaseFee * (parentGasTarget - parent.header.gasUsed) / parentGasTarget / 8
+                          val delta =
+                            parentBaseFee * (parentGasTarget - parent.header.gasUsed).value / parentGasTarget.value / 8
                           if parentBaseFee - delta < 0 then BigInt(0) else parentBaseFee - delta
 
                       // Fetch pending transactions from the tx pool using IO.fromFuture so the
@@ -760,7 +762,7 @@ class EngineApiService(
                               difficulty = Difficulty.Zero,
                               number = blockNumber,
                               gasLimit = gasLimit,
-                              gasUsed = 0,
+                              gasUsed = GasAmount.Zero,
                               unixTimestamp = attrs.timestamp,
                               extraData = ByteString("fukuii".getBytes),
                               mixHash = BlockHash(attrs.prevRandao),
@@ -852,7 +854,7 @@ class EngineApiService(
                                 buildMpt(skeletonBlock.body.transactionList, SignedTransaction.byteArraySerializable)
                               ),
                               logsBloom = BloomFilter(bloomFilter),
-                              gasUsed = gasUsedTotal,
+                              gasUsed = GasAmount(gasUsedTotal),
                               extraFields = finalExtraFields
                             )
                             val payload = skeletonBlock.copy(header = updatedHeader)
@@ -1129,8 +1131,8 @@ class EngineApiService(
       logsBloom = BloomFilter(payload.logsBloom),
       difficulty = Difficulty.Zero,
       number = payload.blockNumber,
-      gasLimit = payload.gasLimit,
-      gasUsed = payload.gasUsed,
+      gasLimit = GasAmount(payload.gasLimit),
+      gasUsed = GasAmount(payload.gasUsed),
       unixTimestamp = payload.timestamp,
       extraData = payload.extraData,
       mixHash = BlockHash(payload.prevRandao),

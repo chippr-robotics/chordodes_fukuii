@@ -280,7 +280,7 @@ class EthBlocksService(
       blockchainReader
         .getBlockHeaderByNumber(num)
         .map { h =>
-          if h.gasLimit > 0 then h.gasUsed.toDouble / h.gasLimit.toDouble else 0.0
+          if h.gasLimit > GasAmount.Zero then h.gasUsed.value.toDouble / h.gasLimit.value.toDouble else 0.0
         }
         .getOrElse(0.0)
     }.toSeq

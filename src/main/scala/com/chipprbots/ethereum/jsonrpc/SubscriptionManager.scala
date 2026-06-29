@@ -194,8 +194,8 @@ object SubscriptionManager:
         "miner" -> JString(h.beneficiary.toString),
         "difficulty" -> JString("0x" + h.difficulty.value.toString(16)),
         "extraData" -> JString("0x" + h.extraData.toHex),
-        "gasLimit" -> JString("0x" + h.gasLimit.toString(16)),
-        "gasUsed" -> JString("0x" + h.gasUsed.toString(16)),
+        "gasLimit" -> JString("0x" + h.gasLimit.value.toString(16)),
+        "gasUsed" -> JString("0x" + h.gasUsed.value.toString(16)),
         "timestamp" -> JString("0x" + h.unixTimestamp.toHexString),
         "nonce" -> JString("0x" + h.nonce.toHex)
       )
@@ -266,7 +266,7 @@ object SubscriptionManager:
         "from" -> JString(stx.senderAddress.toString),
         "to" -> tx.receivingAddress.map(a => JString(a.toString): JValue).getOrElse(JNull),
         "value" -> JString("0x" + tx.value.toString(16)),
-        "gas" -> JString("0x" + tx.gasLimit.toString(16)),
+        "gas" -> JString("0x" + tx.gasLimit.value.toString(16)),
         "gasPrice" -> JString("0x" + tx.gasPrice.toString(16)),
         "input" -> JString("0x" + tx.payload.toHex)
       )

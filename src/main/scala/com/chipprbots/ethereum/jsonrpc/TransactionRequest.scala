@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.utils.Config
 
@@ -25,7 +26,7 @@ case class TransactionRequest(
     LegacyTransaction(
       nonce = nonce.getOrElse(defaultNonce),
       gasPrice = gasPrice.getOrElse(suggestedGasPrice),
-      gasLimit = gasLimit.getOrElse(defaultGasLimit),
+      gasLimit = GasAmount(gasLimit.getOrElse(defaultGasLimit)),
       receivingAddress = if Config.testmode then to.filter(_ != Address(0)) else to,
       value = value.getOrElse(BigInt(0)),
       payload = data.getOrElse(ByteString.empty)

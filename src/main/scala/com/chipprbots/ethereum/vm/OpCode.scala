@@ -583,7 +583,7 @@ case object DIFFICULTY
       else UInt256(s.env.blockHeader.difficulty.value)
     )
 
-case object GASLIMIT extends ConstOp(0x45)(s => UInt256(s.env.blockHeader.gasLimit))
+case object GASLIMIT extends ConstOp(0x45)(s => UInt256(s.env.blockHeader.gasLimit.value))
 
 case object POP extends OpCode(0x50, 1, 0, _.G_base) with ConstGas:
   protected def exec[S <: Storage[S], W <: WorldStateProxy[W, S]](state: ProgramState[W, S]): ProgramState[W, S] =

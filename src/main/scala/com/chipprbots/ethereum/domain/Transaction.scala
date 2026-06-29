@@ -7,7 +7,7 @@ import org.bouncycastle.util.encoders.Hex
 sealed trait Transaction extends Product with Serializable:
   def nonce: BigInt
   def gasPrice: BigInt
-  def gasLimit: BigInt
+  def gasLimit: GasAmount
   def receivingAddress: Option[Address]
   def value: BigInt
   def payload: ByteString
@@ -32,7 +32,7 @@ object Transaction:
   val LegacyThresholdLowerBound: Int = 0xc0
   val LegacyThresholdUpperBound: Int = 0xfe
 
-  def withGasLimit(gl: BigInt): Transaction => Transaction = {
+  def withGasLimit(gl: GasAmount): Transaction => Transaction = {
     case tx: LegacyTransaction         => tx.copy(gasLimit = gl)
     case tx: TransactionWithAccessList => tx.copy(gasLimit = gl)
     case tx: TransactionWithDynamicFee => tx.copy(gasLimit = gl)
@@ -80,7 +80,7 @@ object LegacyTransaction:
   def apply(
       nonce: BigInt,
       gasPrice: BigInt,
-      gasLimit: BigInt,
+      gasLimit: GasAmount,
       receivingAddress: Address,
       value: BigInt,
       payload: ByteString
@@ -90,7 +90,7 @@ object LegacyTransaction:
 case class LegacyTransaction(
     nonce: BigInt,
     gasPrice: BigInt,
-    gasLimit: BigInt,
+    gasLimit: GasAmount,
     receivingAddress: Option[Address],
     value: BigInt,
     payload: ByteString
@@ -111,7 +111,7 @@ object TransactionWithAccessList:
       chainId: BigInt,
       nonce: BigInt,
       gasPrice: BigInt,
-      gasLimit: BigInt,
+      gasLimit: GasAmount,
       receivingAddress: Address,
       value: BigInt,
       payload: ByteString,
@@ -123,7 +123,7 @@ case class TransactionWithAccessList(
     chainId: BigInt,
     nonce: BigInt,
     gasPrice: BigInt,
-    gasLimit: BigInt,
+    gasLimit: GasAmount,
     receivingAddress: Option[Address],
     value: BigInt,
     payload: ByteString,
@@ -146,7 +146,7 @@ object TransactionWithDynamicFee:
       nonce: BigInt,
       maxPriorityFeePerGas: BigInt,
       maxFeePerGas: BigInt,
-      gasLimit: BigInt,
+      gasLimit: GasAmount,
       receivingAddress: Address,
       value: BigInt,
       payload: ByteString,
@@ -172,7 +172,7 @@ case class TransactionWithDynamicFee(
     nonce: BigInt,
     maxPriorityFeePerGas: BigInt,
     maxFeePerGas: BigInt,
-    gasLimit: BigInt,
+    gasLimit: GasAmount,
     receivingAddress: Option[Address],
     value: BigInt,
     payload: ByteString,
@@ -205,7 +205,7 @@ case class BlobTransaction(
     nonce: BigInt,
     maxPriorityFeePerGas: BigInt,
     maxFeePerGas: BigInt,
-    gasLimit: BigInt,
+    gasLimit: GasAmount,
     receivingAddress: Option[Address],
     value: BigInt,
     payload: ByteString,
@@ -235,7 +235,7 @@ object BlobTransaction:
       nonce: BigInt,
       maxPriorityFeePerGas: BigInt,
       maxFeePerGas: BigInt,
-      gasLimit: BigInt,
+      gasLimit: GasAmount,
       receivingAddress: Address,
       value: BigInt,
       payload: ByteString,
@@ -276,7 +276,7 @@ case class SetCodeTransaction(
     nonce: BigInt,
     maxPriorityFeePerGas: BigInt,
     maxFeePerGas: BigInt,
-    gasLimit: BigInt,
+    gasLimit: GasAmount,
     receivingAddress: Option[Address],
     value: BigInt,
     payload: ByteString,

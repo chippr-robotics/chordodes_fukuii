@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.ledger.StxLedger
@@ -483,7 +484,7 @@ class TraceService(
       callTx: EthInfoService.CallTx,
       block: Block
   ): Either[JsonRpcError, SignedTransactionWithSender] =
-    val gasLimit = callTx.gas.getOrElse(block.header.gasLimit)
+    val gasLimit = callTx.gas.map(GasAmount(_)).getOrElse(block.header.gasLimit)
     val fromAddress = callTx.from
       .map(Address.apply)
       .getOrElse(Address(0))

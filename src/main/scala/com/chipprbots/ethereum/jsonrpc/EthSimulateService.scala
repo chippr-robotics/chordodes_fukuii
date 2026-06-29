@@ -375,7 +375,7 @@ class EthSimulateService(
       transactionsRoot = TrieRoot(transactionsRoot),
       receiptsRoot = TrieRoot(receiptsRoot),
       logsBloom = com.chipprbots.ethereum.domain.BloomFilter(logsBloom),
-      gasUsed = gasUsed,
+      gasUsed = GasAmount(gasUsed),
       extraFields = finalExtraFields
     )
 
@@ -465,7 +465,7 @@ class EthSimulateService(
     val ov = overrides.getOrElse(BlockOverrides())
     val number = ov.number.getOrElse(parentHeader.number + 1)
     val timestamp = ov.time.getOrElse(BigInt(parentHeader.unixTimestamp) + 12)
-    val gasLimit = ov.gasLimit.getOrElse(parentHeader.gasLimit)
+    val gasLimit = ov.gasLimit.map(GasAmount(_)).getOrElse(parentHeader.gasLimit)
     val beneficiary = ov.feeRecipient.map(_.bytes).getOrElse(ByteString(new Array[Byte](20)))
     val prevRandao = ov.prevRandao.getOrElse(ByteString(new Array[Byte](32)))
     val baseFee = ov.baseFeePerGas.getOrElse(
@@ -527,7 +527,7 @@ class EthSimulateService(
       difficulty = difficulty,
       number = number,
       gasLimit = gasLimit,
-      gasUsed = BigInt(0), // Placeholder — filled after execution
+      gasUsed = GasAmount.Zero, // Placeholder — filled after execution
       unixTimestamp = timestamp.toLong,
       extraData = ByteString.empty,
       mixHash = BlockHash(prevRandao),
@@ -667,7 +667,7 @@ class EthSimulateService(
       // Build transaction — default gas = min of remaining global 50M pool and remaining block gas
       val DefaultSimGasLimit = BigInt(50000000)
       val remainingGlobalGas = DefaultSimGasLimit - globalGasOffset - accumGas
-      val remainingBlockGas = blockHeader.gasLimit - accumGas
+      val remainingBlockGas = blockHeader.gasLimit.value - accumGas
       val gasLimit = call.gas.getOrElse(remainingGlobalGas.min(remainingBlockGas).max(BigInt(0)))
       val value = call.value.getOrElse(BigInt(0))
       val payload = call.input.getOrElse(ByteString.empty)
@@ -764,7 +764,7 @@ class EthSimulateService(
             nonce = senderNonce,
             maxPriorityFeePerGas = call.maxPriorityFeePerGas.getOrElse(BigInt(0)),
             maxFeePerGas = call.maxFeePerGas.getOrElse(BigInt(0)),
-            gasLimit = gasLimit,
+            gasLimit = GasAmount(gasLimit),
             receivingAddress = toAddr,
             value = value,
             payload = payload,
@@ -778,7 +778,7 @@ class EthSimulateService(
             nonce = senderNonce,
             maxPriorityFeePerGas = call.maxPriorityFeePerGas.getOrElse(BigInt(0)),
             maxFeePerGas = call.maxFeePerGas.getOrElse(BigInt(0)),
-            gasLimit = gasLimit,
+            gasLimit = GasAmount(gasLimit),
             receivingAddress = toAddr,
             value = value,
             payload = payload,
@@ -788,7 +788,7 @@ class EthSimulateService(
           LegacyTransaction(
             nonce = senderNonce,
             gasPrice = gasPrice,
-            gasLimit = gasLimit,
+            gasLimit = GasAmount(gasLimit),
             receivingAddress = toAddr,
             value = value,
             payload = payload
@@ -1014,15 +1014,15 @@ class EthSimulateService(
     val elasticityMultiplier = 2
     val baseFeeChangeDenominator = 8
     val parentGasTarget = parentHeader.gasLimit / elasticityMultiplier
-    if parentGasTarget == 0 then return parentBaseFee
+    if parentGasTarget == GasAmount.Zero then return parentBaseFee
     if parentHeader.gasUsed == parentGasTarget then parentBaseFee
     else if parentHeader.gasUsed > parentGasTarget then
-      val gasUsedDelta = parentHeader.gasUsed - parentGasTarget
-      val baseFeePerGasDelta = (parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator).max(1)
+      val gasUsedDelta = (parentHeader.gasUsed - parentGasTarget).value
+      val baseFeePerGasDelta = (parentBaseFee * gasUsedDelta / parentGasTarget.value / baseFeeChangeDenominator).max(1)
       parentBaseFee + baseFeePerGasDelta
     else
-      val gasUsedDelta = parentGasTarget - parentHeader.gasUsed
-      val baseFeePerGasDelta = parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator
+      val gasUsedDelta = (parentGasTarget - parentHeader.gasUsed).value
+      val baseFeePerGasDelta = parentBaseFee * gasUsedDelta / parentGasTarget.value / baseFeeChangeDenominator
       (parentBaseFee - baseFeePerGasDelta).max(0)
 
   private def computeTransactionsRoot(txs: Seq[SignedTransaction]): ByteString =

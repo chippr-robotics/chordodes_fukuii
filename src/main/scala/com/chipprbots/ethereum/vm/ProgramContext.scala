@@ -18,7 +18,7 @@ object ProgramContext:
       case sct: SetCodeTransaction => sct.authorizationList.size
       case _                       => 0
     val gasLimit =
-      tx.gasLimit - evmConfig.calcTransactionIntrinsicGas(tx.payload, tx.isContractInit, accessList, authListSize)
+      tx.gasLimit.value - evmConfig.calcTransactionIntrinsicGas(tx.payload, tx.isContractInit, accessList, authListSize)
 
     val blobHashes = tx match
       case blob: BlobTransaction => blob.blobVersionedHashes.map(_.value)

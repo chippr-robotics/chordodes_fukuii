@@ -34,8 +34,8 @@ case object BlockMetrics extends MetricsContainer:
 
   def measure(block: Block, getBlockByHashFn: BlockHash => Option[Block]): Unit =
     BlockNumberGauge.set(block.number.toDouble)
-    BlockGasLimitGauge.set(block.header.gasLimit.toDouble)
-    BlockGasUsedGauge.set(block.header.gasUsed.toDouble)
+    BlockGasLimitGauge.set(block.header.gasLimit.value.toDouble)
+    BlockGasUsedGauge.set(block.header.gasUsed.value.toDouble)
     BlockDifficultyGauge.set(block.header.difficulty.value.toDouble)
     BlockTransactionsGauge.set(block.body.numberOfTxs)
     BlockUnclesGauge.set(block.body.numberOfUncles)

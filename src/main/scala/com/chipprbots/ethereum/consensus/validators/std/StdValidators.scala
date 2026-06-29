@@ -85,7 +85,7 @@ object StdValidators:
     val header = block.header
     val blockAndReceiptsValidation = self.blockValidator.validateBlockAndReceipts(header, receipts)
 
-    if header.gasUsed != gasUsed then
+    if header.gasUsed.value != gasUsed then
       Left(ValidationAfterExecError(s"Block has invalid gas used, expected ${header.gasUsed} but got $gasUsed"))
     else if header.stateRoot.value != stateRootHash then
       Left(ValidationAfterExecError(s"Block has invalid state root hash, expected ${Hex
