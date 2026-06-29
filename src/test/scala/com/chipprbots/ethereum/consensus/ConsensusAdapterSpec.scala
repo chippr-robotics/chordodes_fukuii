@@ -80,6 +80,9 @@ class ConsensusAdapterSpec extends AnyFlatSpec with Matchers with ScalaFutures w
 
     // Just to bypass metrics needs
     blockchainReader.getBlockByHash.expects(*).anyNumberOfTimes().returning(None)
+    // BlockExecution records each executed block's difficulty into the TD ring buffer
+    // (#1373) — an incidental call on the real-execution success path; allow it.
+    blockchainReader.recordBlockDifficulty.expects(*).anyNumberOfTimes().returning(())
     blockchainWriter.save.expects(*, *, *, *).returning(())
     blockchainWriter.saveBestKnownBlocks.expects(*, *).returning(())
 
