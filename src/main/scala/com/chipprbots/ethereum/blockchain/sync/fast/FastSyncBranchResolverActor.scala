@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.PreRestart
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -158,7 +159,24 @@ object FastSyncBranchResolverActor:
         networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
 
-        resolver.waitingForPeerWithHighestBlock()
+        // P19: surface PreRestart so a supervisor-triggered restart is visible. Timers are cancelled by
+        // `withTimers` and the watched PeerRequestHandler children are stopped by Pekko on restart; the bus
+        // subscriptions are owned by those children, so cleanup here is the warning log only. The restarted
+        // instance re-polls for handshaked peers and re-issues StartBranchResolver from the parent.
+        Behaviors.intercept(() =>
+          new org.apache.pekko.actor.typed.BehaviorSignalInterceptor[Command]():
+            override def aroundSignal(
+                c: org.apache.pekko.actor.typed.TypedActorContext[Command],
+                signal: org.apache.pekko.actor.typed.Signal,
+                target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Command]
+            ): Behavior[Command] =
+              if signal == PreRestart then
+                c.asScala.log.warn(
+                  "{} received PreRestart — abandoning in-flight branch resolution; children will be recreated",
+                  c.asScala.self.path.name
+                )
+              target(c, signal)
+        )(resolver.waitingForPeerWithHighestBlock())
       }
     }
 

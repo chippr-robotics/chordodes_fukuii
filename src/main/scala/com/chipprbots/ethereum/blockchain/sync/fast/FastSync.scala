@@ -279,7 +279,8 @@ object FastSync:
                 validateHeaderPoW
               )
             )
-            .onFailure[Throwable](SupervisorStrategy.restart),
+            // PR #1378: pivot selection must keep retrying until a pivot is found — backoff, no cap.
+            .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(3.seconds, 30.seconds, 0.1)),
           "pivot-block-selector"
         )
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
@@ -308,7 +309,8 @@ object FastSync:
                       validateHeaderPoW
                     )
                   )
-                  .onFailure[Throwable](SupervisorStrategy.restart),
+                  // PR #1378: pivot selection must keep retrying until a pivot is found — backoff, no cap.
+                  .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(3.seconds, 30.seconds, 0.1)),
                 s"pivot-block-selector-retry-${java.util.UUID.randomUUID()}"
               )
             pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
@@ -397,7 +399,8 @@ object FastSync:
         .spawn(
           Behaviors
             .supervise(StateStorageActor())
-            .onFailure[Throwable](SupervisorStrategy.restart),
+            // PR #1378: state storage must stay alive for sync to complete — backoff, no cap.
+            .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)),
           s"$countActor-state-storage",
           DispatcherSelector.fromConfig("sync-dispatcher")
         )
@@ -407,7 +410,10 @@ object FastSync:
       // We send it StartSyncingTo / RestartRequested and it replies with messages matched in our Behavior[Command] states.
       // §7c-E3: restartWithBackoff bounds the re-request storm on restart. On restart, all in-flight peer assignments
       // are lost and re-requested, but PeerResponseTimeout per-request and the fresh DownloaderState (starts from zero)
-      // limit the burst. Backoff: min 5s, max 60s, 0.3 jitter, 2 restarts max (after which FastSync stops entirely).
+      // limit the burst. Backoff: min 5s, max 60s, 0.3 jitter.
+      // PR #1378: SyncStateSchedulerActor is a sync backbone actor — no `.withMaxRestarts` cap. A cap would silently
+      // stop the state-sync scheduler forever (FastSync stalls and never completes), the exact failure validated on
+      // Mordor. The backoff alone bounds the restart rate.
       val scheduler = ctx
         .spawn(
           Behaviors
@@ -429,7 +435,7 @@ object FastSync:
               )
             )
             .onFailure[Throwable](
-              SupervisorStrategy.restartWithBackoff(5.seconds, 60.seconds, 0.3).withMaxRestarts(2)
+              SupervisorStrategy.restartWithBackoff(5.seconds, 60.seconds, 0.3)
             ),
           s"$countActor-state-scheduler"
         )
@@ -688,7 +694,8 @@ object FastSync:
                   validateHeaderPoW
                 )
               )
-              .onFailure[Throwable](SupervisorStrategy.restart),
+              // PR #1378: pivot selection must keep retrying until a pivot is found — backoff, no cap.
+              .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(3.seconds, 30.seconds, 0.1)),
             s"$countActor-pivot-block-selector-update"
           )
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
@@ -1095,7 +1102,9 @@ object FastSync:
                     syncConfig = syncConfig
                   )
                 )
-                .onFailure[Throwable](SupervisorStrategy.restart),
+                // PR #1378: branch resolution is task-scoped (stops itself on completion); backoff
+                // avoids a tight crash loop. No cap — re-spawn cadence is bounded by the parent.
+                .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)),
               s"fast-sync-branch-resolver-${java.util.UUID.randomUUID()}"
             )
             resolver ! FastSyncBranchResolverActor.StartBranchResolver

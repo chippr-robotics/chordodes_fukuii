@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.PreRestart
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -96,7 +97,7 @@ object SyncStateSchedulerActor:
         // Immediate first poll + periodic rescans (matches PeerListSupportNg's 0-delay scheduleWithFixedDelay).
         networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
-        new Impl(
+        val behavior = new Impl(
           ctx,
           timers,
           sync,
@@ -109,6 +110,24 @@ object SyncStateSchedulerActor:
           peerListHelper
         )
           .waitingForBloomFilterToLoad(None)
+        // P19: surface PreRestart so the supervisor-triggered restart documented in §7c-E3 is visible. On restart
+        // all in-flight peer assignments and the DownloaderState are lost and re-requested from a fresh state;
+        // timers are cancelled by `withTimers` and the PeerListHelper bus subscription is dropped with the helper.
+        // Cleanup here is the warning log only — the restarted instance reloads the bloom filter and re-polls peers.
+        Behaviors.intercept(() =>
+          new org.apache.pekko.actor.typed.BehaviorSignalInterceptor[Command]():
+            override def aroundSignal(
+                c: org.apache.pekko.actor.typed.TypedActorContext[Command],
+                signal: org.apache.pekko.actor.typed.Signal,
+                target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Command]
+            ): Behavior[Command] =
+              if signal == PreRestart then
+                c.asScala.log.warn(
+                  "{} received PreRestart — discarding in-flight DownloaderState; bloom filter will reload on restart",
+                  c.asScala.self.path.name
+                )
+              target(c, signal)
+        )(behavior)
       }
     }
 
