@@ -657,6 +657,57 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     hasBru shouldBe false // ETH68 peer never gets BRU
     networkPeerManagerProbe.expectNoMessage()
 
+  // ---- announceCanonicalHead (PoS head-announce, no shouldSend gating) -----
+
+  it should "send NewBlockHashes to a non-ETH69 handshaked peer via announceCanonicalHead" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new PoSTestSetup:
+    // ETH68 peer from TestSetup (initialPeerInfo uses Capability.ETH68)
+    val header: BlockHeader = baseBlockHeader.copy(number = BigInt(999))
+    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(header.hash.value, header.number)))
+
+    blockBroadcast.announceCanonicalHead(header, Map(peer.id -> PeerWithInfo(peer, initialPeerInfo)))
+
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(expectedHashes, peer.id))
+    networkPeerManagerProbe.expectNoMessage()
+
+  it should "send BlockRangeUpdate(0, number, hash) to an ETH69 handshaked peer via announceCanonicalHead" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new PoSTestSetup:
+    val peerLatestBlock: BigInt = BigInt(500)
+    val eth69Info: PeerInfo = eth69PeerInfoAt(peerLatestBlock)
+    val header: BlockHeader = baseBlockHeader.copy(number = BigInt(1000))
+    val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), header.number, header.hash.value)
+
+    blockBroadcast.announceCanonicalHead(header, Map(peer.id -> PeerWithInfo(peer, eth69Info)))
+
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(expectedBru, peer.id))
+    networkPeerManagerProbe.expectNoMessage()
+
+  it should "announce to ALL peers including peers that shouldSendNewBlock would filter out (no gating)" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new PoSTestSetup:
+    // Set up a peer that is AHEAD of our block — broadcastBlock would filter it via shouldSendNewBlock
+    // (blockAhead=false, heavierChain=false → shouldSend=false). announceCanonicalHead must bypass
+    // this filter and always announce, because the downloader may have seen genesis=0 at STATUS time.
+    val peerBlockNr: BigInt = BigInt(5000)
+    val peerAheadInfo: PeerInfo = initialPeerInfo.copy(
+      remoteStatus = peerStatus.copy(capability = Capability.ETH68),
+      maxBlockNumber = peerBlockNr
+    )
+    // Our head is behind the peer's reported block
+    val ourHeader: BlockHeader = baseBlockHeader.copy(number = BigInt(100))
+    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(ourHeader.hash.value, ourHeader.number)))
+
+    blockBroadcast.announceCanonicalHead(ourHeader, Map(peer.id -> PeerWithInfo(peer, peerAheadInfo)))
+
+    // announceCanonicalHead sends unconditionally — the peer receives NewBlockHashes despite being "ahead"
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(expectedHashes, peer.id))
+    networkPeerManagerProbe.expectNoMessage()
+
   // -------------------------------------------------------------------------
 
   class TestSetup(implicit system: org.apache.pekko.actor.ActorSystem):

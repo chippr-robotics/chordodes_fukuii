@@ -1002,6 +1002,23 @@ object SyncController:
           // Late arrival after sync switch (syncSwitchDelay races) — ignore rather than forwarding
           // to RegularSync, which would crash with ClassCastException.
           Behaviors.same
+        case bh: ForkChoiceManager.BeaconHead =>
+          // PoS/post-merge only: the CL advanced its canonical head. Buffer the latest beacon head
+          // (as every other sync state does) and forward to RegularSync so it can announce the new
+          // head to already-connected eth peers (fixes Hive "fukuii as sync server" run/sync bug).
+          // On PoW chains (ETC/Mordor) clPivotEnabled=false so BeaconHead is never published and
+          // this arm is dead code — there is ZERO PoW/ETC regression risk.
+          //
+          // Compute novelty BEFORE handleBeaconHead mutates latestBeaconHead: the CL re-sends FCU
+          // every slot (~12s) even when the head is unchanged. Only announce on an actual head
+          // advance — re-announcing the same head every slot is wasted peer traffic, and peers that
+          // connect after the advance already learn the head from STATUS (BestBlockNumber is advanced
+          // by the FCU's saveBestKnownBlocks). The push is solely for peers connected at the moment
+          // the head changes.
+          val isNewBeaconHead = !latestBeaconHead.exists(_.headHash == bh.headHash)
+          handleBeaconHead(bh, snapSyncOpt = None)
+          if isNewBeaconHead then regularSync ! SyncProtocol.NewCanonicalHead(bh.headHash, bh.knownHeader)
+          Behaviors.same
         case msg: SyncProtocol.RegularSyncCommand =>
           // GetStatus (JSON-RPC eth_syncing), MinedBlock (miner), and other RegularSyncCommand subtypes
           // arrive here. RegularSync.Command = SyncProtocol.RegularSyncCommand so this is a typed send.

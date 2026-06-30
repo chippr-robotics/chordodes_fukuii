@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast.BlockToBroadcast
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
@@ -66,6 +67,42 @@ class BlockBroadcast(
         eth69Peers.foreach { case (_, PeerWithInfo(peer, _)) =>
           networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(bru, peer.id)
         }
+
+  /** Announces a CL-canonical head to ALL handshaked peers without sending a NewBlock message.
+    *
+    * Used on post-merge (PoS / ETH) chains when `forkchoiceUpdated` advances the head: peers that completed the ETH
+    * STATUS handshake before the FCU was processed saw `bestBlockNumber=0` (genesis) and never received a corrective
+    * announcement. After FCU the normal `broadcastBlock` path is bypassed (engine heads bypass `BlockImporter`), so
+    * without this call those peers time out believing fukuii has nothing to offer. See Hive run/sync bug analysis.
+    *
+    * Wire behaviour (mirrors go-ethereum `handler.BroadcastBlock` head-only path):
+    *   - ETH68 (and all non-ETH69) peers → `NewBlockHashes(hash, number)`: the standard head-announce signal.
+    *   - ETH69 peers → `BlockRangeUpdate(0, number, hash)`: replaces NewBlock on PoS per EIP-7642.
+    *
+    * No `shouldSend` gating: a CL head-advance must be announced to every connected peer regardless of what block
+    * number that peer last reported. This differs intentionally from `broadcastBlock` which filters by
+    * `shouldSendNewBlock`. `broadcastBlock`'s existing behaviour is unchanged.
+    *
+    * Safety: on PoW chains (ETC/Mordor) `BeaconHead` is never published (`clPivotEnabled=false`), so this method is
+    * never called — there is ZERO PoW/ETC regression risk.
+    */
+  def announceCanonicalHead(head: BlockHeader, handshakedPeers: Map[PeerId, PeerWithInfo]): Unit =
+    if handshakedPeers.isEmpty then
+      log.debug("CANONICAL_HEAD_ANNOUNCE: no handshaked peers for block {} — skipping", head.number)
+    else
+      val newBlockHashMsg = ETHPackets.NewBlockHashes.NewBlockHashes(Seq(BlockHash(head.hash.value, head.number)))
+      val bru = ETH69.BlockRangeUpdate(BigInt(0), head.number, head.hash.value)
+      log.info(
+        "CANONICAL_HEAD_ANNOUNCE: block={} hash={} to {} handshaked peers",
+        head.number,
+        head.hash,
+        handshakedPeers.size
+      )
+      handshakedPeers.foreach { case (_, PeerWithInfo(peer, peerInfo)) =>
+        if peerInfo.remoteStatus.capability == Capability.ETH69 then
+          networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(bru, peer.id)
+        else networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(newBlockHashMsg, peer.id)
+      }
 
   private def shouldSendNewBlock(newBlock: BlockToBroadcast, peerInfo: PeerInfo): Boolean =
     val blockAhead = newBlock.block.header.number > peerInfo.maxBlockNumber

@@ -160,6 +160,7 @@ object RegularSync:
           initialFetcher,
           initialImporter,
           supervisor,
+          broadcaster,
           ctx,
           respawn = () =>
             val epoch = spawnEpoch.getAndIncrement()
@@ -175,6 +176,7 @@ object RegularSync:
       fetcher: TypedActorRef[BlockFetcher.FetchCommand],
       importer: TypedActorRef[BlockImporter.Command],
       supervisor: TypedActorRef[SyncController.Command],
+      broadcaster: TypedActorRef[BlockBroadcasterActor.BroadcasterMsg],
       ctx: org.apache.pekko.actor.typed.scaladsl.ActorContext[Command],
       respawn: () => (TypedActorRef[BlockFetcher.FetchCommand], TypedActorRef[BlockImporter.Command])
   ): Behavior[Command] =
@@ -186,7 +188,15 @@ object RegularSync:
         ctx.log.warn("BlockFetcher stopped — re-spawning BlockFetcher and BlockImporter")
         ctx.stop(importer)
         val (newFetcher, newImporter) = respawn()
-        running(progressState.copy(startedFetching = false), newFetcher, newImporter, supervisor, ctx, respawn)
+        running(
+          progressState.copy(startedFetching = false),
+          newFetcher,
+          newImporter,
+          supervisor,
+          broadcaster,
+          ctx,
+          respawn
+        )
 
       case SyncProtocol.Start =>
         ctx.log.info("Starting regular sync")
@@ -203,18 +213,18 @@ object RegularSync:
         Behaviors.same
 
       case ProgressProtocol.StartedFetching =>
-        running(progressState.copy(startedFetching = true), fetcher, importer, supervisor, ctx, respawn)
+        running(progressState.copy(startedFetching = true), fetcher, importer, supervisor, broadcaster, ctx, respawn)
 
       case ProgressProtocol.StartingFrom(blockNumber) =>
         val newState = progressState.copy(initialBlock = blockNumber, currentBlock = blockNumber)
         RegularSyncMetrics.setCurrentBlock(blockNumber)
-        running(newState, fetcher, importer, supervisor, ctx, respawn)
+        running(newState, fetcher, importer, supervisor, broadcaster, ctx, respawn)
 
       case ProgressProtocol.GotNewBlock(blockNumber) =>
         ctx.log.debug("Got information about new block [number = {}]", blockNumber)
         val newState = progressState.copy(bestKnownNetworkBlock = blockNumber)
         RegularSyncMetrics.setBestKnownNetworkBlock(blockNumber)
-        running(newState, fetcher, importer, supervisor, ctx, respawn)
+        running(newState, fetcher, importer, supervisor, broadcaster, ctx, respawn)
 
       case ProgressProtocol.ImportedBlock(blockNumber, internally) =>
         ctx.log.debug("Imported new block [number = {}, internally = {}]", blockNumber, internally)
@@ -222,7 +232,7 @@ object RegularSync:
         RegularSyncMetrics.setCurrentBlock(blockNumber)
         RegularSyncMetrics.incrementBlocksImported()
         if internally then fetcher ! InternalLastBlockImport(blockNumber)
-        running(newState, fetcher, importer, supervisor, ctx, respawn)
+        running(newState, fetcher, importer, supervisor, broadcaster, ctx, respawn)
 
       case msg: SyncProtocol.RegularSyncStuck =>
         // Forward escape-valve signal to SyncController. BlockImporter detects this condition and emits the
@@ -236,6 +246,22 @@ object RegularSync:
           msg.missingHash
         )
         supervisor ! SyncController.WrappedSyncProtocol(msg)
+        Behaviors.same
+
+      case SyncProtocol.NewCanonicalHead(_, Some(header)) =>
+        // PoS/post-merge only: CL advanced its canonical head via forkchoiceUpdated. Announce to all
+        // already-connected eth peers so downloaders that handshaked before the FCU learn about our
+        // advanced head (fixes Hive "fukuii as sync server" bug). On PoW chains (ETC/Mordor) this
+        // message is never emitted — clPivotEnabled=false means BeaconHead is never published.
+        broadcaster ! BlockBroadcasterActor.AnnounceCanonicalHead(header)
+        Behaviors.same
+
+      case SyncProtocol.NewCanonicalHead(_, None) =>
+        // Header was not yet in storage at FCU time. The next forkchoiceUpdated will retry with a
+        // populated knownHeader once engine_newPayload has stored the block. This is the routine
+        // FCU-races-ahead-of-newPayload case (CL moves its head before the EL has the payload), not
+        // an error — log at info and skip; do NOT crash.
+        ctx.log.info("NewCanonicalHead: canonical head header not yet in storage — skipping peer announcement")
         Behaviors.same
 
       case SyncProtocol.FetcherStatusTick =>
@@ -276,6 +302,7 @@ object RegularSync:
           fetcher,
           importer,
           supervisor,
+          broadcaster,
           ctx,
           respawn
         )

@@ -1,5 +1,9 @@
 package com.chipprbots.ethereum.blockchain.sync
+
+import org.apache.pekko.util.ByteString
+
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHeader
 
 object SyncProtocol:
 
@@ -10,7 +14,8 @@ object SyncProtocol:
   trait SyncControllerReply
 
   /** All direct subtypes are defined in this file — sealed is now valid (W17 fix). Direct subtypes: Start, GetStatus,
-    * MinedBlock, RegularSyncStuck (below), FetcherStatusTick, PrintStatusTick, ProgressProtocol (all in this file).
+    * MinedBlock, RegularSyncStuck, BlockFetcherStopped, NewCanonicalHead, FetcherStatusTick, PrintStatusTick,
+    * ProgressProtocol (all in this file).
     */
   sealed trait RegularSyncCommand
 
@@ -64,6 +69,24 @@ object SyncProtocol:
     * replaced together with BlockFetcher to avoid a dead-letter sink.
     */
   case object BlockFetcherStopped extends RegularSyncCommand
+
+  /** Signals that the CL canonical head has advanced (PoS / post-merge chains only).
+    *
+    * Sent by `SyncController.handleRegularSyncMsg` whenever a `ForkChoiceManager.BeaconHead` arrives while regular sync
+    * is running. `RegularSync` forwards it to `BlockBroadcasterActor.AnnounceCanonicalHead` so that peers which
+    * completed their ETH STATUS handshake before the FCU was processed learn about the advanced head immediately.
+    *
+    * This fixes the Hive "fukuii as sync server" bug: `engine_newPayload` stores blocks but does NOT advance
+    * `BestBlockNumber`; only `forkchoiceUpdated → saveBestKnownBlocks` does. Without this announcement, an already-
+    * connected downloader that saw genesis (0) during STATUS has no way to learn that fukuii is now at a real head.
+    *
+    * `knownHeader` is populated by `ForkChoiceManager` when the header is already in storage; `None` means the header
+    * was not yet available at FCU time and the announcement is skipped (the next FCU will retry).
+    *
+    * Safety: on PoW chains (ETC/Mordor) `BeaconHead` is never published (`clPivotEnabled=false`), so this message is
+    * never emitted — there is ZERO PoW/ETC regression risk.
+    */
+  final case class NewCanonicalHead(headHash: ByteString, knownHeader: Option[BlockHeader]) extends RegularSyncCommand
 
   /** Signals that SNAP finalization detected a state root mismatch (snapStateRoot != pivotHeader.stateRoot).
     * SyncController responds by clearing SnapSyncDone and restarting SNAP with a fresh pivot. Mirrors Besu BUG-008

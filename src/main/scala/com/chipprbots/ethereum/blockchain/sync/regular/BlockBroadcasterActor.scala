@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBus
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.PeerListHelper
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast.BlockToBroadcast
+import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
@@ -20,6 +21,12 @@ object BlockBroadcasterActor:
   sealed trait BroadcasterMsg
   case class BroadcastBlock(block: BlockToBroadcast) extends BroadcasterMsg
   case class BroadcastBlocks(blocks: List[BlockToBroadcast]) extends BroadcasterMsg
+
+  /** Sent by RegularSync when a CL-canonical head advance (post-merge `forkchoiceUpdated`) should be announced to all
+    * currently-connected eth peers. The actor already owns the up-to-date handshaked-peer map via `PeerListHelper`, so
+    * it can immediately delegate to `BlockBroadcast.announceCanonicalHead` without any peer-map round-trip.
+    */
+  case class AnnounceCanonicalHead(header: BlockHeader) extends BroadcasterMsg
 
   private case class WrappedHandshakedPeers(peers: Map[Peer, PeerInfo]) extends BroadcasterMsg
   private case class WrappedPeerDisconnected(event: PeerDisconnected) extends BroadcasterMsg
@@ -82,6 +89,10 @@ object BlockBroadcasterActor:
 
       case BroadcastBlocks(blocks) =>
         blocks.foreach(broadcast.broadcastBlock(_, peerListHelper.handshakedPeers))
+        Behaviors.same
+
+      case AnnounceCanonicalHead(header) =>
+        broadcast.announceCanonicalHead(header, peerListHelper.handshakedPeers)
         Behaviors.same
     }
 
