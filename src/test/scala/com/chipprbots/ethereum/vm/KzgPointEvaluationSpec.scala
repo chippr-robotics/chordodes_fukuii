@@ -7,8 +7,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import ethereum.ckzg4844.CKZG4844JNI
-
+import com.chipprbots.ethereum.crypto.KzgTestSetup
 import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for the KZGPointEvaluation precompile (EIP-4844, address 0x0A).
@@ -20,15 +19,9 @@ import com.chipprbots.ethereum.testing.Tags.*
   */
 class KzgPointEvaluationSpec extends AnyFunSuite with BeforeAndAfterAll with Matchers:
 
-  override def beforeAll(): Unit =
-    try
-      CKZG4844JNI.loadNativeLibrary()
-      CKZG4844JNI.loadTrustedSetupFromResource("/trusted_setup.txt", classOf[CKZG4844JNI], 0L)
-    catch case _: Exception => () // already loaded by a prior test class in the same JVM
-
-  override def afterAll(): Unit =
-    try CKZG4844JNI.freeTrustedSetup()
-    catch case _: Exception => ()
+  // Load once per JVM via the shared fixture; never free here. Freeing the process-global native setup
+  // in afterAll races with KzgCellProofsSpec when suites run concurrently (parallelExecution = true).
+  override def beforeAll(): Unit = KzgTestSetup.ensureLoaded()
 
   // go-ethereum pointEvaluation1 vector (192 bytes = 384 hex chars)
   private val validInput = ByteString(

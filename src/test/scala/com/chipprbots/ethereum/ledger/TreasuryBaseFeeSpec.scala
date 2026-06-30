@@ -103,7 +103,7 @@ class TreasuryBaseFeeSpec extends AnyFlatSpec with Matchers with MockFactory:
     // baseFee * 0 = 0, treasury receives nothing
     (treasuryBalAfter - treasuryBalBefore) shouldBe UInt256.Zero
 
-  it should "not credit baseFee when treasury address is zero" taggedAs (OlympiaTest, ConsensusTest) in new TestSetup:
+  it should "fail loudly (OLYMPIA SAFETY) when treasury address is zero post-Olympia" taggedAs (OlympiaTest, ConsensusTest) in new TestSetup:
     override val treasuryAddr: Address = Address(0)
 
     implicit override lazy val blockchainConfig: BlockchainConfig = baseConfig
@@ -117,8 +117,10 @@ class TreasuryBaseFeeSpec extends AnyFlatSpec with Matchers with MockFactory:
     val baseFee: BigInt = BigInt(1000000000)
     val block: Block = makeBlock(olympiaBlock, gasUsed = 21000, Some(baseFee))
 
-    val afterWorld: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
-    // creditBaseFeeToTreasury checks: treasuryAddress != Address(0)
-    // So Address(0) receives nothing — baseFee is effectively burned
-    val zeroAddrBalance: UInt256 = afterWorld.getAccount(Address(0)).map(_.balance).getOrElse(UInt256.Zero)
-    zeroAddrBalance shouldBe UInt256.Zero
+    // ECIP-1112 OLYMPIA SAFETY (BlockPreparator.creditBaseFeeToTreasury): a zero treasury
+    // address post-Olympia is a misconfiguration — the base fee would otherwise be silently
+    // mis-credited. The guard fails loudly instead of burning, so payBlockReward must throw.
+    val ex: IllegalStateException = intercept[IllegalStateException] {
+      mining.blockPreparator.payBlockReward(block, worldState)
+    }
+    ex.getMessage should include("OLYMPIA SAFETY")
