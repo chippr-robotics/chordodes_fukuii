@@ -69,7 +69,7 @@ class OlympiaFeeMarketSpec
         OlympiaTest
       ) in {
         val tx = TransactionWithDynamicFee(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(1_000_000_000L),
           maxFeePerGas = BigInt(10_000_000_000L),
@@ -88,7 +88,7 @@ class OlympiaFeeMarketSpec
         OlympiaTest
       ) in {
         val tx = TransactionWithDynamicFee(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(3_000_000_000L),
           maxFeePerGas = BigInt(10_000_000_000L),
@@ -107,7 +107,7 @@ class OlympiaFeeMarketSpec
         OlympiaTest
       ) in {
         val auth = SetCodeAuthorization(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           address = Address(1),
           nonce = BigInt(0),
           v = BigInt(0),
@@ -115,7 +115,7 @@ class OlympiaFeeMarketSpec
           s = BigInt(2)
         )
         val tx = SetCodeTransaction(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(1_000_000_000L),
           maxFeePerGas = BigInt(5_000_000_000L),
@@ -157,7 +157,7 @@ class OlympiaFeeMarketSpec
         val maxPriority = BigInt(1_000_000_000L)
         val maxFee = BigInt(10_000_000_000L)
         val tx = TransactionWithDynamicFee(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = maxPriority,
           maxFeePerGas = maxFee,
@@ -178,7 +178,7 @@ class OlympiaFeeMarketSpec
       ) in {
         val baseFee = BigInt(5_000_000_000L)
         val tx = TransactionWithDynamicFee(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(0),
           maxFeePerGas = baseFee,

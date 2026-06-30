@@ -28,6 +28,7 @@ import com.chipprbots.ethereum.ledger.TxResult
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.domain.ChainId
 
 class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
   implicit val testContext: IORuntime = IORuntime.global
@@ -219,7 +220,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     ConsensusTest
   ) in new TestSetup:
     implicit override lazy val blockchainConfig: BlockchainConfig = BlockchainConfig(
-      chainId = 0x3d,
+      chainId = ChainId(0x3d),
       networkId = 1,
       customGenesisFileOpt = Some("test-genesis.json"),
       customGenesisJsonOpt = None,
@@ -296,7 +297,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         difficultyBombRemovalBlockNumber = 5900000,
         eip161BlockNumber = 0
       ),
-      chainId = 0x3d,
+      chainId = ChainId(0x3d),
       networkId = 1,
       customGenesisFileOpt = Some("test-genesis.json"),
       customGenesisJsonOpt = None,
@@ -539,7 +540,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     )
 
     val typedTransaction: TypedTransaction = TransactionWithAccessList(
-      chainId = 61, // ethereum classic mainnet
+      chainId = ChainId(61), // ethereum classic mainnet
       nonce = 0,
       gasPrice = GasPrice(1),
       gasLimit = GasAmount(txGasLimit),
@@ -571,7 +572,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         difficultyBombContinueBlockNumber = 5000000,
         difficultyBombRemovalBlockNumber = 5900000
       ),
-      chainId = 0x3d,
+      chainId = ChainId(0x3d),
       networkId = 1,
       customGenesisFileOpt = Some("test-genesis.json"),
       customGenesisJsonOpt = None,

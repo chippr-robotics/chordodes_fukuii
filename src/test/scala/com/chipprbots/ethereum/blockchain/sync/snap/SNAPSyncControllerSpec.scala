@@ -24,6 +24,7 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.domain.ChainId
 
 class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
   import SNAPSyncController.SyncPhase.*
@@ -1263,7 +1264,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
     customGenesisJsonOpt = None,
     daoForkConfig = None,
     accountStartNonce = UInt256.Zero,
-    chainId = BigInt(11155111),
+    chainId = ChainId(11155111),
     networkId = 11155111L,
     monetaryPolicyConfig = MonetaryPolicyConfig(
       eraDuration = 0,

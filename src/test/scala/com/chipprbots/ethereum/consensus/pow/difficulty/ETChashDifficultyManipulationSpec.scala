@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
+import com.chipprbots.ethereum.domain.ChainId
 
 import OscillationFixtures.*
 
@@ -75,7 +76,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
     customGenesisJsonOpt = None,
     daoForkConfig = None,
     accountStartNonce = com.chipprbots.ethereum.domain.UInt256.Zero,
-    chainId = 61,
+    chainId = ChainId(61),
     networkId = 1,
     monetaryPolicyConfig = com.chipprbots.ethereum.utils.MonetaryPolicyConfig(
       5000000, 0.2, 5000000000000000000L, 3000000000000000000L, 2000000000000000000L
