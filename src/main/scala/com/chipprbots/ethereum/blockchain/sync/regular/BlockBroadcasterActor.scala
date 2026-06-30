@@ -25,6 +25,13 @@ object BlockBroadcasterActor:
   /** Sent by RegularSync when a CL-canonical head advance (post-merge `forkchoiceUpdated`) should be announced to all
     * currently-connected eth peers. The actor already owns the up-to-date handshaked-peer map via `PeerListHelper`, so
     * it can immediately delegate to `BlockBroadcast.announceCanonicalHead` without any peer-map round-trip.
+    *
+    * The header is ALSO retained as `latestCanonicalHead` so that peers discovered LATER (via the periodic peer scan)
+    * are announced to as soon as they appear. This closes a race that broke the Hive "fukuii as sync server" test: the
+    * single post-merge `forkchoiceUpdated` fires within milliseconds of RegularSync (and this actor) starting, before
+    * the first `GetHandshakedPeersCmd` reply has populated the peer map — so the immediate announce reaches zero peers.
+    * A downloader that handshaked BEFORE the FCU (at genesis) would then never learn fukuii advanced. Re-announcing to
+    * newly-scanned peers delivers the head the moment that peer is observed.
     */
   case class AnnounceCanonicalHead(header: BlockHeader) extends BroadcasterMsg
 
@@ -60,7 +67,7 @@ object BlockBroadcasterActor:
         networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
 
-        running(peerListHelper, broadcast, networkPeerManager, handshakedPeersAdapter)
+        running(peerListHelper, broadcast, networkPeerManager, handshakedPeersAdapter, latestCanonicalHead = None)
       }
     }
 
@@ -68,7 +75,8 @@ object BlockBroadcasterActor:
       peerListHelper: PeerListHelper,
       broadcast: BlockBroadcast,
       networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
-      handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
+      handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers],
+      latestCanonicalHead: Option[BlockHeader]
   ): Behavior[BroadcasterMsg] =
     Behaviors.receiveMessage {
       case ScanPeers =>
@@ -76,7 +84,18 @@ object BlockBroadcasterActor:
         Behaviors.same
 
       case WrappedHandshakedPeers(peers) =>
+        // Capture the peer set BEFORE the update so we can detect peers that appear in THIS scan. If a CL head has
+        // already been announced (latestCanonicalHead), push it to the newly-observed peers immediately — this is the
+        // recovery path for the FCU-before-peer-map race (see AnnounceCanonicalHead doc). Peers already in the map were
+        // announced to at FCU time (or a prior scan), so we never re-spam them here.
+        val knownBefore = peerListHelper.handshakedPeers.keySet
         peerListHelper.handleHandshakedPeers(peers)
+        latestCanonicalHead.foreach { head =>
+          val newlyObserved = peerListHelper.handshakedPeers.filterNot { case (peerId, _) =>
+            knownBefore.contains(peerId)
+          }
+          if newlyObserved.nonEmpty then broadcast.announceCanonicalHead(head, newlyObserved)
+        }
         Behaviors.same
 
       case WrappedPeerDisconnected(event) =>
@@ -92,8 +111,15 @@ object BlockBroadcasterActor:
         Behaviors.same
 
       case AnnounceCanonicalHead(header) =>
+        // Announce to peers already known now, AND retain the head so peers discovered by a later scan get it too.
         broadcast.announceCanonicalHead(header, peerListHelper.handshakedPeers)
-        Behaviors.same
+        running(
+          peerListHelper,
+          broadcast,
+          networkPeerManager,
+          handshakedPeersAdapter,
+          latestCanonicalHead = Some(header)
+        )
     }
 
 // Logger name anchor — never instantiated
