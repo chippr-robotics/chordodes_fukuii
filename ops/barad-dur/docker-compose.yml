@@ -182,11 +182,21 @@ services:
     image: ${FUKUII_IMAGE:-chipprbots/fukuii:latest}
     container_name: fukuii-secondary
     restart: unless-stopped
-    # Mordor state is tiny (5.2M txns, 0.09% utilization, June 2026).
-    # Heap formula: max(FLOOR=1.5g, min(50% of mem_limit, CEILING=2g)) → 2g on any reasonable host.
+    # Mordor state is tiny (5.2M txns, 0.09% utilization, June 2026), BUT the
+    # post-SNAP verification walk reads the whole trie back out of RocksDB, whose
+    # OFF-HEAP native memory (block cache, table readers, iterators) pushed RSS to
+    # ~4.18g and cgroup-OOM-killed the old 4g cap in a restart loop. 6g gives
+    # off-heap headroom; the JVM heap stays 2g (CEILING caps min(50%·6g, 2g)=2g).
+    # Heap formula: max(FLOOR=1.5g, min(50% of mem_limit, CEILING=2g)) → 2g.
     # Override: FUKUII_HEAP_SECONDARY and FUKUII_MEM_LIMIT_SECONDARY in .env
-    mem_limit: ${FUKUII_MEM_LIMIT_SECONDARY:-4g}
-    memswap_limit: ${FUKUII_MEM_LIMIT_SECONDARY:-4g}
+    mem_limit: ${FUKUII_MEM_LIMIT_SECONDARY:-6g}
+    memswap_limit: ${FUKUII_MEM_LIMIT_SECONDARY:-6g}
+    # MALLOC_ARENA_MAX=2 caps glibc malloc arenas (default 8×cores ≈ 32 on this
+    # 4-core host); arena fragmentation under RocksDB+Pekko native threads was
+    # ~1.7g of the OOM-kill RSS. Durable native-RSS mitigation (proven on the
+    # earlier ETC SNAP host-freeze).
+    environment:
+      - MALLOC_ARENA_MAX=2
     ports:
       # Secondary's mordor.conf binds HTTP RPC on container:8546 (not 8545
       # like the primary), so the host->container map skips 8545 entirely.
