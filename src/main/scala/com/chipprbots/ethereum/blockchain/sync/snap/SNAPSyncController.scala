@@ -1869,7 +1869,6 @@ private class SNAPSyncControllerImpl(
     then
       if SNAPSyncController.shouldSkipHealingAfterDownloads(
           snapSyncConfig,
-          storagePhaseForceCompleted,
           resumedStaleCursors
         )
       then
@@ -3509,7 +3508,11 @@ private class SNAPSyncControllerImpl(
     * the node's existing RocksDB DataSource (via `flatSlotStorage`); the CF auto-creates on open.
     */
   private lazy val healingFrontierStorageOpt: Option[HealingFrontierStorage] =
-    if snapSyncConfig.healingFrontierPersistence then Some(new HealingFrontierStorage(flatSlotStorage.dataSource))
+    // #4 (restored, spec-005): the pruned post-heal verification also needs the frontier store
+    // (prunedHealVerification default true) — without it the first verification reverts to a full
+    // ~90M-node trie walk. Dropped by #1384's stale base.
+    if snapSyncConfig.healingFrontierPersistence || snapSyncConfig.prunedHealVerification then
+      Some(new HealingFrontierStorage(flatSlotStorage.dataSource))
     else None
 
   private lazy val bfsQueueStorage: BfsQueueStorage =
@@ -3545,6 +3548,9 @@ private class SNAPSyncControllerImpl(
                   concurrency = snapSyncConfig.healingConcurrency,
                   visitedCap = snapSyncConfig.healingVisitedCap,
                   healingFrontierStorage = healingFrontierStorageOpt,
+                  // #1319/spec-002 (restored): gate the coordinator's frontier-mirror writes +
+                  // completeness markers ON, matching store presence (dropped by #1384's stale base).
+                  frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
                   traversalParallelism = snapSyncConfig.healingTraversalParallelism,
                   healingMinParallelism = snapSyncConfig.healingMinParallelism,
                   healingReservedCores = snapSyncConfig.healingReservedCores,
@@ -3620,6 +3626,9 @@ private class SNAPSyncControllerImpl(
                     concurrency = snapSyncConfig.healingConcurrency,
                     visitedCap = snapSyncConfig.healingVisitedCap,
                     healingFrontierStorage = healingFrontierStorageOpt,
+                    // #1319/spec-002 (restored): gate frontier-mirror writes + completeness markers
+                    // ON, matching store presence (dropped by #1384's stale base).
+                    frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
                     traversalParallelism = snapSyncConfig.healingTraversalParallelism,
                     healingMinParallelism = snapSyncConfig.healingMinParallelism,
                     healingReservedCores = snapSyncConfig.healingReservedCores,
@@ -5044,7 +5053,6 @@ object SNAPSyncController:
 
   private[snap] def shouldSkipHealingAfterDownloads(
       snapSyncConfig: SNAPSyncConfig,
-      storagePhaseForceCompleted: Boolean,
       resumedStaleCursors: Boolean
   ): Boolean =
     // The deferred-merkleization fast path (skip healing, lazy-heal during block execution) is
@@ -5052,7 +5060,11 @@ object SNAPSyncController:
     // resumed from a prior session (against a possibly drifted root), the delta MUST be walked
     // and re-fetched from the current pivot root before completion — otherwise the state is
     // handed off with silent holes. So a resume forces the full healing walk.
-    snapSyncConfig.deferredMerkleization && !storagePhaseForceCompleted && !resumedStaleCursors
+    // #1371 (restored — #1384's stale base re-added the `!storagePhaseForceCompleted` term, which
+    // routed force-completed deferred-merkleization back into the full heal walk → the
+    // "exactly 1 node, healed=0 forever" stall). Force-completion does not invalidate the
+    // freshly-built trie; only a resumed stale cursor does.
+    snapSyncConfig.deferredMerkleization && !resumedStaleCursors
 
   /** Freshness gate for `refreshPivotInPlace`: reject candidate pivots whose source peer is more than `maxStaleness`
     * blocks behind the CL-driven head.
@@ -5120,7 +5132,10 @@ object SNAPSyncController:
           blacklist,
           syncController,
           validatorFactory
-        ).startSnapSync()
+        ).start() // #1378: start() arms the 5s PollHandshakedPeers timer that populates the
+      //          controller's peerListHelper. Calling startSnapSync() directly bypasses it,
+      //          leaving snapPeersForPivot permanently empty → pivot never selected →
+      //          FallbackToFastSync loop. Reverted by #1384's stale-base clobber; restored.
       }
     }
 
@@ -5147,6 +5162,7 @@ case class SNAPSyncConfig(
     // Layer 2: persist the outstanding healing frontier so a restart resumes (O(frontier)) instead of
     // re-walking the full state. Default false (ships dark). See docs/design/healing-frontier-scale.md.
     healingFrontierPersistence: Boolean = false,
+    prunedHealVerification: Boolean = true, // #4 (restored): pruned post-heal verification vs full ~90M-node walk
     // Operator ceiling for BFS level parallelism. Effective =
     // min(this, min(nproc, max(healingMinParallelism, nproc - healingReservedCores))).
     healingTraversalParallelism: Int = actors.TrieNodeHealingCoordinator.DefaultBfsParallelism,
@@ -5287,6 +5303,9 @@ object SNAPSyncConfig:
         else actors.TrieNodeHealingCoordinator.DefaultVisitedCap,
       healingFrontierPersistence = snapConfig.hasPath("healing-frontier-persistence") &&
         snapConfig.getBoolean("healing-frontier-persistence"),
+      prunedHealVerification =
+        if snapConfig.hasPath("pruned-heal-verification") then snapConfig.getBoolean("pruned-heal-verification")
+        else true,
       healingTraversalParallelism =
         if snapConfig.hasPath("healing-traversal-parallelism") then snapConfig.getInt("healing-traversal-parallelism")
         else actors.TrieNodeHealingCoordinator.DefaultBfsParallelism,
