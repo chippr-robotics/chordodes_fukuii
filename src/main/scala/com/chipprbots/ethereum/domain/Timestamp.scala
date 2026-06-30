@@ -27,7 +27,11 @@ object Timestamp:
     def !=(other: Timestamp): Boolean = t != other
     def min(other: Timestamp): Timestamp = if t < other then t else other
     def max(other: Timestamp): Timestamp = if t > other then t else other
-    def toHexString: String = t.toHexString
+    // Must call the static java.lang.Long.toHexString, NOT `t.toHexString`:
+    // `t: Timestamp` is opaque (no `.toHexString` member on the underlying Long),
+    // so `t.toHexString` re-binds to THIS extension -> infinite recursion / runtime
+    // hang on every caller (eth_subscribe newHeads, Engine API block JSON).
+    def toHexString: String = java.lang.Long.toHexString(t)
 
   given rlpCodec: RLPCodec[Timestamp] = longEncDec.xmap((v: Long) => Timestamp(v), _.toLong)
   given Ordering[Timestamp] = Ordering.by(_.toLong)
