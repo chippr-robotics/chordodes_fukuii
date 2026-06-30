@@ -88,7 +88,10 @@ class BlockBroadcast(
     */
   def announceCanonicalHead(head: BlockHeader, handshakedPeers: Map[PeerId, PeerWithInfo]): Unit =
     if handshakedPeers.isEmpty then
-      log.debug("CANONICAL_HEAD_ANNOUNCE: no handshaked peers for block {} — skipping", head.number)
+      // Logged at INFO (not DEBUG): the empty-peer case is the diagnostic signature of the FCU-before-peer-map race.
+      // BlockBroadcasterActor recovers by re-announcing to peers as the scan discovers them; this line records that
+      // the immediate FCU-time announce reached nobody so the recovery path is the one that actually delivers.
+      log.info("CANONICAL_HEAD_ANNOUNCE: no handshaked peers yet for block {} — deferring to peer-scan", head.number)
     else
       val newBlockHashMsg = ETHPackets.NewBlockHashes.NewBlockHashes(Seq(BlockHash(head.hash.value, head.number.value)))
       val bru = ETH69.BlockRangeUpdate(BigInt(0), head.number.value, head.hash.value)
