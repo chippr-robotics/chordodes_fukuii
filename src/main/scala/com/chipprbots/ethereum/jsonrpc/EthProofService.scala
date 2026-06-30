@@ -171,7 +171,7 @@ class EthProofService(
       block: BlockParam
   ): IO[Either[JsonRpcError, ProofAccount]] = IO {
     for
-      blockNumber <- resolveBlock(block).map(_.block.number)
+      blockNumber <- resolveBlock(block).map(_.block.number.value)
       account <- Either.fromOption(
         blockchainReader.getAccount(blockchainReader.getBestBranch, address, blockNumber),
         noAccount(address, blockNumber)

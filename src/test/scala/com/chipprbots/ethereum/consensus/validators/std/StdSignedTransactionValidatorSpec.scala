@@ -70,8 +70,8 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   // Contract creation (receivingAddress = None) with oversized initcode.
   private val initcodeTx: LegacyTransaction = LegacyTransaction(
     nonce = 0,
-    gasPrice = BigInt("1000000000"),
-    gasLimit = BigInt("1000000"),
+    gasPrice = GasPrice(BigInt("1000000000")),
+    gasLimit = GasAmount(BigInt("1000000")),
     receivingAddress = None,
     value = BigInt(0),
     payload = overLimitPayload
@@ -88,7 +88,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     Account.empty(UInt256(0)).copy(balance = UInt256(BigInt("1000000000000000000")))
 
   private val baseHeader: BlockHeader =
-    Fixtures.Blocks.Block3125369.header.copy(gasLimit = BigInt("10000000"))
+    Fixtures.Blocks.Block3125369.header.copy(gasLimit = GasAmount(BigInt("10000000")))
 
   private def validate(stx: SignedTransaction, blockHeader: BlockHeader)(implicit cfg: BlockchainConfig) =
     StdSignedTransactionValidator.validate(
@@ -106,7 +106,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     ConsensusTest
   ) in {
     implicit val cfg: BlockchainConfig = sepoliaConfig
-    val postShanghaiHeader = baseHeader.copy(unixTimestamp = ShanghaiTs + 1)
+    val postShanghaiHeader = baseHeader.copy(unixTimestamp = Timestamp(ShanghaiTs + 1))
     validate(signedInitcodeTx, postShanghaiHeader) match
       case Left(_: TransactionInitCodeSizeError) => succeed
       case other                                 => fail(s"Expected TransactionInitCodeSizeError, got: $other")
@@ -119,7 +119,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     ConsensusTest
   ) in {
     implicit val cfg: BlockchainConfig = sepoliaConfig
-    val preShanghaiHeader = baseHeader.copy(unixTimestamp = ShanghaiTs - 1)
+    val preShanghaiHeader = baseHeader.copy(unixTimestamp = Timestamp(ShanghaiTs - 1))
     validate(signedInitcodeTx, preShanghaiHeader) match
       case Left(_: TransactionInitCodeSizeError) => fail("Large initcode must be accepted pre-Shanghai")
       case _                                     => succeed
@@ -132,7 +132,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     ConsensusTest
   ) in {
     implicit val cfg: BlockchainConfig = etcConfig
-    val etcHeader = baseHeader.copy(number = BigInt(21_000_000), unixTimestamp = ShanghaiTs + 1)
+    val etcHeader = baseHeader.copy(number = BlockNumber(BigInt(21_000_000)), unixTimestamp = Timestamp(ShanghaiTs + 1))
     validate(signedInitcodeTx, etcHeader) match
       case Left(_: TransactionInitCodeSizeError) => fail("EIP-3860 must not be active on ETC")
       case _                                     => succeed
@@ -154,8 +154,8 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
 
   private val wordCostTx: LegacyTransaction = LegacyTransaction(
     nonce = 0,
-    gasPrice = BigInt("1000000000"),
-    gasLimit = BigInt(56213), // 56214 - 1: below post-Shanghai intrinsic, above pre-Shanghai
+    gasPrice = GasPrice(BigInt("1000000000")),
+    gasLimit = GasAmount(BigInt(56213)), // 56214 - 1: below post-Shanghai intrinsic, above pre-Shanghai
     receivingAddress = None,
     value = BigInt(0),
     payload = wordCostPayload
@@ -175,7 +175,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     // sepoliaLondonConfig has Mystique fee schedule active at block 0 (G_txdatanonzero=16,
     // G_initcode_word=2). Post-Shanghai: eip3860Enabled=true → intrinsic = 56214 > gasLimit 56213.
     implicit val cfg: BlockchainConfig = sepoliaLondonConfig
-    val postShanghaiHeader = baseHeader.copy(unixTimestamp = ShanghaiTs + 1)
+    val postShanghaiHeader = baseHeader.copy(unixTimestamp = Timestamp(ShanghaiTs + 1))
     validate(signedWordCostTx, postShanghaiHeader) match
       case Left(_: TransactionNotEnoughGasForIntrinsicError) => succeed
       case other => fail(s"Expected TransactionNotEnoughGasForIntrinsicError, got: $other")
@@ -188,7 +188,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     // etcMystiqueConfig has Mystique fee schedule active at block 0 but no shanghaiTimestamp,
     // so eip3860Enabled stays false. Intrinsic = 21000+32000+200*16+0 = 56200 ≤ 56213 → accepted.
     implicit val cfg: BlockchainConfig = etcMystiqueConfig
-    val etcHeader = baseHeader.copy(number = BigInt(21_000_000), unixTimestamp = ShanghaiTs + 1)
+    val etcHeader = baseHeader.copy(number = BlockNumber(BigInt(21_000_000)), unixTimestamp = Timestamp(ShanghaiTs + 1))
     validate(signedWordCostTx, etcHeader) match
       case Left(_: TransactionNotEnoughGasForIntrinsicError) =>
         fail("EIP-3860 word cost must not apply on ETC pre-Olympia")
@@ -217,8 +217,8 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
 
   // Cancun block header: excessBlobGas = 0 → blobBaseFee = 1
   private val cancunHeader: BlockHeader = baseHeader.copy(
-    unixTimestamp = CancunTs + 1,
-    gasLimit = BigInt("30000000"),
+    unixTimestamp = Timestamp(CancunTs + 1),
+    gasLimit = GasAmount(BigInt("30000000")),
     extraFields = HefPostCancun(
       baseFee = BigInt(1_000_000_000L),
       withdrawalsRoot = ByteString(new Array[Byte](32)),
@@ -234,7 +234,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
       nonce = 0,
       maxPriorityFeePerGas = BigInt(0),
       maxFeePerGas = BigInt(2_000_000_000L),
-      gasLimit = BigInt(1_000_000),
+      gasLimit = GasAmount(BigInt(1_000_000)),
       receivingAddress = Some(Address(0L)),
       value = BigInt(0),
       payload = ByteString.empty,
@@ -267,7 +267,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     validate(signedBlobTx(BigInt(0)), cancunHeader) match
       case Left(err: TransactionMaxFeePerBlobGasTooLow) =>
         err.maxFeePerBlobGas shouldBe BigInt(0)
-        err.blobBaseFee shouldBe BlobGasUtils.getBlobGasPrice(BigInt(0), CancunTs + 1, sepoliaCancunConfig)
+        err.blobBaseFee shouldBe BlobGasUtils.getBlobGasPrice(BigInt(0), Timestamp(CancunTs + 1), sepoliaCancunConfig)
       case other => fail(s"Expected TransactionMaxFeePerBlobGasTooLow, got: $other")
   }
 
@@ -288,7 +288,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   ) in {
     implicit val cfg: BlockchainConfig = etcConfig
     // ETC has no cancunTimestamp → validateBlobTransactionSupport fires first
-    val etcHeader = baseHeader.copy(unixTimestamp = CancunTs + 1)
+    val etcHeader = baseHeader.copy(unixTimestamp = Timestamp(CancunTs + 1))
     validate(signedBlobTx(BigInt(0)), etcHeader) match
       case Left(TransactionSyntaxError(msg)) if msg.contains("TYPE_3_TX_NOT_SUPPORTED") => succeed
       case Left(_: TransactionMaxFeePerBlobGasTooLow) =>
@@ -309,8 +309,8 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
   private def signedTxWithNonce(n: BigInt): SignedTransaction = SignedTransaction(
     LegacyTransaction(
       nonce = n,
-      gasPrice = BigInt("1000000000"),
-      gasLimit = BigInt("100000"),
+      gasPrice = GasPrice(BigInt("1000000000")),
+      gasLimit = GasAmount(BigInt("100000")),
       receivingAddress = Some(Address(0xcafe)),
       value = BigInt(0),
       payload = ByteString.empty
@@ -353,7 +353,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers:
     ConsensusTest
   ) in {
     implicit val cfg: BlockchainConfig = sepoliaConfig
-    val postShanghaiHeader = baseHeader.copy(unixTimestamp = ShanghaiTs + 1)
+    val postShanghaiHeader = baseHeader.copy(unixTimestamp = Timestamp(ShanghaiTs + 1))
     validate(signedTxWithNonce(Eip2681OverflowNonce), postShanghaiHeader) match
       case Left(TransactionSyntaxError(msg)) if msg.contains("EIP-2681") => succeed
       case other => fail(s"Expected EIP-2681 TransactionSyntaxError on ETH, got: $other")

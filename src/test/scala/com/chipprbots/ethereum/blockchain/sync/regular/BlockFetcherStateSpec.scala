@@ -9,6 +9,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.HeadersNotMatchingReadyBlocks
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImporter
 import com.chipprbots.ethereum.network.PeerId
@@ -55,9 +56,9 @@ class BlockFetcherStateSpec extends ScalaTestWithActorTestKit with AnyWordSpecLi
 
         assert(result.map(_.waitingHeaders) === Right(Queue.empty))
         blocks.foreach { block =>
-          assert(result.map(_.blockProviders(block.number)) === Right(peer))
+          assert(result.map(_.blockProviders(block.number.value)) === Right(peer))
         }
-        assert(result.map(_.knownTop) === Right(blocks.last.number))
+        assert(result.map(_.knownTop) === Right(blocks.last.number.value))
       }
 
       "enqueue requested blocks fails when ready blocks is not forming a sequence with given headers" taggedAs (

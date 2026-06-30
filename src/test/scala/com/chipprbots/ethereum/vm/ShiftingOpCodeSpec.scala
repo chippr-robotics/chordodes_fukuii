@@ -16,6 +16,9 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
 import com.chipprbots.ethereum.vm.MockWorldState.PC
@@ -165,10 +168,10 @@ class ShiftingOpCodeSpec extends AnyWordSpec with Matchers with ScalaCheckProper
 
     val blockHeader: BlockHeader = BlockFixtures.ValidBlock.header.copy(
       difficulty = Difficulty(1000000),
-      number = 1,
-      gasLimit = 10000000,
-      gasUsed = 0,
-      unixTimestamp = 0
+      number = BlockNumber(1),
+      gasLimit = GasAmount(10000000),
+      gasUsed = GasAmount.Zero,
+      unixTimestamp = Timestamp(0)
     )
 
     def getContext(world: MockWorldState = defaultWorld, inputData: ByteString = bEmpty): PC =

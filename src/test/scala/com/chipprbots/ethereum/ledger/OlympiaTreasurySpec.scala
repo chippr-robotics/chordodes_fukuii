@@ -14,8 +14,8 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
   * config-level address invariants: the treasury address must be set to the canonical deployed contract on all
   * ETC-family chains.
   *
-  * Deployed treasury: 0x60d0A7394f9Cd5C469f9F5Ec4F9C803F5294d79b (identical across ETC mainnet and Mordor — cross-chain
-  * consistency requirement). Updated from demo v0.3 address in the olympia treasury-address fix commit.
+  * Deployed treasury: 0xd6165F3aF4281037bce810621F62B43077Fb0e37 (identical across ETC mainnet, Mordor, and Gorgoroth —
+  * cross-chain consistency enforced via fukuii.olympia.treasury-address in blockchains.conf).
   */
 // scalastyle:off magic.number
 class OlympiaTreasurySpec extends AnyFlatSpec with Matchers:
@@ -25,7 +25,7 @@ class OlympiaTreasurySpec extends AnyFlatSpec with Matchers:
   private val mordorConfig = BlockchainConfig.fromRawConfig(fullConfig.getConfig("fukuii.blockchains.mordor"))
 
   // The canonical treasury address deployed on ETC mainnet and Mordor.
-  private val CanonicalTreasury: Address = Address("60d0A7394f9Cd5C469f9F5Ec4F9C803F5294d79b")
+  private val CanonicalTreasury: Address = Address("d6165F3aF4281037bce810621F62B43077Fb0e37")
 
   // ── ETC mainnet ──────────────────────────────────────────────────────────
 

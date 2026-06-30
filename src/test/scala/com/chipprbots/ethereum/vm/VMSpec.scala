@@ -152,10 +152,10 @@ class VMSpec extends AnyWordSpec with ScalaCheckPropertyChecks with Matchers:
 
     val blockHeader: BlockHeader = BlockFixtures.ValidBlock.header.copy(
       difficulty = Difficulty(1000000),
-      number = 1,
-      gasLimit = 10000000,
-      gasUsed = 0,
-      unixTimestamp = 0
+      number = BlockNumber(1),
+      gasLimit = GasAmount(10000000),
+      gasUsed = GasAmount.Zero,
+      unixTimestamp = Timestamp(0)
     )
 
     val evmBlockchainConfig: BlockchainConfigForEvm = BlockchainConfigForEvm(
@@ -178,7 +178,7 @@ class VMSpec extends AnyWordSpec with ScalaCheckPropertyChecks with Matchers:
       mystiqueBlockNumber = Long.MaxValue,
       spiralBlockNumber = Long.MaxValue,
       olympiaBlockNumber = Long.MaxValue,
-      chainId = 0x3d
+      chainId = ChainId(0x3d)
     )
 
     val homesteadConfig: EvmConfig = EvmConfig.forBlock(0, evmBlockchainConfig.copy(homesteadBlockNumber = 0))

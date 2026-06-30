@@ -995,8 +995,7 @@ object PeerManagerActor:
               eventBus,
               knownNodesManager,
               incomingConnection,
-              initHandshaker = handshaker,
-              peerManagerRef = ctx.self
+              initHandshaker = handshaker
             )
           )
           .onFailure[Throwable](

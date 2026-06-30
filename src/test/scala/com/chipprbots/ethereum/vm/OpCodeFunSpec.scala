@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
@@ -345,8 +346,8 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
         val (blockHeaderNumber, stack1) = stateIn.stack.pop()
 
         val withinLimits =
-          stateIn.env.blockHeader.number - blockHeaderNumber.toBigInt <= 256 &&
-            blockHeaderNumber.toBigInt < stateIn.env.blockHeader.number
+          stateIn.env.blockHeader.number.value - blockHeaderNumber.toBigInt <= 256 &&
+            blockHeaderNumber.toBigInt < stateIn.env.blockHeader.number.value
 
         val hash = stateIn.world.getBlockHash(blockHeaderNumber).filter(_ => withinLimits).getOrElse(UInt256.Zero)
 

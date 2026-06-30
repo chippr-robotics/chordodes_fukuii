@@ -16,6 +16,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.SignedTransaction
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.Withdrawal
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
@@ -113,9 +114,10 @@ class EngineApiController(
             var payload = decodedPayload
             val hasWithdrawals = payload.withdrawals.isDefined
             val blockchainConfig = com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig
-            val isShanghaiPayload = blockchainConfig.isShanghaiTimestamp(payload.timestamp)
-            val isCancunPayload = blockchainConfig.isCancunTimestamp(payload.timestamp)
-            val isPraguePayload = blockchainConfig.isPragueTimestamp(payload.timestamp)
+            val payloadTimestamp = Timestamp(payload.timestamp)
+            val isShanghaiPayload = blockchainConfig.isShanghaiTimestamp(payloadTimestamp)
+            val isCancunPayload = blockchainConfig.isCancunTimestamp(payloadTimestamp)
+            val isPraguePayload = blockchainConfig.isPragueTimestamp(payloadTimestamp)
 
             // Version enforcement on payload shape (not on method-of-fork — that's -38005).
             // Hive withdrawals suite expects -32602 (InvalidParamsError) for shape mismatches:
@@ -270,8 +272,8 @@ class EngineApiController(
             val hasWithdrawals = payloadAttrs.exists(_.withdrawals.isDefined)
             val attrTimestamp = payloadAttrs.map(_.timestamp)
             val blockchainConfig = com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig
-            val isShanghaiTimestamp = attrTimestamp.exists(blockchainConfig.isShanghaiTimestamp)
-            val isCancunTimestamp = attrTimestamp.exists(blockchainConfig.isCancunTimestamp)
+            val isShanghaiTimestamp = attrTimestamp.exists(ts => blockchainConfig.isShanghaiTimestamp(Timestamp(ts)))
+            val isCancunTimestamp = attrTimestamp.exists(ts => blockchainConfig.isCancunTimestamp(Timestamp(ts)))
 
             // Engine API version matrix. -38005 UNSUPPORTED_FORK only when the RPC method itself is
             // wrong for the current fork; -38003 INVALID_PAYLOAD_ATTRIBUTES for attribute-shape
@@ -498,8 +500,8 @@ class EngineApiController(
             case t: TransactionWithDynamicFee => (baseFee + t.maxPriorityFeePerGas).min(t.maxFeePerGas)
             case t: BlobTransaction           => (baseFee + t.maxPriorityFeePerGas).min(t.maxFeePerGas)
             case t: SetCodeTransaction        => (baseFee + t.maxPriorityFeePerGas).min(t.maxFeePerGas)
-            case t: TransactionWithAccessList => t.gasPrice
-            case _                            => stx.tx.gasPrice
+            case t: TransactionWithAccessList => t.gasPrice.value
+            case _                            => stx.tx.gasPrice.value
           val priorityPerGas = (effectiveGasPrice - baseFee).max(0)
           gasUsed * priorityPerGas
         }
@@ -539,9 +541,9 @@ class EngineApiController(
       "receiptsRoot" -> JString(hex(header.receiptsRoot.value)),
       "logsBloom" -> JString(hex(header.logsBloom.value)),
       "prevRandao" -> JString(hex(header.mixHash.value)),
-      "blockNumber" -> JString(hexQ(header.number)),
-      "gasLimit" -> JString(hexQ(header.gasLimit)),
-      "gasUsed" -> JString(hexQ(header.gasUsed)),
+      "blockNumber" -> JString(hexQ(header.number.value)),
+      "gasLimit" -> JString(hexQ(header.gasLimit.value)),
+      "gasUsed" -> JString(hexQ(header.gasUsed.value)),
       "timestamp" -> JString(s"0x${header.unixTimestamp.toHexString}"),
       "extraData" -> JString(hex(header.extraData)),
       "baseFeePerGas" -> JString(hexQ(baseFee.getOrElse(BigInt(0)))),

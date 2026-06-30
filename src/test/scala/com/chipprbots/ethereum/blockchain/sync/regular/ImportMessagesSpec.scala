@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.event.Logging.*
+import org.apache.pekko.event.Logging.{InfoLevel, WarningLevel}
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -8,6 +8,8 @@ import org.scalatest.wordspec.AnyWordSpec
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
+import com.chipprbots.ethereum.domain.BlockNumber
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -20,7 +22,7 @@ class ImportMessagesSpec extends AnyWordSpec with Matchers:
   private val testPeer: PeerId = PeerId("test-peer")
 
   private def blockAt(number: Int): Block =
-    Block(BlockHelpers.defaultHeader.copy(number = BigInt(number)), BlockBody(Nil, Nil))
+    Block(BlockHelpers.defaultHeader.copy(number = BlockNumber(number)), BlockBody(Nil, Nil))
 
   private def messages(tipNumber: Int = 100): NewBlockImportMessages =
     new NewBlockImportMessages(blockAt(tipNumber), testPeer)
@@ -29,7 +31,10 @@ class ImportMessagesSpec extends AnyWordSpec with Matchers:
 
     "produce InfoLevel with txs, gas, uncles, number, and peer fields" taggedAs (UnitTest, StateTest) in {
       val block =
-        Block(BlockHelpers.defaultHeader.copy(number = BigInt(42), gasUsed = 1_000_000), BlockBody(Nil, Nil))
+        Block(
+          BlockHelpers.defaultHeader.copy(number = BlockNumber(42), gasUsed = GasAmount(1_000_000)),
+          BlockBody(Nil, Nil)
+        )
       val msgs = new NewBlockImportMessages(block, testPeer)
 
       val (level, msg) = msgs.importedToTheTop()
@@ -43,10 +48,10 @@ class ImportMessagesSpec extends AnyWordSpec with Matchers:
     }
 
     "report non-zero tx and uncle counts from block body" taggedAs (UnitTest, StateTest) in {
-      val uncle = BlockHelpers.defaultHeader.copy(number = BigInt(41))
+      val uncle = BlockHelpers.defaultHeader.copy(number = BlockNumber(41))
       val stx = BlockHelpers.generateBlock(BlockHelpers.genesis).body.transactionList.head
       val block = Block(
-        BlockHelpers.defaultHeader.copy(number = BigInt(42)),
+        BlockHelpers.defaultHeader.copy(number = BlockNumber(42)),
         BlockBody(List(stx), List(uncle))
       )
       val msgs = new NewBlockImportMessages(block, testPeer)

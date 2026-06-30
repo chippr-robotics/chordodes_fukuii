@@ -10,9 +10,12 @@ import com.chipprbots.ethereum.domain.AccessListItem
 import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlobTransaction
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
@@ -25,6 +28,7 @@ import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.Transaction
 import com.chipprbots.ethereum.domain.TransactionWithAccessList
 import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.Withdrawal
 
@@ -60,6 +64,14 @@ object Picklers:
   given storageKeyPickler: Pickler[StorageKey] =
     transformPickler[StorageKey, BigInt](StorageKey(_))(_.value)
   given accessListItemPickler: Pickler[AccessListItem] = generatePickler[AccessListItem]
+  given gasAmountPickler: Pickler[GasAmount] =
+    transformPickler[GasAmount, BigInt](GasAmount(_))(_.value)
+  given gasPricePickler: Pickler[GasPrice] =
+    transformPickler[GasPrice, BigInt](GasPrice(_))(_.value)
+  given blockNumberPickler: Pickler[BlockNumber] =
+    transformPickler[BlockNumber, BigInt](BlockNumber(_))(_.value)
+  given timestampPickler: Pickler[Timestamp] =
+    transformPickler[Timestamp, Long](Timestamp(_))(_.toLong)
 
   given legacyTransactionPickler: Pickler[LegacyTransaction] = generatePickler[LegacyTransaction]
   given transactionWithAccessListPickler: Pickler[TransactionWithAccessList] =

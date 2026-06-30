@@ -28,6 +28,7 @@ import com.chipprbots.ethereum.ledger.TxResult
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.domain.ChainId
 
 class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
   implicit val testContext: IORuntime = IORuntime.global
@@ -49,8 +50,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        unixTimestamp = Timestamp(miningTimestamp),
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -76,8 +77,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        unixTimestamp = Timestamp(miningTimestamp),
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -106,8 +107,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        unixTimestamp = Timestamp(miningTimestamp),
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
 
@@ -160,8 +161,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        unixTimestamp = Timestamp(miningTimestamp),
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -179,7 +180,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
   ) in new TestSetup:
     val txWitGasTooBigGasLimit: SignedTransaction = SignedTransaction
       .sign(
-        transaction.copy(gasLimit = BigInt(2).pow(100000), nonce = signedTransaction.tx.nonce + 1),
+        transaction.copy(gasLimit = GasAmount(BigInt(2).pow(100000)), nonce = signedTransaction.tx.nonce + 1),
         keyPair,
         Some(BigInt(0x3d))
       )
@@ -201,8 +202,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        unixTimestamp = Timestamp(miningTimestamp),
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
 
@@ -219,7 +220,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     ConsensusTest
   ) in new TestSetup:
     implicit override lazy val blockchainConfig: BlockchainConfig = BlockchainConfig(
-      chainId = 0x3d,
+      chainId = ChainId(0x3d),
       networkId = 1,
       customGenesisFileOpt = Some("test-genesis.json"),
       customGenesisJsonOpt = None,
@@ -271,8 +272,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
           mixHash = BlockHash(minedMixHash),
-          unixTimestamp = miningTimestamp,
-          gasLimit = generatedBlockGasLimit
+          unixTimestamp = Timestamp(miningTimestamp),
+          gasLimit = GasAmount(generatedBlockGasLimit)
         )
       )
     validators.blockHeaderValidator.validate(
@@ -296,7 +297,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         difficultyBombRemovalBlockNumber = 5900000,
         eip161BlockNumber = 0
       ),
-      chainId = 0x3d,
+      chainId = ChainId(0x3d),
       networkId = 1,
       customGenesisFileOpt = Some("test-genesis.json"),
       customGenesisJsonOpt = None,
@@ -323,8 +324,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
 
     val transaction1: LegacyTransaction = LegacyTransaction(
       nonce = 0,
-      gasPrice = 1,
-      gasLimit = 1000000,
+      gasPrice = GasPrice(1),
+      gasLimit = GasAmount(1000000),
       receivingAddress = None,
       value = 0,
       payload = ByteString.empty
@@ -367,8 +368,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
           mixHash = BlockHash(minedMixHash),
-          unixTimestamp = miningTimestamp,
-          gasLimit = generatedBlockGasLimit
+          unixTimestamp = Timestamp(miningTimestamp),
+          gasLimit = GasAmount(generatedBlockGasLimit)
         )
       )
     validators.blockHeaderValidator.validate(
@@ -407,8 +408,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
           mixHash = BlockHash(minedMixHash),
-          unixTimestamp = miningTimestamp,
-          gasLimit = generatedBlockGasLimit
+          unixTimestamp = Timestamp(miningTimestamp),
+          gasLimit = GasAmount(generatedBlockGasLimit)
         )
       )
     validators.blockHeaderValidator.validate(
@@ -433,8 +434,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
 
     val failingTransaction: LegacyTransaction = LegacyTransaction(
       nonce = 0,
-      gasPrice = 1,
-      gasLimit = txGasLimit,
+      gasPrice = GasPrice(1),
+      gasLimit = GasAmount(txGasLimit),
       receivingAddress = Address(testAddress),
       value = txTransfer,
       payload = ByteString.empty
@@ -463,8 +464,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        unixTimestamp = Timestamp(miningTimestamp),
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -482,7 +483,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     ConsensusTest
   ) in new TestSetup:
     val txWitSameNonceButLowerGasPrice: SignedTransaction = SignedTransaction
-      .sign(transaction.copy(gasPrice = signedTransaction.tx.gasPrice - 1), keyPair, Some(BigInt(0x3d)))
+      .sign(transaction.copy(gasPrice = GasPrice(signedTransaction.tx.gasPrice.value - 1)), keyPair, Some(BigInt(0x3d)))
 
     val pendingBlock: PendingBlock =
       blockGenerator
@@ -505,8 +506,8 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
-        gasLimit = generatedBlockGasLimit
+        unixTimestamp = Timestamp(miningTimestamp),
+        gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
     validators.blockHeaderValidator.validate(
@@ -531,18 +532,18 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     val txTransfer = 9000
     val transaction: LegacyTransaction = LegacyTransaction(
       nonce = 0,
-      gasPrice = 1,
-      gasLimit = txGasLimit,
+      gasPrice = GasPrice(1),
+      gasLimit = GasAmount(txGasLimit),
       receivingAddress = Address(testAddress),
       value = txTransfer,
       payload = ByteString.empty
     )
 
     val typedTransaction: TypedTransaction = TransactionWithAccessList(
-      chainId = 61, // ethereum classic mainnet
+      chainId = BigInt(61), // ethereum classic mainnet
       nonce = 0,
-      gasPrice = 1,
-      gasLimit = txGasLimit,
+      gasPrice = GasPrice(1),
+      gasLimit = GasAmount(txGasLimit),
       receivingAddress = Address(testAddress),
       value = txTransfer,
       payload = ByteString.empty,
@@ -552,7 +553,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     lazy val signedTransaction: SignedTransaction =
       SignedTransaction.sign(transaction, keyPair, Some(BigInt(0x3d)))
     lazy val duplicatedSignedTransaction: SignedTransaction =
-      SignedTransaction.sign(transaction.copy(gasLimit = 2), keyPair, Some(BigInt(0x3d)))
+      SignedTransaction.sign(transaction.copy(gasLimit = GasAmount(2)), keyPair, Some(BigInt(0x3d)))
 
     lazy val signedTypedTransaction: SignedTransaction =
       SignedTransaction.sign(typedTransaction, keyPair, Some(BigInt(0x3d)))
@@ -571,7 +572,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         difficultyBombContinueBlockNumber = 5000000,
         difficultyBombRemovalBlockNumber = 5900000
       ),
-      chainId = 0x3d,
+      chainId = ChainId(0x3d),
       networkId = 1,
       customGenesisFileOpt = Some("test-genesis.json"),
       customGenesisJsonOpt = None,

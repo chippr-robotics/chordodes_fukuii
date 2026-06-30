@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.PreRestart
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
@@ -40,7 +41,28 @@ object StateStorageActor:
   /** Internal: the asynchronous persist completed (success or failure). */
   final private case class PersistDone(result: Try[FastSyncStateStorage]) extends Command
 
-  def apply(): Behavior[Command] = uninitialized()
+  def apply(): Behavior[Command] = withPreRestart(uninitialized())
+
+  /** P19: wrap a behavior so a `PreRestart` signal is observed from every state before the supervisor restarts the
+    * actor. StateStorageActor holds only a plain [[FastSyncStateStorage]] reference (no open file handles, no peer-bus
+    * subscriptions, no timers) so cleanup is a warning log only — the restarted instance re-receives `Init` from
+    * FastSync and rebinds the storage. The log makes an otherwise-silent restart visible in production.
+    */
+  private def withPreRestart(b: Behavior[Command]): Behavior[Command] =
+    Behaviors.intercept(() =>
+      new org.apache.pekko.actor.typed.BehaviorSignalInterceptor[Command]():
+        override def aroundSignal(
+            c: org.apache.pekko.actor.typed.TypedActorContext[Command],
+            signal: org.apache.pekko.actor.typed.Signal,
+            target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Command]
+        ): Behavior[Command] =
+          if signal == PreRestart then
+            c.asScala.log.warn(
+              "{} received PreRestart — discarding in-flight persist; storage will be rebound on Init",
+              c.asScala.self.path.name
+            )
+          target(c, signal)
+    )(b)
 
   private def uninitialized(): Behavior[Command] =
     Behaviors.receiveMessage {

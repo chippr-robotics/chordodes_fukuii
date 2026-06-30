@@ -216,7 +216,7 @@ object PendingTransactionsManager:
       val bestBlockOpt = Option(blockchainReader).flatMap(_.getBestBlock)
       val currentBaseFee = bestBlockOpt.flatMap(_.header.baseFee).getOrElse(blockchainConfig.baseFeeFloor)
       val isOlympiaActive =
-        bestBlockOpt.exists(_.header.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber)
+        bestBlockOpt.exists(_.header.number.value >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber)
       val effectiveMinTip = if isOlympiaActive then blockchainConfig.minTip else BigInt(1)
       val afterTipCheck = afterPendingNonceCheck.filter { stx =>
         val effectiveTip =
@@ -260,7 +260,7 @@ object PendingTransactionsManager:
               accountsBySender.get(stx.senderAddress).flatten.exists { account =>
                 val tx = stx.tx.tx
                 val nonceValid = tx.nonce >= account.nonce.toBigInt && tx.nonce < account.nonce.toBigInt + 1024
-                val maxGasCost = tx.gasLimit * tx.gasPrice
+                val maxGasCost = tx.gasLimit.value * tx.gasPrice.value
                 val totalCost = tx.value + maxGasCost
                 val balanceValid = account.balance.toBigInt >= totalCost
                 nonceValid && balanceValid

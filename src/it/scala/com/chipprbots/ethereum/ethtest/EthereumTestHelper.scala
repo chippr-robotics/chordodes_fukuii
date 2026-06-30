@@ -158,7 +158,9 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup:
       val genesisBlock = Block(genesisHeader, BlockBody(Seq.empty, Seq.empty))
       testBlockchainStorages.blockHeadersStorage.put(genesisHeader.hash.value, genesisHeader).commit()
       testBlockchainStorages.blockBodiesStorage.put(genesisHeader.hash.value, genesisBlock.body).commit()
-      testBlockchainStorages.blockNumberMappingStorage.put(genesisHeader.number, genesisHeader.hash.value).commit()
+      testBlockchainStorages.blockNumberMappingStorage
+        .put(genesisHeader.number.value, genesisHeader.hash.value)
+        .commit()
 
       // Also need to store chain weight for the genesis block
       testBlockchainStorages.chainWeightStorage.put(genesisHeader.hash.value, ChainWeight.zero).commit()
@@ -188,7 +190,9 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup:
             // Store the executed block
             testBlockchainStorages.blockHeadersStorage.put(block.header.hash.value, block.header).commit()
             testBlockchainStorages.blockBodiesStorage.put(block.header.hash.value, block.body).commit()
-            testBlockchainStorages.blockNumberMappingStorage.put(block.header.number, block.header.hash.value).commit()
+            testBlockchainStorages.blockNumberMappingStorage
+              .put(block.header.number.value, block.header.hash.value)
+              .commit()
             testBlockchainStorages.receiptStorage.put(block.header.hash.value, receiptList).commit()
 
             // Update chain weight
@@ -242,10 +246,10 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup:
         TrieRoot(ByteString(parseHex("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(ByteString(Array.fill(256)(0.toByte))),
       difficulty = Difficulty(BigInt(0)),
-      number = blockNumber,
-      gasLimit = parseBigInt(testBlock.blockHeader.gasLimit),
-      gasUsed = BigInt(0),
-      unixTimestamp = parseBigInt(testBlock.blockHeader.timestamp).toLong - 1,
+      number = BlockNumber(blockNumber),
+      gasLimit = GasAmount(parseBigInt(testBlock.blockHeader.gasLimit)),
+      gasUsed = GasAmount.Zero,
+      unixTimestamp = Timestamp(parseBigInt(testBlock.blockHeader.timestamp).toLong - 1),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString(Array.fill(32)(0.toByte))),
       nonce = ByteString(Array.fill(8)(0.toByte))

@@ -9,6 +9,8 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.testing.Tags.*
@@ -28,8 +30,8 @@ class LegacyTransactionSpec extends AnyFlatSpec with Matchers:
 
   val validTx: LegacyTransaction = LegacyTransaction(
     nonce = 172320,
-    gasPrice = BigInt("50000000000"),
-    gasLimit = 90000,
+    gasPrice = GasPrice(BigInt("50000000000")),
+    gasLimit = GasAmount(90000),
     receivingAddress = Address(Hex.decode("1c51bf013add0857c5d9cf2f71a7f15ca93d4816")),
     value = BigInt("1049756850000000000"),
     payload = ByteString.empty
@@ -50,7 +52,7 @@ class LegacyTransactionSpec extends AnyFlatSpec with Matchers:
   )
 
   val invalidStx: SignedTransaction = SignedTransaction(
-    validTx.copy(gasPrice = 0),
+    validTx.copy(gasPrice = GasPrice.Zero),
     pointSign = -98.toByte,
     signatureRandom = ByteString(Hex.decode("cfe3ad31d6612f8d787c45f115cc5b43fb22bcc210b62ae71dc7cbf0a6bea8df")),
     signature = ByteString(Hex.decode("57db8998114fae3c337e99dbd8573d4085691880f4576c6c1f6c5bbfe67d6cf0"))
@@ -65,8 +67,8 @@ class LegacyTransactionSpec extends AnyFlatSpec with Matchers:
 
   val validTransactionForNewSigningScheme: LegacyTransaction = LegacyTransaction(
     nonce = 587440,
-    gasPrice = BigInt("20000000000"),
-    gasLimit = 90000,
+    gasPrice = GasPrice(BigInt("20000000000")),
+    gasLimit = GasAmount(90000),
     receivingAddress = Address(Hex.decode("77b95d2028c741c038735b09d8d6e99ea180d40c")),
     value = BigInt("1552986466088074000"),
     payload = ByteString.empty
@@ -110,8 +112,8 @@ class LegacyTransactionSpec extends AnyFlatSpec with Matchers:
     val stx: SignedTransaction = SignedTransaction(
       tx = LegacyTransaction(
         nonce = BigInt(0),
-        gasPrice = BigInt("50000000000000"),
-        gasLimit = BigInt(21000),
+        gasPrice = GasPrice(BigInt("50000000000000")),
+        gasLimit = GasAmount(21000),
         receivingAddress = Address(ByteString(Hex.decode("5df9b87991262f6ba471f09758cde1c0fc1de734"))),
         value = BigInt(31337),
         payload = ByteString.empty

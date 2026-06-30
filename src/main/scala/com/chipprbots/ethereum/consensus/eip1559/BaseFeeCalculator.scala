@@ -23,7 +23,7 @@ object BaseFeeCalculator:
     *   the expected baseFee for the child block
     */
   def calcBaseFee(parent: BlockHeader, blockchainConfig: BlockchainConfig): BigInt =
-    val isParentOlympia = parent.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
+    val isParentOlympia = parent.number.value >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
     if !isParentOlympia then return InitialBaseFee
 
     val parentBaseFee = parent.baseFee.getOrElse(InitialBaseFee)
@@ -34,7 +34,7 @@ object BaseFeeCalculator:
       // Parent used more gas than target — baseFee increases
       // max(1, parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator)
       val gasUsedDelta = parent.gasUsed - parentGasTarget
-      val baseFeeDelta = (parentBaseFee * gasUsedDelta / parentGasTarget / BaseFeeChangeDenominator).max(1)
+      val baseFeeDelta = (parentBaseFee * gasUsedDelta.value / parentGasTarget.value / BaseFeeChangeDenominator).max(1)
       parentBaseFee + baseFeeDelta
     else
       // Parent used less gas than target — baseFee decreases.
@@ -47,5 +47,5 @@ object BaseFeeCalculator:
       // NOTE: EngineApiService and EthSimulateService carry inline copies of this decrease and
       // already omit the min-1 floor — they must stay in agreement with this method.
       val gasUsedDelta = parentGasTarget - parent.gasUsed
-      val baseFeeDelta = parentBaseFee * gasUsedDelta / parentGasTarget / BaseFeeChangeDenominator
+      val baseFeeDelta = parentBaseFee * gasUsedDelta.value / parentGasTarget.value / BaseFeeChangeDenominator
       (parentBaseFee - baseFeeDelta).max(blockchainConfig.baseFeeFloor)

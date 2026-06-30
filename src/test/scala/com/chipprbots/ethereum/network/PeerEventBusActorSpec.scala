@@ -304,6 +304,6 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
       remoteStatus = peerStatus,
       chainWeight = peerStatus.chainWeight,
       forkAccepted = false,
-      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number,
+      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number.value,
       bestBlockHash = peerStatus.bestHash
     )

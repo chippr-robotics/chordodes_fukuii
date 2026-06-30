@@ -48,7 +48,7 @@ class BlockHeaderFieldCountSpec
   private val etcConfig: BlockchainConfig = blockchainConfig.copy(networkType = NetworkType.ETC)
 
   private def baseHeader(ts: Long): BlockHeader =
-    Fixtures.Blocks.ValidBlock.header.copy(unixTimestamp = ts)
+    Fixtures.Blocks.ValidBlock.header.copy(unixTimestamp = Timestamp(ts))
 
   "BlockHeader.validateFieldCount" when {
 

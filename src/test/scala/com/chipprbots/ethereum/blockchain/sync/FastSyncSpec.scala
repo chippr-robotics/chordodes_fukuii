@@ -64,12 +64,12 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
     )
 
     lazy val bestBlockAtStart: Block = testBlocks(10)
-    lazy val expectedPivotBlockNumber: BigInt = bestBlockAtStart.number - syncConfig.pivotBlockOffset
+    lazy val expectedPivotBlockNumber: BigInt = bestBlockAtStart.number.value - syncConfig.pivotBlockOffset
     lazy val expectedTargetBlockNumber: BigInt = expectedPivotBlockNumber + syncConfig.fastSyncBlockValidationX
     lazy val testPeers: Map[Peer, NetworkPeerManagerActor.PeerInfo] = twoAcceptedPeers.map { case (k, peerInfo) =>
       val lastBlock = bestBlockAtStart
       k -> peerInfo
-        .withBestBlockData(lastBlock.number, lastBlock.hash.value)
+        .withBestBlockData(lastBlock.number.value, lastBlock.hash.value)
         .copy(remoteStatus = peerInfo.remoteStatus.copy(bestHash = lastBlock.hash.value))
     }
     lazy val networkPeerManager =
@@ -189,7 +189,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
 
           val watcher = TestProbe()
           watcher.watch(fastSync)
-          fastSync ! FastSync.WrappedPrhResult(ResponseReceived(peer, msg, timeTaken = 0L))
+          fastSync ! FastSync.WrappedPrhResult(ResponseReceived(0, peer, msg, timeTaken = 0L))
 
           // If the actor crashes, we'll receive Terminated.
           watcher.expectNoMessage(500.millis)
@@ -330,7 +330,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
           _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
           blocksBatch <- blocksFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("blocks fiber canceled")))
           status <- getSyncStatus
-          lastBlockFromBatch = blocksBatch.lastOption.map(_.number).getOrElse(BigInt(0))
+          lastBlockFromBatch = blocksBatch.lastOption.map(_.number.value).getOrElse(BigInt(0))
         yield status match
           case Status.Syncing(startingBlockNumber, blocksProgress, stateNodesProgress) =>
             assert(startingBlockNumber === BigInt(0))

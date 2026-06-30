@@ -171,7 +171,6 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers:
     val rlpxConnectionProbe: TestProbe = TestProbe()
     val peerMessageBus: TestProbe = TestProbe()
     val knownNodesManager: TestProbe = TestProbe()
-    val peerManagerProbe: TestProbe = TestProbe()
 
     def peerActor(handshaker: Handshaker[PeerInfo]): TestActorRef[Nothing] = TestActorRef(
       PropsAdapter(
@@ -182,8 +181,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers:
           peerEventBus = peerMessageBus.ref,
           knownNodesManager = knownNodesManager.ref,
           incomingConnection = false,
-          initHandshaker = handshaker,
-          peerManagerRef = peerManagerProbe.ref
+          initHandshaker = handshaker
         )
       )
     )

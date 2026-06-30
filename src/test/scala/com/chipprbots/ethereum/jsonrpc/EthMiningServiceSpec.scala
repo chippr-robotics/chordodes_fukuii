@@ -35,16 +35,19 @@ import com.chipprbots.ethereum.consensus.pow.difficulty.EthashDifficultyCalculat
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.getEncodedWithoutNonce
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.*
 import com.chipprbots.ethereum.jsonrpc.NodeJsonRpcHealthChecker.JsonRpcHealthConfig
@@ -197,27 +200,28 @@ class EthMiningServiceSpec
     import scala.concurrent.Await
     val response: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
 
-    response shouldEqual Right(GetWorkResponse(powHash, seedHash, target, block.header.number))
+    response shouldEqual Right(GetWorkResponse(powHash, seedHash, target, block.header.number.value))
 
   it should "generate and submit work when generating block for mining with restricted ethash generator" taggedAs (
     UnitTest,
     RPCTest
   ) in new TestSetup:
-    val testMining: TestMining = buildTestMining()
-    override lazy val restrictedGenerator = new RestrictedPoWBlockGeneratorImpl(
-      evmCodeStorage = storagesInstance.storages.evmCodeStorage,
-      validators = MockValidatorsAlwaysSucceed,
-      blockchainReader = blockchainReader,
-      miningConfig = miningConfig,
-      blockPreparator = testMining.blockPreparator,
-      EthashDifficultyCalculator,
-      minerKey
-    )
-    override lazy val mining: TestMining = testMining.withBlockGenerator(restrictedGenerator)
+    (blockGenerator
+      .generateBlock(
+        _: Block,
+        _: Seq[SignedTransaction],
+        _: Address,
+        _: Seq[BlockHeader],
+        _: Option[InMemoryWorldStateProxy]
+      )(_: BlockchainConfig))
+      .expects(parentBlock, Nil, *, *, *, *)
+      .returning(PendingBlockAndState(PendingBlock(block, Nil), fakeWorld))
 
     blockchainWriter.save(parentBlock, Nil, ChainWeight.totalDifficultyOnly(parentBlock.header.difficulty.value), true)
 
-    val response: Either[JsonRpcError, GetWorkResponse] = ethMiningService.getWork(GetWorkRequest()).unsafeRunSync()
+    val workFuture: Future[Either[JsonRpcError, GetWorkResponse]] =
+      ethMiningService.getWork(GetWorkRequest()).unsafeToFuture()
+
     replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
     ommersPool.expectMsgPF() {
@@ -225,11 +229,13 @@ class EthMiningServiceSpec
         replyTo ! OmmersPool.Ommers(Nil)
     }
 
-    assert(response.isRight)
-    val responseData = response.toOption.get
+    import scala.concurrent.Await
+    val response: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
+    response shouldBe Symbol("right")
 
-    val submitRequest: SubmitWorkRequest =
-      SubmitWorkRequest(ByteString("nonce"), responseData.powHeaderHash, ByteString(Hex.decode("01" * 32)))
+    blockGenerator.getPrepared.expects(powHash).returning(Some(PendingBlock(block, Nil)))
+
+    val submitRequest = SubmitWorkRequest(ByteString("nonce"), powHash, ByteString(Hex.decode("01" * 32)))
     val response1: Either[JsonRpcError, SubmitWorkResponse] = ethMiningService.submitWork(submitRequest).unsafeRunSync()
     response1 shouldEqual Right(SubmitWorkResponse(true))
 
@@ -288,7 +294,11 @@ class EthMiningServiceSpec
       SubmitHashRateResponse(true)
     )
 
-    // Wait half the timeout period, then submit second hashrate
+    // deliberate: the miner-active-timeout expiry mechanism is under test.
+    // The sleep advances real time past half the timeout window so that id1 is on
+    // its way to expiry while id2 (submitted after the sleep) is still fresh.
+    // There is no actor message or state change to synchronize on here — wall-clock
+    // advancement is the exact thing being tested.
     Thread.sleep(jsonRpcConfig.minerActiveTimeout.toMillis / 2)
     ethMiningService.submitHashRate(SubmitHashRateRequest(rate, id2)).unsafeRunSync() shouldEqual Right(
       SubmitHashRateResponse(true)
@@ -540,10 +550,10 @@ class EthMiningServiceSpec
         receiptsRoot = TrieRoot(ByteString.empty),
         logsBloom = BloomFilter(ByteString.empty),
         difficulty = Difficulty(difficulty),
-        number = 0,
-        gasLimit = 16733003,
-        gasUsed = 0,
-        unixTimestamp = 1494604900,
+        number = BlockNumber(0),
+        gasLimit = GasAmount(16733003),
+        gasUsed = GasAmount.Zero,
+        unixTimestamp = Timestamp(1494604900),
         extraData = ByteString.empty,
         mixHash = BlockHash(ByteString.empty),
         nonce = ByteString.empty
@@ -564,10 +574,10 @@ class EthMiningServiceSpec
           TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
         difficulty = Difficulty(difficulty),
-        number = 1,
-        gasLimit = 16733003,
-        gasUsed = 0,
-        unixTimestamp = 1494604913,
+        number = BlockNumber(1),
+        gasLimit = GasAmount(16733003),
+        gasUsed = GasAmount.Zero,
+        unixTimestamp = Timestamp(1494604913),
         extraData = ByteString(Hex.decode("6d696e6564207769746820657463207363616c61")),
         mixHash = BlockHash(ByteString.empty),
         nonce = ByteString.empty

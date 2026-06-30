@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.vm
 
 import org.scalatest.funsuite.AnyFunSuite
 
+import com.chipprbots.ethereum.domain.ChainId
 import com.chipprbots.ethereum.testing.Tags.*
 
 class EvmConfigEtcForkSelectionSpec extends AnyFunSuite:
@@ -26,7 +27,7 @@ class EvmConfigEtcForkSelectionSpec extends AnyFunSuite:
     mystiqueBlockNumber = Long.MaxValue,
     spiralBlockNumber = Long.MaxValue,
     olympiaBlockNumber = Long.MaxValue,
-    chainId = 0x3f
+    chainId = ChainId(0x3f)
   )
 
   test("EvmConfig.forBlock prefers Atlantis over Byzantium when activated at same height", UnitTest, VMTest) {

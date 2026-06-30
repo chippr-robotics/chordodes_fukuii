@@ -96,10 +96,11 @@ object BinarySearchSupport extends Logger:
     if parentBlockHeader
         .isParentOf(childBlockHeader)
     then // chains are still aligned but there might be an even better block
-      if parentNum == max then BinarySearchCompleted(parentNum)
-      else if parentNum == min && childNum == max then ContinueBinarySearch(searchState.copy(minBlockNumber = childNum))
-      else ContinueBinarySearch(searchState.copy(minBlockNumber = parentNum))
+      if parentNum.value == max then BinarySearchCompleted(parentNum.value)
+      else if parentNum.value == min && childNum.value == max then
+        ContinueBinarySearch(searchState.copy(minBlockNumber = childNum.value))
+      else ContinueBinarySearch(searchState.copy(minBlockNumber = parentNum.value))
     else // no parent/child -> chains have diverged before parent block
     if min == 1 && max <= 2 then NoCommonBlock
-    else if min == max then BinarySearchCompleted(parentOf(parentNum))
-    else ContinueBinarySearch(searchState.copy(maxBlockNumber = parentOf(parentNum).max(1)))
+    else if min == max then BinarySearchCompleted(parentOf(parentNum.value))
+    else ContinueBinarySearch(searchState.copy(maxBlockNumber = parentOf(parentNum.value).max(1)))

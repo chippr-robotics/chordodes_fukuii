@@ -26,7 +26,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers:
 
   private val genesisHash = Fixtures.Blocks.Genesis.header.hash.value
   private val latestHash = Fixtures.Blocks.Block3125369.header.hash.value
-  private val latestBlockNr = Fixtures.Blocks.Block3125369.header.number
+  private val latestBlockNr = Fixtures.Blocks.Block3125369.header.number.value
 
   private val dummyForkId = ForkId(0L, None)
 

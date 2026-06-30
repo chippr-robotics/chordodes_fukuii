@@ -8,7 +8,10 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 
 /** Integration test for MESS (ECIP-1100: Modified Exponential Subjective Scoring).
@@ -33,10 +36,10 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers:
       receiptsRoot = TrieRoot(ByteString.empty),
       logsBloom = BloomFilter(ByteString.empty),
       difficulty = Difficulty(difficulty),
-      number = number,
-      gasLimit = 0,
-      gasUsed = 0,
-      unixTimestamp = timestamp,
+      number = BlockNumber(number),
+      gasLimit = GasAmount.Zero,
+      gasUsed = GasAmount.Zero,
+      unixTimestamp = Timestamp(timestamp),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString.empty),
       nonce = ByteString.empty

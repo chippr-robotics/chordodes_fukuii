@@ -191,7 +191,7 @@ class EngineApiService(
         blockchainReader.getBlockHeaderByHash(BlockHash(payload.parentHash)).map(_.hash.value).getOrElse(zeroHash)
       PayloadStatusV1(Invalid, latestValidHash = Some(lvh), validationError = Some("INVALID_VERSIONED_HASHES"))
     else if blockchainReader.getBlockHeaderByHash(BlockHash(payload.blockHash)).exists { h =>
-        blockchainReader.getBlockHeaderByNumber(h.number).exists(_.hash.value == payload.blockHash)
+        blockchainReader.getBlockHeaderByNumber(h.number.value).exists(_.hash.value == payload.blockHash)
       }
     then
       // Already fully stored with number mapping — skip re-execution
@@ -219,7 +219,7 @@ class EngineApiService(
           Some(s"invalid block number: expected ${parent.number + 1} got ${block.header.number}")
         else if block.header.unixTimestamp <= parent.unixTimestamp then
           Some(s"invalid timestamp: ${block.header.unixTimestamp} <= parent ${parent.unixTimestamp}")
-        else if block.header.gasLimit < BigInt(5000) then
+        else if block.header.gasLimit < GasAmount(5000) then
           Some(s"gas limit below minimum: ${block.header.gasLimit} < 5000")
         else
           // EIP-1559 gas limit bounds: |gasLimit - parent.gasLimit| < parent.gasLimit / 1024
@@ -297,7 +297,7 @@ class EngineApiService(
         // parent) has unverified ancestry, and a child built on it must NOT be claimed as
         // VALID — hive's "Invalid NewPayload, ParentHash" test expects ACCEPTED/SYNCING.
         val parentValidated = parentHeader.exists { p =>
-          blockchainReader.getBlockHeaderByNumber(p.number).exists(_.hash == p.hash) ||
+          blockchainReader.getBlockHeaderByNumber(p.number.value).exists(_.hash == p.hash) ||
           blockchainReader.getReceiptsByHash(p.hash).isDefined
         }
         val executionResult =
@@ -330,7 +330,7 @@ class EngineApiService(
                     // we store by-hash-only so later forkchoiceUpdated can promote via
                     // ForkChoiceManager.promoteBranchToCanonical.
                     val extendsCanonical = parentHeader.exists { p =>
-                      blockchainReader.getBlockHeaderByNumber(p.number).exists(_.hash == p.hash)
+                      blockchainReader.getBlockHeaderByNumber(p.number.value).exists(_.hash == p.hash)
                     }
                     if extendsCanonical then blockchainWriter.storeBlock(block).commit()
                     else blockchainWriter.storeBlockByHashOnly(block).commit()
@@ -442,7 +442,9 @@ class EngineApiService(
       // Chain-imported blocks (chain.rlp) and newPayload VALID blocks DO have it.
       val headHeader = blockchainReader.getBlockHeaderByHash(BlockHash(forkChoiceState.headBlockHash))
       val blockFullyStored = headHeader.exists { header =>
-        blockchainReader.getBlockHeaderByNumber(header.number).exists(_.hash.value == forkChoiceState.headBlockHash)
+        blockchainReader
+          .getBlockHeaderByNumber(header.number.value)
+          .exists(_.hash.value == forkChoiceState.headBlockHash)
       }
       val blockExistsByHash = headHeader.isDefined
       val isGenesis = forkChoiceState.headBlockHash == blockchainReader
@@ -538,7 +540,8 @@ class EngineApiService(
               if attrs.timestamp == 0 then Some("invalid payload attributes: zero timestamp")
               else
                 blockchainReader.getBlockHeaderByHash(BlockHash(forkChoiceState.headBlockHash)).flatMap { parent =>
-                  if attrs.timestamp <= parent.unixTimestamp then Some("invalid payload attributes: timestamp too low")
+                  if attrs.timestamp <= parent.unixTimestamp.toLong then
+                    Some("invalid payload attributes: timestamp too low")
                   else None
                 }
             }
@@ -600,13 +603,15 @@ class EngineApiService(
                       val parentBaseFee = parent.header.baseFee.getOrElse(BigInt("1000000000"))
                       val parentGasTarget = parent.header.gasLimit / 2
                       val baseFee: BigInt =
-                        if parent.header.number == 0 then parentBaseFee
+                        if parent.header.number == BlockNumber.Zero then parentBaseFee
                         else if parent.header.gasUsed == parentGasTarget then parentBaseFee
                         else if parent.header.gasUsed > parentGasTarget then
-                          val delta = parentBaseFee * (parent.header.gasUsed - parentGasTarget) / parentGasTarget / 8
+                          val delta =
+                            parentBaseFee * (parent.header.gasUsed - parentGasTarget).value / parentGasTarget.value / 8
                           parentBaseFee + (if delta == BigInt(0) then BigInt(1) else delta)
                         else
-                          val delta = parentBaseFee * (parentGasTarget - parent.header.gasUsed) / parentGasTarget / 8
+                          val delta =
+                            parentBaseFee * (parentGasTarget - parent.header.gasUsed).value / parentGasTarget.value / 8
                           if parentBaseFee - delta < 0 then BigInt(0) else parentBaseFee - delta
 
                       // Fetch pending transactions from the tx pool using IO.fromFuture so the
@@ -629,7 +634,7 @@ class EngineApiService(
                           // Also capture the network-wrapped raw bytes for EIP-4844 blob txs so
                           // engine_getPayloadV3 can emit them in the blobsBundle envelope.
                           IO {
-                            val expectedChainId = blockchainConfig.chainId
+                            val expectedChainId = blockchainConfig.chainId.value
                             val filtered = response.pendingTransactions.map(_.stx.tx).filter { stx =>
                               val txChainId: Option[BigInt] = stx.tx match
                                 case t: com.chipprbots.ethereum.domain.TransactionWithAccessList => Some(t.chainId)
@@ -659,7 +664,8 @@ class EngineApiService(
                             // the proposer packs every pool blob tx into one block and getPayloadV3's
                             // blobsBundle grows past the test's `ExpectedIncludedBlobCount`.
                             val pendingTxsForBlock =
-                              val maxBlobGas = BlobGasUtils.maxBlobGasPerBlock(attrs.timestamp, blockchainConfig)
+                              val maxBlobGas =
+                                BlobGasUtils.maxBlobGasPerBlock(Timestamp(attrs.timestamp), blockchainConfig)
                               pendingTxs
                                 .foldLeft((Seq.empty[SignedTransaction], BigInt(0))) { case ((kept, blobGas), stx) =>
                                   stx.tx match
@@ -687,9 +693,10 @@ class EngineApiService(
 
                             // Determine which fork is active at the proposed block's timestamp so we emit
                             // the correct HeaderExtraFields variant and header fields.
-                            val isShanghai = blockchainConfig.isShanghaiTimestamp(attrs.timestamp)
-                            val isCancun = blockchainConfig.isCancunTimestamp(attrs.timestamp)
-                            val isPrague = blockchainConfig.isPragueTimestamp(attrs.timestamp)
+                            val attrTs = Timestamp(attrs.timestamp)
+                            val isShanghai = blockchainConfig.isShanghaiTimestamp(attrTs)
+                            val isCancun = blockchainConfig.isCancunTimestamp(attrTs)
+                            val isPrague = blockchainConfig.isPragueTimestamp(attrTs)
                             val withdrawals: Seq[com.chipprbots.ethereum.domain.Withdrawal] =
                               attrs.withdrawals.getOrElse(Nil)
 
@@ -706,7 +713,7 @@ class EngineApiService(
                               parentExcessBlobGas,
                               parentBlobGasUsed,
                               parentBlobBaseFee,
-                              attrs.timestamp,
+                              attrTs,
                               blockchainConfig
                             )
 
@@ -760,8 +767,8 @@ class EngineApiService(
                               difficulty = Difficulty.Zero,
                               number = blockNumber,
                               gasLimit = gasLimit,
-                              gasUsed = 0,
-                              unixTimestamp = attrs.timestamp,
+                              gasUsed = GasAmount.Zero,
+                              unixTimestamp = Timestamp(attrs.timestamp),
                               extraData = ByteString("fukuii".getBytes),
                               mixHash = BlockHash(attrs.prevRandao),
                               nonce = ByteString(new Array[Byte](8)),
@@ -852,7 +859,7 @@ class EngineApiService(
                                 buildMpt(skeletonBlock.body.transactionList, SignedTransaction.byteArraySerializable)
                               ),
                               logsBloom = BloomFilter(bloomFilter),
-                              gasUsed = gasUsedTotal,
+                              gasUsed = GasAmount(gasUsedTotal),
                               extraFields = finalExtraFields
                             )
                             val payload = skeletonBlock.copy(header = updatedHeader)
@@ -1128,10 +1135,10 @@ class EngineApiService(
       receiptsRoot = TrieRoot(payload.receiptsRoot),
       logsBloom = BloomFilter(payload.logsBloom),
       difficulty = Difficulty.Zero,
-      number = payload.blockNumber,
-      gasLimit = payload.gasLimit,
-      gasUsed = payload.gasUsed,
-      unixTimestamp = payload.timestamp,
+      number = BlockNumber(payload.blockNumber),
+      gasLimit = GasAmount(payload.gasLimit),
+      gasUsed = GasAmount(payload.gasUsed),
+      unixTimestamp = Timestamp(payload.timestamp),
       extraData = payload.extraData,
       mixHash = BlockHash(payload.prevRandao),
       nonce = ByteString(new Array[Byte](8)),
@@ -1315,7 +1322,7 @@ object BlobGasUtils:
   /** Fork-aware blob gas price. Prague (EIP-7691) raises the update fraction. */
   def getBlobGasPrice(
       excessBlobGas: BigInt,
-      blockTimestamp: Long,
+      blockTimestamp: Timestamp,
       blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig
   ): BigInt =
     val fraction = updateFractionFor(blockTimestamp, blockchainConfig)
@@ -1326,7 +1333,7 @@ object BlobGasUtils:
     * Prague value (Osaka's blob params are unchanged from Prague).
     */
   def updateFractionFor(
-      blockTimestamp: Long,
+      blockTimestamp: Timestamp,
       blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig
   ): BigInt =
     if blockchainConfig.isBpo2Timestamp(blockTimestamp) then BPO2_BLOB_BASE_FEE_UPDATE_FRACTION
@@ -1345,7 +1352,7 @@ object BlobGasUtils:
       parentExcessBlobGas: BigInt,
       parentBlobGasUsed: BigInt,
       parentBaseFee: BigInt,
-      childTimestamp: Long,
+      childTimestamp: Timestamp,
       blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig
   ): BigInt =
     val target = targetBlobGasPerBlock(childTimestamp, blockchainConfig)
@@ -1359,7 +1366,7 @@ object BlobGasUtils:
     * BPO wins.
     */
   def maxBlobGasPerBlock(
-      blockTimestamp: Long,
+      blockTimestamp: Timestamp,
       blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig
   ): BigInt =
     if blockchainConfig.isBpo2Timestamp(blockTimestamp) then BPO2_MAX_BLOB_GAS
@@ -1372,7 +1379,7 @@ object BlobGasUtils:
     * (6 blobs) instead of the active BPO target (8 or 12 blobs).
     */
   def targetBlobGasPerBlock(
-      blockTimestamp: Long,
+      blockTimestamp: Timestamp,
       blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig
   ): BigInt =
     if blockchainConfig.isBpo2Timestamp(blockTimestamp) then BPO2_TARGET_BLOB_GAS

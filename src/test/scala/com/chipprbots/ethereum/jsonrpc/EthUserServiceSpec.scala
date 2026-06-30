@@ -48,7 +48,7 @@ class EthUserServiceSpec
     val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = TrieRoot(ByteString(mpt.getRootHash)))
     val newblock: Block = blockToRequest.copy(header = newBlockHeader)
     blockchainWriter.storeBlock(newblock).commit()
-    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.number)
+    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.number.value)
 
     val response: ServiceResponse[GetCodeResponse] = ethUserService.getCode(GetCodeRequest(address, BlockParam.Latest))
 
@@ -69,7 +69,7 @@ class EthUserServiceSpec
     val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = TrieRoot(ByteString(mpt.getRootHash)))
     val newblock: Block = blockToRequest.copy(header = newBlockHeader)
     blockchainWriter.storeBlock(newblock).commit()
-    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.number)
+    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.number.value)
 
     val response: ServiceResponse[GetBalanceResponse] =
       ethUserService.getBalance(GetBalanceRequest(address, BlockParam.Latest))
@@ -82,7 +82,7 @@ class EthUserServiceSpec
     val newBlockHeader = blockToRequest.header
     val newblock: Block = blockToRequest.copy(header = newBlockHeader)
     blockchainWriter.storeBlock(newblock).commit()
-    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.header.number)
+    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.header.number.value)
 
     val response: ServiceResponse[GetBalanceResponse] =
       ethUserService.getBalance(GetBalanceRequest(address, BlockParam.Latest))
@@ -112,7 +112,7 @@ class EthUserServiceSpec
     val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = TrieRoot(ByteString(mpt.getRootHash)))
     val newblock: Block = blockToRequest.copy(header = newBlockHeader)
     blockchainWriter.storeBlock(newblock).commit()
-    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.number)
+    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.number.value)
 
     val response: ServiceResponse[GetStorageAtResponse] =
       ethUserService.getStorageAt(GetStorageAtRequest(address, 333, BlockParam.Latest))
@@ -133,7 +133,7 @@ class EthUserServiceSpec
     val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = TrieRoot(ByteString(mpt.getRootHash)))
     val newblock: Block = blockToRequest.copy(header = newBlockHeader)
     blockchainWriter.storeBlock(newblock).commit()
-    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.number)
+    blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.number.value)
 
     val response: ServiceResponse[GetTransactionCountResponse] =
       ethUserService.getTransactionCount(GetTransactionCountRequest(address, BlockParam.Latest))

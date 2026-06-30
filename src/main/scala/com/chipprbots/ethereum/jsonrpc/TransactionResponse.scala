@@ -112,13 +112,13 @@ object TransactionResponse:
       hash = stx.hash.value,
       nonce = stx.tx.nonce,
       blockHash = blockHeader.map(_.hash.value),
-      blockNumber = blockHeader.map(_.number),
+      blockNumber = blockHeader.map(_.number.value),
       transactionIndex = transactionIndex.map(txIndex => BigInt(txIndex)),
       from = SignedTransaction.getSender(stx).map(_.bytes),
       to = stx.tx.receivingAddress.map(_.bytes),
       value = stx.tx.value,
       gasPrice = effectiveGasPrice,
-      gas = stx.tx.gasLimit,
+      gas = stx.tx.gasLimit.value,
       input = stx.tx.payload,
       `type` = Some(txType),
       chainId = txChainId,
@@ -133,7 +133,7 @@ object TransactionResponse:
       v = Some(stx.signature.v),
       r = Some(stx.signature.r),
       s = Some(stx.signature.s),
-      blockTimestamp = blockHeader.map(h => BigInt(h.unixTimestamp))
+      blockTimestamp = blockHeader.map(h => BigInt(h.unixTimestamp.toLong))
     )
 
   private def encodeAccessList(accessList: List[AccessListItem]): Seq[Map[String, Any]] =

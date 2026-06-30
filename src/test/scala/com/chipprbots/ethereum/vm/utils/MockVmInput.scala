@@ -6,6 +6,8 @@ import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransaction
 
@@ -28,11 +30,14 @@ object MockVmInput:
       senderAddress: Address,
       payload: ByteString,
       value: BigInt,
-      gasLimit: BigInt,
+      gasLimit: GasAmount,
       gasPrice: BigInt = defaultGasPrice,
       receivingAddress: Option[Address] = None,
       nonce: BigInt = 0
   ): SignedTransaction =
-    new MockTransaction(LegacyTransaction(nonce, gasPrice, gasLimit, receivingAddress, value, payload), senderAddress)
+    new MockTransaction(
+      LegacyTransaction(nonce, GasPrice(gasPrice), gasLimit, receivingAddress, value, payload),
+      senderAddress
+    )
 
   def blockHeader: BlockHeader = BlockFixtures.ValidBlock.header

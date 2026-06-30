@@ -161,11 +161,11 @@ object FilterManager:
                   transactionIndex = txIndex,
                   transactionHash = tx.hash.value,
                   blockHash = block.header.hash.value,
-                  blockNumber = block.header.number,
+                  blockNumber = block.header.number.value,
                   address = log.loggerAddress,
                   data = log.data,
                   topics = log.logTopics,
-                  blockTimestamp = Some(BigInt(block.header.unixTimestamp))
+                  blockTimestamp = Some(BigInt(block.header.unixTimestamp.toLong))
                 )
               }
           else Nil
@@ -177,7 +177,7 @@ object FilterManager:
       blockParam match
         case BlockParam.WithNumber(blockNumber) => blockNumber
         case BlockParam.WithHash(hash) =>
-          blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number).getOrElse(bestBlockNumber)
+          blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number.value).getOrElse(bestBlockNumber)
         case BlockParam.Earliest  => 0
         case BlockParam.Latest    => bestBlockNumber
         case BlockParam.Safe      => bestBlockNumber

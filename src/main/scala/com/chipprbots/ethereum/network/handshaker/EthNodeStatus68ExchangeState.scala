@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.network.handshaker
 
 import cats.effect.SyncIO
 
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.forkid.ForkIdValidationResult.Connect
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.forkid.ForkIdValidator
@@ -66,9 +67,11 @@ case class EthNodeStatus68ExchangeState(
 
     val localBestBlock = blockchainReader.getBestBlockNumber
     val localGenesisHash = blockchainReader.genesisHeader.hash.value
-    val storedTimestamp = blockchainReader.getBlockHeaderByNumber(localBestBlock).map(_.unixTimestamp).getOrElse(0L)
-    val localBestTimestamp = if storedTimestamp == 0L then System.currentTimeMillis() / 1000 else storedTimestamp
-    val localForkId = ForkId.create(localGenesisHash, blockchainConfig)(localBestBlock, localBestTimestamp)
+    val storedTimestamp =
+      blockchainReader.getBlockHeaderByNumber(localBestBlock).map(_.unixTimestamp).getOrElse(Timestamp.Zero)
+    val localBestTimestamp =
+      if storedTimestamp == Timestamp.Zero then Timestamp(System.currentTimeMillis() / 1000) else storedTimestamp
+    val localForkId = ForkId.create(localGenesisHash, blockchainConfig)(localBestBlock, localBestTimestamp.toLong)
 
     log.debug(
       "ETH{}_STATUS: Local state - bestBlock={}, genesisHash={}, localForkId={}",
@@ -171,8 +174,9 @@ case class EthNodeStatus68ExchangeState(
     // Core-geth uses head.Number.Uint64() and head.Time for forkID — not checkpoints.
     val forkIdBlockNumber = bestBlockNumber
     val forkIdTimestamp =
-      if bestBlockHeader.unixTimestamp == 0L then System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
-    val forkId = ForkId.create(genesisHash, blockchainConfig)(forkIdBlockNumber, forkIdTimestamp)
+      if bestBlockHeader.unixTimestamp == Timestamp.Zero then Timestamp(System.currentTimeMillis() / 1000)
+      else bestBlockHeader.unixTimestamp
+    val forkId = ForkId.create(genesisHash, blockchainConfig)(forkIdBlockNumber, forkIdTimestamp.toLong)
 
     val status = ETHPackets.Status68.Status68(
       protocolVersion = negotiatedCapability.version,

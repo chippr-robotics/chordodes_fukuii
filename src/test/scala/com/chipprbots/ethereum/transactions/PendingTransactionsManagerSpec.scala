@@ -22,6 +22,8 @@ import com.chipprbots.ethereum.consensus.eip1559.BaseFeeCalculator
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -386,8 +388,8 @@ class PendingTransactionsManagerSpec
   ) in new TestSetup:
     val zeroTipLegacy: LegacyTransaction = LegacyTransaction(
       nonce = BigInt(0),
-      gasPrice = BigInt(0), // tip = gasPrice - baseFee = 0 - 0 = 0 < minTip(1)
-      gasLimit = BigInt(21_000),
+      gasPrice = GasPrice.Zero, // tip = gasPrice - baseFee = 0 - 0 = 0 < minTip(1)
+      gasLimit = GasAmount(21_000),
       receivingAddress = Some(Address(42)),
       value = BigInt(0),
       payload = ByteString.empty
@@ -406,8 +408,8 @@ class PendingTransactionsManagerSpec
   ) in new TestSetup:
     val validLegacy: LegacyTransaction = LegacyTransaction(
       nonce = BigInt(0),
-      gasPrice = BigInt(1), // tip = 1 - 0 = 1 >= minTip(1)
-      gasLimit = BigInt(21_000),
+      gasPrice = GasPrice(1), // tip = 1 - 0 = 1 >= minTip(1)
+      gasLimit = GasAmount(21_000),
       receivingAddress = Some(Address(42)),
       value = BigInt(0),
       payload = ByteString.empty
@@ -432,7 +434,7 @@ class PendingTransactionsManagerSpec
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(0), // tip = 0 < minTip(1)
       maxFeePerGas = BaseFeeCalculator.InitialBaseFee, // = 1 gwei
-      gasLimit = BigInt(21_000),
+      gasLimit = GasAmount(21_000),
       receivingAddress = Some(Address(42)),
       value = BigInt(0),
       payload = ByteString.empty,
@@ -455,7 +457,7 @@ class PendingTransactionsManagerSpec
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(1), // effectiveTip = min(1, 1gwei+1 - 1gwei) = 1 >= minTip(1)
       maxFeePerGas = BaseFeeCalculator.InitialBaseFee + 1, // baseFee + 1 wei
-      gasLimit = BigInt(21_000),
+      gasLimit = GasAmount(21_000),
       receivingAddress = Some(Address(42)),
       value = BigInt(0),
       payload = ByteString.empty,
@@ -479,7 +481,7 @@ class PendingTransactionsManagerSpec
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(0),
       maxFeePerGas = baseFee,
-      gasLimit = BigInt(21_000),
+      gasLimit = GasAmount(21_000),
       receivingAddress = Some(Address(42)),
       value = BigInt(0),
       payload = ByteString.empty,
@@ -490,7 +492,7 @@ class PendingTransactionsManagerSpec
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(1),
       maxFeePerGas = baseFee + 1,
-      gasLimit = BigInt(21_000),
+      gasLimit = GasAmount(21_000),
       receivingAddress = Some(Address(42)),
       value = BigInt(0),
       payload = ByteString.empty,
@@ -555,7 +557,7 @@ class PendingTransactionsManagerSpec
     val keyPair1: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
     val keyPair2: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
 
-    val tx: LegacyTransaction = LegacyTransaction(1, 1, 1, Some(Address(42)), 10, ByteString(""))
+    val tx: LegacyTransaction = LegacyTransaction(1, GasPrice(1), GasAmount(1), Some(Address(42)), 10, ByteString(""))
 
     def newStx(
         @scala.annotation.unused nonce: BigInt = 0,

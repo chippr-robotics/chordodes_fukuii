@@ -14,6 +14,8 @@ import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
@@ -307,7 +309,11 @@ class DebugTracingService(
         block <- blockchainReader
           .getBlockByHash(BlockHash(req.blockHash))
           .toRight(JsonRpcError.InvalidParams(s"Block not found for hash ${req.blockHash.toHex}"))
-        _ <- Either.cond(block.header.number > 0, (), JsonRpcError.InvalidParams("Genesis block is not traceable"))
+        _ <- Either.cond(
+          block.header.number.value > 0,
+          (),
+          JsonRpcError.InvalidParams("Genesis block is not traceable")
+        )
         parentHeader <- blockchainReader
           .getBlockHeaderByHash(block.header.parentHash)
           .toRight(JsonRpcError.InvalidParams("Parent block header not found"))
@@ -360,7 +366,7 @@ class DebugTracingService(
                 stxLedger.simulateTransactionWithTracer(stx, block.header, Some(world), tracer)
                 tracer.getResult
               }
-              TraceChainBlockResult(block.header.number, block.header.hash.value, traces)
+              TraceChainBlockResult(block.header.number.value, block.header.hash.value, traces)
             }
           }
         }
@@ -377,12 +383,12 @@ class DebugTracingService(
     import com.chipprbots.ethereum.domain.LegacyTransaction
     import com.chipprbots.ethereum.crypto.ECDSASignature
 
-    val gasLimit = callTx.gas.getOrElse(block.header.gasLimit)
+    val gasLimit = callTx.gas.map(GasAmount(_)).getOrElse(block.header.gasLimit)
     val fromAddress = callTx.from
       .map(Address.apply)
       .getOrElse(Address(0))
     val toAddress = callTx.to.map(Address.apply)
 
-    val tx = LegacyTransaction(0, callTx.gasPrice, gasLimit, toAddress, callTx.value, callTx.data)
+    val tx = LegacyTransaction(0, GasPrice(callTx.gasPrice), gasLimit, toAddress, callTx.value, callTx.data)
     val fakeSignature = ECDSASignature(0, 0, 0)
     Right(SignedTransactionWithSender(tx, fakeSignature, fromAddress))

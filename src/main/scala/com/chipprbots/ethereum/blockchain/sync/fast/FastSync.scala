@@ -244,7 +244,7 @@ object FastSync:
       // headers continued being written to RocksDB past the last SyncState snapshot.
       val existingBestHeader = blockchainReader.getBestBlockNumber
       val updatedState =
-        if existingBestHeader > syncState.bestBlockHeaderNumber && existingBestHeader <= syncState.pivotBlock.number
+        if existingBestHeader > syncState.bestBlockHeaderNumber && existingBestHeader <= syncState.pivotBlock.number.value
         then
           log.info(
             "Headers in database ({}) ahead of persisted sync state ({}). Advancing to skip redundant download.",
@@ -279,7 +279,8 @@ object FastSync:
                 validateHeaderPoW
               )
             )
-            .onFailure[Throwable](SupervisorStrategy.restart),
+            // PR #1378: pivot selection must keep retrying until a pivot is found — backoff, no cap.
+            .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(3.seconds, 30.seconds, 0.1)),
           "pivot-block-selector"
         )
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
@@ -308,7 +309,8 @@ object FastSync:
                       validateHeaderPoW
                     )
                   )
-                  .onFailure[Throwable](SupervisorStrategy.restart),
+                  // PR #1378: pivot selection must keep retrying until a pivot is found — backoff, no cap.
+                  .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(3.seconds, 30.seconds, 0.1)),
                 s"pivot-block-selector-retry-${java.util.UUID.randomUUID()}"
               )
             pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
@@ -323,7 +325,7 @@ object FastSync:
           case WrappedSyncProtocol(msg: SyncProtocol.GetStatus) =>
             ctx.self ! GetStatusCmd(msg.replyTo); Behaviors.same
           case WrappedPivotResult(PivotBlockSelector.Result(pivotBlockHeader)) =>
-            if pivotBlockHeader.number < 1 then
+            if pivotBlockHeader.number < BlockNumber(1L) then
               log.info("Unable to start block synchronization in fast mode: pivot block is less than 1")
               // Don't give up — peers may not have been fork-validated yet at startup.
               // Retry pivot selection after a delay instead of marking fast sync done.
@@ -335,7 +337,7 @@ object FastSync:
               // This avoids re-downloading millions of headers that survived a restart.
               val existingBestHeader = blockchainReader.getBestBlockNumber
               val bootstrappedHeaderNumber =
-                if existingBestHeader > 0 && existingBestHeader <= pivotBlockHeader.number then
+                if existingBestHeader > 0 && existingBestHeader <= pivotBlockHeader.number.value then
                   log.info(
                     "Found existing headers in database up to block {}. Skipping redundant header download.",
                     existingBestHeader
@@ -346,7 +348,7 @@ object FastSync:
               val initialSyncState =
                 SyncState(
                   pivotBlockHeader,
-                  safeDownloadTarget = pivotBlockHeader.number + syncConfig.fastSyncBlockValidationX,
+                  safeDownloadTarget = pivotBlockHeader.number.value + syncConfig.fastSyncBlockValidationX,
                   bestBlockHeaderNumber = bootstrappedHeaderNumber,
                   lastFullBlockNumber = bootstrappedHeaderNumber
                 )
@@ -397,7 +399,8 @@ object FastSync:
         .spawn(
           Behaviors
             .supervise(StateStorageActor())
-            .onFailure[Throwable](SupervisorStrategy.restart),
+            // PR #1378: state storage must stay alive for sync to complete — backoff, no cap.
+            .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)),
           s"$countActor-state-storage",
           DispatcherSelector.fromConfig("sync-dispatcher")
         )
@@ -407,7 +410,10 @@ object FastSync:
       // We send it StartSyncingTo / RestartRequested and it replies with messages matched in our Behavior[Command] states.
       // §7c-E3: restartWithBackoff bounds the re-request storm on restart. On restart, all in-flight peer assignments
       // are lost and re-requested, but PeerResponseTimeout per-request and the fresh DownloaderState (starts from zero)
-      // limit the burst. Backoff: min 5s, max 60s, 0.3 jitter, 2 restarts max (after which FastSync stops entirely).
+      // limit the burst. Backoff: min 5s, max 60s, 0.3 jitter.
+      // PR #1378: SyncStateSchedulerActor is a sync backbone actor — no `.withMaxRestarts` cap. A cap would silently
+      // stop the state-sync scheduler forever (FastSync stalls and never completes), the exact failure validated on
+      // Mordor. The backoff alone bounds the restart rate.
       val scheduler = ctx
         .spawn(
           Behaviors
@@ -429,7 +435,7 @@ object FastSync:
               )
             )
             .onFailure[Throwable](
-              SupervisorStrategy.restartWithBackoff(5.seconds, 60.seconds, 0.3).withMaxRestarts(2)
+              SupervisorStrategy.restartWithBackoff(5.seconds, 60.seconds, 0.3)
             ),
           s"$countActor-state-scheduler"
         )
@@ -461,11 +467,8 @@ object FastSync:
       lastLoggedFullBlock = initial.lastFullBlockNumber
       lastLoggedStateNodes = initial.downloadedNodesCount
 
-      // Persist delay should be 0, as the presence of it marks that fast sync was started. Use the 4-arg form with a
-      // 0s INITIAL delay: the 3-arg form reuses `persistStateSnapshotInterval` (= 1.minute) as the initial delay too,
-      // so a crash within the first minute would leave getSyncState()==None and re-enter startFromScratch (re-selecting
-      // a pivot) instead of resuming. The immediate persist records the chosen pivot at startup.
-      timers.startTimerWithFixedDelay(PersistTimerKey, PersistSyncState, 0.seconds, persistStateSnapshotInterval)
+      // Persist delay should be 0, as the presence of it marks that fast sync was started.
+      timers.startTimerWithFixedDelay(PersistTimerKey, PersistSyncState, persistStateSnapshotInterval)
       timers.startTimerWithFixedDelay(PrintStatusTimerKey, PrintStatus, printStatusInterval)
       timers.startTimerWithFixedDelay(HeartBeatTimerKey, ProcessSyncing, syncRetryInterval * 2)
 
@@ -511,7 +514,7 @@ object FastSync:
           case None => Behaviors.same
           case Some(_) =>
             msg match
-              case WrappedPrhResult(PeerRequestHandler.RequestFailed(peer, reason)) =>
+              case WrappedPrhResult(PeerRequestHandler.RequestFailed(_, peer, reason)) =>
                 handleRequestFailure(peer, FastSyncRequestFailed(reason))
                 Behaviors.same
               case RequestTerminated(handler) =>
@@ -549,7 +552,7 @@ object FastSync:
     }
 
     private def handleResponses(result: ResponseReceived[?]): Behavior[Command] = result match
-      case ResponseReceived(peer, blockHeadersMsg: ETHPackets.BlockHeaders, timeTaken) =>
+      case ResponseReceived(_, peer, blockHeadersMsg: ETHPackets.BlockHeaders, timeTaken) =>
         log.debug(
           "Received {} block headers from peer [{}] in {} ms",
           blockHeadersMsg.headers.size,
@@ -565,7 +568,7 @@ object FastSync:
                 s.headersFetcherQueue.deliver(peerWithInfo, blockHeadersMsg, timeTaken) match
                   case DeliveryResult.Delivered(_) =>
                     if blockHeadersMsg.headers.nonEmpty then
-                      headerResponseBuffer.put(blockHeadersMsg.headers.head.number, blockHeadersMsg.headers)
+                      headerResponseBuffer.put(blockHeadersMsg.headers.head.number.value, blockHeadersMsg.headers)
                       drainOrderedHeaders(peer)
                     else
                       blacklist.add(peer.id, blacklistDuration, WrongBlockHeaders)
@@ -581,7 +584,7 @@ object FastSync:
                 log.debug("Received block headers from unknown peer [{}], ignoring", peer.id)
                 Behaviors.same
 
-      case ResponseReceived(peer, blockBodiesMsg: ETHPackets.BlockBodies, timeTaken) =>
+      case ResponseReceived(_, peer, blockBodiesMsg: ETHPackets.BlockBodies, timeTaken) =>
         session match
           case None => Behaviors.same
           case Some(s) =>
@@ -605,7 +608,7 @@ object FastSync:
             val requestedBodies = s.requestedBlockBodies.getOrElse(peer.id, Nil)
             updateSession(s => s.copy(requestedBlockBodies = s.requestedBlockBodies - peer.id))
             handleBlockBodies(peer, requestedBodies, blockBodiesMsg.bodies)
-      case ResponseReceived(peer, receipts68: ETHPackets.Receipts68, timeTaken) =>
+      case ResponseReceived(_, peer, receipts68: ETHPackets.Receipts68, timeTaken) =>
         session match
           case None => Behaviors.same
           case Some(s) =>
@@ -663,7 +666,7 @@ object FastSync:
             updateSession(s => s.copy(requestedReceipts = s.requestedReceipts - peer.id))
             handleReceipts(peer, requestedHashes, receipts)
 
-      case ResponseReceived(peer, other, _) =>
+      case ResponseReceived(_, peer, other, _) =>
         log.debug(
           "Received unexpected response type {} from peer [{}], ignoring",
           other.getClass.getSimpleName,
@@ -691,7 +694,8 @@ object FastSync:
                   validateHeaderPoW
                 )
               )
-              .onFailure[Throwable](SupervisorStrategy.restart),
+              // PR #1378: pivot selection must keep retrying until a pivot is found — backoff, no cap.
+              .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(3.seconds, 30.seconds, 0.1)),
             s"$countActor-pivot-block-selector-update"
           )
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
@@ -773,7 +777,7 @@ object FastSync:
                   processSyncing()
                   b
 
-                case WrappedPrhResult(PeerRequestHandler.RequestFailed(peer, reason)) =>
+                case WrappedPrhResult(PeerRequestHandler.RequestFailed(_, peer, reason)) =>
                   handleRequestFailure(peer, FastSyncRequestFailed(reason))
                   Behaviors.same
                 case RequestTerminated(handler) =>
@@ -790,7 +794,7 @@ object FastSync:
             case None => Behaviors.same
             case Some(s) =>
               msg match
-                case WrappedPrhResult(PeerRequestHandler.RequestFailed(peer, reason)) =>
+                case WrappedPrhResult(PeerRequestHandler.RequestFailed(_, peer, reason)) =>
                   handleRequestFailure(peer, FastSyncRequestFailed(reason))
                   Behaviors.same
                 case RequestTerminated(handler) =>
@@ -813,7 +817,7 @@ object FastSync:
                       updateSession(s => s.copy(stateSyncStarted = true))
                       s2.syncStateScheduler ! StartSyncingTo(
                         s2.syncState.pivotBlock.stateRoot,
-                        s2.syncState.pivotBlock.number
+                        s2.syncState.pivotBlock.number.value
                       )
                     }
                   // Mirror the Classic `context.become(this.receive); processSyncing()`: transition out of the
@@ -870,7 +874,7 @@ object FastSync:
         case Some(s) =>
           SyncProtocol.Status.Syncing(
             s.initialLastFullBlockNumber,
-            Progress(s.syncState.lastFullBlockNumber, s.syncState.pivotBlock.number),
+            Progress(s.syncState.lastFullBlockNumber, s.syncState.pivotBlock.number.value),
             Some(
               Progress(s.syncState.downloadedNodesCount, s.syncState.totalNodesCount.max(1))
             ) // There's always at least one state root to fetch
@@ -895,7 +899,7 @@ object FastSync:
       session.foreach { s =>
         updateReason match
           case ImportedLastBlock =>
-            if pivotBlockHeader.number - s.syncState.pivotBlock.number <= syncConfig.maxTargetDifference then
+            if (pivotBlockHeader.number - s.syncState.pivotBlock.number).value <= syncConfig.maxTargetDifference then
               log.debug("Current pivot block is fresh enough, starting state download.")
               // Empty root has means that there were no transactions in blockchain, and Mpt trie is empty
               // Asking for this root would result only with empty transactions
@@ -912,7 +916,7 @@ object FastSync:
                   )
                 )
                 session.foreach(
-                  _.syncStateScheduler ! StartSyncingTo(pivotBlockHeader.stateRoot, pivotBlockHeader.number)
+                  _.syncStateScheduler ! StartSyncingTo(pivotBlockHeader.stateRoot, pivotBlockHeader.number.value)
                 )
             else
               updateSession(s =>
@@ -934,7 +938,7 @@ object FastSync:
                 )
                 // Always restart state download with new pivot — even if the jump is large.
                 // The state scheduler's bloom filter handles nodes already downloaded.
-                s2.syncStateScheduler ! StartSyncingTo(pivotBlockHeader.stateRoot, pivotBlockHeader.number)
+                s2.syncStateScheduler ! StartSyncingTo(pivotBlockHeader.stateRoot, pivotBlockHeader.number.value)
               }
 
           case LastBlockValidationFailed =>
@@ -973,7 +977,7 @@ object FastSync:
                 )
               then
                 updateSession(s => s.copy(stateSyncRestartRequested = false, stateSyncStarted = true))
-                s2.syncStateScheduler ! StartSyncingTo(pivotBlockHeader.stateRoot, pivotBlockHeader.number)
+                s2.syncStateScheduler ! StartSyncingTo(pivotBlockHeader.stateRoot, pivotBlockHeader.number.value)
             }
       }
 
@@ -985,7 +989,7 @@ object FastSync:
       }
 
     private def validateHeader(header: BlockHeader, peer: Peer): Either[HeaderProcessingResult, BlockHeader] =
-      val shouldValidate = session.exists(s => header.number >= s.syncState.nextBlockToFullyValidate)
+      val shouldValidate = session.exists(s => header.number.value >= s.syncState.nextBlockToFullyValidate)
 
       if shouldValidate then
         validators.blockHeaderValidator.validate(
@@ -1009,8 +1013,8 @@ object FastSync:
 
       updateSession { s =>
         val s2 =
-          if header.number > s.syncState.bestBlockHeaderNumber then
-            s.copy(syncState = s.syncState.copy(bestBlockHeaderNumber = header.number))
+          if header.number.value > s.syncState.bestBlockHeaderNumber then
+            s.copy(syncState = s.syncState.copy(bestBlockHeaderNumber = header.number.value))
           else s
         s2.copy(syncState =
           s2.syncState
@@ -1038,8 +1042,8 @@ object FastSync:
       session match
         case None => Behaviors.same
         case Some(s) =>
-          if header.number <= s.syncState.safeDownloadTarget then
-            discardLastBlocks(header.number, N)
+          if header.number.value <= s.syncState.safeDownloadTarget then
+            discardLastBlocks(header.number.value, N)
             updateSession(s => s.copy(syncState = s.syncState.updateDiscardedBlocks(header, N)))
             if header.number >= s.syncState.pivotBlock.number then updatePivotBlock(LastBlockValidationFailed)
             else if continueSyncing then processSyncing()
@@ -1066,7 +1070,7 @@ object FastSync:
             case Left(result) => result
             case Right((header, weight)) =>
               updateSyncState(header, weight)
-              if session.exists(s => header.number == s.syncState.safeDownloadTarget) then ImportedPivotBlock
+              if session.exists(s => header.number.value == s.syncState.safeDownloadTarget) then ImportedPivotBlock
               else processHeaders(headers.tail)
         else HeadersProcessingFinished
 
@@ -1098,7 +1102,9 @@ object FastSync:
                     syncConfig = syncConfig
                   )
                 )
-                .onFailure[Throwable](SupervisorStrategy.restart),
+                // PR #1378: branch resolution is task-scoped (stops itself on completion); backoff
+                // avoids a tight crash loop. No cap — re-spawn cadence is bounded by the parent.
+                .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)),
               s"fast-sync-branch-resolver-${java.util.UUID.randomUUID()}"
             )
             resolver ! FastSyncBranchResolverActor.StartBranchResolver
@@ -1286,7 +1292,7 @@ object FastSync:
         val deltaNodes = (savedNodes - lastLoggedStateNodes).toDouble
         val nodesPerSec = deltaNodes / dtSeconds
 
-        val blockTarget = s.syncState.pivotBlock.number.max(1)
+        val blockTarget = s.syncState.pivotBlock.number.value.max(1)
         val blockPercent = pct(lastFull, blockTarget)
         val nodePercent = (((savedNodes.toDouble / totalNodes.toDouble) * 100.0).toInt).max(0).min(100)
 
@@ -1349,7 +1355,7 @@ object FastSync:
       // else blockHashesWithBodies.nonEmpty
 
     def hasBestBlockFreshEnoughToUpdatePivotBlock(info: PeerInfo, state: SyncState, syncConfig: SyncConfig): Boolean =
-      (info.maxBlockNumber - syncConfig.pivotBlockOffset) - state.pivotBlock.number >= syncConfig.maxPivotBlockAge
+      (info.maxBlockNumber - syncConfig.pivotBlockOffset) - state.pivotBlock.number.value >= syncConfig.maxPivotBlockAge
 
     private def getPeersWithFreshEnoughPivot(
         peers: NonEmptyList[PeerWithInfo],
@@ -1372,7 +1378,7 @@ object FastSync:
       if peersWithInfo.isEmpty then false
       else
         val peerWithBestBlockInNetwork = peersWithInfo.maxBy(_.peerInfo.maxBlockNumber)
-        val pivotNumber = session.map(_.syncState.pivotBlock.number).getOrElse(BigInt(0))
+        val pivotNumber = session.map(_.syncState.pivotBlock.number.value).getOrElse(BigInt(0))
 
         val bestPossibleTargetDifferenceInNetwork =
           (peerWithBestBlockInNetwork.peerInfo.maxBlockNumber - syncConfig.pivotBlockOffset) - pivotNumber
@@ -1427,7 +1433,10 @@ object FastSync:
             )
             updateSession(s => s.copy(stateSyncStarted = true, stateSyncRestartRequested = false))
             session.foreach(
-              _.syncStateScheduler ! StartSyncingTo(s.syncState.pivotBlock.stateRoot, s.syncState.pivotBlock.number)
+              _.syncStateScheduler ! StartSyncingTo(
+                s.syncState.pivotBlock.stateRoot,
+                s.syncState.pivotBlock.number.value
+              )
             )
 
           // Refresh pivot for state download when it becomes stale — whether blocks are done or not.
@@ -1439,13 +1448,6 @@ object FastSync:
           // Re-read after potential update. Returns Some(pivotUpdateBehavior) if stale, None otherwise.
           // The stale-state branch may transition to waitingForPivotBlockUpdate; the final block may
           // override it (or keep it). The method returns the last-decided behavior.
-          // `pivotUpdateTriggered` records whether this cycle invoked askForPivotBlockUpdate (→ waitingForPivotBlockUpdate).
-          // The Classic baseline set context.become(waitingForPivotBlockUpdate) as a side effect that PERSISTED past the
-          // later `if (blockchainDataToDownload) processDownloads()`. In the typed rewrite the transition lives in a value,
-          // so the final block must NOT discard it when blocks are still downloading — otherwise the selector's
-          // WrappedPivotResult/PivotSelectionFailed reply is dropped (syncing() has no case for it), updatingPivotBlock
-          // stays true forever, and the state-sync pivot refresh wedges permanently.
-          var pivotUpdateTriggered = false
           val nextBehavior: Behavior[Command] = session
             .flatMap { s2 =>
               if s2.stateSyncStarted && !s2.syncState.stateSyncFinished && !s2.stateSyncRestartRequested &&
@@ -1462,7 +1464,6 @@ object FastSync:
                   )
                   s2.syncStateScheduler ! RestartRequested
                   updateSession(_.copy(stateSyncRestartRequested = true))
-                  pivotUpdateTriggered = true
                   Some(askForPivotBlockUpdate(ImportedLastBlock))
                 else None
               else None
@@ -1500,16 +1501,6 @@ object FastSync:
           }
 
           if fullySynced then finish()
-          else if pivotUpdateTriggered then
-            // A pivot refresh was just requested this cycle: askForPivotBlockUpdate already spawned the selector and
-            // set updatingPivotBlock=true + stateSyncRestartRequested=true. We MUST return nextBehavior
-            // (waitingForPivotBlockUpdate) so the selector's reply is handled — returning processDownloads() here (as
-            // the next branch would when blocks are still downloading) silently drops the transition and wedges the
-            // refresh. Still dispatch outstanding block downloads for Classic parity (become+processDownloads both ran);
-            // their responses are dropped during the brief wait and re-dispatched when the reply transitions back to
-            // syncing(), exactly as the baseline behaved.
-            if blockchainDataToDownload then processDownloads()
-            nextBehavior
           else if blockchainDataToDownload then processDownloads()
           else if noBlockchainWorkRemaining && notInTheMiddleOfUpdate then
             session.foreach { s4 =>
@@ -1596,7 +1587,8 @@ object FastSync:
               peerEventBus,
               requestMsg = req,
               responseMsgCode = Codes.BlockBodiesCode,
-              replyTo = prhResultAdapter
+              replyTo = prhResultAdapter,
+              requestId = 0
             )
           )
           updateSession(s =>
@@ -1620,7 +1612,8 @@ object FastSync:
               peerEventBus,
               requestMsg = req,
               responseMsgCode = Codes.ReceiptsCode,
-              replyTo = prhResultAdapter
+              replyTo = prhResultAdapter,
+              requestId = 0
             )
           )
           updateSession(s =>
@@ -1635,7 +1628,8 @@ object FastSync:
         enqueueHeadersIfNeeded()
         // re-read session after enqueueHeadersIfNeeded may update headerQueueHighWatermark
         session.foreach { s2 =>
-          val eligibleHeaderPeers = allPeers.filter(_.peerInfo.maxBlockNumber >= s2.syncState.pivotBlock.number).toSeq
+          val eligibleHeaderPeers =
+            allPeers.filter(_.peerInfo.maxBlockNumber >= s2.syncState.pivotBlock.number.value).toSeq
           val headerAssignments =
             ConcurrentFetch.dispatchTo(s2.headersFetcherQueue, eligibleHeaderPeers, targetRtt, "headers", log)
           headerAssignments.foreach { case (peerWithInfo, req) =>
@@ -1648,7 +1642,8 @@ object FastSync:
                 peerEventBus,
                 requestMsg = req,
                 responseMsgCode = Codes.BlockHeadersCode,
-                replyTo = prhResultAdapter
+                replyTo = prhResultAdapter,
+                requestId = 0
               )
             )
           }
@@ -1709,16 +1704,16 @@ object FastSync:
       if fullBlocks.nonEmpty then
         val bestReceivedBlock = fullBlocks.maxBy(_.number)
         val lastStoredBestBlockNumber = blockchainReader.getBestBlockNumber
-        if lastStoredBestBlockNumber < bestReceivedBlock.number then
+        if lastStoredBestBlockNumber < bestReceivedBlock.number.value then
           // Set best block info with BOTH hash and number (putBestBlockNumber only
           // sets the number, leaving getBestBlockInfo().hash stale/empty).
           appStateStorage
-            .putBestBlockInfo(BlockInfo(bestReceivedBlock.hash.value, bestReceivedBlock.number))
-            .and(blockNumberMappingStorage.put(bestReceivedBlock.number, bestReceivedBlock.hash.value))
+            .putBestBlockInfo(BlockInfo(bestReceivedBlock.hash.value, bestReceivedBlock.number.value))
+            .and(blockNumberMappingStorage.put(bestReceivedBlock.number.value, bestReceivedBlock.hash.value))
             .commit()
         updateSession(s =>
           s.copy(syncState =
-            s.syncState.copy(lastFullBlockNumber = bestReceivedBlock.number.max(lastStoredBestBlockNumber))
+            s.syncState.copy(lastFullBlockNumber = bestReceivedBlock.number.value.max(lastStoredBestBlockNumber))
           )
         )
 
@@ -1865,21 +1860,21 @@ object FastSync:
 
     def updateNextBlockToValidate(header: BlockHeader, K: Int, X: Int): SyncState = copy(
       nextBlockToFullyValidate =
-        if bestBlockHeaderNumber >= pivotBlock.number - X then header.number + 1
-        else (header.number + K / 2 + Random.nextInt(K)).min(pivotBlock.number - X)
+        if bestBlockHeaderNumber >= pivotBlock.number.value - X then header.number.value + 1
+        else (header.number.value + K / 2 + Random.nextInt(K)).min(pivotBlock.number.value - X)
     )
 
     def updateDiscardedBlocks(header: BlockHeader, N: Int): SyncState = copy(
       blockBodiesQueue = Seq.empty,
       receiptsQueue = Seq.empty,
-      bestBlockHeaderNumber = (header.number - N - 1).max(0),
-      nextBlockToFullyValidate = (header.number - N).max(1)
+      bestBlockHeaderNumber = (header.number.value - N - 1).max(0),
+      nextBlockToFullyValidate = (header.number.value - N).max(1)
     )
 
     def updatePivotBlock(newPivot: BlockHeader, numberOfSafeBlocks: BigInt, updateFailures: Boolean): SyncState =
       copy(
         pivotBlock = newPivot,
-        safeDownloadTarget = newPivot.number + numberOfSafeBlocks,
+        safeDownloadTarget = newPivot.number.value + numberOfSafeBlocks,
         pivotBlockUpdateFailures = if updateFailures then pivotBlockUpdateFailures + 1 else pivotBlockUpdateFailures,
         updatingPivotBlock = false
       )

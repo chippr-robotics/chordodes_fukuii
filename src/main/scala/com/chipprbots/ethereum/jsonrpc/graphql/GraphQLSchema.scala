@@ -146,7 +146,7 @@ object GraphQLSchema:
       case t: SetCodeTransaction =>
         val bf = baseFee.getOrElse(BigInt(0))
         t.maxPriorityFeePerGas.min(t.maxFeePerGas - bf).max(BigInt(0))
-      case other => other.gasPrice - baseFee.getOrElse(BigInt(0))
+      case other => other.gasPrice.value - baseFee.getOrElse(BigInt(0))
 
   /** `null` for pre-Byzantium receipts (which store a state root instead of a status byte — see EIP-658). Hive test 30
     * expects `status: null` for a Frontier-era transaction.
@@ -173,7 +173,7 @@ object GraphQLSchema:
     ctx.blockchainReader.getBlockByNumber(ctx.blockchainReader.getBestBranch, blockNumber).map { b =>
       InMemoryWorldStateProxy(
         ctx.evmCodeStorage,
-        ctx.blockchain.getBackingMptStorage(b.header.number),
+        ctx.blockchain.getBackingMptStorage(b.header.number.value),
         (n: BigInt) => ctx.blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value),
         ctx.blockchainConfig.accountStartNonce,
         b.header.stateRoot.value,
@@ -440,7 +440,7 @@ object GraphQLSchema:
               case Some(n) => BigInt(n)
               case None =>
                 c.value.parent.blockInfo
-                  .map(_.block.header.number)
+                  .map(_.block.header.number.value)
                   .getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
             GAccount(c.value.log.loggerAddress.bytes, blockNum)
         ),
@@ -469,7 +469,7 @@ object GraphQLSchema:
             val blockNum = c.arg(BlockNumberArg) match
               case Some(n) => BigInt(n)
               case None =>
-                c.value.blockInfo.map(_.block.header.number).getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
+                c.value.blockInfo.map(_.block.header.number.value).getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
             val sender = SignedTransaction.getSender(c.value.stx).getOrElse(Address(0))
             GAccount(sender.bytes, blockNum)
         ),
@@ -483,13 +483,13 @@ object GraphQLSchema:
                 case Some(n) => BigInt(n)
                 case None =>
                   c.value.blockInfo
-                    .map(_.block.header.number)
+                    .map(_.block.header.number.value)
                     .getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
               GAccount(addr.bytes, blockNum)
             }
         ),
         Field("value", BigIntType, resolve = _.value.stx.tx.value),
-        Field("gasPrice", BigIntType, resolve = _.value.stx.tx.gasPrice),
+        Field("gasPrice", BigIntType, resolve = _.value.stx.tx.gasPrice.value),
         Field("maxFeePerGas", OptionType(BigIntType), resolve = c => txMaxFeePerGas(c.value.stx.tx)),
         Field("maxPriorityFeePerGas", OptionType(BigIntType), resolve = c => txMaxPriorityFeePerGas(c.value.stx.tx)),
         Field("maxFeePerBlobGas", OptionType(BigIntType), resolve = c => txMaxFeePerBlobGas(c.value.stx.tx)),
@@ -549,7 +549,7 @@ object GraphQLSchema:
               if c.value.stx.tx.isContractInit then
                 SignedTransaction.getSender(c.value.stx).map { sender =>
                   val createdAddress = createContractAddress(sender, c.value.stx.tx.nonce)
-                  val blockNum = c.arg(BlockNumberArg).map(BigInt(_)).getOrElse(bi.block.header.number)
+                  val blockNum = c.arg(BlockNumberArg).map(BigInt(_)).getOrElse(bi.block.header.number.value)
                   GAccount(createdAddress.bytes, blockNum)
                 }
               else None
@@ -634,7 +634,7 @@ object GraphQLSchema:
                 .get
             }
         ),
-        Field("timestamp", LongType, resolve = _.value.header.unixTimestamp),
+        Field("timestamp", LongType, resolve = _.value.header.unixTimestamp.toLong),
         Field("logsBloom", BytesType, resolve = _.value.header.logsBloom.value),
         Field("mixHash", Bytes32Type, resolve = _.value.header.mixHash.value),
         Field("difficulty", BigIntType, resolve = _.value.header.difficulty.value),

@@ -7,6 +7,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostPrague
@@ -127,7 +128,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
         blockHeader: BlockHeader,
         daoForkConfig: DaoForkConfig
     ): Either[BlockHeaderError, BlockHeaderValid] =
-      (daoForkConfig.requiresExtraData(blockHeader.number), daoForkConfig.blockExtraData) match
+      (daoForkConfig.requiresExtraData(blockHeader.number.value), daoForkConfig.blockExtraData) match
         case (false, _) =>
           Right(BlockHeaderValid)
         case (true, Some(forkExtraData)) if blockHeader.extraData == forkExtraData =>
@@ -176,7 +177,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
       // because the Ethash difficulty algorithm always produces a positive value.
       Right(BlockHeaderValid)
     else if difficulty.calculateDifficulty(
-        blockHeader.number,
+        blockHeader.number.value,
         blockHeader.unixTimestamp,
         parent
       ) == blockHeader.difficulty
@@ -193,7 +194,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
     *   BlockHeader if valid, an [[HeaderGasUsedError]] otherwise
     */
   private def validateGasUsed(blockHeader: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] =
-    if blockHeader.gasUsed <= blockHeader.gasLimit && blockHeader.gasUsed >= 0 then Right(BlockHeaderValid)
+    if blockHeader.gasUsed <= blockHeader.gasLimit && blockHeader.gasUsed >= GasAmount.Zero then Right(BlockHeaderValid)
     else Left(HeaderGasUsedError)
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.gasLimit]] follows the restrictions based on its parent
@@ -214,7 +215,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
   ): Either[BlockHeaderError, BlockHeaderValid] =
     // 2^63 - 1 is the protocol-wide gasLimit cap (cannot fit in an int64). It applies
     // regardless of EIP-106 activation — any block with gasLimit >= 2^63 is malformed.
-    if blockHeader.gasLimit > MaxGasLimit then Left(HeaderGasLimitError)
+    if blockHeader.gasLimit.value > MaxGasLimit then Left(HeaderGasLimitError)
     else
       // Standard ±1/1024 bound applies at all blocks including the Olympia activation.
       // ETC Olympia increases gas limit 7.5× (8M → 60M) via gradual miner convergence
@@ -222,7 +223,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
       // maintaining effective capacity, not increasing throughput).
       val gasLimitDiff = (blockHeader.gasLimit - parentHeader.gasLimit).abs
       val gasLimitDiffLimit = parentHeader.gasLimit / GasLimitBoundDivisor
-      if gasLimitDiff < gasLimitDiffLimit && blockHeader.gasLimit >= MinGasLimit then Right(BlockHeaderValid)
+      if gasLimitDiff < gasLimitDiffLimit && blockHeader.gasLimit >= GasAmount(MinGasLimit) then Right(BlockHeaderValid)
       else Left(HeaderGasLimitError)
 
   /** Validates [[com.chipprbots.ethereum.domain.BlockHeader.number]] is the next one after its parents number based on
@@ -247,7 +248,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
   private def validateExtraFields(
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    val isOlympiaActivated = blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
+    val isOlympiaActivated = blockHeader.number.value >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
 
     blockHeader.extraFields match
       case HefPostPrague(_, _, _, _, _, _) if isOlympiaActivated => Right(BlockHeaderValid)
@@ -265,7 +266,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator:
       blockHeader: BlockHeader,
       parentHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    val isOlympiaActivated = blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
+    val isOlympiaActivated = blockHeader.number.value >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
     if !isOlympiaActivated then Right(BlockHeaderValid)
     else
       blockHeader.baseFee match

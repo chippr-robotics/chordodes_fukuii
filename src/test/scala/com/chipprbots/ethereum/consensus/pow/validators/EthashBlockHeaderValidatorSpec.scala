@@ -84,12 +84,13 @@ class EthashBlockHeaderValidatorSpec
 
   it should "return a failure if created based on invalid timestamp" taggedAs (UnitTest, ConsensusTest) in {
     forAll(longGen) { timestamp =>
-      val blockHeader = validBlockHeader.copy(unixTimestamp = timestamp)
+      val blockHeader = validBlockHeader.copy(unixTimestamp = Timestamp(timestamp))
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
       timestamp match
-        case t if t <= validParentBlockHeader.unixTimestamp => assert(validateResult == Left(HeaderTimestampError))
-        case validBlockHeader.unixTimestamp                 => assert(validateResult == Right(BlockHeaderValid))
-        case _                                              => assert(validateResult == Left(HeaderDifficultyError))
+        case t if Timestamp(t) <= validParentBlockHeader.unixTimestamp =>
+          assert(validateResult == Left(HeaderTimestampError))
+        case t if t == validBlockHeader.unixTimestamp.toLong => assert(validateResult == Right(BlockHeaderValid))
+        case _                                               => assert(validateResult == Left(HeaderDifficultyError))
     }
   }
 
@@ -105,27 +106,27 @@ class EthashBlockHeaderValidatorSpec
 
   it should "return a failure if created based on invalid gas used" taggedAs (UnitTest, ConsensusTest) in {
     forAll(bigIntGen) { gasUsed =>
-      val blockHeader = validBlockHeader.copy(gasUsed = gasUsed)
+      val blockHeader = validBlockHeader.copy(gasUsed = GasAmount(gasUsed))
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
-      if gasUsed > validBlockHeader.gasLimit then assert(validateResult == Left(HeaderGasUsedError))
+      if gasUsed > validBlockHeader.gasLimit.value then assert(validateResult == Left(HeaderGasUsedError))
       else assert(validateResult == Right(BlockHeaderValid))
     }
   }
 
   it should "return a failure if created based on invalid negative gas used" taggedAs (UnitTest, ConsensusTest) in {
     val gasUsed = -1
-    val blockHeader = validBlockHeader.copy(gasUsed = gasUsed)
+    val blockHeader = validBlockHeader.copy(gasUsed = GasAmount(gasUsed))
     val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
     assert(validateResult == Left(HeaderGasUsedError))
   }
 
   it should "return a failure if created based on invalid gas limit" taggedAs (UnitTest, ConsensusTest) in {
-    val LowerGasLimit =
-      MinGasLimit.max(validParentBlockHeader.gasLimit - validParentBlockHeader.gasLimit / GasLimitBoundDivisor + 1)
-    val UpperGasLimit = validParentBlockHeader.gasLimit + validParentBlockHeader.gasLimit / GasLimitBoundDivisor - 1
+    val parentGasLimit = validParentBlockHeader.gasLimit.value
+    val LowerGasLimit = MinGasLimit.max(parentGasLimit - parentGasLimit / GasLimitBoundDivisor + 1)
+    val UpperGasLimit = parentGasLimit + parentGasLimit / GasLimitBoundDivisor - 1
 
     forAll(bigIntGen) { gasLimit =>
-      val blockHeader = validBlockHeader.copy(gasLimit = gasLimit)
+      val blockHeader = validBlockHeader.copy(gasLimit = GasAmount(gasLimit))
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
       if gasLimit < LowerGasLimit || gasLimit > UpperGasLimit then assert(validateResult == Left(HeaderGasLimitError))
       else assert(validateResult == Right(BlockHeaderValid))
@@ -136,17 +137,17 @@ class EthashBlockHeaderValidatorSpec
     UnitTest,
     ConsensusTest
   ) in {
-    val validParent = Block(validParentBlockHeader.copy(gasLimit = Long.MaxValue), validParentBlockBody)
-    val invalidBlockHeader = validBlockHeader.copy(gasLimit = BigInt(Long.MaxValue) + 1)
+    val validParent = Block(validParentBlockHeader.copy(gasLimit = GasAmount(Long.MaxValue)), validParentBlockBody)
+    val invalidBlockHeader = validBlockHeader.copy(gasLimit = GasAmount(BigInt(Long.MaxValue) + 1))
     PoWBlockHeaderValidator.validate(invalidBlockHeader, validParent.header) shouldBe Left(HeaderGasLimitError)
   }
 
   it should "return a failure if created based on invalid number" taggedAs (UnitTest, ConsensusTest) in {
     forAll(longGen) { number =>
-      val blockHeader = validBlockHeader.copy(number = number)
+      val blockHeader = validBlockHeader.copy(number = BlockNumber(number))
       val parent = Block(validParentBlockHeader, validParentBlockBody)
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, parent.header)
-      if number != validParentBlockHeader.number + 1 then
+      if BlockNumber(number) != validParentBlockHeader.number + 1 then
         assert(validateResult == Left(HeaderNumberError) || validateResult == Left(HeaderDifficultyError))
       else assert(validateResult == Right(BlockHeaderValid))
     }
@@ -203,14 +204,14 @@ class EthashBlockHeaderValidatorSpec
   ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
       validParentBlockHeader.copy(
-        number = 5000101,
-        unixTimestamp = 1513175023,
+        number = BlockNumber(5000101),
+        unixTimestamp = Timestamp(1513175023),
         difficulty = Difficulty(BigInt("22627021745803"))
       )
     val parent: Block = Block(parentHeader, parentBody)
 
-    val blockNumber: BigInt = parentHeader.number + 1
-    val blockTimestamp: Long = parentHeader.unixTimestamp + 6
+    val blockNumber: BigInt = (parentHeader.number + 1).value
+    val blockTimestamp: Timestamp = parentHeader.unixTimestamp + 6
 
     val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
     val expected: BigInt = BigInt("22638070358408")
@@ -223,14 +224,14 @@ class EthashBlockHeaderValidatorSpec
   ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
       validParentBlockHeader.copy(
-        number = 5899999,
-        unixTimestamp = 1525176000,
+        number = BlockNumber(5899999),
+        unixTimestamp = Timestamp(1525176000),
         difficulty = Difficulty(BigInt("22627021745803"))
       )
     val parent: Block = Block(parentHeader, parentBody)
 
-    val blockNumber: BigInt = parentHeader.number + 1
-    val blockTimestamp: Long = parentHeader.unixTimestamp + 6
+    val blockNumber: BigInt = (parentHeader.number + 1).value
+    val blockTimestamp: Timestamp = parentHeader.unixTimestamp + 6
 
     val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
     val blockDifficultyWihtoutBomb: BigInt = BigInt("22638070096264")
@@ -243,8 +244,8 @@ class EthashBlockHeaderValidatorSpec
   ) in new EphemBlockchainTestSetup:
     val parent: Block = Block(afterRewardReductionParentBlockHeader, parentBody)
 
-    val blockNumber: BigInt = afterRewardReductionBlockHeader.number
-    val blockTimestamp: Long = afterRewardReductionBlockHeader.unixTimestamp
+    val blockNumber: BigInt = afterRewardReductionBlockHeader.number.value
+    val blockTimestamp: Timestamp = afterRewardReductionBlockHeader.unixTimestamp
 
     val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)
 
@@ -272,14 +273,14 @@ class EthashBlockHeaderValidatorSpec
 
     val parentHeader: BlockHeader =
       validParentBlockHeader.copy(
-        number = 9200000 - 1,
-        unixTimestamp = 1525176000,
+        number = BlockNumber(9200000 - 1),
+        unixTimestamp = Timestamp(1525176000),
         difficulty = Difficulty(BigInt("22627021745803"))
       )
     val parent: Block = Block(parentHeader, parentBody)
 
-    val blockNumber: BigInt = parentHeader.number + 1
-    val blockTimestamp: Long = parentHeader.unixTimestamp + 6
+    val blockNumber: BigInt = (parentHeader.number + 1).value
+    val blockTimestamp: Timestamp = parentHeader.unixTimestamp + 6
 
     val difficulty = EthashDifficultyCalculator.calculateDifficulty(blockNumber, blockTimestamp, parent.header)(
       blockchainConfigWithoutDifficultyBombRemoval
@@ -307,10 +308,10 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("20626433633447")),
-    number = 3582022,
-    gasLimit = 4700036,
-    gasUsed = 0,
-    unixTimestamp = 1492735637,
+    number = BlockNumber(3582022),
+    gasLimit = GasAmount(4700036),
+    gasUsed = GasAmount.Zero,
+    unixTimestamp = Timestamp(1492735637),
     extraData = ByteString(Hex.decode("d58301050b8650617269747986312e31352e31826c69")),
     mixHash = BlockHash(ByteString(Hex.decode("7d2db22c3dfaccb1b6927f5675ec24a41991ee4bcffdc564f940a45c1fce8acb"))),
     nonce = ByteString(Hex.decode("81d6a5e8029f9446"))
@@ -326,10 +327,10 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("5fa90473cd08a08fc766329651d81bb6e4ef2bb330cf90c3025927a3bafe0c57"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("20616098743527")),
-    number = 3582021,
-    gasLimit = 4699925,
-    gasUsed = 1005896,
-    unixTimestamp = 1492735634,
+    number = BlockNumber(3582021),
+    gasLimit = GasAmount(4699925),
+    gasUsed = GasAmount(1005896),
+    unixTimestamp = Timestamp(1492735634),
     extraData = ByteString(Hex.decode("d58301050c8650617269747986312e31362e30826c69")),
     mixHash = BlockHash(ByteString(Hex.decode("d10215664192800200eab9ca7b90f9ceb8d8428200c2b4e6aebe2191c2a52c0e"))),
     nonce = ByteString(Hex.decode("83e2d9b401cdfa77"))
@@ -345,10 +346,10 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("3482399171761329")),
-    number = 5863375,
-    gasLimit = 7999992,
-    gasUsed = 7998727,
-    unixTimestamp = 1530104899,
+    number = BlockNumber(5863375),
+    gasLimit = GasAmount(7999992),
+    gasUsed = GasAmount(7998727),
+    unixTimestamp = Timestamp(1530104899),
     extraData = ByteString(Hex.decode("657468706f6f6c2e6f7267202855533129")),
     mixHash = BlockHash(ByteString(Hex.decode("8f86617d6422c26a89b8b349b160973ca44f90326e758f1ef669c4046741dd06"))),
     nonce = ByteString(Hex.decode("2cc9a5500763ce09"))
@@ -364,10 +365,10 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("3480699544328087")),
-    number = 5863374,
-    gasLimit = 7992222,
-    gasUsed = 7980470,
-    unixTimestamp = 1530104893,
+    number = BlockNumber(5863374),
+    gasLimit = GasAmount(7992222),
+    gasUsed = GasAmount(7980470),
+    unixTimestamp = Timestamp(1530104893),
     extraData = ByteString(Hex.decode("73656f3130")),
     mixHash = BlockHash(ByteString(Hex.decode("8f86617d6422c26a89b8b349b160973ca44f90326e758f1ef669c4046741dd06"))),
     nonce = ByteString(Hex.decode("b9fa123002b9407d"))
@@ -383,10 +384,10 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("989772")),
-    number = 20,
-    gasLimit = 131620495,
-    gasUsed = 0,
-    unixTimestamp = 1486752441,
+    number = BlockNumber(20),
+    gasLimit = GasAmount(131620495),
+    gasUsed = GasAmount.Zero,
+    unixTimestamp = Timestamp(1486752441),
     extraData = ByteString(Hex.decode("d783010507846765746887676f312e372e33856c696e7578")),
     mixHash = BlockHash(ByteString(Hex.decode("6bc729364c9b682cfa923ba9480367ebdfa2a9bca2a652fe975e8d5958f696dd"))),
     nonce = ByteString(Hex.decode("797a8f3a494f937b"))
@@ -402,10 +403,10 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("989289")),
-    number = 19,
-    gasLimit = 131749155,
-    gasUsed = 0,
-    unixTimestamp = 1486752440,
+    number = BlockNumber(19),
+    gasLimit = GasAmount(131749155),
+    gasUsed = GasAmount.Zero,
+    unixTimestamp = Timestamp(1486752440),
     extraData = ByteString(Hex.decode("d783010507846765746887676f312e372e33856c696e7578")),
     mixHash = BlockHash(ByteString(Hex.decode("7f9ac1ddeafff0f926ed9887b8cf7d50c3f919d902e618b957022c46c8b404a6"))),
     nonce = ByteString(Hex.decode("3fc7bc671f7cee70"))
@@ -436,13 +437,13 @@ class EthashBlockHeaderValidatorSpec
         override val drainList: Seq[Address] = Nil
         override val forkBlockHash: ByteString =
           if supportsDaoFork then ProDaoForkBlock.header.hash.value else DaoForkBlock.header.hash.value
-        override val forkBlockNumber: BigInt = DaoForkBlock.header.number
+        override val forkBlockNumber: BigInt = DaoForkBlock.header.number.value
         override val refundContract: Option[Address] = None
         override val includeOnForkIdList: Boolean = false
       ),
       // unused
       maxCodeSize = None,
-      chainId = 0x3d,
+      chainId = ChainId(0x3d),
       networkId = 1,
       monetaryPolicyConfig = null,
       customGenesisFileOpt = None,
@@ -463,10 +464,10 @@ class EthashBlockHeaderValidatorSpec
     receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = Difficulty(BigInt("62230570926948")),
-    number = 1920008,
-    gasLimit = 4707788,
-    gasUsed = 0,
-    unixTimestamp = 1469021025,
+    number = BlockNumber(1920008),
+    gasLimit = GasAmount(4707788),
+    gasUsed = GasAmount.Zero,
+    unixTimestamp = Timestamp(1469021025),
     extraData = ByteString(Hex.decode("64616f2d686172642d666f726b")),
     mixHash = BlockHash(ByteString(Hex.decode("e73421390c1b084a9806754b238715ec333cdccc8d09b90cb6e38a9d1e247d6f"))),
     nonce = ByteString(Hex.decode("c207c8381305bef2"))
@@ -488,10 +489,10 @@ class EthashBlockHeaderValidatorSpec
       )
     ),
     difficulty = Difficulty(BigInt("62230571058020")),
-    number = 1920009,
-    gasLimit = 4712384,
-    gasUsed = 109952,
-    unixTimestamp = 1469021040,
+    number = BlockNumber(1920009),
+    gasLimit = GasAmount(4712384),
+    gasUsed = GasAmount(109952),
+    unixTimestamp = Timestamp(1469021040),
     extraData = ByteString(Hex.decode("64616f2d686172642d666f726b")),
     mixHash = BlockHash(ByteString(Hex.decode("5bde79f4dc5be28af2d956e748a0d6ebc1f8eb5c1397e76729269e730611cb99"))),
     nonce = ByteString(Hex.decode("2b4b464c0a4da82a"))
@@ -513,10 +514,10 @@ class EthashBlockHeaderValidatorSpec
       )
     ),
     difficulty = Difficulty(BigInt("62230571189092")),
-    number = 1920010,
-    gasLimit = 4712388,
-    gasUsed = 114754,
-    unixTimestamp = 1469021050,
+    number = BlockNumber(1920010),
+    gasLimit = GasAmount(4712388),
+    gasUsed = GasAmount(114754),
+    unixTimestamp = Timestamp(1469021050),
     extraData = ByteString(Hex.decode("657468706f6f6c2e6f7267202855533129")),
     mixHash = BlockHash(ByteString(Hex.decode("8f86617d6422c26a89b8b349b160973ca44f90326e758f1ef669c4046741dd06"))),
     nonce = ByteString(Hex.decode("c7de19e00a8c3e32"))

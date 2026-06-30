@@ -241,8 +241,15 @@ class SubscriptionManagerSpec
 
     blockTopic ! org.apache.pekko.actor.typed.pubsub.Topic.Publish(NewBlockImported(fixtureBlock))
 
-    // conn2 should receive nothing — take(1) with a short completion timeout: if nothing was
-    // routed the stream never completes and completionTimeout fires, proving isolation.
+    // deliberate: this is a negative isolation test, not a message-arrival wait.
+    // We need to give the actor system time to process the Topic.Publish and
+    // potentially (incorrectly) route to conn2 before asserting it did not.
+    // A probe.expectNoMessage(200.millis) would be equivalent but requires an
+    // unused probe allocation.  The stream-based assertion that follows uses a
+    // 50ms completionTimeout — the 200ms here ensures that window has expired by
+    // the time we build the stream, so any erroneous routing has already happened.
+    // FUTURE: replace once SubscriptionManager delivery through preMaterialized
+    // queues is made synchronization-point-observable (tracked in CHASE-QUEUE).
     Thread.sleep(200)
     val messages2 = source2.take(1).completionTimeout(50.millis).runWith(Sink.seq)(mat)
     intercept[Exception](Await.result(messages2, 200.millis))

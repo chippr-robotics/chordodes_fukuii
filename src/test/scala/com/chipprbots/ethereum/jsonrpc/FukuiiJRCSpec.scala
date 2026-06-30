@@ -149,7 +149,7 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
             .obj ++ List(
             "isPending" -> JBool(false),
             "isOutgoing" -> JBool(true),
-            "timestamp" -> JLong(block.header.unixTimestamp),
+            "timestamp" -> JLong(block.header.unixTimestamp.toLong),
             "gasUsed" -> JString(s"0x${BigInt(42).toString(16)}")
           )
         ),
@@ -160,7 +160,7 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
             .obj ++ List(
             "isPending" -> JBool(false),
             "isOutgoing" -> JBool(false),
-            "timestamp" -> JLong(block.header.unixTimestamp),
+            "timestamp" -> JLong(block.header.unixTimestamp.toLong),
             "gasUsed" -> JString(s"0x${BigInt(21).toString(16)}")
           )
         )

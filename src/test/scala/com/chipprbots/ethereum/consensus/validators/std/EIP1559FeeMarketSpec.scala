@@ -44,9 +44,9 @@ class EIP1559FeeMarketSpec
   private val priorityFee = BigInt("2000000000") // 2 gwei
 
   private val postMystiqueHeader = Fixtures.Blocks.ValidBlock.header.copy(
-    number = BigInt(20_000_000),
-    gasLimit = BigInt(8_000_000),
-    gasUsed = 0,
+    number = BlockNumber(BigInt(20_000_000)),
+    gasLimit = GasAmount(BigInt(8_000_000)),
+    gasUsed = GasAmount.Zero,
     extraFields = HefPostOlympia(baseFee)
   )
 
@@ -64,28 +64,28 @@ class EIP1559FeeMarketSpec
       maxFeePerGas: BigInt = maxFee
   ): SignedTransaction =
     val tx = TransactionWithDynamicFee(
-      chainId = config.chainId,
+      chainId = config.chainId.value,
       nonce = 0,
       maxPriorityFeePerGas = maxPriority,
       maxFeePerGas = maxFeePerGas,
-      gasLimit = 21000,
+      gasLimit = GasAmount(21000),
       receivingAddress = Some(Address(1)),
       value = BigInt(0),
       payload = ByteString.empty,
       accessList = Nil
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   private def signLegacy(gasPrice: BigInt): SignedTransaction =
     val tx = LegacyTransaction(
       nonce = 0,
-      gasPrice = gasPrice,
-      gasLimit = 21000,
+      gasPrice = GasPrice(gasPrice),
+      gasLimit = GasAmount(21000),
       receivingAddress = Address(1),
       value = BigInt(0),
       payload = ByteString.empty
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   // ── Type-2 happy path ──────────────────────────────────────────────────────
 

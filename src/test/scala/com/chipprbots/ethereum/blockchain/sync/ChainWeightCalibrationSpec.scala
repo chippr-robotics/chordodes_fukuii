@@ -218,7 +218,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
     new RegularSyncSetup:
       // Build h10 whose parentHash points to a header that is NOT stored
       val h10: BlockHeader = Fixtures.Blocks.Genesis.header.copy(
-        number = BigInt(10),
+        number = BlockNumber(10),
         parentHash = BlockHash(fakeMissingHash) // parentHash for a header that doesn't exist
       )
       blockchainWriter.storeBlockHeader(h10).commit()
@@ -542,7 +542,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
 
     /** Store a best block with a given block number so getBestBlock/getBestBlockHeader succeed. */
     def setupBestBlock(blockNum: BigInt): Unit =
-      val hdr = Fixtures.Blocks.Genesis.header.copy(number = blockNum)
+      val hdr = Fixtures.Blocks.Genesis.header.copy(number = BlockNumber(blockNum))
       val blk = Block(hdr, BlockBody(Nil, Nil))
       blockchainWriter.save(blk, Seq.empty, ChainWeight.totalDifficultyOnly(BigInt(1)), saveAsBestBlock = true)
 
@@ -550,7 +550,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
     def setBestBlockHeader(hdr: BlockHeader): Unit =
       blockchainWriter.storeBlockHeader(hdr).commit()
       storagesInstance.storages.appStateStorage
-        .putBestBlockInfo(BlockInfo(hdr.hash.value, hdr.number))
+        .putBestBlockInfo(BlockInfo(hdr.hash.value, hdr.number.value))
         .commit()
 
     /** Build an anchor chain: `length` headers starting at `startNum`, each pointing to the previous via parentHash.
@@ -563,7 +563,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       for i <- 0 until length do
         val n = startNum + i
         val h = Fixtures.Blocks.Genesis.header.copy(
-          number = BigInt(n),
+          number = BlockNumber(n),
           parentHash = prev.hash,
           // vary a field to ensure a unique hash per block (nonce distinguishes them)
           nonce = org.apache.pekko.util.ByteString(Array.fill(8)(n.toByte))

@@ -1,5 +1,7 @@
 package com.chipprbots.ethereum.vm
 
+import com.chipprbots.ethereum.domain.ChainId
+
 object Fixtures:
 
   val ConstantinopleBlockNumber = 200
@@ -33,5 +35,5 @@ object Fixtures:
     mystiqueBlockNumber = MystiqueBlockNumber,
     spiralBlockNumber = SpiralBlockNumber,
     olympiaBlockNumber = OlympiaBlockNumber,
-    chainId = 0x3d
+    chainId = ChainId(0x3d)
   )

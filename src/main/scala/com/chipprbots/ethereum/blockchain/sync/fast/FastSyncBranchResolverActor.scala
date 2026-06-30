@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.PreRestart
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -158,7 +159,24 @@ object FastSyncBranchResolverActor:
         networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
 
-        resolver.waitingForPeerWithHighestBlock()
+        // P19: surface PreRestart so a supervisor-triggered restart is visible. Timers are cancelled by
+        // `withTimers` and the watched PeerRequestHandler children are stopped by Pekko on restart; the bus
+        // subscriptions are owned by those children, so cleanup here is the warning log only. The restarted
+        // instance re-polls for handshaked peers and re-issues StartBranchResolver from the parent.
+        Behaviors.intercept(() =>
+          new org.apache.pekko.actor.typed.BehaviorSignalInterceptor[Command]():
+            override def aroundSignal(
+                c: org.apache.pekko.actor.typed.TypedActorContext[Command],
+                signal: org.apache.pekko.actor.typed.Signal,
+                target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Command]
+            ): Behavior[Command] =
+              if signal == PreRestart then
+                c.asScala.log.warn(
+                  "{} received PreRestart — abandoning in-flight branch resolution; children will be recreated",
+                  c.asScala.self.path.name
+                )
+              target(c, signal)
+        )(resolver.waitingForPeerWithHighestBlock())
       }
     }
 
@@ -181,6 +199,10 @@ object FastSyncBranchResolverActor:
 
     private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
       context.messageAdapter[PeerRequestHandler.Result](PeerRequestResult(_))
+
+    // Monotonically increasing counter that makes each PeerRequestHandler child name unique within
+    // this resolver's lifetime, even when the same peer is used across multiple binary-search steps.
+    private var requestSeq: Int = 0
 
     private def log = context.log
 
@@ -226,13 +248,13 @@ object FastSyncBranchResolverActor:
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match
-            case PeerRequestResult(ResponseReceived(peer, ETH68BlockHeaders(_, headers), timeTaken))
+            case PeerRequestResult(ResponseReceived(_, peer, ETH68BlockHeaders(_, headers), timeTaken))
                 if peer == masterPeer =>
               if headers.size == recentHeadersSize then
                 log.debug("Received {} block headers from peer {} in {} ms", headers.size, masterPeer.id, timeTaken)
                 handleRecentBlockHeadersResponse(headers, masterPeer, bestBlockNumber)
               else handleInvalidResponse(peer, requestHandler)
-            case PeerRequestResult(RequestFailed(peer, reason)) =>
+            case PeerRequestResult(RequestFailed(_, peer, reason)) =>
               handleRequestFailure(peer, requestHandler, reason)
             case HandlerTerminated(ref) if ref == requestHandler =>
               handlePeerTermination(masterPeer, ref)
@@ -248,17 +270,17 @@ object FastSyncBranchResolverActor:
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match
-            case PeerRequestResult(ResponseReceived(peer, ETH68BlockHeaders(_, headers), durationMs))
+            case PeerRequestResult(ResponseReceived(_, peer, ETH68BlockHeaders(_, headers), durationMs))
                 if peer == searchState.masterPeer =>
               context.unwatch(requestHandler)
               headers.toList match
-                case childHeader :: Nil if childHeader.number == blockHeaderNumberToSearch =>
+                case childHeader :: Nil if childHeader.number.value == blockHeaderNumberToSearch =>
                   log.debug(ReceivedBlockHeaderLog, blockHeaderNumberToSearch, peer.id, durationMs)
                   handleBinarySearchBlockHeaderResponse(searchState, childHeader)
                 case _ =>
-                  log.warn(ReceivedWrongHeaders, blockHeaderNumberToSearch, headers.map(_.number))
+                  log.warn(ReceivedWrongHeaders, blockHeaderNumberToSearch, headers.map(_.number.value))
                   handleInvalidResponse(peer, requestHandler)
-            case PeerRequestResult(RequestFailed(peer, reason)) =>
+            case PeerRequestResult(RequestFailed(_, peer, reason)) =>
               handleRequestFailure(peer, requestHandler, reason)
             case HandlerTerminated(ref) if ref == requestHandler =>
               handlePeerTermination(searchState.masterPeer, ref)
@@ -300,7 +322,7 @@ object FastSyncBranchResolverActor:
         childHeader: BlockHeader
     ): Behavior[Command] =
       import BinarySearchSupport.*
-      blockchainReader.getBlockHeaderByNumber(parentOf(childHeader.number)) match
+      blockchainReader.getBlockHeaderByNumber(parentOf(childHeader.number.value)) match
         case Some(parentHeader) =>
           validateBlockHeaders(parentHeader, childHeader, searchState) match
             case NoCommonBlock => stopWithFailure(BranchResolutionFailed.noCommonBlock)
@@ -309,7 +331,7 @@ object FastSyncBranchResolverActor:
             case ContinueBinarySearch(newSearchState) =>
               log.debug(s"Continuing binary search with new search state: $newSearchState")
               requestBlockHeaderForBinarySearch(newSearchState)
-        case None => stopWithFailure(BranchResolutionFailed.blockHeaderNotFound(childHeader.number))
+        case None => stopWithFailure(BranchResolutionFailed.blockHeaderNotFound(childHeader.number.value))
 
     private def finalizeBranchResolver(firstCommonBlockNumber: BigInt, masterPeer: Peer): Behavior[Command] =
       branchLogic.discardBlocksAfter(firstCommonBlockNumber)
@@ -332,7 +354,8 @@ object FastSyncBranchResolverActor:
         .get(peer.id)
         .exists(peerWithInfo => Capability.usesRequestId(peerWithInfo.peerInfo.remoteStatus.capability))
 
-      val handler = context.spawnAnonymous(
+      requestSeq += 1
+      val handler = context.spawn(
         PeerRequestHandler.behavior[ETH68GetBlockHeaders, ETH68BlockHeaders](
           peer,
           syncConfig.peerResponseTimeout,
@@ -341,8 +364,10 @@ object FastSyncBranchResolverActor:
           requestMsg =
             ETH68GetBlockHeaders(ETHPackets.nextRequestId, Left(fromBlock), amount, skip = 0, reverse = false),
           responseMsgCode = Codes.BlockHeadersCode,
-          replyTo = prhResultAdapter
-        )
+          replyTo = prhResultAdapter,
+          requestId = 0
+        ),
+        s"branch-resolver-header-request-${peer.id.value}-$requestSeq"
       )
       context.watchWith(handler, HandlerTerminated(handler))
       handler

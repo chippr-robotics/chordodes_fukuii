@@ -19,9 +19,13 @@ import com.chipprbots.ethereum.utils.ForkTimestamps
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
 import com.chipprbots.ethereum.utils.NetworkType
 import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.BlockNumber
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
+import com.chipprbots.ethereum.domain.ChainId
 
 class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
   import SNAPSyncController.SyncPhase.*
@@ -176,6 +180,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
 
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
+      storagePhaseForceCompleted = false,
       resumedStaleCursors = false
     ) shouldBe true
   }
@@ -191,6 +196,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
     // force-completed flag is therefore no longer a routing input (the caller keeps it for logging).
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
+      storagePhaseForceCompleted = false,
       resumedStaleCursors = false
     ) shouldBe true
   }
@@ -203,11 +209,13 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
     // flag states; assert both.
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = SNAPSyncConfig(deferredMerkleization = false, movingRootDeltaHeal = false),
+      storagePhaseForceCompleted = false,
       resumedStaleCursors = false
     ) shouldBe false
 
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = SNAPSyncConfig(deferredMerkleization = false, movingRootDeltaHeal = true),
+      storagePhaseForceCompleted = false,
       resumedStaleCursors = false
     ) shouldBe false
   }
@@ -220,6 +228,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
     // silent state corruption. The healing walk from the new root re-fetches the delta.
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
+      storagePhaseForceCompleted = false,
       resumedStaleCursors = true
     ) shouldBe false
   }
@@ -247,10 +256,10 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
       receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
       difficulty = Difficulty.Zero,
-      number = 9876543,
-      gasLimit = 30000000,
-      gasUsed = 0,
-      unixTimestamp = 1700000000,
+      number = BlockNumber(9876543),
+      gasLimit = GasAmount(30000000),
+      gasUsed = GasAmount(0),
+      unixTimestamp = Timestamp(1700000000),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8)),
@@ -1258,7 +1267,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
     customGenesisJsonOpt = None,
     daoForkConfig = None,
     accountStartNonce = UInt256.Zero,
-    chainId = BigInt(11155111),
+    chainId = ChainId(11155111),
     networkId = 11155111L,
     monetaryPolicyConfig = MonetaryPolicyConfig(
       eraDuration = 0,
@@ -1289,10 +1298,10 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
       receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
       difficulty = Difficulty.Zero,
-      number = BigInt(5187023),
-      gasLimit = BigInt(30000000),
-      gasUsed = BigInt(0),
-      unixTimestamp = 1700000000L, // well above shanghaiTimestamp=1677557088
+      number = BlockNumber(BigInt(5187023)),
+      gasLimit = GasAmount(BigInt(30000000)),
+      gasUsed = GasAmount(BigInt(0)),
+      unixTimestamp = Timestamp(1700000000L), // well above shanghaiTimestamp=1677557088
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8)),

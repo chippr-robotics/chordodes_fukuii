@@ -6,6 +6,7 @@ import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.ledger.BlockExecutionError.ValidationBeforeExecError
@@ -46,7 +47,7 @@ class BlockValidation(
           val remaining = n - queuedBlocks.length - 1
           val remainingBlocks = Iterator
             .iterate(blockchainReader.getBlockByHash(highestBlockInStorage.header.parentHash))(
-              _.filter(_.number > 0) // avoid trying to fetch parent of genesis
+              _.filter(_.number != BlockNumber.Zero) // avoid trying to fetch parent of genesis
                 .flatMap(p => blockchainReader.getBlockByHash(p.header.parentHash))
             )
             .take(remaining)

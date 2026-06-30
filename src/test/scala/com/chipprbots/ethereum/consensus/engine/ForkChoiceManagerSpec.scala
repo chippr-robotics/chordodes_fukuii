@@ -15,6 +15,9 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.BlockNumber
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -38,10 +41,10 @@ class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
       receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
       difficulty = Difficulty.Zero,
-      number = 12345,
-      gasLimit = 30000000,
-      gasUsed = 0,
-      unixTimestamp = 1700000000,
+      number = BlockNumber(12345),
+      gasLimit = GasAmount(30000000),
+      gasUsed = GasAmount(0),
+      unixTimestamp = Timestamp(1700000000),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8)),

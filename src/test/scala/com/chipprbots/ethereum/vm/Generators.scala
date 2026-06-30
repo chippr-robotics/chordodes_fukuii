@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.vm.MockWorldState.*
 
@@ -97,7 +98,9 @@ object Generators extends ObjectGenerators:
       blockPlacement <- getUInt256Gen(0, blockNumber)
       returnData <- returnDataGen
 
-      blockHeader = exampleBlockHeader.copy(number = if isTopHeader then blockNumber else blockNumber - blockPlacement)
+      blockHeader = exampleBlockHeader.copy(number =
+        BlockNumber(if isTopHeader then blockNumber.toBigInt else (blockNumber - blockPlacement).toBigInt)
+      )
 
       world = MockWorldState(numberOfHashes = blockNumber - 1)
         .saveCode(ownerAddr, code)

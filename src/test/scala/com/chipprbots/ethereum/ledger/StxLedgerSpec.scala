@@ -31,7 +31,7 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger:
       * geth)
       */
 
-    val tx: LegacyTransaction = LegacyTransaction(0, 0, lastBlockGasLimit, existingAddress, 0, sendData)
+    val tx: LegacyTransaction = LegacyTransaction(0, GasPrice.Zero, lastBlockGasLimit, existingAddress, 0, sendData)
     val fakeSignature: ECDSASignature = ECDSASignature(0, 0, 0)
     val stx: SignedTransaction = SignedTransaction(tx, fakeSignature)
     val stxFromAddress: SignedTransactionWithSender = SignedTransactionWithSender(stx, fromAddress)
@@ -51,7 +51,7 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger:
 
     // Execute transaction with gasLimit lesser by one that estimated minimum
     val errorExecResult: TxResult = mining.blockPreparator.executeTransaction(
-      stx.copy(tx = Transaction.withGasLimit(estimationResult - 1)(stx.tx)),
+      stx.copy(tx = Transaction.withGasLimit(GasAmount(estimationResult - 1))(stx.tx)),
       fromAddress,
       genesisHeader,
       worldWithAccount
@@ -67,7 +67,14 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger:
     val transferValue = 2
 
     val tx: LegacyTransaction =
-      LegacyTransaction(0, 0, lastBlockGasLimit, existingEmptyAccountAddres, transferValue, ByteString.empty)
+      LegacyTransaction(
+        0,
+        GasPrice.Zero,
+        lastBlockGasLimit,
+        existingEmptyAccountAddres,
+        transferValue,
+        ByteString.empty
+      )
     val fakeSignature: ECDSASignature = ECDSASignature(0, 0, 0)
     val stx: SignedTransaction = SignedTransaction(tx, fakeSignature)
 
@@ -85,12 +92,20 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger:
     val transferValue = 2
 
     val tx: LegacyTransaction =
-      LegacyTransaction(0, 0, lastBlockGasLimit, existingEmptyAccountAddres, transferValue, ByteString.empty)
+      LegacyTransaction(
+        0,
+        GasPrice.Zero,
+        lastBlockGasLimit,
+        existingEmptyAccountAddres,
+        transferValue,
+        ByteString.empty
+      )
     val fakeSignature: ECDSASignature = ECDSASignature(0, 0, 0)
     val stxFromAddress: SignedTransactionWithSender =
       SignedTransactionWithSender(SignedTransaction(tx, fakeSignature), fromAddress)
 
-    val newBlock: Block = genesisBlock.copy(header = block.header.copy(number = 1, parentHash = BlockHash(genesisHash)))
+    val newBlock: Block =
+      genesisBlock.copy(header = block.header.copy(number = BlockNumber(1), parentHash = BlockHash(genesisHash)))
 
     val preparedBlock: PreparedBlock =
       mining.blockPreparator.prepareBlock(
@@ -101,7 +116,7 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger:
       )
     val preparedWorld: InMemoryWorldStateProxy = preparedBlock.updatedWorld
     val header: BlockHeader =
-      preparedBlock.block.header.copy(number = 1, stateRoot = TrieRoot(preparedBlock.stateRootHash))
+      preparedBlock.block.header.copy(number = BlockNumber(1), stateRoot = TrieRoot(preparedBlock.stateRootHash))
 
     /** All operations in `ledger.prepareBlock` are performed on ReadOnlyWorldStateProxy so there are no updates in
       * underlying storages, but StateRootHash returned by it `expect` this updates to be in storages. It leads to
@@ -148,7 +163,7 @@ trait ScenarioSetup extends EphemBlockchainTestSetup:
       phoenixBlockNumber = 0,
       petersburgBlockNumber = 0
     ),
-    chainId = 0x03,
+    chainId = ChainId(0x03),
     networkId = 1,
     maxCodeSize = None,
     customGenesisFileOpt = None,
@@ -227,11 +242,13 @@ trait ScenarioSetup extends EphemBlockchainTestSetup:
 
   val block: Block = someGenesisBlock.toBlock
   val genesisBlock: Block =
-    block.copy(header = block.header.copy(stateRoot = TrieRoot(worldWithAccount.stateRootHash), gasLimit = 1000000))
+    block.copy(header =
+      block.header.copy(stateRoot = TrieRoot(worldWithAccount.stateRootHash), gasLimit = GasAmount(1000000))
+    )
   val genesisHash: ByteString = genesisBlock.header.hash.value
   val genesisHeader: BlockHeader = genesisBlock.header
   val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesisHeader)
-  val lastBlockGasLimit: BigInt = genesisBlock.header.gasLimit
+  val lastBlockGasLimit: GasAmount = genesisBlock.header.gasLimit
 
   blockchainWriter
     .storeBlock(genesisBlock)

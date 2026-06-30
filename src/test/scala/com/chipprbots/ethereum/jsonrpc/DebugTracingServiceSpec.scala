@@ -142,7 +142,7 @@ class DebugTracingServiceSpec
         .commit()
 
       val result: Either[JsonRpcError, TraceBlockByNumberResponse] = service
-        .traceBlockByNumber(TraceBlockByNumberRequest(BlockParam.WithNumber(emptyBlock.header.number)))
+        .traceBlockByNumber(TraceBlockByNumberRequest(BlockParam.WithNumber(emptyBlock.header.number.value)))
         .unsafeRunSync()
 
       result shouldBe Right(TraceBlockByNumberResponse(Seq.empty))

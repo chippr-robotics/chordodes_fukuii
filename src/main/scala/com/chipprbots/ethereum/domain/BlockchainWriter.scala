@@ -28,7 +28,7 @@ class BlockchainWriter(
         "New best known block number - {}",
         block.header.number
       )
-      appStateStorage.putBestBlockInfo(BlockInfo(block.header.hash.value, block.header.number))
+      appStateStorage.putBestBlockInfo(BlockInfo(block.header.hash.value, block.header.number.value))
     else appStateStorage.emptyBatchUpdate
 
     log.debug("Saving new block {} to database", block.idTag)
@@ -72,7 +72,7 @@ class BlockchainWriter(
 
   def storeBlockHeader(blockHeader: BlockHeader): DataSourceBatchUpdate =
     val hash = blockHeader.hash
-    blockHeadersStorage.put(hash.value, blockHeader).and(saveBlockNumberMapping(blockHeader.number, hash))
+    blockHeadersStorage.put(hash.value, blockHeader).and(saveBlockNumberMapping(blockHeader.number.value, hash))
 
   def storeBlockBody(blockHash: BlockHash, blockBody: BlockBody): DataSourceBatchUpdate =
     blockBodiesStorage.put(blockHash.value, blockBody).and(saveTxsLocations(blockHash, blockBody))
@@ -120,13 +120,13 @@ class BlockchainWriter(
       reader.getBlockHeaderByHash(hash) match
         case None => cursor = None
         case Some(header) =>
-          val canonicalHashAtNumber = reader.getBlockHeaderByNumber(header.number).map(_.hash)
+          val canonicalHashAtNumber = reader.getBlockHeaderByNumber(header.number.value).map(_.hash)
           if canonicalHashAtNumber.contains(hash) then
             // reached existing canonical ancestor — stop
             cursor = None
           else
-            buf += ((header.number, hash))
-            if header.number == 0 then cursor = None
+            buf += ((header.number.value, hash))
+            if header.number == BlockNumber.Zero then cursor = None
             else cursor = Some(header.parentHash)
     if buf.nonEmpty then
       // Rewrite number→hash AND tx-location for every block on the newly canonical branch.

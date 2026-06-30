@@ -18,12 +18,15 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderGasLi
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -72,10 +75,10 @@ class SpiralToOlympiaGasTransitionSpec
 
   private def spiralHeader(number: BigInt, gasLimit: BigInt, timestamp: Long): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      number = number,
-      gasLimit = gasLimit,
-      gasUsed = 0,
-      unixTimestamp = timestamp,
+      number = BlockNumber(number),
+      gasLimit = GasAmount(gasLimit),
+      gasUsed = GasAmount.Zero,
+      unixTimestamp = Timestamp(timestamp),
       difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefEmpty
@@ -90,10 +93,10 @@ class SpiralToOlympiaGasTransitionSpec
   ): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
       parentHash = BlockHash(parentHash),
-      number = number,
-      gasLimit = gasLimit,
-      gasUsed = 0,
-      unixTimestamp = timestamp,
+      number = BlockNumber(number),
+      gasLimit = GasAmount(gasLimit),
+      gasUsed = GasAmount.Zero,
+      unixTimestamp = Timestamp(timestamp),
       difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefPostOlympia(baseFee)
@@ -113,7 +116,7 @@ class SpiralToOlympiaGasTransitionSpec
           recommitInterval = 0.seconds
         ),
         new DifficultyCalculator:
-          def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
+          def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Timestamp, parent: BlockHeader)(implicit
               blockchainConfig: BlockchainConfig
           ): Difficulty = Difficulty(BigInt(1))
       ):
@@ -124,7 +127,7 @@ class SpiralToOlympiaGasTransitionSpec
         blockNumber: BigInt,
         parent: com.chipprbots.ethereum.domain.Block,
         beneficiary: Address,
-        blockTimestamp: Long,
+        blockTimestamp: Timestamp,
         x: Ommers
     )(implicit blockchainConfig: BlockchainConfig): BlockHeader =
       defaultPrepareHeader(blockNumber, parent, beneficiary, blockTimestamp, x)

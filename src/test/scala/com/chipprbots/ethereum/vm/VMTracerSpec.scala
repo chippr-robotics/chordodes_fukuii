@@ -46,10 +46,10 @@ class VMTracerSpec extends AnyFreeSpec with Matchers:
 
   private val blockHeader = BlockFixtures.ValidBlock.header.copy(
     difficulty = Difficulty(1000000),
-    number = 1,
-    gasLimit = 10000000,
-    gasUsed = 0,
-    unixTimestamp = 0
+    number = BlockNumber(1),
+    gasLimit = GasAmount(10000000),
+    gasUsed = GasAmount.Zero,
+    unixTimestamp = Timestamp(0)
   )
 
   private val evmConfig = EvmConfig.forBlock(
@@ -74,7 +74,7 @@ class VMTracerSpec extends AnyFreeSpec with Matchers:
       mystiqueBlockNumber = Long.MaxValue,
       spiralBlockNumber = Long.MaxValue,
       olympiaBlockNumber = Long.MaxValue,
-      chainId = 0x3d
+      chainId = ChainId(0x3d)
     )
   )
 

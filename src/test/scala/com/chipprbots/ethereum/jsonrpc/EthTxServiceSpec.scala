@@ -142,13 +142,13 @@ class EthTxServiceSpec
     val request: GetTransactionByHashRequest = GetTransactionByHashRequest(txToRequestHash)
 
     // when
-    val response: Either[JsonRpcError, RawTransactionResponse] =
-      ethTxService.getRawTransactionByHash(request).unsafeRunSync()
+    val response: Future[Either[JsonRpcError, RawTransactionResponse]] =
+      ethTxService.getRawTransactionByHash(request).unsafeToFuture()
 
     // then
     replyPTM(PendingTransactionsResponse(Nil))
 
-    response shouldEqual Right(RawTransactionResponse(None))
+    response.futureValue shouldEqual Right(RawTransactionResponse(None))
 
   it should "handle eth_getRawTransactionByHash if the tx is still pending" taggedAs (
     UnitTest,
@@ -177,13 +177,13 @@ class EthTxServiceSpec
     val request: GetTransactionByHashRequest = GetTransactionByHashRequest(txToRequestHash)
 
     // when
-    val response: Either[JsonRpcError, RawTransactionResponse] =
-      ethTxService.getRawTransactionByHash(request).unsafeRunSync()
+    val response: Future[Either[JsonRpcError, RawTransactionResponse]] =
+      ethTxService.getRawTransactionByHash(request).unsafeToFuture()
 
     // then
     replyPTM(PendingTransactionsResponse(Nil))
 
-    response shouldEqual Right(RawTransactionResponse(Some(txToRequest)))
+    response.futureValue shouldEqual Right(RawTransactionResponse(Some(txToRequest)))
 
   it should "return minimum 1 wei gas price when there are no transactions" taggedAs (
     UnitTest,
@@ -196,11 +196,11 @@ class EthTxServiceSpec
 
   it should "return average gas price" taggedAs (UnitTest, RPCTest) in new TestSetup:
     private val block: Block =
-      Block(Fixtures.Blocks.Block3125369.header.copy(number = 42), Fixtures.Blocks.Block3125369.body)
+      Block(Fixtures.Blocks.Block3125369.header.copy(number = BlockNumber(42)), Fixtures.Blocks.Block3125369.body)
     blockchainWriter
       .storeBlock(block)
       .commit()
-    blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
+    blockchainWriter.saveBestKnownBlocks(block.hash, block.number.value)
 
     val response: ServiceResponse[GetGasPriceResponse] = ethTxService.getGetGasPrice(GetGasPriceRequest())
     response.unsafeRunSync() shouldEqual Right(GetGasPriceResponse(BigInt("20000000000")))
@@ -210,7 +210,7 @@ class EthTxServiceSpec
     RPCTest
   ) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val txIndex: Int = 1
     val request: GetTransactionByBlockNumberAndIndexRequest =
@@ -230,7 +230,7 @@ class EthTxServiceSpec
 
     val txIndex: Int = blockToRequest.body.transactionList.length + 42
     val request: GetTransactionByBlockNumberAndIndexRequest =
-      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number), txIndex)
+      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number.value), txIndex)
     val response: GetTransactionByBlockNumberAndIndexResponse =
       ethTxService.getTransactionByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
@@ -244,7 +244,10 @@ class EthTxServiceSpec
 
     val txIndex: Int = 1
     val request: GetTransactionByBlockNumberAndIndexRequest =
-      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number - 42), txIndex)
+      GetTransactionByBlockNumberAndIndexRequest(
+        BlockParam.WithNumber(blockToRequest.header.number.value - 42),
+        txIndex
+      )
     val response: GetTransactionByBlockNumberAndIndexResponse =
       ethTxService.getTransactionByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
@@ -255,7 +258,7 @@ class EthTxServiceSpec
     RPCTest
   ) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val txIndex: Int = 1
     val request: GetTransactionByBlockNumberAndIndexRequest =
@@ -274,7 +277,7 @@ class EthTxServiceSpec
 
     val txIndex: Int = blockToRequest.body.transactionList.length + 42
     val request: GetTransactionByBlockNumberAndIndexRequest =
-      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number), txIndex)
+      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number.value), txIndex)
     val response: RawTransactionResponse =
       ethTxService.getRawTransactionByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
@@ -288,7 +291,10 @@ class EthTxServiceSpec
 
     val txIndex: Int = 1
     val request: GetTransactionByBlockNumberAndIndexRequest =
-      GetTransactionByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequest.header.number - 42), txIndex)
+      GetTransactionByBlockNumberAndIndexRequest(
+        BlockParam.WithNumber(blockToRequest.header.number.value - 42),
+        txIndex
+      )
     val response: RawTransactionResponse =
       ethTxService.getRawTransactionByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
@@ -297,12 +303,12 @@ class EthTxServiceSpec
   it should "handle get transaction by hash if the tx is not on the blockchain and not taggedAs (UnitTest, RPCTest) in the tx pool" in new TestSetup:
 
     val request: GetTransactionByHashRequest = GetTransactionByHashRequest(txToRequestHash)
-    val response: Either[JsonRpcError, GetTransactionByHashResponse] =
-      ethTxService.getTransactionByHash(request).unsafeRunSync()
+    val response: Future[Either[JsonRpcError, GetTransactionByHashResponse]] =
+      ethTxService.getTransactionByHash(request).unsafeToFuture()
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    response shouldEqual Right(GetTransactionByHashResponse(None))
+    response.futureValue shouldEqual Right(GetTransactionByHashResponse(None))
 
   it should "handle get transaction by hash if the tx is still pending" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
@@ -323,12 +329,12 @@ class EthTxServiceSpec
     blockchainWriter.storeBlock(blockWithTx).commit()
 
     val request: GetTransactionByHashRequest = GetTransactionByHashRequest(txToRequestHash)
-    val response: Either[JsonRpcError, GetTransactionByHashResponse] =
-      ethTxService.getTransactionByHash(request).unsafeRunSync()
+    val response: Future[Either[JsonRpcError, GetTransactionByHashResponse]] =
+      ethTxService.getTransactionByHash(request).unsafeToFuture()
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    response shouldEqual Right(
+    response.futureValue shouldEqual Right(
       GetTransactionByHashResponse(Some(TransactionResponse(txToRequest, Some(blockWithTx.header), Some(0))))
     )
 
@@ -352,7 +358,7 @@ class EthTxServiceSpec
     // eth_getTransactionReceipt now requires the block to be on the canonical chain
     // (block.number <= bestBlockNumber). Promote the fixture block to best so the
     // receipt surfaces — mirrors what ChainImporter/BlockImporter do on real imports.
-    blockchainWriter.saveBestKnownBlocks(blockWithTx.header.hash, blockWithTx.header.number)
+    blockchainWriter.saveBestKnownBlocks(blockWithTx.header.hash, blockWithTx.header.number.value)
 
     val request: GetTransactionReceiptRequest = GetTransactionReceiptRequest(contractCreatingTransaction.hash.value)
     val response: ServiceResponse[GetTransactionReceiptResponse] = ethTxService.getTransactionReceipt(request)
@@ -377,11 +383,11 @@ class EthTxServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup:
-    val res: PendingTransactionsResponse = ethTxService.getTransactionsFromPool.unsafeRunSync()
+    val res: Future[PendingTransactionsResponse] = ethTxService.getTransactionsFromPool.unsafeToFuture()
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    res shouldBe PendingTransactionsResponse(Nil)
+    res.futureValue shouldBe PendingTransactionsResponse(Nil)
 
   it should "send message to pendingTransactionsManager and return GetPendingTransactionsResponse with two transactions" taggedAs (
     UnitTest,
@@ -391,8 +397,8 @@ class EthTxServiceSpec
       val fakeTransaction = SignedTransactionWithSender(
         LegacyTransaction(
           nonce = 0,
-          gasPrice = 123,
-          gasLimit = 123,
+          gasPrice = GasPrice(123),
+          gasLimit = GasAmount(123),
           receivingAddress = Address("0x1234"),
           value = 0,
           payload = ByteString()
@@ -468,8 +474,8 @@ class EthTxServiceSpec
     val contractCreatingTransaction: SignedTransaction = SignedTransaction(
       LegacyTransaction(
         nonce = 2550,
-        gasPrice = BigInt("20000000000"),
-        gasLimit = 3000000,
+        gasPrice = GasPrice(BigInt("20000000000")),
+        gasLimit = GasAmount(3000000),
         receivingAddress = None,
         value = 0,
         payload

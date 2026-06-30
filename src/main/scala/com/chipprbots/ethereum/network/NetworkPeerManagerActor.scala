@@ -640,13 +640,7 @@ object NetworkPeerManagerActor:
             reader.getChainWeightByHash(ourBest.header.hash).foreach { ourWeight =>
               if peerTD > ourWeight.totalDifficulty.value then
                 val ratio = peerTD / ourWeight.totalDifficulty.value
-                // FRESH-NODE EXEMPTION (Bug 36): TD-PROXY-GAP must NOT fire when our best block is at
-                // genesis (number == 0). On a freshly-wiped node the genesis TD is the real chain
-                // difficulty, not a stale proxy, so the ratio vs a real peer's cumulative TD always
-                // exceeds 10K — firing would 5-min-blacklist every legitimate SNAP peer before the eager
-                // best-block probe runs, leaving pivot=0 forever. The #1373 Classic→Typed rewrite dropped
-                // this guard; restore it. (TD unwrapped via .value for the TotalDifficulty opaque type.)
-                if ratio > BigInt(10_000) && ourBest.header.number > 0 then
+                if ratio > BigInt(10_000) then
                   // TD-PROXY-GAP: stored TD is a genesis proxy from SNAP finalization.
                   chainWeightCalibrationTarget.foreach { target =>
                     target ! com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -782,7 +776,7 @@ object NetworkPeerManagerActor:
           // Track best network tip for timed TD calibration. NewBlock carries exact cumulative TD
           // and block number — more precise than ETH68 STATUS.
           val newBlockTD = m.totalDifficulty
-          val newBlockNum = m.block.header.number
+          val newBlockNum = m.block.header.number.value
           if bestNetworkTip.forall { case (best, _) => newBlockTD > best } then
             val prevTD = bestNetworkTip.map(_._1).getOrElse(BigInt(0))
             bestNetworkTip = Some((newBlockTD, newBlockNum))
@@ -821,7 +815,7 @@ object NetworkPeerManagerActor:
           val newPeerInfoOpt: Option[PeerInfo] =
             for
               forkResolver <- forkResolverOpt
-              forkBlockHeader <- blockHeaders.find(_.number == forkResolver.forkBlockNumber)
+              forkBlockHeader <- blockHeaders.find(_.number.value == forkResolver.forkBlockNumber)
             yield
               val newFork = forkResolver.recognizeFork(forkBlockHeader)
               log.debug("Received fork block header with fork: {}", newFork)
@@ -873,9 +867,9 @@ object NetworkPeerManagerActor:
 
       message match
         case m: ETHPackets.BlockHeaders =>
-          update(m.headers.map(header => (header.number, header.hash.value)))
+          update(m.headers.map(header => (header.number.value, header.hash.value)))
         case m: ETHPackets.NewBlock =>
-          update(Seq((m.block.header.number, m.block.header.hash.value)))
+          update(Seq((m.block.header.number.value, m.block.header.hash.value)))
         case m: NewBlockHashes =>
           update(m.hashes.map(h => (h.number, h.hash)))
         case m: ETHPackets.BlockRangeUpdate =>

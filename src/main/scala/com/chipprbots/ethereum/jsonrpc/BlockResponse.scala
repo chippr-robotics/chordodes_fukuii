@@ -109,7 +109,7 @@ object BlockResponse:
     })
 
     BlockResponse(
-      number = block.header.number,
+      number = block.header.number.value,
       hash = if pendingBlock then None else Some(block.header.hash.value),
       parentHash = block.header.parentHash.value,
       nonce = if pendingBlock then None else Some(block.header.nonce),
@@ -123,9 +123,9 @@ object BlockResponse:
       totalDifficulty = td,
       extraData = block.header.extraData,
       size = Block.size(block),
-      gasLimit = block.header.gasLimit,
-      gasUsed = block.header.gasUsed,
-      timestamp = block.header.unixTimestamp,
+      gasLimit = block.header.gasLimit.value,
+      gasUsed = block.header.gasUsed.value,
+      timestamp = BigInt(block.header.unixTimestamp.toLong),
       mixHash = block.header.mixHash.value,
       transactions = transactions,
       uncles = block.body.uncleNodesList.map(_.hash.value),

@@ -28,10 +28,10 @@ case class BlockHeader(
     receiptsRoot: TrieRoot,
     logsBloom: BloomFilter,
     difficulty: Difficulty,
-    number: BigInt,
-    gasLimit: BigInt,
-    gasUsed: BigInt,
-    unixTimestamp: Long,
+    number: BlockNumber,
+    gasLimit: GasAmount,
+    gasUsed: GasAmount,
+    unixTimestamp: Timestamp,
     extraData: ByteString,
     mixHash: BlockHash,
     nonce: ByteString,
@@ -82,7 +82,7 @@ case class BlockHeader(
   /** Post-merge, mixHash carries the prevRandao value from the beacon chain. */
   def prevRandao: Option[ByteString] = if isPoS then Some(mixHash.value) else None
 
-  def isParentOf(child: BlockHeader): Boolean = number + 1 == child.number && child.parentHash == hash
+  def isParentOf(child: BlockHeader): Boolean = number + 1L == child.number && child.parentHash == hash
 
   override def toString: String =
     s"BlockHeader { " +
@@ -216,10 +216,10 @@ object BlockHeaderImplicits:
         RLPValue(receiptsRoot.value.toArray),
         RLPValue(logsBloom.toArray),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(difficulty.value)),
-        RLPValue(ByteUtils.bigIntToUnsignedByteArray(number)),
-        RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasLimit)),
-        RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasUsed)),
-        RLPValue(ByteUtils.bigIntToUnsignedByteArray(unixTimestamp)),
+        RLPValue(ByteUtils.bigIntToUnsignedByteArray(number.value)),
+        RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasLimit.value)),
+        RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasUsed.value)),
+        RLPValue(ByteUtils.bigIntToUnsignedByteArray(unixTimestamp.toLong)),
         RLPValue(extraData.toArray),
         RLPValue(mixHash.value.toArray),
         RLPValue(nonce.toArray)
@@ -275,10 +275,10 @@ object BlockHeaderImplicits:
             receiptsRoot = TrieRoot(byteStringFromEncodeable(items(5))),
             logsBloom = BloomFilter(byteStringFromEncodeable(items(6))),
             difficulty = Difficulty(bigIntFromEncodeable(items(7))),
-            number = bigIntFromEncodeable(items(8)),
-            gasLimit = bigIntFromEncodeable(items(9)),
-            gasUsed = bigIntFromEncodeable(items(10)),
-            unixTimestamp = longFromEncodeable(items(11)),
+            number = BlockNumber(bigIntFromEncodeable(items(8))),
+            gasLimit = GasAmount(bigIntFromEncodeable(items(9))),
+            gasUsed = GasAmount(bigIntFromEncodeable(items(10))),
+            unixTimestamp = Timestamp(longFromEncodeable(items(11))),
             extraData = byteStringFromEncodeable(items(12)),
             mixHash = BlockHash(byteStringFromEncodeable(items(13))),
             nonce = byteStringFromEncodeable(items(14))

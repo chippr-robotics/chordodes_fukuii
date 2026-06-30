@@ -42,9 +42,9 @@ class OlympiaFeeMarketSpec
 
   private def olympiaParent(gasLimit: BigInt, gasUsed: BigInt, baseFee: BigInt): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      number = olympiaBlock,
-      gasLimit = gasLimit,
-      gasUsed = gasUsed,
+      number = BlockNumber(olympiaBlock),
+      gasLimit = GasAmount(gasLimit),
+      gasUsed = GasAmount(gasUsed),
       extraFields = HefPostOlympia(baseFee)
     )
 
@@ -55,13 +55,13 @@ class OlympiaFeeMarketSpec
       "Type 0 (legacy): return gasPrice regardless of baseFee" taggedAs (UnitTest, OlympiaTest) in {
         val legacyTx = LegacyTransaction(
           nonce = 0,
-          gasPrice = BigInt(5_000_000_000L),
-          gasLimit = 21000,
+          gasPrice = GasPrice(5_000_000_000L),
+          gasLimit = GasAmount(21000),
           receivingAddress = Address(1),
           value = BigInt(0),
           payload = ByteString.empty
         )
-        Transaction.effectiveGasPrice(legacyTx, Some(BigInt(2_000_000_000L))) shouldBe legacyTx.gasPrice
+        Transaction.effectiveGasPrice(legacyTx, Some(BigInt(2_000_000_000L))) shouldBe legacyTx.gasPrice.value
       }
 
       "Type 2 (dynamic fee): return min(maxFee, baseFee + maxPriority) — uncapped case" taggedAs (
@@ -69,11 +69,11 @@ class OlympiaFeeMarketSpec
         OlympiaTest
       ) in {
         val tx = TransactionWithDynamicFee(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(1_000_000_000L),
           maxFeePerGas = BigInt(10_000_000_000L),
-          gasLimit = BigInt(21000),
+          gasLimit = GasAmount(BigInt(21000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -88,11 +88,11 @@ class OlympiaFeeMarketSpec
         OlympiaTest
       ) in {
         val tx = TransactionWithDynamicFee(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(3_000_000_000L),
           maxFeePerGas = BigInt(10_000_000_000L),
-          gasLimit = BigInt(21000),
+          gasLimit = GasAmount(BigInt(21000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -107,7 +107,7 @@ class OlympiaFeeMarketSpec
         OlympiaTest
       ) in {
         val auth = SetCodeAuthorization(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           address = Address(1),
           nonce = BigInt(0),
           v = BigInt(0),
@@ -115,11 +115,11 @@ class OlympiaFeeMarketSpec
           s = BigInt(2)
         )
         val tx = SetCodeTransaction(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(1_000_000_000L),
           maxFeePerGas = BigInt(5_000_000_000L),
-          gasLimit = BigInt(50000),
+          gasLimit = GasAmount(BigInt(50000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -141,8 +141,8 @@ class OlympiaFeeMarketSpec
         val baseFee = BigInt(2_000_000_000L)
         val legacyTx = LegacyTransaction(
           nonce = 0,
-          gasPrice = gasPrice,
-          gasLimit = 21000,
+          gasPrice = GasPrice(gasPrice),
+          gasLimit = GasAmount(21000),
           receivingAddress = Address(1),
           value = BigInt(0),
           payload = ByteString.empty
@@ -157,11 +157,11 @@ class OlympiaFeeMarketSpec
         val maxPriority = BigInt(1_000_000_000L)
         val maxFee = BigInt(10_000_000_000L)
         val tx = TransactionWithDynamicFee(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = maxPriority,
           maxFeePerGas = maxFee,
-          gasLimit = BigInt(21000),
+          gasLimit = GasAmount(BigInt(21000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -178,11 +178,11 @@ class OlympiaFeeMarketSpec
       ) in {
         val baseFee = BigInt(5_000_000_000L)
         val tx = TransactionWithDynamicFee(
-          chainId = config.chainId,
+          chainId = config.chainId.value,
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(0),
           maxFeePerGas = baseFee,
-          gasLimit = BigInt(21000),
+          gasLimit = GasAmount(BigInt(21000)),
           receivingAddress = Some(Address(1)),
           value = BigInt(0),
           payload = ByteString.empty,
@@ -229,7 +229,7 @@ class OlympiaFeeMarketSpec
           nonce = BigInt(0),
           maxPriorityFeePerGas = BigInt(0),
           maxFeePerGas = baseFee,
-          gasLimit = BigInt(21_000),
+          gasLimit = GasAmount(BigInt(21_000)),
           receivingAddress = None,
           value = BigInt(0),
           payload = ByteString.empty,
@@ -250,7 +250,7 @@ class OlympiaFeeMarketSpec
           nonce = BigInt(0),
           maxPriorityFeePerGas = InitialBaseFee,
           maxFeePerGas = InitialBaseFee * 2,
-          gasLimit = BigInt(21_000),
+          gasLimit = GasAmount(BigInt(21_000)),
           receivingAddress = None,
           value = BigInt(0),
           payload = ByteString.empty,
@@ -265,8 +265,8 @@ class OlympiaFeeMarketSpec
         val baseFee = InitialBaseFee
         val legacyTx = LegacyTransaction(
           nonce = BigInt(0),
-          gasPrice = baseFee,
-          gasLimit = BigInt(21_000),
+          gasPrice = GasPrice(baseFee),
+          gasLimit = GasAmount(BigInt(21_000)),
           receivingAddress = None,
           value = BigInt(0),
           payload = ByteString.empty

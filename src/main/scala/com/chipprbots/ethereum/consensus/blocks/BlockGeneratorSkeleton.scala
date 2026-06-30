@@ -44,7 +44,7 @@ abstract class BlockGeneratorSkeleton(
       blockNumber: BigInt,
       parent: Block,
       beneficiary: Address,
-      blockTimestamp: Long,
+      blockTimestamp: Timestamp,
       x: Ommers
   )(implicit blockchainConfig: BlockchainConfig): BlockHeader =
     BlockHeader(
@@ -57,9 +57,9 @@ abstract class BlockGeneratorSkeleton(
       receiptsRoot = TrieRoot.Empty,
       logsBloom = BloomFilter.Empty,
       difficulty = difficultyCalc.calculateDifficulty(blockNumber, blockTimestamp, parent.header),
-      number = blockNumber,
-      gasLimit = calculateGasLimit(parent.header.gasLimit, blockNumber),
-      gasUsed = 0,
+      number = BlockNumber(blockNumber),
+      gasLimit = GasAmount(calculateGasLimit(parent.header.gasLimit.value, blockNumber)),
+      gasUsed = GasAmount.Zero,
       unixTimestamp = blockTimestamp,
       extraData = blockchainConfig.daoForkConfig
         .flatMap(daoForkConfig => daoForkConfig.getExtraData(blockNumber))
@@ -72,7 +72,7 @@ abstract class BlockGeneratorSkeleton(
       blockNumber: BigInt,
       parent: Block,
       beneficiary: Address,
-      blockTimestamp: Long,
+      blockTimestamp: Timestamp,
       x: X
   )(implicit blockchainConfig: BlockchainConfig): BlockHeader
 
@@ -88,7 +88,7 @@ abstract class BlockGeneratorSkeleton(
       initialWorldStateBeforeExecution: Option[InMemoryWorldStateProxy]
   )(implicit blockchainConfig: BlockchainConfig): PendingBlockAndState =
 
-    val blockTimestamp = blockTimestampProvider.getEpochSecond
+    val blockTimestamp = Timestamp(blockTimestampProvider.getEpochSecond)
     val header = prepareHeader(blockNumber, parent, beneficiary, blockTimestamp, x)
     val nextBlockBaseFee = com.chipprbots.ethereum.consensus.eip1559.BaseFeeCalculator.calcBaseFee(
       parent.header,
@@ -113,7 +113,7 @@ abstract class BlockGeneratorSkeleton(
                 stateRoot = TrieRoot(stateRoot),
                 receiptsRoot = TrieRoot(buildMpt(receipts, Receipt.byteArraySerializable)),
                 logsBloom = BloomFilter(bloomFilter),
-                gasUsed = gasUsed
+                gasUsed = GasAmount(gasUsed)
               ),
               body = prepareBlock.body
             ),
@@ -124,7 +124,7 @@ abstract class BlockGeneratorSkeleton(
 
   protected def prepareTransactions(
       transactions: Seq[SignedTransaction],
-      blockGasLimit: BigInt,
+      blockGasLimit: GasAmount,
       blockBaseFee: BigInt = BigInt(0),
       blockNumber: BigInt = BigInt(0)
   )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransaction] =
@@ -154,7 +154,7 @@ abstract class BlockGeneratorSkeleton(
       .toList
       .flatMap { txsFromSender =>
         val ordered = txsFromSender
-          .sortBy(-_.tx.gasPrice)
+          .sortBy(-_.tx.gasPrice.value)
           .sortBy(_.tx.nonce)
           .foldLeft(Seq.empty[SignedTransaction]) { case (txs, tx) =>
             if txs.exists(_.tx.nonce == tx.tx.nonce) then txs
@@ -168,7 +168,7 @@ abstract class BlockGeneratorSkeleton(
       .flatMap { case (_, txs) => txs }
 
     val transactionsForBlock: Seq[SignedTransaction] = sortedTransactions
-      .scanLeft((BigInt(0), None: Option[SignedTransaction])) { case ((accumulatedGas, _), stx) =>
+      .scanLeft((GasAmount.Zero, None: Option[SignedTransaction])) { case ((accumulatedGas, _), stx) =>
         (accumulatedGas + stx.tx.gasLimit, Some(stx))
       }
       .collect { case (gas, Some(stx)) => (gas, stx) }

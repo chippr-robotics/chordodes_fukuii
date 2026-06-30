@@ -79,7 +79,7 @@ object FixtureProvider:
     fixtures.blockHeaders.toSeq
       .sortBy { case (_, header) => header.number }
       .foreach { case (originalHash, header) =>
-        if header.number <= blockNumber then
+        if header.number.value <= blockNumber then
           val receiptsUpdates = fixtures.receipts
             .get(originalHash)
             .map(r => storages.receiptStorage.put(originalHash, r))
@@ -88,24 +88,24 @@ object FixtureProvider:
           storages.blockBodiesStorage
             .put(originalHash, fixtures.blockBodies(originalHash))
             .and(storages.blockHeadersStorage.put(originalHash, header))
-            .and(storages.blockNumberMappingStorage.put(header.number, originalHash))
+            .and(storages.blockNumberMappingStorage.put(header.number.value, originalHash))
             .and(receiptsUpdates)
             .commit()
 
           def traverse(nodeHash: ByteString): Unit =
             fixtures.stateMpt.get(nodeHash).orElse(fixtures.contractMpts.get(nodeHash)) match
               case Some(m: BranchNode) =>
-                storages.stateStorage.saveNode(ByteString(m.hash), m.toBytes, header.number)
+                storages.stateStorage.saveNode(ByteString(m.hash), m.toBytes, header.number.value)
                 m.children.collect { case HashNode(hash) => traverse(ByteString(hash)) }
 
               case Some(m: ExtensionNode) =>
-                storages.stateStorage.saveNode(ByteString(m.hash), m.toBytes, header.number)
+                storages.stateStorage.saveNode(ByteString(m.hash), m.toBytes, header.number.value)
                 m.next match
                   case HashNode(hash) if hash.nonEmpty => traverse(ByteString(hash))
                   case _                               =>
 
               case Some(m: LeafNode) =>
-                storages.stateStorage.saveNode(ByteString(m.hash), m.toBytes, header.number)
+                storages.stateStorage.saveNode(ByteString(m.hash), m.toBytes, header.number.value)
                 Try(m.value.toArray[Byte].toAccount).toOption.foreach { account =>
                   // Note: We've already saved all EVM code above, so this check is now redundant
                   // but kept for backwards compatibility with fixtures that have correct codeHash
@@ -212,7 +212,7 @@ object FixtureProvider:
     val blocks = blocksByOriginalHash.values.toList
 
     Fixture(
-      blocks.map(b => b.header.number -> b).toMap,
+      blocks.map(b => b.header.number.value -> b).toMap,
       blocksByOriginalHash.toMap, // Use original hash keys for blockByHash
       headers,
       bodies,
@@ -245,7 +245,7 @@ object FixtureProvider:
   ): Unit =
     val emptyRoot = ByteString(MerklePatriciaTrie.EmptyRootHash)
     val missing = headers.values
-      .filter(_.number > 0)
+      .filter(_.number > BlockNumber(0))
       .filterNot(_.stateRoot.value == emptyRoot) // an all-empty state needs no dumped node
       .filterNot(header => stateTree.contains(header.stateRoot.value) || contractTrees.contains(header.stateRoot.value))
       .map(header => header.number -> Hex.toHexString(header.stateRoot.toArray))

@@ -237,7 +237,7 @@ object BlockchainHostActor:
         requestIdOpt: Option[BigInt]
     ): Option[MessageSerializable] =
       val blockNumber =
-        block.fold(a => Some(a), b => blockchainReader.getBlockHeaderByHash(BlockHash(b)).map(_.number))
+        block.fold(a => Some(a), b => blockchainReader.getBlockHeaderByHash(BlockHash(b)).map(_.number.value))
 
       blockNumber match
         case Some(startBlockNumber) if startBlockNumber >= 0 && maxHeaders >= 0 && skip >= 0 =>

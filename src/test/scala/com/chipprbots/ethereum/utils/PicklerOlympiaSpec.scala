@@ -25,7 +25,7 @@ class PicklerOlympiaSpec extends AnyFlatSpec with Matchers:
       nonce = BigInt(42),
       maxPriorityFeePerGas = BigInt(1000000000),
       maxFeePerGas = BigInt(2000000000),
-      gasLimit = BigInt(21000),
+      gasLimit = GasAmount(21000),
       receivingAddress = Some(Address(1)),
       value = BigInt(1000),
       payload = ByteString.empty,
@@ -49,7 +49,7 @@ class PicklerOlympiaSpec extends AnyFlatSpec with Matchers:
       nonce = BigInt(1),
       maxPriorityFeePerGas = BigInt(1000000000),
       maxFeePerGas = BigInt(2000000000),
-      gasLimit = BigInt(50000),
+      gasLimit = GasAmount(50000),
       receivingAddress = Some(Address(3)),
       value = BigInt(0),
       payload = ByteString(Array(0x01.toByte, 0x02.toByte)),
@@ -75,8 +75,8 @@ class PicklerOlympiaSpec extends AnyFlatSpec with Matchers:
   "Mixed transaction types" should "roundtrip in sequence" taggedAs (OlympiaTest, UnitTest) in {
     val legacy: Transaction = LegacyTransaction(
       nonce = BigInt(0),
-      gasPrice = BigInt(20000000000L),
-      gasLimit = BigInt(21000),
+      gasPrice = GasPrice(BigInt(20000000000L)),
+      gasLimit = GasAmount(21000),
       receivingAddress = Address(1),
       value = BigInt(1000),
       payload = ByteString.empty
@@ -86,7 +86,7 @@ class PicklerOlympiaSpec extends AnyFlatSpec with Matchers:
       nonce = BigInt(1),
       maxPriorityFeePerGas = BigInt(1000000000),
       maxFeePerGas = BigInt(2000000000),
-      gasLimit = BigInt(21000),
+      gasLimit = GasAmount(21000),
       receivingAddress = Some(Address(2)),
       value = BigInt(0),
       payload = ByteString.empty,

@@ -599,7 +599,9 @@ object SyncController:
                 Behaviors
                   .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
                   .onFailure[Throwable](
-                    SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                    // PR #1378: PeersClient is a sync backbone actor. No `.withMaxRestarts` —
+                    // a cap would silently stop it forever and stall sync (validated live on Mordor).
+                    SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)
                   ),
                 s"peers-client-bootstrap-$gen"
               )
@@ -617,7 +619,8 @@ object SyncController:
                         preferSnapPeers = true
                       )
                     )
-                    .onFailure[Throwable](SupervisorStrategy.restart),
+                    // PivotHeaderBootstrap must keep retrying until the pivot header arrives — no cap.
+                    .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(2.seconds, 60.seconds, 0.1)),
                   s"pivot-header-bootstrap-$gen"
                 )
 
@@ -640,7 +643,8 @@ object SyncController:
                 Behaviors
                   .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
                   .onFailure[Throwable](
-                    SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                    // PR #1378: PeersClient is a sync backbone actor — no `.withMaxRestarts` cap.
+                    SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)
                   ),
                 s"peers-client-bootstrap-$gen"
               )
@@ -658,7 +662,8 @@ object SyncController:
                         preferSnapPeers = false
                       )
                     )
-                    .onFailure[Throwable](SupervisorStrategy.restart),
+                    // PivotHeaderBootstrap must keep retrying until the pivot header arrives — no cap.
+                    .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(2.seconds, 60.seconds, 0.1)),
                   s"pivot-header-bootstrap-$gen"
                 )
             // We pass `targetBlock = 0` as a placeholder — the bootstrap reply carries the
@@ -842,7 +847,8 @@ object SyncController:
             Behaviors
               .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
               .onFailure[Throwable](
-                SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                // PR #1378: PeersClient is a sync backbone actor — no `.withMaxRestarts` cap.
+                SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)
               ),
             s"healing-serve-root-peers-$gen"
           )
@@ -859,7 +865,8 @@ object SyncController:
                     preferSnapPeers = true
                   )
                 )
-                .onFailure[Throwable](SupervisorStrategy.restart),
+                // PivotHeaderBootstrap must keep retrying until the pivot header arrives — no cap.
+                .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(2.seconds, 60.seconds, 0.1)),
               s"healing-serve-root-bootstrap-$gen"
             )
           healingServeRootBootstrap = Some((peersClient, bootstrap))
@@ -955,7 +962,7 @@ object SyncController:
                 .map(_.totalDifficulty.value)
                 .getOrElse(blockchainReader.genesisHeader.difficulty.value)
               val calibratedTD =
-                if peerMaxBlock > BigInt(0) then peerTD * bestBlock.header.number / peerMaxBlock
+                if peerMaxBlock > BigInt(0) then peerTD * bestBlock.header.number.value / peerMaxBlock
                 else peerTD
               if calibratedTD > genesisWeight * BigInt(1000) then
                 val storedTD: BigInt = blockchainReader
@@ -1164,7 +1171,8 @@ object SyncController:
               Behaviors
                 .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
                 .onFailure[Throwable](
-                  SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                  // PR #1378: PeersClient is a sync backbone actor — no `.withMaxRestarts` cap.
+                  SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)
                 ),
               s"peers-client-bootstrap-$gen"
             )
@@ -1182,7 +1190,8 @@ object SyncController:
                       preferSnapPeers = true
                     )
                   )
-                  .onFailure[Throwable](SupervisorStrategy.restart),
+                  // PivotHeaderBootstrap must keep retrying until the pivot header arrives — no cap.
+                  .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(2.seconds, 60.seconds, 0.1)),
                 s"pivot-header-bootstrap-$gen"
               )
           runningPivotHeaderBootstrap(newPeersClient, newHeaderBootstrap, newTargetBlock, originalSnapSyncRef)
@@ -1248,7 +1257,8 @@ object SyncController:
               Behaviors
                 .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
                 .onFailure[Throwable](
-                  SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                  // PR #1378: PeersClient is a sync backbone actor — no `.withMaxRestarts` cap.
+                  SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)
                 ),
               s"peers-client-bootstrap-$gen"
             )
@@ -1265,7 +1275,8 @@ object SyncController:
                     preferSnapPeers = false
                   )
                 )
-                .onFailure[Throwable](SupervisorStrategy.restart),
+                // PivotHeaderBootstrap must keep retrying until the pivot header arrives — no cap.
+                .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(2.seconds, 60.seconds, 0.1)),
               s"pivot-header-bootstrap-$gen"
             )
           runningPivotHeaderBootstrap(newPeersClient, newHeaderBootstrap, targetBlock = BigInt(0), originalSnapSyncRef)
@@ -1479,7 +1490,7 @@ object SyncController:
           }
         }
         fileOpt.foreach { path =>
-          val chainIdBig = configBuilder.blockchainConfig.chainId
+          val chainIdBig = configBuilder.blockchainConfig.chainId.value
           log.info("[CHECKPOINT IMPORT] starting from {} (chainId={})", path, chainIdBig)
           val importer = new com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter(
             blockchainWriter,
@@ -1778,7 +1789,8 @@ object SyncController:
           Behaviors
             .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
             .onFailure[Throwable](
-              SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+              // PR #1378: PeersClient is a sync backbone actor — no `.withMaxRestarts` cap.
+              SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)
             ),
           s"peers-client-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")
@@ -1859,7 +1871,8 @@ object SyncController:
                   requestTimeout = snapSyncConfig.chainDownloadTimeout
                 )
               )
-              .onFailure[Throwable](SupervisorStrategy.restart),
+              // PR #1378: ChainDownloader must run until backfill completes — backoff, no cap.
+              .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)),
             s"backfill-resumer-$syncGeneration",
             DispatcherSelector.fromConfig("sync-dispatcher")
           )
@@ -1949,7 +1962,8 @@ object SyncController:
                     snapSyncConfig
                   )
                 )
-                .onFailure[Throwable](SupervisorStrategy.restart),
+                // PR #1378: CombinedRecoveryScanActor owns a full recovery pass that must complete — no cap.
+                .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)),
               s"combined-recovery-scan-$syncGeneration",
               DispatcherSelector.fromConfig("sync-dispatcher")
             )
@@ -1975,7 +1989,9 @@ object SyncController:
                           )
                         )
                         .onFailure[Throwable](
-                          SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+                          // PR #1378: state-recovery phase owner — a `.withMaxRestarts` cap would
+                          // stall recovery permanently (silently stops the actor forever). No cap.
+                          SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)
                         ),
                       s"bytecode-recovery-$syncGeneration",
                       DispatcherSelector.fromConfig("sync-dispatcher")
@@ -2001,7 +2017,9 @@ object SyncController:
                           )
                         )
                         .onFailure[Throwable](
-                          SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+                          // PR #1378: state-recovery phase owner — a `.withMaxRestarts` cap would
+                          // stall recovery permanently (silently stops the actor forever). No cap.
+                          SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)
                         ),
                       s"storage-recovery-$syncGeneration",
                       DispatcherSelector.fromConfig("sync-dispatcher")
@@ -2061,7 +2079,9 @@ object SyncController:
                         )
                       )
                       .onFailure[Throwable](
-                        SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+                        // PR #1378: state-recovery phase owner — a `.withMaxRestarts` cap would
+                        // stall recovery permanently (silently stops the actor forever). No cap.
+                        SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)
                       ),
                     s"bytecode-recovery-dl-$syncGeneration",
                     DispatcherSelector.fromConfig("sync-dispatcher")
@@ -2088,7 +2108,9 @@ object SyncController:
                         )
                       )
                       .onFailure[Throwable](
-                        SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+                        // PR #1378: state-recovery phase owner — a `.withMaxRestarts` cap would
+                        // stall recovery permanently (silently stops the actor forever). No cap.
+                        SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2)
                       ),
                     s"storage-recovery-dl-$syncGeneration",
                     DispatcherSelector.fromConfig("sync-dispatcher")
@@ -2287,7 +2309,8 @@ object SyncController:
             Behaviors
               .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
               .onFailure[Throwable](
-                SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                // PR #1378: PeersClient is a sync backbone actor — no `.withMaxRestarts` cap.
+                SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)
               ),
             s"recovery-recent-root-peers-$gen"
           )
@@ -2304,7 +2327,8 @@ object SyncController:
                     preferSnapPeers = true
                   )
                 )
-                .onFailure[Throwable](SupervisorStrategy.restart),
+                // PivotHeaderBootstrap must keep retrying until the pivot header arrives — no cap.
+                .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(2.seconds, 60.seconds, 0.1)),
               s"recovery-recent-root-bootstrap-$gen"
             )
           recentRootBootstrap = Some((peersClient, bootstrap))
@@ -2363,7 +2387,7 @@ object SyncController:
 
           while !anchorFound && !abort do
             blockchainReader.getChainWeightByHash(cur.hash) match
-              case Some(cw) if cw.totalDifficulty.value > cur.number * MinTDPerBlock =>
+              case Some(cw) if cw.totalDifficulty.value > cur.number.value * MinTDPerBlock =>
                 anchorTD = cw.totalDifficulty.value
                 anchorFound = true
                 log.debug(
@@ -2464,7 +2488,8 @@ object SyncController:
           Behaviors
             .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
             .onFailure[Throwable](
-              SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+              // PR #1378: PeersClient is a sync backbone actor — no `.withMaxRestarts` cap.
+              SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2)
             ),
           s"peers-client-bootstrap-$gen"
         )

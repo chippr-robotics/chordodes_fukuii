@@ -142,11 +142,11 @@ class BlockchainImpl(
     val txList = block.body.transactionList
 
     val blockNumberMappingUpdates =
-      if blockchainReader.getHashByBlockNumber(blockchainReader.getBestBranch, block.number).contains(blockHash) then
-        removeBlockNumberMapping(block.number)
+      if blockchainReader.getHashByBlockNumber(blockchainReader.getBestBranch, block.number.value).contains(blockHash)
+      then removeBlockNumberMapping(block.number.value)
       else blockNumberMappingStorage.emptyBatchUpdate
 
-    val potentialNewBestBlockNumber: BigInt = (block.number - 1).max(0)
+    val potentialNewBestBlockNumber: BigInt = (block.number.value - 1).max(0)
     val potentialNewBestBlockHash: ByteString = block.header.parentHash.value
 
     val bestBlockNumberUpdates =

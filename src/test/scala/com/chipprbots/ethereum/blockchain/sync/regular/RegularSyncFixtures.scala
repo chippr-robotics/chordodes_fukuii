@@ -318,11 +318,11 @@ trait RegularSyncFixtures:
           val maxBlock = minBlock + amount
           val matchingHeaders = blocks
             .filter { b =>
-              val nr = b.number
+              val nr = b.number.value
               minBlock <= nr && nr < maxBlock
             }
             .map(_.header)
-            .sortBy(_.number)
+            .sortBy(_.number.value)
           replyTo ! PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), matchingHeaders))
           None
         // Handle ETH68/69 GetBlockBodies (with requestId)
@@ -349,13 +349,13 @@ trait RegularSyncFixtures:
         else None
 
     implicit class BlocksListOps(blocks: List[Block]):
-      def headNumberUnsafe: BigInt = blocks.head.number
-      def headNumber: Option[BigInt] = blocks.headOption.map(_.number)
+      def headNumberUnsafe: BigInt = blocks.head.number.value
+      def headNumber: Option[BigInt] = blocks.headOption.map(_.number.value)
       def headers: List[BlockHeader] = blocks.map(_.header)
       def hashes: List[ByteString] = headers.map(_.hash.value)
       def bodies: List[BlockBody] = blocks.map(_.body)
-      def numbers: List[BigInt] = blocks.map(_.number)
-      def numberAt(index: Int): Option[BigInt] = blocks.get(index).map(_.number)
+      def numbers: List[BigInt] = blocks.map(_.number.value)
+      def numberAt(index: Int): Option[BigInt] = blocks.get(index).map(_.number.value)
       def numberAtUnsafe(index: Int): BigInt = numberAt(index).get
       def byHash(hash: ByteString): Option[Block] = blocks.find(_.hash.value == hash)
       def byHashUnsafe(hash: ByteString): Block = byHash(hash).get
@@ -485,7 +485,7 @@ trait RegularSyncFixtures:
         if block == newBlock then
           importedNewBlock = true
           IO.pure(
-            BlockImportedToTop(List(BlockData(newBlock, Nil, ChainWeight.totalDifficultyOnly(newBlock.number))))
+            BlockImportedToTop(List(BlockData(newBlock, Nil, ChainWeight.totalDifficultyOnly(newBlock.number.value))))
           )
         else
           if block == testBlocks.last then importedLastTestBlock = true
@@ -539,7 +539,7 @@ trait RegularSyncFixtures:
 
     def sendNewBlock(block: Block = newBlock, peer: Peer = defaultPeer): Unit =
       blockFetcher ! MessageFromPeer(
-        ETHPackets.NewBlock(block, ChainWeight.totalDifficultyOnly(block.number).totalDifficulty.value),
+        ETHPackets.NewBlock(block, ChainWeight.totalDifficultyOnly(block.number.value).totalDifficulty.value),
         peer.id
       )
 

@@ -85,11 +85,11 @@ object TransactionReceiptResponse:
         transactionIndex = transactionIndex,
         transactionHash = stx.hash.value,
         blockHash = blockHeader.hash.value,
-        blockNumber = blockHeader.number,
+        blockNumber = blockHeader.number.value,
         address = txLog.loggerAddress,
         data = txLog.data,
         topics = txLog.logTopics,
-        blockTimestamp = Some(BigInt(blockHeader.unixTimestamp))
+        blockTimestamp = Some(BigInt(blockHeader.unixTimestamp.toLong))
       )
     }
 
@@ -114,7 +114,7 @@ object TransactionReceiptResponse:
     new TransactionReceiptResponse(
       transactionHash = stx.hash.value,
       transactionIndex = transactionIndex,
-      blockNumber = blockHeader.number,
+      blockNumber = blockHeader.number.value,
       blockHash = blockHeader.hash.value,
       from = signedTransactionSender,
       to = stx.tx.receivingAddress,
@@ -135,5 +135,5 @@ object TransactionReceiptResponse:
             .getBlobGasPrice(eg, blockHeader.unixTimestamp, blockchainConfig)
         )
       ),
-      blockTimestamp = Some(BigInt(blockHeader.unixTimestamp))
+      blockTimestamp = Some(BigInt(blockHeader.unixTimestamp.toLong))
     )

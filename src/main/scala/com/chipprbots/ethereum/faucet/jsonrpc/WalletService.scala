@@ -6,6 +6,8 @@ import cats.data.EitherT
 import cats.effect.IO
 
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.faucet.FaucetConfig
 import com.chipprbots.ethereum.jsonrpc.client.RpcClient.RpcError
@@ -35,7 +37,14 @@ class WalletService(walletRpcClient: WalletRpcClientApi, keyStore: KeyStore, con
 
   private def prepareTx(wallet: Wallet, targetAddress: Address, nonce: BigInt): ByteString =
     val transaction =
-      LegacyTransaction(nonce, config.txGasPrice, config.txGasLimit, Some(targetAddress), config.txValue, ByteString())
+      LegacyTransaction(
+        nonce,
+        GasPrice(config.txGasPrice),
+        GasAmount(config.txGasLimit),
+        Some(targetAddress),
+        config.txValue,
+        ByteString()
+      )
 
     val stx = wallet.signTx(transaction, None)
     ByteString(rlp.encode(stx.tx.toRLPEncodable))

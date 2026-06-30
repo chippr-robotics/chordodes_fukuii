@@ -59,16 +59,16 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
 
   val defaultBlockHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     difficulty = Difficulty(1000000),
-    number = blockchainConfig.forkBlockNumbers.homesteadBlockNumber + 1,
-    gasLimit = 1000000,
-    gasUsed = 0,
-    unixTimestamp = 1486752441
+    number = BlockNumber(blockchainConfig.forkBlockNumbers.homesteadBlockNumber + 1),
+    gasLimit = GasAmount(1000000),
+    gasUsed = GasAmount.Zero,
+    unixTimestamp = Timestamp(1486752441)
   )
 
   val defaultTx: LegacyTransaction = LegacyTransaction(
     nonce = 42,
-    gasPrice = 1,
-    gasLimit = 90000,
+    gasPrice = GasPrice(1),
+    gasLimit = GasAmount(90000),
     receivingAddress = receiverAddress,
     value = 0,
     payload = ByteString.empty
@@ -90,7 +90,7 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
   val defaultAddressesToDelete: Set[Address] =
     Set(Address(Hex.decode("01")), Address(Hex.decode("02")), Address(Hex.decode("03")))
   val defaultLogs: Seq[TxLogEntry] = Seq(defaultLog.copy(loggerAddress = defaultAddressesToDelete.head))
-  val defaultGasPrice: UInt256 = 10
+  val defaultGasPrice: GasPrice = GasPrice(10)
   val defaultGasLimit: UInt256 = 1000000
   val defaultValue: BigInt = 1000
 
@@ -183,25 +183,25 @@ trait BlockchainSetup extends TestSetup:
     beneficiary = minerAddress.bytes,
     receiptsRoot = Account.EmptyStorageRootHash,
     logsBloom = BloomFilter.Empty,
-    gasLimit = defaultGasLimit,
-    gasUsed = 0
+    gasLimit = GasAmount(defaultGasLimit.toBigInt),
+    gasUsed = GasAmount.Zero
   )
   val validBlockBodyWithNoTxs: BlockBody = BlockBody(Nil, Nil)
 
   blockchainWriter
     .storeBlockHeader(validBlockParentHeader)
     .and(blockchainWriter.storeBlockBody(validBlockParentHeader.hash, validBlockBodyWithNoTxs))
-    .and(storagesInstance.storages.appStateStorage.putBestBlockNumber(validBlockParentHeader.number))
+    .and(storagesInstance.storages.appStateStorage.putBestBlockNumber(validBlockParentHeader.number.value))
     .and(storagesInstance.storages.chainWeightStorage.put(validBlockParentHeader.hash.value, ChainWeight.zero))
     .commit()
 
   val validTx: LegacyTransaction = defaultTx.copy(
     nonce = initialOriginNonce,
-    gasLimit = defaultGasLimit,
+    gasLimit = GasAmount(defaultGasLimit.toBigInt),
     value = defaultValue
   )
   val validStxSignedByOrigin: SignedTransaction =
-    SignedTransaction.sign(validTx, originKeyPair, Some(blockchainConfig.chainId))
+    SignedTransaction.sign(validTx, originKeyPair, Some(blockchainConfig.chainId.value))
 
 // SCALA 3 MIGRATION: Cannot use self-type constraint with anonymous instantiation in Scala 3.
 // The implementing class must extend MockFactory and provide mock implementations.
@@ -234,7 +234,7 @@ trait DaoForkTestSetup extends TestSetup:
     override val range: Int = 10
     override val drainList: Seq[Address] = Seq(Address(1), Address(2), Address(3))
     override val forkBlockHash: ByteString = proDaoBlock.header.hash.value
-    override val forkBlockNumber: BigInt = proDaoBlock.header.number
+    override val forkBlockNumber: BigInt = proDaoBlock.header.number.value
     override val refundContract: Option[Address] = Some(Address(4))
     override val includeOnForkIdList: Boolean = false
 
@@ -249,7 +249,7 @@ trait DaoForkTestSetup extends TestSetup:
       )
     )
     .copy(
-      chainId = 0x01,
+      chainId = ChainId(0x01),
       networkId = 1,
       daoForkConfig = Some(supportDaoForkConfig),
       customGenesisFileOpt = None,
@@ -296,13 +296,13 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
 
   val defaultHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
     difficulty = Difficulty(100),
-    number = 1,
-    gasLimit = 1000000,
-    gasUsed = 0,
-    unixTimestamp = 0
+    number = BlockNumber(1),
+    gasLimit = GasAmount(1000000),
+    gasUsed = GasAmount.Zero,
+    unixTimestamp = Timestamp(0)
   )
 
-  val genesisHeader: BlockHeader = defaultHeader.copy(number = 0, extraData = ByteString("genesis"))
+  val genesisHeader: BlockHeader = defaultHeader.copy(number = BlockNumber(0), extraData = ByteString("genesis"))
 
   def getBlock(
       number: BigInt = 1,
@@ -313,7 +313,12 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
   ): Block =
     Block(
       defaultHeader
-        .copy(parentHash = BlockHash(parent), difficulty = Difficulty(difficulty), number = number, extraData = salt),
+        .copy(
+          parentHash = BlockHash(parent),
+          difficulty = Difficulty(difficulty),
+          number = BlockNumber(number),
+          extraData = salt
+        ),
       BlockBody(Nil, ommers)
     )
 

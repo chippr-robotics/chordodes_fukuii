@@ -269,7 +269,7 @@ object RegularSyncItSpecUtils:
     private def getMptForBlock(block: Block) =
       InMemoryWorldStateProxy(
         storagesInstance.storages.evmCodeStorage,
-        bl.getBackingMptStorage(block.number),
+        bl.getBackingMptStorage(block.number.value),
         (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
         UInt256.Zero,
         ByteString(MerklePatriciaTrie.EmptyRootHash),
@@ -289,7 +289,7 @@ object RegularSyncItSpecUtils:
         updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy
     ): (Block, ChainWeight, InMemoryWorldStateProxy) =
       val newBlockNumber = parent.header.number + 1
-      val newWorld = updateWorldForBlock(newBlockNumber, parentWorld)
+      val newWorld = updateWorldForBlock(newBlockNumber.value, parentWorld)
       val newBlock = parent.copy(header =
         parent.header.copy(
           parentHash = parent.header.hash,

@@ -166,20 +166,20 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits:
         val baseHeaderFields = List(
           "difficulty" -> encodeAsHex(h.difficulty.value),
           "extraData" -> encodeAsHex(h.extraData),
-          "gasLimit" -> encodeAsHex(h.gasLimit),
-          "gasUsed" -> encodeAsHex(h.gasUsed),
+          "gasLimit" -> encodeAsHex(h.gasLimit.value),
+          "gasUsed" -> encodeAsHex(h.gasUsed.value),
           "hash" -> encodeAsHex(blockHash),
           "logsBloom" -> encodeAsHex(h.logsBloom.value),
           "miner" -> encodeAsHex(h.beneficiary),
           "mixHash" -> encodeAsHex(h.mixHash.value),
           "nonce" -> encodeAsHex(h.nonce),
-          "number" -> encodeAsHex(h.number),
+          "number" -> encodeAsHex(h.number.value),
           "parentHash" -> encodeAsHex(h.parentHash.value),
           "receiptsRoot" -> encodeAsHex(h.receiptsRoot.value),
           "sha3Uncles" -> encodeAsHex(h.ommersHash.value),
           "size" -> encodeAsHex(BigInt(Block.size(Block(h, block.body)))),
           "stateRoot" -> encodeAsHex(h.stateRoot.value),
-          "timestamp" -> encodeAsHex(BigInt(h.unixTimestamp)),
+          "timestamp" -> encodeAsHex(BigInt(h.unixTimestamp.toLong)),
           "transactionsRoot" -> encodeAsHex(h.transactionsRoot.value),
           "uncles" -> JArray(Nil)
         ) ++ (if h.withdrawalsRoot.isDefined then List("withdrawals" -> JArray(Nil)) else Nil)
@@ -230,15 +230,15 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits:
           case t: com.chipprbots.ethereum.domain.SetCodeTransaction        => Some(t.chainId)
           case t: com.chipprbots.ethereum.domain.TransactionWithDynamicFee => Some(t.chainId)
           case t: com.chipprbots.ethereum.domain.TransactionWithAccessList => Some(t.chainId)
-          case _ => Some(com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig.chainId)
+          case _ => Some(com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig.chainId.value)
         val sender = senderAddr.bytes
         val effectiveGasPrice = com.chipprbots.ethereum.domain.Transaction.effectiveGasPrice(tx, header.baseFee)
         val baseFields = List(
           "blockHash" -> encodeAsHex(blockHash),
-          "blockNumber" -> encodeAsHex(header.number),
-          "blockTimestamp" -> encodeAsHex(BigInt(header.unixTimestamp)),
+          "blockNumber" -> encodeAsHex(header.number.value),
+          "blockTimestamp" -> encodeAsHex(BigInt(header.unixTimestamp.toLong)),
           "from" -> encodeAsHex(sender),
-          "gas" -> encodeAsHex(tx.gasLimit),
+          "gas" -> encodeAsHex(tx.gasLimit.value),
           "gasPrice" -> encodeAsHex(effectiveGasPrice),
           "hash" -> encodeAsHex(stx.hash.value),
           "input" -> encodeAsHex(tx.payload),

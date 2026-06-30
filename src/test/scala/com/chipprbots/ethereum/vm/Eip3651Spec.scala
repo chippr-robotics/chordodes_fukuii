@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -31,7 +32,7 @@ class Eip3651Spec extends AnyWordSpec with Matchers:
 
     val fakeHeaderPreEip3651: BlockHeader =
       BlockFixtures.ValidBlock.header.copy(
-        number = Fixtures.MystiqueBlockNumber,
+        number = BlockNumber(Fixtures.MystiqueBlockNumber),
         beneficiary = coinbaseAddr.bytes
       )
 

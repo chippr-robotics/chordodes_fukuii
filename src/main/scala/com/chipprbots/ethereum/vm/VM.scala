@@ -146,7 +146,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
               )
             else
 
-              if DebugTrace.enabledForBlock(context.blockHeader.number) then
+              if DebugTrace.enabledForBlock(context.blockHeader.number.value) then
                 val callerAccountNonce = context.world.getAccount(context.callerAddr).map(_.nonce)
                 callerAccountNonce.foreach { n =>
                   val nonceForCreate = n - 1
@@ -238,7 +238,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
           stack
         )
         // Opcode-level tracing for targeted debugging
-        if DebugTrace.enabledForBlock(state.env.blockHeader.number) && state.env.callDepth == 0 then
+        if DebugTrace.enabledForBlock(state.env.blockHeader.number.value) && state.env.callDepth == 0 then
           log.debug("[EVM] pc={} op={} gas={} gasAfter={} depth={}", state.pc, opCode, state.gas, gas, env.callDepth)
         if newState.halted then newState
         else exec(newState)
@@ -280,13 +280,13 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
 
   private def exceedsMaxContractSize(context: PC, config: EvmConfig, contractCode: ByteString): Boolean =
     lazy val maxCodeSizeExceeded = config.maxCodeSize.exists(codeSizeLimit => contractCode.size > codeSizeLimit)
-    val currentBlock = context.blockHeader.number
+    val currentBlock = context.blockHeader.number.value
     // Max code size was enabled on eip161 block number on eth network, and on atlantis block number on etc
     (currentBlock >= config.blockchainConfig.eip161BlockNumber || currentBlock >= config.blockchainConfig.atlantisBlockNumber) &&
     maxCodeSizeExceeded
 
   private def saveNewContract(context: PC, address: Address, result: PR, config: EvmConfig): PR =
-    val tracing = DebugTrace.enabledForBlock(context.blockHeader.number)
+    val tracing = DebugTrace.enabledForBlock(context.blockHeader.number.value)
 
     val out: PR =
       if result.error.isDefined then

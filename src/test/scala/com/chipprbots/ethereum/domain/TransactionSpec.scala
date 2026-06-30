@@ -56,7 +56,7 @@ class TransactionSpec
         Address(slice)
 
       val originalSignedTransaction =
-        SignedTransaction.sign(originalTransaction, senderKeys, Some(blockchainConfig.chainId))
+        SignedTransaction.sign(originalTransaction, senderKeys, Some(blockchainConfig.chainId.value))
       // check for proper signature content
       getSender(originalSignedTransaction) shouldEqual (Some(originalSenderAddress))
 
@@ -98,8 +98,8 @@ class TransactionSpec
     val tx: TransactionWithAccessList = TransactionWithAccessList(
       1, // ethereum mainnet, used by the core-geth test
       3,
-      1,
-      25000,
+      GasPrice(1),
+      GasAmount(25000),
       toAddr,
       10,
       ByteString(Hex.decode("5544")),
@@ -129,8 +129,8 @@ class TransactionSpec
     val toAddr: Address = Address.apply("b94f5374fce5edbc8e2a8697c15331677e6ebf0b")
     val tx: LegacyTransaction = LegacyTransaction(
       3,
-      1,
-      2000,
+      GasPrice(1),
+      GasAmount(2000),
       toAddr,
       10,
       ByteString(Hex.decode("5544"))

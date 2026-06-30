@@ -9,9 +9,11 @@ import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostPrague
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.FeeSchedule
@@ -88,8 +90,8 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers:
 
   def cancunHeader(excessBlobGas: BigInt = BigInt(0), timestamp: Long = 0L): BlockHeader =
     BlockFixtures.ValidBlock.header.copy(
-      number = Fixtures.OlympiaBlockNumber,
-      unixTimestamp = timestamp,
+      number = BlockNumber(Fixtures.OlympiaBlockNumber),
+      unixTimestamp = Timestamp(timestamp),
       extraFields = HefPostCancun(
         baseFee = BigInt(1000000000L),
         withdrawalsRoot = ByteString(Array.fill(32)(0.toByte)),
@@ -101,8 +103,8 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers:
 
   def bpo1Header(excessBlobGas: BigInt = BigInt(0)): BlockHeader =
     BlockFixtures.ValidBlock.header.copy(
-      number = Fixtures.OlympiaBlockNumber,
-      unixTimestamp = 2000L, // matches bpo1Timestamp = Some(2000L) in ethBpo1Config
+      number = BlockNumber(Fixtures.OlympiaBlockNumber),
+      unixTimestamp = Timestamp(2000L), // matches bpo1Timestamp = Some(2000L) in ethBpo1Config
       extraFields = HefPostPrague(
         baseFee = BigInt(1000000000L),
         withdrawalsRoot = ByteString(Array.fill(32)(0.toByte)),
@@ -115,8 +117,8 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers:
 
   def bpo2Header(excessBlobGas: BigInt = BigInt(0)): BlockHeader =
     BlockFixtures.ValidBlock.header.copy(
-      number = Fixtures.OlympiaBlockNumber,
-      unixTimestamp = 3000L, // matches bpo2Timestamp = Some(3000L) in ethBpo2Config
+      number = BlockNumber(Fixtures.OlympiaBlockNumber),
+      unixTimestamp = Timestamp(3000L), // matches bpo2Timestamp = Some(3000L) in ethBpo2Config
       extraFields = HefPostPrague(
         baseFee = BigInt(1000000000L),
         withdrawalsRoot = ByteString(Array.fill(32)(0.toByte)),
@@ -129,8 +131,8 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers:
 
   def pragueHeader(excessBlobGas: BigInt = BigInt(0)): BlockHeader =
     BlockFixtures.ValidBlock.header.copy(
-      number = Fixtures.OlympiaBlockNumber,
-      unixTimestamp = 1000L, // matches pragueTimestamp = Some(1000L) in ethPragueConfig
+      number = BlockNumber(Fixtures.OlympiaBlockNumber),
+      unixTimestamp = Timestamp(1000L), // matches pragueTimestamp = Some(1000L) in ethPragueConfig
       extraFields = HefPostPrague(
         baseFee = BigInt(1000000000L),
         withdrawalsRoot = ByteString(Array.fill(32)(0.toByte)),
@@ -143,7 +145,7 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers:
 
   def etcOlympiaHeader: BlockHeader =
     BlockFixtures.ValidBlock.header.copy(
-      number = Fixtures.OlympiaBlockNumber,
+      number = BlockNumber(Fixtures.OlympiaBlockNumber),
       extraFields = HefPostOlympia(BigInt(1000000000L))
     )
 

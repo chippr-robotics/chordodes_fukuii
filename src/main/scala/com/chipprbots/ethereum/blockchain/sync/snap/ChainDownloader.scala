@@ -196,11 +196,8 @@ class ChainDownloader private (
       handleCommon(message).getOrElse {
         message match
           case Dispatch =>
-            // Propagate the dispatch result: checkCompletion() inside dispatchRequests() returns idle() when the
-            // backfill is done, and discarding it would strand the actor in downloading() with its dispatch timer
-            // cancelled — a later UpdateTarget(bigger) would then never reschedule (only the idle() branch does).
-            // When not complete, dispatchRequests() re-arms the timer and returns Behaviors.same.
-            if !paused then dispatchRequests() else Behaviors.same
+            if !paused then dispatchRequests()
+            Behaviors.same
 
           case Pause =>
             if !paused then
@@ -209,12 +206,11 @@ class ChainDownloader private (
             Behaviors.same
 
           case Resume =>
-            // Propagate the dispatch result (idle() on completion) instead of always returning Behaviors.same.
             if paused then
               paused = false
               log.info("Chain download resumed")
               dispatchRequests()
-            else Behaviors.same
+            Behaviors.same
 
           case UpdateTarget(newTarget) =>
             if newTarget > targetBlock then
@@ -235,9 +231,8 @@ class ChainDownloader private (
 
           case BoostConcurrency(n) =>
             boostConcurrency(n)
-            // Immediately use the new slots; propagate completion (dispatchRequests may return idle()) so a
-            // post-completion boost doesn't re-arm dispatch and fire `replyTo ! Done` a second time.
-            dispatchRequests()
+            dispatchRequests() // Immediately use the new slots
+            Behaviors.same
 
           case YieldToRegularSync(n) =>
             yieldToRegularSync(n)
@@ -248,7 +243,7 @@ class ChainDownloader private (
             Behaviors.same
 
           // --- Header responses ---
-          case PeerResult(ResponseReceived(peer, ETHPackets.BlockHeaders(_, headers), _)) =>
+          case PeerResult(ResponseReceived(_, peer, ETHPackets.BlockHeaders(_, headers), _)) =>
             headerRequestPeers -= peer.id
             if headers.nonEmpty then
               emptyHeaderPeers -= peer.id
@@ -258,7 +253,7 @@ class ChainDownloader private (
               log.debug("Empty headers from {} — excluding from header dispatch", peer.id)
             dispatchRequests()
 
-          case PeerResult(RequestFailed(peer, reason)) =>
+          case PeerResult(RequestFailed(_, peer, reason)) =>
             headerRequestPeers -= peer.id
             bodyRequestPeers -= peer.id
             receiptRequestPeers -= peer.id
@@ -267,7 +262,7 @@ class ChainDownloader private (
             dispatchRequests()
 
           // --- Body responses ---
-          case PeerResult(ResponseReceived(peer, ETHPackets.BlockBodies(_, bodies), _)) =>
+          case PeerResult(ResponseReceived(_, peer, ETHPackets.BlockBodies(_, bodies), _)) =>
             bodyRequestPeers.get(peer.id).foreach { case (_, requestedHashes) =>
               bodyRequestPeers -= peer.id
               handleBodies(peer, requestedHashes, bodies)
@@ -275,7 +270,7 @@ class ChainDownloader private (
             dispatchRequests()
 
           // --- Receipt responses ---
-          case PeerResult(ResponseReceived(peer, eth66Receipts: ETHPackets.Receipts68, _)) =>
+          case PeerResult(ResponseReceived(_, peer, eth66Receipts: ETHPackets.Receipts68, _)) =>
             receiptRequestPeers.get(peer.id).foreach { case (_, requestedHashes) =>
               receiptRequestPeers -= peer.id
               handleReceipts(peer, requestedHashes, eth66Receipts)
@@ -283,7 +278,7 @@ class ChainDownloader private (
             dispatchRequests()
 
           // ETH70 partial receipt delivery
-          case PeerResult(ResponseReceived(peer, receipts70: ETHPackets.Receipts70, _)) =>
+          case PeerResult(ResponseReceived(_, peer, receipts70: ETHPackets.Receipts70, _)) =>
             receiptRequestPeers.get(peer.id).foreach { case (_, requestedHashes) =>
               receiptRequestPeers -= peer.id
               handleReceipts70(peer, requestedHashes, receipts70)
@@ -385,7 +380,8 @@ class ChainDownloader private (
             peerEventBus,
             requestMsg,
             Codes.BlockHeadersCode,
-            replyTo = prhResultAdapter
+            replyTo = prhResultAdapter,
+            requestId = 0
           ),
         s"chain-headers-${bestHeaderNumber + 1}-${System.nanoTime()}"
       )
@@ -406,7 +402,8 @@ class ChainDownloader private (
             peerEventBus,
             requestMsg,
             Codes.BlockBodiesCode,
-            replyTo = prhResultAdapter
+            replyTo = prhResultAdapter,
+            requestId = 0
           ),
         s"chain-bodies-${System.nanoTime()}"
       )
@@ -434,7 +431,8 @@ class ChainDownloader private (
               peerEventBus,
               requestMsg,
               Codes.ReceiptsCode,
-              replyTo = prhResultAdapter
+              replyTo = prhResultAdapter,
+              requestId = 0
             ),
           s"chain-receipts-eth70-${System.nanoTime()}"
         )
@@ -449,7 +447,8 @@ class ChainDownloader private (
               peerEventBus,
               requestMsg,
               Codes.ReceiptsCode,
-              replyTo = prhResultAdapter
+              replyTo = prhResultAdapter,
+              requestId = 0
             ),
           s"chain-receipts-${System.nanoTime()}"
         )
@@ -462,10 +461,10 @@ class ChainDownloader private (
 
     // Find usable headers: skip any before our expected start, use what extends our chain
     val usableOpt: Option[Seq[BlockHeader]] =
-      if headers.head.number == expectedStart then Some(headers)
-      else if headers.head.number < expectedStart && headers.last.number >= expectedStart then
+      if headers.head.number.value == expectedStart then Some(headers)
+      else if headers.head.number.value < expectedStart && headers.last.number.value >= expectedStart then
         // Response overlaps — trim to the portion we need
-        val trimmed = headers.dropWhile(_.number < expectedStart)
+        val trimmed = headers.dropWhile(_.number.value < expectedStart)
         log.debug(
           "Chain download: trimmed overlapping headers {}-{} to start at {} ({} usable)",
           headers.head.number,
@@ -474,7 +473,7 @@ class ChainDownloader private (
           trimmed.size
         )
         Some(trimmed)
-      else if headers.head.number > expectedStart then
+      else if headers.head.number.value > expectedStart then
         // Gap — can't use without the intervening headers
         log.debug(
           "Chain download: peer {} sent headers starting at {} but we need {} (gap)",
@@ -523,7 +522,7 @@ class ChainDownloader private (
               blockchainWriter
                 .storeBlockHeader(header)
                 .and(blockchainWriter.storeChainWeight(header.hash, parentWeight.increase(header)))
-                .and(appStateStorage.putBackfillBestHeader(header.number))
+                .and(appStateStorage.putBackfillBestHeader(header.number.value))
                 .commit()
 
               bodiesQueue :+= header.hash.value
@@ -556,7 +555,7 @@ class ChainDownloader private (
       // Store received bodies + atomically advance the body cursor (#1169).
       val received = requestedHashes.zip(bodies)
       val highestBodyNumber = received
-        .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number) }
+        .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number.value) }
         .maxOption
         .getOrElse(BigInt(0))
       val cursorUpdate =
@@ -612,7 +611,7 @@ class ChainDownloader private (
         // ahead of disk.
         val receiptsByHash = requestedHashes.zip(receiptsByBlock)
         val highestReceiptNumber = receiptsByHash
-          .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number) }
+          .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number.value) }
           .maxOption
           .getOrElse(BigInt(0))
 
@@ -696,7 +695,7 @@ class ChainDownloader private (
         // Store complete receipts + advance backfill cursor (#1169 pattern)
         if completeByHash.nonEmpty then
           val highestReceiptNumber = completeByHash
-            .flatMap { case (h, _) => blockchainReader.getBlockHeaderByHash(BlockHash(h)).map(_.number) }
+            .flatMap { case (h, _) => blockchainReader.getBlockHeaderByHash(BlockHash(h)).map(_.number.value) }
             .maxOption
             .getOrElse(BigInt(0))
 

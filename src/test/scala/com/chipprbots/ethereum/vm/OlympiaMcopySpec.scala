@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -29,10 +30,10 @@ class OlympiaMcopySpec extends AnyWordSpec with Matchers:
     val callerAddr: Address = Address(0xca11)
 
     val headerOlympia: BlockHeader =
-      BlockFixtures.ValidBlock.header.copy(number = Fixtures.OlympiaBlockNumber)
+      BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.OlympiaBlockNumber))
 
     val headerPreOlympia: BlockHeader =
-      BlockFixtures.ValidBlock.header.copy(number = Fixtures.SpiralBlockNumber)
+      BlockFixtures.ValidBlock.header.copy(number = BlockNumber(Fixtures.SpiralBlockNumber))
 
     // Non-overlapping copy: copy 32 bytes from offset 0 to offset 32
     // First MSTORE 0xAA..AA at offset 0, then MCOPY from 0→32 for 32 bytes

@@ -94,7 +94,7 @@ class DebugServiceSpec
       remoteStatus = peerStatus,
       chainWeight = peerStatus.chainWeight,
       forkAccepted = false,
-      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number,
+      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number.value,
       bestBlockHash = peerStatus.bestHash
     )
     val peer1Probe: TestProbe = TestProbe()

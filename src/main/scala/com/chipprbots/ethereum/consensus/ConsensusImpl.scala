@@ -74,7 +74,7 @@ class ConsensusImpl(
         IO.delay(importToTop(branch, currentBestBlockWeight)).evalOn(blockExecutionScheduler.compute)
       else
         IO
-          .delay(importToNewBranch(branch, currentBestHeader.number, currentBestBlockWeight))
+          .delay(importToNewBranch(branch, currentBestHeader.number.value, currentBestBlockWeight))
           .evalOn(blockExecutionScheduler.compute)
 
     consensusResult.flatTap(result => IO(measureBlockMetrics(result)))
@@ -124,7 +124,7 @@ class ConsensusImpl(
   private def saveLastBlock(blocks: List[BlockData]): Unit = blocks.lastOption.foreach(b =>
     blockchainWriter.saveBestKnownBlocks(
       b.block.hash,
-      b.block.number
+      b.block.number.value
     )
   )
 
@@ -156,7 +156,7 @@ class ConsensusImpl(
     val (executedBlocks, maybeError) = blockExecution.executeAndValidateBlocks(newBranch.toList, parentWeight)
 
     // Advance bestKnown to furthest successfully executed block (even on partial failure)
-    executedBlocks.lastOption.foreach(b => blockchainWriter.saveBestKnownBlocks(b.block.hash, b.block.number))
+    executedBlocks.lastOption.foreach(b => blockchainWriter.saveBestKnownBlocks(b.block.hash, b.block.number.value))
 
     maybeError match
       case None =>

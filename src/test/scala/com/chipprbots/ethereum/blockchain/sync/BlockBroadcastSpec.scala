@@ -17,6 +17,7 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast.BlockToBro
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
@@ -43,8 +44,9 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   ) in new TestSetup:
     // given
     // Block that should be sent as it's total difficulty is higher than known by peer
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber - 3)
-    val newBlockNewHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(blockHeader.hash.value, blockHeader.number)))
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(initialPeerInfo.maxBlockNumber - 3))
+    val newBlockNewHashes: NewBlockHashes =
+      NewBlockHashes(Seq(BlockHash(blockHeader.hash.value, blockHeader.number.value)))
     val chainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(2)
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
     val newBlockMsg: NewBlock = ETHPackets.NewBlock(block, chainWeight.totalDifficulty.value)
@@ -66,8 +68,9 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   ) in new TestSetup:
     // given
     // Block that should be sent as it's total difficulty is higher than known by peer
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber - 3)
-    val newBlockNewHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(blockHeader.hash.value, blockHeader.number)))
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(initialPeerInfo.maxBlockNumber - 3))
+    val newBlockNewHashes: NewBlockHashes =
+      NewBlockHashes(Seq(BlockHash(blockHeader.hash.value, blockHeader.number.value)))
     val peerInfo: PeerInfo = initialPeerInfo
       .copy(remoteStatus = peerStatus.copy(capability = Capability.ETH63))
       .withChainWeight(ChainWeight.totalDifficultyOnly(initialPeerInfo.chainWeight.totalDifficulty.value))
@@ -91,7 +94,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   ) in new TestSetup:
     // given
     // Block that shouldn't be sent as it's number and total difficulty is lower than known by peer
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber - 2)
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(initialPeerInfo.maxBlockNumber - 2))
     val chainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
@@ -109,8 +112,9 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     SyncTest
   ) in new TestSetup:
     // given
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber + 4)
-    val newBlockNewHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(blockHeader.hash.value, blockHeader.number)))
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(initialPeerInfo.maxBlockNumber + 4))
+    val newBlockNewHashes: NewBlockHashes =
+      NewBlockHashes(Seq(BlockHash(blockHeader.hash.value, blockHeader.number.value)))
     val chainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
     val newBlockMsg: NewBlock = ETHPackets.NewBlock(block, chainWeight.totalDifficulty.value)
@@ -132,7 +136,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   ) in new TestSetup:
     // given
     // Block should already be known by the peer due to max block known
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber - 2)
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(initialPeerInfo.maxBlockNumber - 2))
     val chainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
@@ -150,8 +154,9 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     SyncTest
   ) in new TestSetup:
     // given
-    val firstHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber + 4)
-    val firstBlockNewHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(firstHeader.hash.value, firstHeader.number)))
+    val firstHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(initialPeerInfo.maxBlockNumber + 4))
+    val firstBlockNewHashes: NewBlockHashes =
+      NewBlockHashes(Seq(BlockHash(firstHeader.hash.value, firstHeader.number.value)))
     val firstChainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
     val firstBlock: Block = Block(firstHeader, BlockBody(Nil, Nil))
     val firstBlockMsg: NewBlock = ETHPackets.NewBlock(firstBlock, firstChainWeight.totalDifficulty.value)
@@ -218,7 +223,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
       bestBlockHash = eth69Status.bestHash
     )
     // Our block is behind the peer — should NOT be sent
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock - 100)
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peerLatestBlock - 100))
     val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt("99000000000000000000000000"))
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
@@ -251,8 +256,9 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
       bestBlockHash = eth69Status.bestHash
     )
     // Our block is ahead of the peer — should be sent
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock + 1)
-    val newBlockHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(blockHeader.hash.value, blockHeader.number)))
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peerLatestBlock + 1))
+    val newBlockHashes: NewBlockHashes =
+      NewBlockHashes(Seq(BlockHash(blockHeader.hash.value, blockHeader.number.value)))
     val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt("101000000000000000000000000"))
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
     val newBlockMsg: NewBlock = ETHPackets.NewBlock(block, ourChainWeight.totalDifficulty.value)
@@ -262,7 +268,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
       Map(peer.id -> PeerWithInfo(peer, eth69PeerInfo))
     )
 
-    val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), blockHeader.number, blockHeader.hash.value)
+    val expectedBru: BlockRangeUpdate =
+      ETH69.BlockRangeUpdate(BigInt(0), blockHeader.number.value, blockHeader.hash.value)
     networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockMsg, peer.id))
     networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockHashes, peer.id))
     networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(expectedBru, peer.id))
@@ -290,7 +297,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
       maxBlockNumber = peerLatestBlock,
       bestBlockHash = eth69Status.bestHash
     )
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock) // same block number
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peerLatestBlock)) // same block number
     val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt("100000000000000000000000001"))
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
@@ -353,11 +360,12 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     )
 
     // Our block is at sharedBlockNr (behind both peers by 1) but with heavier TD
-    val ourBlockHdr: BlockHeader = baseBlockHeader.copy(number = sharedBlockNr)
+    val ourBlockHdr: BlockHeader = baseBlockHeader.copy(number = BlockNumber(sharedBlockNr))
     val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(10001)) // heavier than peerTD
     val ourBlock: Block = Block(ourBlockHdr, BlockBody(Nil, Nil))
     val newBlockMsg: NewBlock = ETHPackets.NewBlock(ourBlock, ourChainWeight.totalDifficulty.value)
-    val newBlockHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(ourBlockHdr.hash.value, ourBlockHdr.number)))
+    val newBlockHashes: NewBlockHashes =
+      NewBlockHashes(Seq(BlockHash(ourBlockHdr.hash.value, ourBlockHdr.number.value)))
 
     blockBroadcast.broadcastBlock(
       BlockToBroadcast(ourBlock, ourChainWeight),
@@ -421,10 +429,11 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     )
 
     // Our block is ahead of both peers
-    val ourBlockHdr: BlockHeader = baseBlockHeader.copy(number = peerBlockNr + 1)
+    val ourBlockHdr: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peerBlockNr + 1))
     val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(9001))
     val ourBlock: Block = Block(ourBlockHdr, BlockBody(Nil, Nil))
-    val newBlockHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(ourBlockHdr.hash.value, ourBlockHdr.number)))
+    val newBlockHashes: NewBlockHashes =
+      NewBlockHashes(Seq(BlockHash(ourBlockHdr.hash.value, ourBlockHdr.number.value)))
 
     blockBroadcast.broadcastBlock(
       BlockToBroadcast(ourBlock, ourChainWeight),
@@ -456,7 +465,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     hashRecipients should contain(peer2.id)
 
     // BlockRangeUpdate to the ETH69 peer only
-    val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), ourBlockHdr.number, ourBlockHdr.hash.value)
+    val expectedBru: BlockRangeUpdate =
+      ETH69.BlockRangeUpdate(BigInt(0), ourBlockHdr.number.value, ourBlockHdr.hash.value)
     val bruRecipients: Set[PeerId] = messages.collect {
       case NetworkPeerManagerActor.SendMessageCmd(msg, id) if msg.underlyingMsg == expectedBru => id
     }
@@ -473,7 +483,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   ) in new TestSetup:
     val peerLatestBlock: BigInt = BigInt(1000)
     val eth69PeerInfo: PeerInfo = eth69PeerInfoAt(peerLatestBlock)
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock + 1)
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peerLatestBlock + 1))
     val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
@@ -496,7 +506,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   ) in new PoSTestSetup:
     val peerLatestBlock: BigInt = BigInt(1000)
     val eth69PeerInfo: PeerInfo = eth69PeerInfoAt(peerLatestBlock)
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock + 1)
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(peerLatestBlock + 1))
     val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
@@ -528,7 +538,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     // Broadcast 3 consecutive blocks
     val blocks: IndexedSeq[Block] = (1 to 3).map { i =>
-      val hdr = baseBlockHeader.copy(number = peerLatestBlock + i)
+      val hdr = baseBlockHeader.copy(number = BlockNumber(peerLatestBlock + i))
       Block(hdr, BlockBody(Nil, Nil))
     }
     blocks.foreach { block =>
@@ -558,7 +568,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(9999))
 
     def broadcastAt(n: Int): Unit =
-      val hdr = baseBlockHeader.copy(number = BigInt(n))
+      val hdr = baseBlockHeader.copy(number = BlockNumber(n))
       val block = Block(hdr, BlockBody(Nil, Nil))
       blockBroadcast.broadcastBlock(
         BlockToBroadcast(block, ourWeight),
@@ -596,7 +606,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
       val pm: TestProbe = TestProbe()(testKit.system.classicSystem)
       val bb = new BlockBroadcast(pm.ref, isPoWChain = isPoW)
 
-      val blockHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BigInt(1001))
+      val blockHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BlockNumber(1001))
       val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
       val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
@@ -639,7 +649,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     SyncTest
   ) in new TestSetup:
     // ETH68 peer — should get NewBlock + NewBlockHashes, but NO BlockRangeUpdate
-    val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber + 1)
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(initialPeerInfo.maxBlockNumber + 1))
     val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(initialPeerInfo.chainWeight.totalDifficulty.value + 1)
     val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
@@ -664,8 +674,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     SyncTest
   ) in new PoSTestSetup:
     // ETH68 peer from TestSetup (initialPeerInfo uses Capability.ETH68)
-    val header: BlockHeader = baseBlockHeader.copy(number = BigInt(999))
-    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(header.hash.value, header.number)))
+    val header: BlockHeader = baseBlockHeader.copy(number = BlockNumber(999))
+    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(header.hash.value, header.number.value)))
 
     blockBroadcast.announceCanonicalHead(header, Map(peer.id -> PeerWithInfo(peer, initialPeerInfo)))
 
@@ -678,8 +688,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   ) in new PoSTestSetup:
     val peerLatestBlock: BigInt = BigInt(500)
     val eth69Info: PeerInfo = eth69PeerInfoAt(peerLatestBlock)
-    val header: BlockHeader = baseBlockHeader.copy(number = BigInt(1000))
-    val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), header.number, header.hash.value)
+    val header: BlockHeader = baseBlockHeader.copy(number = BlockNumber(1000))
+    val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), header.number.value, header.hash.value)
 
     blockBroadcast.announceCanonicalHead(header, Map(peer.id -> PeerWithInfo(peer, eth69Info)))
 
@@ -699,8 +709,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
       maxBlockNumber = peerBlockNr
     )
     // Our head is behind the peer's reported block
-    val ourHeader: BlockHeader = baseBlockHeader.copy(number = BigInt(100))
-    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(ourHeader.hash.value, ourHeader.number)))
+    val ourHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(100))
+    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(ourHeader.hash.value, ourHeader.number.value)))
 
     blockBroadcast.announceCanonicalHead(ourHeader, Map(peer.id -> PeerWithInfo(peer, peerAheadInfo)))
 
@@ -728,7 +738,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
       remoteStatus = peerStatus,
       chainWeight = peerStatus.chainWeight,
       forkAccepted = false,
-      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number,
+      maxBlockNumber = Fixtures.Blocks.Block3125369.header.number.value,
       bestBlockHash = peerStatus.bestHash
     )
 

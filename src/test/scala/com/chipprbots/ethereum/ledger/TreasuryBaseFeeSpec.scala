@@ -59,8 +59,8 @@ class TreasuryBaseFeeSpec extends AnyFlatSpec with Matchers with MockFactory:
       Block(
         header = Fixtures.Blocks.Genesis.header.copy(
           beneficiary = miner.bytes,
-          number = number,
-          gasUsed = gasUsed,
+          number = BlockNumber(number),
+          gasUsed = GasAmount(gasUsed),
           extraFields = extraFields
         ),
         body = BlockBody(Nil, Nil)

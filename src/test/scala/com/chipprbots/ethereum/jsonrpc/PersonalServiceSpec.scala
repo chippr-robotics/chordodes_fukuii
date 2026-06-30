@@ -516,7 +516,7 @@ class PersonalServiceSpec
         txPoolConfig,
         new BlockchainConfigBuilder with com.chipprbots.ethereum.TestInstanceConfigProvider:
           override def blockchainConfig: BlockchainConfig = BlockchainConfig(
-            chainId = chainId,
+            chainId = ChainId(chainId),
             // unused
             networkId = 1,
             maxCodeSize = None,

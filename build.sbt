@@ -531,7 +531,6 @@ addCommandAlias(
 // testStandard - Tier 2: Standard tests (< 30 minutes)
 // Runs unit and integration tests. Excludes only Tier 3 tests:
 // BenchmarkTest/EthereumTest: the 3-hour compliance suite — belongs in testComprehensive only.
-// SyncTest: timeout-prone actor choreography, excluded for the same reason testEssential excludes it (ADR-017).
 addCommandAlias(
   "testStandard",
   """; compile-all

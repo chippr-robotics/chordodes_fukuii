@@ -129,7 +129,7 @@ class EthBlocksService(
     // (a) it lives at its advertised number in the canonical index, or (b) it's a known
     // sidechain (has receipts stored, i.e. was fully executed on the fork-choice sidechain path).
     val isExposed = blockOpt.exists { b =>
-      blockchainReader.getBlockHeaderByNumber(b.header.number).exists(_.hash == b.header.hash) ||
+      blockchainReader.getBlockHeaderByNumber(b.header.number.value).exists(_.hash == b.header.hash) ||
       blockchainReader.getReceiptsByHash(b.header.hash).isDefined
     }
     val blockResponseOpt =
@@ -268,7 +268,7 @@ class EthBlocksService(
 
   def feeHistory(req: FeeHistoryRequest): ServiceResponse[FeeHistoryResponse] = IO {
     val bestBlock = blockchainReader.getBestBlockNumber
-    val newestBlockNum = resolveBlock(req.newestBlock).toOption.map(_.block.header.number).getOrElse(bestBlock)
+    val newestBlockNum = resolveBlock(req.newestBlock).toOption.map(_.block.header.number.value).getOrElse(bestBlock)
     val count = req.blockCount.min(1024).toInt
     val oldestBlock = (newestBlockNum - count + 1).max(0)
 
@@ -280,7 +280,7 @@ class EthBlocksService(
       blockchainReader
         .getBlockHeaderByNumber(num)
         .map { h =>
-          if h.gasLimit > 0 then h.gasUsed.toDouble / h.gasLimit.toDouble else 0.0
+          if h.gasLimit > GasAmount.Zero then h.gasUsed.value.toDouble / h.gasLimit.value.toDouble else 0.0
         }
         .getOrElse(0.0)
     }.toSeq

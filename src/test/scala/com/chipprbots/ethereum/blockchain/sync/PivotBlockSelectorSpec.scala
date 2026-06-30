@@ -20,6 +20,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.PivotBlockSelector
 import com.chipprbots.ethereum.blockchain.sync.fast.PivotBlockSelector.Result
 import com.chipprbots.ethereum.blockchain.sync.fast.PivotBlockSelector.SelectPivotBlock
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
@@ -260,7 +261,7 @@ class PivotBlockSelectorSpec
     // peer responds with block header number
     pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
       MessageFromPeer(
-        BlockHeaders(BigInt(0), Seq(pivotBlockHeader.copy(number = expectedPivotBlock + 1))),
+        BlockHeaders(BigInt(0), Seq(pivotBlockHeader.copy(number = BlockNumber(expectedPivotBlock + 1)))),
         peer1.id
       )
     )
@@ -433,7 +434,7 @@ class PivotBlockSelectorSpec
     SyncTest
   ) in new TestSetup:
     updateHandshakedPeers(
-      HandshakedPeers(allPeers.updated(peer1, allPeers(peer1).copy(maxBlockNumber = expectedPivotBlock - 1)))
+      HandshakedPeers(allPeers.updated(peer1, allPeers(peer1).copy(maxBlockNumber = BigInt(expectedPivotBlock - 1))))
     )
 
     pivotBlockSelector ! SelectPivotBlock
@@ -496,7 +497,7 @@ class PivotBlockSelectorSpec
     override val peersToChoosePivotBlockMargin = 1
 
     // ETH69 G5 — elected pivot is block 900; resolve it canonically for the backlink match.
-    val pivot900: BlockHeader = baseBlockHeader.copy(number = 900)
+    val pivot900: BlockHeader = baseBlockHeader.copy(number = BlockNumber(900))
     canonicalByNumber = n => if n == BigInt(900) then Some(pivot900) else None
 
     updateHandshakedPeers(
@@ -522,13 +523,13 @@ class PivotBlockSelectorSpec
 
     // Collecting pivot block (for voting)
     pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
-      MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer1.id)
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = BlockNumber(900)))), peer1.id)
     )
     pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
-      MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer3.id)
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = BlockNumber(900)))), peer3.id)
     )
     pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
-      MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer4.id)
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = BlockNumber(900)))), peer4.id)
     )
 
     expectUnsubscribeCmds(
@@ -710,7 +711,7 @@ class PivotBlockSelectorSpec
       val chain: Seq[BlockHeader] = reverseChain(expectedPivotBlock, depth = 5)
       val pivot: BlockHeader = chain.head
       val anchor: BlockHeader = chain.last // pivot-4
-      canonicalByNumber = n => if n == anchor.number then Some(anchor) else None
+      canonicalByNumber = n => if n == anchor.number.value then Some(anchor) else None
 
       electUnanimousPivot(this, pivot)
       expectBacklinkProbe(pivot, Seq(peer1, peer2, peer3))
@@ -727,7 +728,7 @@ class PivotBlockSelectorSpec
     val chain: Seq[BlockHeader] = reverseChain(expectedPivotBlock, depth = depth)
     val pivot: BlockHeader = chain.head
     val anchor: BlockHeader = chain.last // pivot - (N-1), the deepest returned header
-    canonicalByNumber = n => if n == anchor.number then Some(anchor) else None
+    canonicalByNumber = n => if n == anchor.number.value then Some(anchor) else None
 
     electUnanimousPivot(this, pivot)
     expectBacklinkProbe(pivot, Seq(peer1, peer2, peer3))
@@ -770,7 +771,7 @@ class PivotBlockSelectorSpec
     val pivot: BlockHeader = chain.head
     val anchor: BlockHeader = chain.last
     // Even though a canonical match exists, forged PoW must reject the chain before the canonical check.
-    canonicalByNumber = n => if n == anchor.number then Some(anchor) else None
+    canonicalByNumber = n => if n == anchor.number.value then Some(anchor) else None
     // The third returned header (pivot-2) has invalid PoW.
     val forged: BlockHeader = chain(2)
     validateHeaderPoWFn = h => h.hash != forged.hash
@@ -990,13 +991,13 @@ class PivotBlockSelectorSpec
     // Ask for pivot block header (the best block from the best peer - offset)
     val expectedPivotBlock: Int = bestBlock - syncConfig.pivotBlockOffset
 
-    val pivotBlockHeader: BlockHeader = baseBlockHeader.copy(number = expectedPivotBlock)
+    val pivotBlockHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(expectedPivotBlock))
     val differentBlockHeader: BlockHeader =
-      baseBlockHeader.copy(number = expectedPivotBlock, extraData = ByteString("different"))
+      baseBlockHeader.copy(number = BlockNumber(expectedPivotBlock), extraData = ByteString("different"))
     val anotherDifferentBlockHeader: BlockHeader =
-      baseBlockHeader.copy(number = expectedPivotBlock, extraData = ByteString("different2"))
+      baseBlockHeader.copy(number = BlockNumber(expectedPivotBlock), extraData = ByteString("different2"))
     val nextAnotherDifferentBlockHeader: BlockHeader =
-      baseBlockHeader.copy(number = expectedPivotBlock, extraData = ByteString("different3"))
+      baseBlockHeader.copy(number = BlockNumber(expectedPivotBlock), extraData = ByteString("different3"))
 
     val peer1TestProbe: TestProbe = TestProbe("peer1")(classicSystem)
     val peer2TestProbe: TestProbe = TestProbe("peer2")(classicSystem)
@@ -1133,7 +1134,7 @@ class PivotBlockSelectorSpec
       * by the happy-path electing tests so the backlink probe confirms on the pivot header itself.
       */
     def canonicalReturningPivot: BigInt => Option[BlockHeader] =
-      n => if n == pivotBlockHeader.number then Some(pivotBlockHeader) else None
+      n => if n == pivotBlockHeader.number.value then Some(pivotBlockHeader) else None
 
     /** ETH69 G5 — build a reverse-ordered, parentHash-linked header chain with its tip at `tipNum`, walking back
       * `depth` blocks (so the returned Seq is [tip, tip-1, ..., tip-depth+1]). Each header's parentHash points at the
@@ -1146,6 +1147,10 @@ class PivotBlockSelectorSpec
       val oldestNum = tipNum - depth + 1
       val ascending = (oldestNum to tipNum).foldLeft(Vector.empty[BlockHeader]) { (acc, n) =>
         val parentHash = acc.lastOption.map(_.hash).getOrElse(BlockHash(ByteString("genesis-parent")))
-        acc :+ baseBlockHeader.copy(number = n, parentHash = parentHash, extraData = ByteString(s"backlink-$n"))
+        acc :+ baseBlockHeader.copy(
+          number = BlockNumber(n),
+          parentHash = parentHash,
+          extraData = ByteString(s"backlink-$n")
+        )
       }
       ascending.reverse

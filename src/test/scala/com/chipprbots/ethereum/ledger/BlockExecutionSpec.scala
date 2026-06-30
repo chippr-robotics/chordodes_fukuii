@@ -65,7 +65,7 @@ class BlockExecutionSpec
           )
         )
 
-        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(block1.header.number)
+        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(block1.header.number.value)
         val newMining: TestMining = mining.withVM(vm).withValidators(mockValidators)
         override lazy val blockValidation =
           new BlockValidation(newMining, blockchainReader, BlockQueue(blockchainReader, syncConfig))
@@ -106,7 +106,7 @@ class BlockExecutionSpec
             addressesToDelete = defaultAddressesToDelete
           )
         )
-        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(block2.header.number)
+        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(block2.header.number.value)
         val newMining: TestMining = mining.withVM(mockVm).withValidators(mockValidators)
         override lazy val blockValidation =
           new BlockValidation(newMining, blockchainReader, BlockQueue(blockchainReader, syncConfig))
@@ -140,7 +140,7 @@ class BlockExecutionSpec
             addressesToDelete = defaultAddressesToDelete
           )
         )
-        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(chain.last.number)
+        val mockValidators = new MockValidatorsFailOnSpecificBlockNumber(chain.last.number.value)
         val newMining: TestMining = mining.withVM(mockVm).withValidators(mockValidators)
         override lazy val blockValidation =
           new BlockValidation(newMining, blockchainReader, BlockQueue(blockchainReader, syncConfig))
@@ -214,7 +214,7 @@ class BlockExecutionSpec
 
         val transaction: Transaction = validStxSignedByOrigin.tx
         // Check valid world
-        val minerPaymentForTxs: UInt256 = UInt256(transaction.gasLimit * transaction.gasPrice)
+        val minerPaymentForTxs: UInt256 = UInt256(transaction.gasLimit.value * transaction.gasPrice.value)
         val changes: Seq[(Address, IncreaseNonce.type | UpdateBalance)] = Seq(
           originAddress -> IncreaseNonce,
           originAddress -> UpdateBalance(-minerPaymentForTxs), // Origin payment for tx execution and nonce increase
@@ -224,7 +224,7 @@ class BlockExecutionSpec
         expectedStateRoot shouldBe InMemoryWorldStateProxy.persistState(resultingWorldState).stateRootHash
 
         // Check valid gasUsed
-        resultingGasUsed shouldBe transaction.gasLimit
+        resultingGasUsed shouldBe transaction.gasLimit.value
 
         // Check valid receipts
         resultingReceipts.size shouldBe 1
@@ -248,13 +248,13 @@ class BlockExecutionSpec
           )
 
         forAll(table) { (gasLimit, logs, addressesToDelete, txValidAccordingToValidators) =>
-          val tx = validTx.copy(gasLimit = gasLimit)
+          val tx = validTx.copy(gasLimit = GasAmount(gasLimit))
           val stx = SignedTransactionWithSender(
-            SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId)),
+            SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value)),
             Address(originKeyPair)
           )
 
-          val blockHeader: BlockHeader = validBlockHeader.copy(gasLimit = gasLimit)
+          val blockHeader: BlockHeader = validBlockHeader.copy(gasLimit = GasAmount(gasLimit))
           val blockBodyWithTxs: BlockBody = validBlockBodyWithNoTxs.copy(transactionList = Seq(stx.tx))
           val block = Block(blockHeader, blockBodyWithTxs)
 
@@ -292,7 +292,7 @@ class BlockExecutionSpec
 
             val transaction = stx.tx.tx
             // Check valid world
-            val minerPaymentForTxs = UInt256(transaction.gasLimit * transaction.gasPrice)
+            val minerPaymentForTxs = UInt256(transaction.gasLimit.value * transaction.gasPrice.value)
             val changes = Seq(
               originAddress -> IncreaseNonce,
               originAddress -> UpdateBalance(-minerPaymentForTxs), // Origin payment for tx execution and nonce increase
@@ -302,7 +302,7 @@ class BlockExecutionSpec
             expectedStateRoot shouldBe InMemoryWorldStateProxy.persistState(resultingWorldState).stateRootHash
 
             // Check valid gasUsed
-            resultingGasUsed shouldBe stx.tx.tx.gasLimit
+            resultingGasUsed shouldBe stx.tx.tx.gasLimit.value
 
             // Check valid receipts
             resultingReceipts.size shouldBe 1
@@ -364,14 +364,14 @@ class BlockExecutionSpec
         val ommersAddresses = (0 until ommersSize).map(i => Address(i.toByte +: Hex.decode("10")))
 
         val blockReward =
-          mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number, ommersSize)
+          mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number.value, ommersSize)
 
         val changes = Seq(
           minerAddress -> UpdateBalance(UInt256(blockReward))
         ) ++ ommersAddresses.map { ommerAddress =>
           val ommerReward = mining.blockPreparator.blockRewardCalculator.calculateOmmerRewardForInclusion(
-            validBlockHeader.number,
-            validBlockHeader.number - ommersBlockDifference
+            validBlockHeader.number.value,
+            validBlockHeader.number.value - ommersBlockDifference
           )
           ommerAddress -> UpdateBalance(UInt256(ommerReward))
         }
@@ -382,7 +382,7 @@ class BlockExecutionSpec
         val blockBodyWithOmmers = validBlockBodyWithNoTxs.copy(
           uncleNodesList = ommersAddresses.map(ommerAddress =>
             defaultBlockHeader.copy(
-              number = blockHeader.number - ommersBlockDifference,
+              number = BlockNumber(blockHeader.number.value - ommersBlockDifference),
               beneficiary = ommerAddress.bytes
             )
           )
@@ -425,7 +425,7 @@ class BlockExecutionSpec
       )
 
       val blockReward: BigInt =
-        mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number, 0)
+        mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number.value, 0)
 
       val changes: Seq[(Address, UpdateBalance)] = Seq(
         minerAddress -> UpdateBalance(UInt256(blockReward)) // Paying miner for block processing
@@ -474,7 +474,7 @@ class BlockExecutionSpec
       )
 
       val blockReward: BigInt =
-        mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number, 0)
+        mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number.value, 0)
 
       val changes: Seq[(Address, UpdateBalance)] =
         Seq(minerAddress -> UpdateBalance(UInt256(blockReward))) // Paying miner for block processing
@@ -493,7 +493,7 @@ class BlockExecutionSpec
       forAll(table) { (stateRootHash, cumulativeGasUsedBlock, validators) =>
         val blockExecution = mkBlockExecution(validators = validators)
         val blockHeader: BlockHeader =
-          validBlockHeader.copy(gasUsed = cumulativeGasUsedBlock, stateRoot = TrieRoot(stateRootHash))
+          validBlockHeader.copy(gasUsed = GasAmount(cumulativeGasUsedBlock), stateRoot = TrieRoot(stateRootHash))
         val block = Block(blockHeader, validBlockBodyWithNoTxs)
 
         val blockExecResult = blockExecution.executeAndValidateBlock(block)
@@ -526,18 +526,22 @@ class BlockExecutionSpec
         def keyPair(address: Address): AsymmetricCipherKeyPair =
           if address == originAddress then originKeyPair else receiverKeyPair
 
-        val tx1 = validTx.copy(value = 100, receivingAddress = Some(receiver1Address), gasLimit = defaultGasLimit)
+        val tx1 = validTx.copy(
+          value = 100,
+          receivingAddress = Some(receiver1Address),
+          gasLimit = GasAmount(defaultGasLimit.toBigInt)
+        )
         val tx2 = validTx.copy(
           value = 50,
           receivingAddress = Some(receiver2Address),
-          gasLimit = defaultGasLimit * 2,
+          gasLimit = GasAmount(defaultGasLimit.toBigInt * 2),
           nonce = validTx.nonce + (if origin1Address == origin2Address then 1 else 0)
         )
         val keyPair1 = keyPair(origin1Address)
         val keyPair2 = keyPair(origin2Address)
 
-        val st1 = SignedTransaction.sign(tx1, keyPair1, Some(blockchainConfig.chainId))
-        val st2 = SignedTransaction.sign(tx2, keyPair2, Some(blockchainConfig.chainId))
+        val st1 = SignedTransaction.sign(tx1, keyPair1, Some(blockchainConfig.chainId.value))
+        val st2 = SignedTransaction.sign(tx2, keyPair2, Some(blockchainConfig.chainId.value))
 
         val stx1 = SignedTransactionWithSender(st1, Address(keyPair1))
         val stx2 = SignedTransactionWithSender(st2, Address(keyPair2))
@@ -552,14 +556,14 @@ class BlockExecutionSpec
         val transaction1 = stx1.tx.tx
         val transaction2 = stx2.tx.tx
         // Check valid gasUsed
-        resultingGasUsed shouldBe transaction1.gasLimit + transaction2.gasLimit
+        resultingGasUsed shouldBe (transaction1.gasLimit + transaction2.gasLimit).value
 
         // Check valid receipts
         resultingReceipts.size shouldBe 2
         val Seq(receipt1, receipt2) = resultingReceipts
 
         // Check receipt1
-        val minerPaymentForTx1 = UInt256(transaction1.gasLimit * transaction1.gasPrice)
+        val minerPaymentForTx1 = UInt256(transaction1.gasLimit.value * transaction1.gasPrice.value)
         val changesTx1 = Seq(
           origin1Address -> IncreaseNonce,
           origin1Address -> UpdateBalance(-minerPaymentForTx1), // Origin payment for tx execution and nonce increase
@@ -570,12 +574,12 @@ class BlockExecutionSpec
         val LegacyReceipt(rootHashReceipt1, gasUsedReceipt1, logsBloomFilterReceipt1, logsReceipt1) =
           receipt1: @unchecked
         rootHashReceipt1 shouldBe HashOutcome(expectedStateRootTx1)
-        gasUsedReceipt1 shouldBe stx1.tx.tx.gasLimit
+        gasUsedReceipt1 shouldBe stx1.tx.tx.gasLimit.value
         logsBloomFilterReceipt1 shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(Nil))
         logsReceipt1 shouldBe Nil
 
         // Check receipt2
-        val minerPaymentForTx2 = UInt256(transaction2.gasLimit * transaction2.gasPrice)
+        val minerPaymentForTx2 = UInt256(transaction2.gasLimit.value * transaction2.gasPrice.value)
         val changesTx2 = Seq(
           origin2Address -> IncreaseNonce,
           origin2Address -> UpdateBalance(-minerPaymentForTx2), // Origin payment for tx execution and nonce increase
@@ -586,7 +590,7 @@ class BlockExecutionSpec
         val LegacyReceipt(rootHashReceipt2, gasUsedReceipt2, logsBloomFilterReceipt2, logsReceipt2) =
           receipt2: @unchecked
         rootHashReceipt2 shouldBe HashOutcome(expectedStateRootTx2)
-        gasUsedReceipt2 shouldBe (transaction1.gasLimit + transaction2.gasLimit)
+        gasUsedReceipt2 shouldBe (transaction1.gasLimit + transaction2.gasLimit).value
         logsBloomFilterReceipt2 shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(Nil))
         logsReceipt2 shouldBe Nil
 
@@ -594,14 +598,14 @@ class BlockExecutionSpec
         InMemoryWorldStateProxy.persistState(resultingWorldState).stateRootHash shouldBe expectedStateRootTx2
 
         val blockReward: BigInt =
-          mining.blockPreparator.blockRewardCalculator.calculateMiningReward(block.header.number, 0)
+          mining.blockPreparator.blockRewardCalculator.calculateMiningReward(block.header.number.value, 0)
         val changes = Seq(
           minerAddress -> UpdateBalance(UInt256(blockReward))
         )
         val blockExpectedStateRoot = applyChanges(expectedStateRootTx2, changes)
 
         val blockWithCorrectStateAndGasUsed = block.copy(
-          header = block.header.copy(stateRoot = TrieRoot(blockExpectedStateRoot), gasUsed = gasUsedReceipt2)
+          header = block.header.copy(stateRoot = TrieRoot(blockExpectedStateRoot), gasUsed = GasAmount(gasUsedReceipt2))
         )
         assert(blockExecution.executeAndValidateBlock(blockWithCorrectStateAndGasUsed).isRight)
       }

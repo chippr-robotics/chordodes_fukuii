@@ -19,11 +19,13 @@ import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.Receipt
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.branch.Branch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
 import com.chipprbots.ethereum.domain.BlockHash
@@ -41,15 +43,15 @@ class BranchResolutionSpec
 
     "check if headers are from chain" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
       val branchResolution = new BranchResolution(blockchainReader)
-      val parent: BlockHeader = defaultBlockHeader.copy(number = 1)
-      val child: BlockHeader = defaultBlockHeader.copy(number = 2, parentHash = parent.hash)
+      val parent: BlockHeader = defaultBlockHeader.copy(number = BlockNumber(1))
+      val child: BlockHeader = defaultBlockHeader.copy(number = BlockNumber(2), parentHash = parent.hash)
       branchResolution.doHeadersFormChain(NonEmptyList.of(parent, child)) shouldBe true
 
     "check if headers are not from chain" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
       val branchResolution = new BranchResolution(blockchainReader)
-      val parent: BlockHeader = defaultBlockHeader.copy(number = 1)
-      val otherParent: BlockHeader = defaultBlockHeader.copy(number = 3)
-      val child: BlockHeader = defaultBlockHeader.copy(number = 2, parentHash = parent.hash)
+      val parent: BlockHeader = defaultBlockHeader.copy(number = BlockNumber(1))
+      val otherParent: BlockHeader = defaultBlockHeader.copy(number = BlockNumber(3))
+      val child: BlockHeader = defaultBlockHeader.copy(number = BlockNumber(2), parentHash = parent.hash)
       branchResolution.doHeadersFormChain(NonEmptyList.of(otherParent, child)) shouldBe false
 
     "report an invalid branch when headers do not form a chain" in new BranchResolutionTestSetupImpl:
@@ -73,7 +75,7 @@ class BranchResolutionSpec
         setChainWeightByHash(headers.head.parentHash.value, ChainWeight.zero)
 
         val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash.value, headers.head.difficulty.value - 1)
-        oldBlocks.map(b => setBlockByNumber(b.header.number, Some(b)))
+        oldBlocks.map(b => setBlockByNumber(b.header.number.value, Some(b)))
 
         branchResolution.resolveBranch(headers) shouldEqual NewBetterBranch(oldBlocks)
 
@@ -86,7 +88,7 @@ class BranchResolutionSpec
         setChainWeightByHash(headers.head.parentHash.value, ChainWeight.zero)
 
         val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash.value, headers.head.difficulty.value)
-        oldBlocks.map(b => setBlockByNumber(b.header.number, Some(b)))
+        oldBlocks.map(b => setBlockByNumber(b.header.number.value, Some(b)))
 
         branchResolution.resolveBranch(headers) shouldEqual NoChainSwitch
 
@@ -100,7 +102,7 @@ class BranchResolutionSpec
       setBlockByNumber(0, Some(Block(genesisHeader, BlockBody(Nil, Nil))))
 
       val oldBlocks: List[Block] = getChain(1, 10, genesisHeader.hash.value, headers.tail.head.difficulty.value - 1)
-      oldBlocks.foreach(b => setBlockByNumber(b.header.number, Some(b)))
+      oldBlocks.foreach(b => setBlockByNumber(b.header.number.value, Some(b)))
 
       branchResolution.resolveBranch(headers) shouldEqual NewBetterBranch(oldBlocks)
 
@@ -123,7 +125,7 @@ class BranchResolutionSpec
       setChainWeightByHash(commonParent.hash.value, ChainWeight.zero)
 
       val oldBlocks: List[Block] = getChain(3, 8, commonParent.hash.value)
-      oldBlocks.foreach(b => setBlockByNumber(b.header.number, Some(b)))
+      oldBlocks.foreach(b => setBlockByNumber(b.header.number.value, Some(b)))
 
       setBlockByNumber(1, Some(Block(headers.head, BlockBody(Nil, Nil))))
       setBlockByNumber(2, Some(Block(headers.tail.head, BlockBody(Nil, Nil))))
@@ -139,8 +141,8 @@ class BranchResolutionSpec
 
       setHeaderInChain(commonParent.hash.value)
       setChainWeightForBlock(commonParent, parentWeight)
-      setBestBlockNumber(longerBranchLowerWeight.last.number)
-      longerBranchLowerWeight.foreach(b => setBlockByNumber(b.number, Some(b)))
+      setBestBlockNumber(longerBranchLowerWeight.last.number.value)
+      longerBranchLowerWeight.foreach(b => setBlockByNumber(b.number.value, Some(b)))
 
       branchResolution.resolveBranch(shorterBranchHigherWeight.map(_.header)) shouldEqual NewBetterBranch(
         longerBranchLowerWeight
@@ -214,7 +216,7 @@ class BranchResolutionSpec
     ) in new MessTestSetup:
       setBestBlockNumber(5)
       setChainWeightByHash(commonParentHash, ChainWeight.zero)
-      val earlyBlock: Block = Block(oldBlock.header.copy(number = 5), oldBlock.body)
+      val earlyBlock: Block = Block(oldBlock.header.copy(number = BlockNumber(5)), oldBlock.body)
       setBlockByNumber(5, Some(earlyBlock))
       // Activation at block 1000 — block 5 is before it, so MESS should not fire
       branchResolution.messConfig = Some(
@@ -241,7 +243,7 @@ class BranchResolutionSpec
         deactivationBlock = Some(BigInt(19_250_000)),
         reactivationBlock = None
       )
-      val deactivatedBlock: Block = Block(oldBlock.header.copy(number = BigInt(20_000_000)), oldBlock.body)
+      val deactivatedBlock: Block = Block(oldBlock.header.copy(number = BlockNumber(BigInt(20_000_000))), oldBlock.body)
 
       setBestBlockNumber(BigInt(20_000_000))
       setChainWeightByHash(commonParentHash, ChainWeight.zero)
@@ -261,7 +263,7 @@ class BranchResolutionSpec
         reactivationBlock = Some(BigInt(25_000_000)) // Olympia reactivation
       )
       val olympiaBlock: Block = Block(
-        oldBlock.header.copy(number = BigInt(25_000_001), unixTimestamp = headTs),
+        oldBlock.header.copy(number = BlockNumber(BigInt(25_000_001)), unixTimestamp = Timestamp(headTs)),
         oldBlock.body
       )
 
@@ -322,7 +324,7 @@ class BranchResolutionSpec
       // Best block is 5; new header extends at 6 — no old blocks displaced
       val newHeader: BlockHeader =
         Block(
-          defaultHeader.copy(number = 6, difficulty = Difficulty.Zero, parentHash = BlockHash(parentHash)),
+          defaultHeader.copy(number = BlockNumber(6), difficulty = Difficulty.Zero, parentHash = BlockHash(parentHash)),
           BlockBody(Nil, Nil)
         ).header
       val parentWeight: ChainWeight = ChainWeight.totalDifficultyOnly(1000)
@@ -374,7 +376,7 @@ class BranchResolutionSpec
 
     override def setBestBlock(block: Block): CallHandler0[BigInt] =
       (() => blockchainReader.getBestBlock).expects().anyNumberOfTimes().returning(Some(block))
-      (() => blockchainReader.getBestBlockNumber).expects().anyNumberOfTimes().returning(block.header.number)
+      (() => blockchainReader.getBestBlockNumber).expects().anyNumberOfTimes().returning(block.header.number.value)
 
     override def setBestBlockNumber(num: BigInt): CallHandler0[BigInt] =
       (() => blockchainReader.getBestBlockNumber).expects().returning(num)
@@ -430,7 +432,7 @@ class BranchResolutionSpec
     /** Single canonical block at height 10 with difficulty=100 and a controlled timestamp. */
     val oldBlock: Block =
       val b = getBlock(number = 10, difficulty = 100, parent = commonParentHash)
-      Block(b.header.copy(unixTimestamp = headTs), b.body)
+      Block(b.header.copy(unixTimestamp = Timestamp(headTs)), b.body)
 
     /** Standard ETC/Mordor MESS config: active from block 10, no deactivation. */
     val ETCMessConfig: MESSConfig = MESSConfig(
@@ -444,4 +446,4 @@ class BranchResolutionSpec
     def expectAncestorHeader(ts: Long = ancestorTs): Unit =
       blockchainReader.getBlockHeaderByHash
         .expects(BlockHash(commonParentHash))
-        .returning(Some(defaultHeader.copy(number = 9, unixTimestamp = ts)))
+        .returning(Some(defaultHeader.copy(number = BlockNumber(9), unixTimestamp = Timestamp(ts))))

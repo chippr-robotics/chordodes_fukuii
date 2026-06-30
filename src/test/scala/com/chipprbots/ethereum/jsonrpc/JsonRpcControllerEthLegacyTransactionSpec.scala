@@ -61,7 +61,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     val txIndexToRequest: Int = blockToRequest.body.transactionList.size / 2
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getTransactionByBlockHashAndIndex",
@@ -86,7 +86,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     val txIndexToRequest: Int = blockToRequest.body.transactionList.size / 2
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getRawTransactionByBlockHashAndIndex",
@@ -143,7 +143,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     val txIndex = 1
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getTransactionByBlockNumberAndIndex",
@@ -165,11 +165,14 @@ class JsonRpcControllerEthLegacyTransactionSpec
     RPCTest
   ) in new JsonRpcControllerFixture:
     val blockToRequest: Block =
-      Block(Fixtures.Blocks.Block3125369.header.copy(number = BigInt(0xc005)), Fixtures.Blocks.Block3125369.body)
+      Block(
+        Fixtures.Blocks.Block3125369.header.copy(number = BlockNumber(BigInt(0xc005))),
+        Fixtures.Blocks.Block3125369.body
+      )
     val txIndex = 1
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getTransactionByBlockNumberAndIndex",
@@ -194,12 +197,12 @@ class JsonRpcControllerEthLegacyTransactionSpec
     val txIndex = 1
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getTransactionByBlockNumberAndIndex",
       List(
-        JInt(Fixtures.Blocks.Block3125369.header.number),
+        JInt(Fixtures.Blocks.Block3125369.header.number.value),
         JString(s"0x${Hex.toHexString(BigInt(txIndex).toByteArray)}")
       )
     )
@@ -220,7 +223,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     val txIndex = 1
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getRawTransactionByBlockNumberAndIndex",
@@ -244,11 +247,14 @@ class JsonRpcControllerEthLegacyTransactionSpec
   ) in new JsonRpcControllerFixture:
     // given
     val blockToRequest: Block =
-      Block(Fixtures.Blocks.Block3125369.header.copy(number = BigInt(0xc005)), Fixtures.Blocks.Block3125369.body)
+      Block(
+        Fixtures.Blocks.Block3125369.header.copy(number = BlockNumber(BigInt(0xc005))),
+        Fixtures.Blocks.Block3125369.body
+      )
     val txIndex = 1
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getRawTransactionByBlockNumberAndIndex",
@@ -274,12 +280,12 @@ class JsonRpcControllerEthLegacyTransactionSpec
     val txIndex = 1
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getRawTransactionByBlockNumberAndIndex",
       List(
-        JInt(Fixtures.Blocks.Block3125369.header.number),
+        JInt(Fixtures.Blocks.Block3125369.header.number.value),
         JString(s"0x${Hex.toHexString(BigInt(txIndex).toByteArray)}")
       )
     )
@@ -354,7 +360,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
 
     blockchainWriter.storeBlock(blockToRequest).commit()
-    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
+    blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number.value)
 
     val rpcRequest: JsonRpcRequest = newJsonRpcRequest(
       "eth_getBlockTransactionCountByHash",
@@ -378,7 +384,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
           TransactionReceiptResponse(
             transactionHash = ByteString(Hex.decode("23" * 32)),
             transactionIndex = 1,
-            blockNumber = Fixtures.Blocks.Block3125369.header.number,
+            blockNumber = Fixtures.Blocks.Block3125369.header.number.value,
             blockHash = Fixtures.Blocks.Block3125369.header.hash.value,
             from = Address(arbitraryValue1),
             to = None,
@@ -391,7 +397,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
                 transactionIndex = 1,
                 transactionHash = ByteString(Hex.decode("23" * 32)),
                 blockHash = Fixtures.Blocks.Block3125369.header.hash.value,
-                blockNumber = Fixtures.Blocks.Block3125369.header.number,
+                blockNumber = Fixtures.Blocks.Block3125369.header.number.value,
                 address = Address(arbitraryValue),
                 data = ByteString(Hex.decode("43" * 32)),
                 topics = Seq(ByteString(Hex.decode("44" * 32)), ByteString(Hex.decode("45" * 32)))
@@ -470,7 +476,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
           TransactionReceiptResponse(
             transactionHash = ByteString(Hex.decode("23" * 32)),
             transactionIndex = 1,
-            blockNumber = Fixtures.Blocks.Block3125369.header.number,
+            blockNumber = Fixtures.Blocks.Block3125369.header.number.value,
             blockHash = Fixtures.Blocks.Block3125369.header.hash.value,
             from = Address(arbitraryValue1),
             to = None,
@@ -483,7 +489,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
                 transactionIndex = 1,
                 transactionHash = ByteString(Hex.decode("23" * 32)),
                 blockHash = Fixtures.Blocks.Block3125369.header.hash.value,
-                blockNumber = Fixtures.Blocks.Block3125369.header.number,
+                blockNumber = Fixtures.Blocks.Block3125369.header.number.value,
                 address = Address(arbitraryValue),
                 data = ByteString(Hex.decode("43" * 32)),
                 topics = Seq(ByteString(Hex.decode("44" * 32)), ByteString(Hex.decode("45" * 32)))
@@ -581,8 +587,8 @@ class JsonRpcControllerEthLegacyTransactionSpec
       val fakeTransaction = SignedTransactionWithSender(
         LegacyTransaction(
           nonce = 0,
-          gasPrice = 123,
-          gasLimit = 123,
+          gasPrice = GasPrice(123),
+          gasLimit = GasAmount(123),
           receivingAddress = Address("0x1234"),
           value = 0,
           payload = ByteString()

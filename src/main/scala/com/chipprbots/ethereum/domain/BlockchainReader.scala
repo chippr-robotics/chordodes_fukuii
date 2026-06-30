@@ -144,8 +144,8 @@ class BlockchainReader(
   def isInChain(branch: Branch, hash: BlockHash): Boolean = branch match
     case BestBranch(_, tipBlockNumber) =>
       (for
-        header <- getBlockHeaderByHash(hash) if header.number <= tipBlockNumber
-        hashFromBestChain <- getHashByBlockNumber(branch, header.number)
+        header <- getBlockHeaderByHash(hash) if header.number.value <= tipBlockNumber
+        hashFromBestChain <- getHashByBlockNumber(branch, header.number.value)
       yield header.hash == hashFromBestChain).getOrElse(false)
     case EmptyBranch => false
 

@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import com.chipprbots.ethereum.domain.ChainId
 import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
@@ -23,7 +24,7 @@ class ChainConfigValidationSpec extends AnyFlatSpec with Matchers:
   // ===== ETC Mainnet Chain Identity =====
 
   "ETC mainnet config" should "have correct chain ID and network ID" taggedAs (UnitTest, ConsensusTest) in {
-    etcConfig.chainId shouldBe 61
+    etcConfig.chainId shouldBe ChainId(61)
     etcConfig.networkId shouldBe 1
   }
 
@@ -97,7 +98,7 @@ class ChainConfigValidationSpec extends AnyFlatSpec with Matchers:
   // ===== Mordor Chain Identity =====
 
   "Mordor config" should "have correct chain ID and network ID" taggedAs (UnitTest, ConsensusTest) in {
-    mordorConfig.chainId shouldBe 63
+    mordorConfig.chainId shouldBe ChainId(63)
     mordorConfig.networkId shouldBe 7
   }
 

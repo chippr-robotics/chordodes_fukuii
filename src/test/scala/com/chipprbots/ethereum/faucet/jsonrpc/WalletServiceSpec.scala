@@ -18,6 +18,8 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.faucet.FaucetConfig
@@ -50,8 +52,8 @@ class WalletServiceSpec extends AnyFlatSpec with Matchers with MockFactory:
     val tx: SignedTransactionWithSender = wallet.signTx(
       LegacyTransaction(
         currentNonce,
-        config.txGasPrice,
-        config.txGasLimit,
+        GasPrice(config.txGasPrice),
+        GasAmount(config.txGasLimit),
         receivingAddress,
         config.txValue,
         ByteString()

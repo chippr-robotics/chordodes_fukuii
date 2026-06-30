@@ -31,11 +31,11 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
   private val validS = ByteString(Hex.decode("72216654137b4b58a4ece0a6df87aa1a4faf18ec4091839dd1c722fa9604fd09"))
 
   private val blobTx = BlobTransaction(
-    chainId = blockchainConfig.chainId,
+    chainId = blockchainConfig.chainId.value,
     nonce = 0,
     maxPriorityFeePerGas = BigInt("1000000000"),
     maxFeePerGas = BigInt("2000000000"),
-    gasLimit = 21000,
+    gasLimit = GasAmount(21000),
     receivingAddress = Some(Address(Hex.decode("32be343b94f860124dc4fee278fdcbd38c102d88"))),
     value = BigInt(0),
     payload = ByteString.empty,
@@ -53,8 +53,8 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
 
   // Block header well into post-Spiral ETC — unixTimestamp has no Cancun in ETC config.
   private val etcBlockHeader = Fixtures.Blocks.Block3125369.header.copy(
-    number = BigInt(21_000_000),
-    gasLimit = 8_000_000,
+    number = BlockNumber(BigInt(21_000_000)),
+    gasLimit = GasAmount(8_000_000),
     extraFields = HefPostOlympia(BigInt("1000000000"))
   )
 
@@ -83,14 +83,14 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "reject blob tx at low block numbers on ETC (pre-Spiral)" taggedAs (UnitTest, ConsensusTest) in {
-    val earlyHeader = etcBlockHeader.copy(number = BigInt(1_000_000))
+    val earlyHeader = etcBlockHeader.copy(number = BlockNumber(BigInt(1_000_000)))
     validate(signedBlobTx, earlyHeader) match
       case Left(TransactionSyntaxError(msg)) => msg should include("TYPE_3_TX_NOT_SUPPORTED")
       case other                             => fail(s"Expected TransactionSyntaxError, got: $other")
   }
 
   it should "reject blob tx at block 0 (genesis) on ETC" taggedAs (UnitTest, ConsensusTest) in {
-    val genesisHeader = etcBlockHeader.copy(number = BigInt(0))
+    val genesisHeader = etcBlockHeader.copy(number = BlockNumber(BigInt(0)))
     validate(signedBlobTx, genesisHeader) match
       case Left(TransactionSyntaxError(msg)) => msg should include("TYPE_3_TX_NOT_SUPPORTED")
       case other                             => fail(s"Expected TransactionSyntaxError, got: $other")
@@ -107,7 +107,7 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
     implicit val cancunCfg: BlockchainConfig = blockchainConfig.copy(
       forkTimestamps = blockchainConfig.forkTimestamps.copy(cancunTimestamp = Some(0L))
     )
-    val cancunHeader = etcBlockHeader.copy(unixTimestamp = 1_000_000_000L)
+    val cancunHeader = etcBlockHeader.copy(unixTimestamp = Timestamp(1_000_000_000L))
     validate(signedBlobTx, cancunHeader)(cancunCfg) match
       case Left(TransactionSyntaxError(msg)) if msg.contains("TYPE_3_TX_NOT_SUPPORTED") =>
         fail("Blob tx should not be rejected for type when Cancun is active")
@@ -119,8 +119,8 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
   it should "not affect validation of legacy transactions" taggedAs (UnitTest, ConsensusTest) in {
     val legacyTx = LegacyTransaction(
       nonce = 0,
-      gasPrice = BigInt("2000000000"),
-      gasLimit = 21000,
+      gasPrice = GasPrice(BigInt("2000000000")),
+      gasLimit = GasAmount(21000),
       receivingAddress = Address(Hex.decode("32be343b94f860124dc4fee278fdcbd38c102d88")),
       value = BigInt(0),
       payload = ByteString.empty

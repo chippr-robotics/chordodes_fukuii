@@ -18,6 +18,8 @@ import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.GasPrice
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.ledger.StxLedger
@@ -149,7 +151,7 @@ class TraceService(
           req.txHash,
           txIndex,
           block.header.hash.value,
-          block.header.number
+          block.header.number.value
         )
       yield TraceTransactionResponse(flat)
     }.recover { case _: MissingNodeException =>
@@ -294,7 +296,7 @@ class TraceService(
       val world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentStateRoot)
       val tracer = new CallTracer(onlyTopCall = false)
       stxLedger.simulateTransactionWithTracer(stx, block.header, Some(world), tracer)
-      flattenCallTree(tracer.getResult, stx.tx.hash.value, txIndex, block.header.hash.value, block.header.number)
+      flattenCallTree(tracer.getResult, stx.tx.hash.value, txIndex, block.header.hash.value, block.header.number.value)
     }
 
   /** Builds a replay result bundle: { trace, vmTrace, stateDiff } based on options. */
@@ -313,7 +315,13 @@ class TraceService(
     val traceField: JValue =
       if options.trace then
         JArray(
-          flattenCallTree(callTracer.getResult, txHash, txIndex, block.header.hash.value, block.header.number).toList
+          flattenCallTree(
+            callTracer.getResult,
+            txHash,
+            txIndex,
+            block.header.hash.value,
+            block.header.number.value
+          ).toList
         )
       else JNull
 
@@ -483,12 +491,12 @@ class TraceService(
       callTx: EthInfoService.CallTx,
       block: Block
   ): Either[JsonRpcError, SignedTransactionWithSender] =
-    val gasLimit = callTx.gas.getOrElse(block.header.gasLimit)
+    val gasLimit = callTx.gas.map(GasAmount(_)).getOrElse(block.header.gasLimit)
     val fromAddress = callTx.from
       .map(Address.apply)
       .getOrElse(Address(0))
     val toAddress = callTx.to.map(Address.apply)
 
-    val tx = LegacyTransaction(0, callTx.gasPrice, gasLimit, toAddress, callTx.value, callTx.data)
+    val tx = LegacyTransaction(0, GasPrice(callTx.gasPrice), gasLimit, toAddress, callTx.value, callTx.data)
     val fakeSignature = ECDSASignature(0, 0, 0)
     Right(SignedTransactionWithSender(tx, fakeSignature, fromAddress))

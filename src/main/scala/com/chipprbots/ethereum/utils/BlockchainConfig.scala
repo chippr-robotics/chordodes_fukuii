@@ -10,6 +10,8 @@ import com.typesafe.config.ConfigRenderOptions
 
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.ChainId
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.NumericUtils.*
 
@@ -42,7 +44,7 @@ case class BlockchainConfig(
     customGenesisJsonOpt: Option[String],
     daoForkConfig: Option[DaoForkConfig],
     accountStartNonce: UInt256,
-    chainId: BigInt,
+    chainId: ChainId,
     networkId: Long,
     monetaryPolicyConfig: MonetaryPolicyConfig,
     gasTieBreaker: Boolean,
@@ -53,7 +55,7 @@ case class BlockchainConfig(
     messConfig: MESSConfig = MESSConfig(),
     treasuryAddress: Address = Address(0),
     baseFeeFloor: BigInt = BigInt(0),
-    minTip: BigInt = BigInt(1),
+    minTip: BigInt = BigInt(1000000000),
     networkType: NetworkType = NetworkType.ETC,
     terminalTotalDifficulty: Option[BigInt] = None,
     forkTimestamps: ForkTimestamps = ForkTimestamps()
@@ -61,27 +63,27 @@ case class BlockchainConfig(
   def isPoS(totalDifficulty: BigInt): Boolean =
     terminalTotalDifficulty.exists(ttd => totalDifficulty >= ttd)
 
-  def isShanghaiTimestamp(timestamp: Long): Boolean =
-    forkTimestamps.shanghaiTimestamp.exists(ts => timestamp >= ts)
+  def isShanghaiTimestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.shanghaiTimestamp.exists(ts => timestamp.toLong >= ts)
 
-  def isCancunTimestamp(timestamp: Long): Boolean =
-    forkTimestamps.cancunTimestamp.exists(ts => timestamp >= ts)
+  def isCancunTimestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.cancunTimestamp.exists(ts => timestamp.toLong >= ts)
 
-  def isPragueTimestamp(timestamp: Long): Boolean =
-    forkTimestamps.pragueTimestamp.exists(ts => timestamp >= ts)
+  def isPragueTimestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.pragueTimestamp.exists(ts => timestamp.toLong >= ts)
 
-  def isOsakaTimestamp(timestamp: Long): Boolean =
-    forkTimestamps.osakaTimestamp.exists(ts => timestamp >= ts)
+  def isOsakaTimestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.osakaTimestamp.exists(ts => timestamp.toLong >= ts)
 
   /** EIP-7892 Blob Parameter Only (BPO) fork activation. BPOs raise the blob target/max without other consensus
     * changes. Sepolia activated BPO1 on 2025-10-21.
     */
-  def isBpo1Timestamp(timestamp: Long): Boolean =
-    forkTimestamps.bpo1Timestamp.exists(ts => timestamp >= ts)
+  def isBpo1Timestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.bpo1Timestamp.exists(ts => timestamp.toLong >= ts)
 
   /** EIP-7892 BPO2: second blob-target bump. Sepolia activated 2025-10-28. */
-  def isBpo2Timestamp(timestamp: Long): Boolean =
-    forkTimestamps.bpo2Timestamp.exists(ts => timestamp >= ts)
+  def isBpo2Timestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.bpo2Timestamp.exists(ts => timestamp.toLong >= ts)
 
   def withUpdatedForkBlocks(update: (ForkBlockNumbers) => ForkBlockNumbers): BlockchainConfig =
     copy(forkBlockNumbers = update(forkBlockNumbers))
@@ -207,9 +209,9 @@ object BlockchainConfig:
     val daoForkConfig = Try(blockchainConfig.getConfig("dao")).toOption.map(DaoForkConfig(_))
     val accountStartNonce: UInt256 = UInt256(BigInt(blockchainConfig.getString("account-start-nonce")))
 
-    val chainId: BigInt =
+    val chainId: ChainId =
       val s = blockchainConfig.getString("chain-id")
-      parseHexOrDecNumber(s)
+      ChainId(parseHexOrDecNumber(s))
 
     val networkId: Long = Try(blockchainConfig.getLong("network-id")).getOrElse {
       Try(BigInt(blockchainConfig.getString("network-id")).toLong).getOrElse(1L)

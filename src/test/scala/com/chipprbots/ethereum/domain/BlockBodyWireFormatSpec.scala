@@ -24,8 +24,8 @@ class BlockBodyWireFormatSpec extends AnyFlatSpec with Matchers:
     val typedTx = TransactionWithAccessList(
       chainId = 1,
       nonce = 1,
-      gasPrice = 1,
-      gasLimit = 21000,
+      gasPrice = GasPrice(1),
+      gasLimit = GasAmount(21000),
       receivingAddress = None,
       value = 0,
       payload = ByteString.empty,

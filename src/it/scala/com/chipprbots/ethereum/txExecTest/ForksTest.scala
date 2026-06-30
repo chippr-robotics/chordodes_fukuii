@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.txExecTest.util.FixtureProvider
+import com.chipprbots.ethereum.domain.ChainId
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
@@ -30,7 +31,7 @@ class ForksTest extends AnyFlatSpec with Matchers:
         eip160BlockNumber = 7,
         eip155BlockNumber = 0
       ),
-      chainId = 0x3d,
+      chainId = ChainId(0x3d),
       monetaryPolicyConfig = MonetaryPolicyConfig(5000000, 0.2, 5000000000000000000L, 3000000000000000000L),
       // unused
       bootstrapNodes = Set(),

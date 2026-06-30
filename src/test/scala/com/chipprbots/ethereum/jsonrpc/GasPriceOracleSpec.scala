@@ -87,7 +87,7 @@ class GasPriceOracleSpec
       baseFeeOpt: Option[BigInt]
   ): BlockHeader =
     fixtureHeader.copy(
-      number = number,
+      number = BlockNumber(number),
       beneficiary = coinbase,
       extraFields = baseFeeOpt.fold[HeaderExtraFields](HefEmpty)(HefPostOlympia.apply)
     )
@@ -110,8 +110,8 @@ class GasPriceOracleSpec
   private def fakeTx(price: BigInt): SignedTransaction = SignedTransaction(
     LegacyTransaction(
       nonce = 0,
-      gasPrice = price,
-      gasLimit = 21000,
+      gasPrice = GasPrice(price),
+      gasLimit = GasAmount(21000),
       receivingAddress = Some(Address(zeroAddr)),
       value = 0,
       payload = ByteString.empty
@@ -341,7 +341,7 @@ class GasPriceOracleSpec
     val r = mockReader(bestNum = 20, window = window, bestBlock = Some(blk(20, Nil)))
     // Tx is included → oracle returns tx.gasPrice (20 gwei) as the only sample
     val result = svc(r).suggestGasPrice()
-    result shouldEqual tx.tx.gasPrice
+    result shouldEqual tx.tx.gasPrice.value
   }
 
   it should "return the floor when an all-coinbase-tx block exhausts the window" taggedAs (UnitTest, RPCTest) in {
@@ -453,26 +453,26 @@ class GasPriceOracleSpec
     val req = TransactionRequest(from = Address(zeroAddr), gasPrice = Some(userPrice))
     val oracle = 10 * gwei // oracle would have suggested 10g
     val tx = req.toTransaction(BigInt(0), oracle)
-    tx.gasPrice shouldEqual userPrice
+    tx.gasPrice.value shouldEqual userPrice
   }
 
   it should "use the oracle price when no gasPrice provided by the user" taggedAs (UnitTest, RPCTest) in {
     val oracle = 4 * gwei
     val req = TransactionRequest(from = Address(zeroAddr))
     val tx = req.toTransaction(BigInt(0), oracle)
-    tx.gasPrice shouldEqual oracle
+    tx.gasPrice.value shouldEqual oracle
   }
 
   it should "use oracle price of 1 wei (minimum valid) when oracle returns 1 wei" taggedAs (UnitTest, RPCTest) in {
     val req = TransactionRequest(from = Address(zeroAddr))
     val tx = req.toTransaction(BigInt(0), BigInt(1))
-    tx.gasPrice shouldEqual BigInt(1)
+    tx.gasPrice.value shouldEqual BigInt(1)
   }
 
   it should "respect user's explicit gasPrice = 0 over any oracle value" taggedAs (UnitTest, RPCTest) in {
     val req = TransactionRequest(from = Address(zeroAddr), gasPrice = Some(BigInt(0)))
     val tx = req.toTransaction(BigInt(0), 5 * gwei)
-    tx.gasPrice shouldEqual BigInt(0)
+    tx.gasPrice.value shouldEqual BigInt(0)
   }
 
   // ─── F. Network-specific integration regression ───────────────────────────

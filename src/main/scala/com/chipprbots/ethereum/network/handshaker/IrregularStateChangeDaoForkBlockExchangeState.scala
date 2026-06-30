@@ -46,7 +46,7 @@ case class IrregularStateChangeDaoForkBlockExchangeState(
     )
 
   private def processForkBlockHeaders(blockHeaders: Seq[BlockHeader]): HandshakerState[PeerInfo] =
-    val forkBlockHeaderOpt = blockHeaders.find(_.number == forkResolver.forkBlockNumber)
+    val forkBlockHeaderOpt = blockHeaders.find(_.number.value == forkResolver.forkBlockNumber)
 
     forkBlockHeaderOpt match
       case Some(forkBlockHeader) =>

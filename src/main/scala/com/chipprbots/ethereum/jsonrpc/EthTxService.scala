@@ -20,6 +20,7 @@ import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.Receipt
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
@@ -130,8 +131,8 @@ class EthTxService(
         // index, AND (b) its number is <= the client's best-block pointer (i.e. FCU has
         // advanced past it). (a) alone is true right after newPayload's storeBlock but
         // (b) flips only when the subsequent FCU updates saveBestKnownBlocks.
-        _ <- blockchainReader.getBlockHeaderByNumber(header.number).filter(_.hash.value == blockHash)
-        bestNum = blockchainReader.getBestBlockNumber if header.number <= bestNum
+        _ <- blockchainReader.getBlockHeaderByNumber(header.number.value).filter(_.hash.value == blockHash)
+        bestNum = blockchainReader.getBestBlockNumber if header.number.value <= bestNum
         stx <- body.transactionList.lift(txIndex)
         receipts <- blockchainReader.getReceiptsByHash(BlockHash(blockHash))
         receipt: Receipt <- receipts.lift(txIndex)
@@ -230,7 +231,7 @@ class EthTxService(
       // 60th percentile — matches go-ethereum/core-geth default (configurable there, fixed here).
       // Biases slightly above the median to reduce stuck-transaction risk during fee spikes.
       val idx = math.min((sorted.length * 60) / 100, sorted.length - 1)
-      sorted(idx).max(floor).min(GasPriceMaxCap)
+      sorted(idx).value.max(floor).min(GasPriceMaxCap)
     else floor // no transactions in window: return floor, never 0
 
   def getGetGasPrice(@unused req: GetGasPriceRequest): ServiceResponse[GetGasPriceResponse] =
@@ -248,8 +249,8 @@ class EthTxService(
           // use the timestamp-aware forBlock variant — Shanghai activates by timestamp on
           // post-merge chains, not block number.
           val tip = blockchainReader.getBestBlock.map(_.header)
-          val bestNum = tip.map(_.number).getOrElse(blockchainReader.getBestBlockNumber)
-          val ts = tip.map(_.unixTimestamp).getOrElse(0L)
+          val bestNum = tip.map(_.number.value).getOrElse(blockchainReader.getBestBlockNumber)
+          val ts = tip.map(_.unixTimestamp).getOrElse(Timestamp.Zero)
           val evmConfig = com.chipprbots.ethereum.vm.EvmConfig.forBlock(bestNum, ts, blockchainConfig)
           val tx = signedTransaction.tx
           val initCodeTooLarge =

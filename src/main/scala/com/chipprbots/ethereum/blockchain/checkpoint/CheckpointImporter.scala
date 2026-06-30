@@ -81,7 +81,7 @@ final class CheckpointImporter(
     // Pass the checkpoint block number so ReferenceCountNodeStorage tags nodes at the
     // imported block height — matches what SNAP healing does at pivot, so post-import
     // pruning math stays sane.
-    val mpt = stateStorage.getBackingStorage(blockNum)
+    val mpt = stateStorage.getBackingStorage(blockNum.value)
     val nodeBuf = scala.collection.mutable.ArrayBuffer.empty[(ByteString, Array[Byte])]
     val codeBuf = scala.collection.mutable.ArrayBuffer.empty[(ByteString, Array[Byte])]
     var totalNodes = 0L
@@ -153,7 +153,7 @@ final class CheckpointImporter(
             blockchainWriter
               .storeBlockHeader(header.blockHeader)
               .and(blockchainWriter.storeChainWeight(blockHash, header.chainWeight))
-              .and(appStateStorage.putBestBlockInfo(BlockInfo(blockHash.value, blockNum)))
+              .and(appStateStorage.putBestBlockInfo(BlockInfo(blockHash.value, blockNum.value)))
               .and(appStateStorage.snapSyncDone())
               .and(appStateStorage.bytecodeRecoveryDone())
               .and(appStateStorage.storageRecoveryDone())
@@ -169,10 +169,10 @@ final class CheckpointImporter(
               totalBytecodes,
               codeBytes / (1024 * 1024),
               elapsed / 1000,
-              blockNum + 1
+              blockNum + 1L
             )
 
-            Right(ImportResult(blockNum, totalNodes, totalBytecodes, elapsed))
+            Right(ImportResult(blockNum.value, totalNodes, totalBytecodes, elapsed))
 
   private def hex8(bs: ByteString): String =
     bs.take(8).toArray.map("%02x".format(_)).mkString

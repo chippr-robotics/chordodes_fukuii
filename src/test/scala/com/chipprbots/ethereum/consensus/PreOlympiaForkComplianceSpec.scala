@@ -6,6 +6,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm
+import com.chipprbots.ethereum.domain.ChainId
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.EvmConfig
 import com.chipprbots.ethereum.vm.FeeSchedule
@@ -46,7 +47,7 @@ class PreOlympiaForkComplianceSpec extends AnyFlatSpec with Matchers with Parall
         mystiqueBlockNumber = Long.MaxValue,
         spiralBlockNumber = Long.MaxValue,
         olympiaBlockNumber = Long.MaxValue,
-        chainId = 0x3d
+        chainId = ChainId(0x3d)
       )
     )
 

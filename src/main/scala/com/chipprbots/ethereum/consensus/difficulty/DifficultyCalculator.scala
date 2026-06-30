@@ -4,16 +4,17 @@ import com.chipprbots.ethereum.consensus.pow.difficulty.EthashDifficultyCalculat
 import com.chipprbots.ethereum.consensus.pow.difficulty.TargetTimeDifficultyCalculator
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 trait DifficultyCalculator:
-  def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
+  def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Timestamp, parent: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Difficulty
 
 object DifficultyCalculator extends DifficultyCalculator:
 
-  def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
+  def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Timestamp, parent: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Difficulty =
     (blockchainConfig.powTargetTime match

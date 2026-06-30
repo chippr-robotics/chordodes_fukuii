@@ -12,8 +12,11 @@ import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits.given
 
@@ -36,10 +39,10 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers:
         TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
       difficulty = Difficulty(BigInt("131072")),
-      number = 0,
-      gasLimit = BigInt("8000000"),
-      gasUsed = 0,
-      unixTimestamp = 1701302272L,
+      number = BlockNumber(0),
+      gasLimit = GasAmount(BigInt("8000000")),
+      gasUsed = GasAmount.Zero,
+      unixTimestamp = Timestamp(1701302272L),
       extraData = ByteString(Hex.decode("00")),
       mixHash = BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
       nonce = ByteString(Hex.decode("0000000000000042"))
@@ -77,10 +80,10 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers:
         TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
       difficulty = Difficulty(BigInt("131072")),
-      number = 0,
-      gasLimit = BigInt("8000000"),
-      gasUsed = 0,
-      unixTimestamp = 1701302272L,
+      number = BlockNumber(0),
+      gasLimit = GasAmount(BigInt("8000000")),
+      gasUsed = GasAmount.Zero,
+      unixTimestamp = Timestamp(1701302272L),
       extraData = ByteString(Hex.decode("00")),
       mixHash = BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
       nonce = ByteString(Hex.decode("0000000000000042"))

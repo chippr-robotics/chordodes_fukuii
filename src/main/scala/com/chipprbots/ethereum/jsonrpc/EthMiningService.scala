@@ -127,11 +127,11 @@ class EthMiningService(
             val powHeaderHash = ByteString(kec256(BlockHeader.getEncodedWithoutNonce(pb.block.header)))
             val dagSeed = EthashUtils
               .seed(
-                pb.block.header.number.toLong,
+                pb.block.header.number.value.toLong,
                 blockchainConfig.forkBlockNumbers.ecip1099BlockNumber.toLong
               )
             val target = ByteString((BigInt(2).pow(256) / pb.block.header.difficulty.value).toByteArray)
-            val blockNumber = pb.block.header.number
+            val blockNumber = pb.block.header.number.value
             val workResponse = GetWorkResponse(powHeaderHash, dagSeed, target, blockNumber)
             val notifyUrls = ethash.config.generic.notifyUrls
             if notifyUrls.nonEmpty then
@@ -155,7 +155,7 @@ class EthMiningService(
             val bestBlockNum = blockchainReader.getBestBlockNumber
             val staleThreshold = ethash.config.generic.staleThreshold
             // core-geth reference: consensus/ethash/sealer.go staleThreshold check
-            if bestBlockNum - pendingBlock.block.header.number > staleThreshold then
+            if bestBlockNum - pendingBlock.block.header.number.value > staleThreshold then
               log.debug(
                 "Rejecting stale work submission for block {}, current best {}, threshold {}",
                 pendingBlock.block.header.number,

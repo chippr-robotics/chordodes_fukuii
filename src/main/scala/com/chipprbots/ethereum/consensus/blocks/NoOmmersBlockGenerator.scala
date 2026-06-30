@@ -30,7 +30,7 @@ abstract class NoOmmersBlockGenerator(
       blockNumber: BigInt,
       parent: Block,
       beneficiary: Address,
-      blockTimestamp: Long,
+      blockTimestamp: Timestamp,
       x: Nil.type
   )(implicit blockchainConfig: BlockchainConfig): BlockHeader =
     defaultPrepareHeader(blockNumber, parent, beneficiary, blockTimestamp, x)
@@ -55,7 +55,7 @@ abstract class NoOmmersBlockGenerator(
           parent,
           transactions,
           beneficiary,
-          blockNumber,
+          blockNumber.value,
           blockPreparator,
           x,
           initialWorldStateBeforeExecution

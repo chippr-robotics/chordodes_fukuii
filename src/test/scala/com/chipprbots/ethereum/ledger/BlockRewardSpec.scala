@@ -34,7 +34,7 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     val block: Block = sampleBlock(Address(0xdeadbeef))
     val afterRewardWorldState: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
     val expectedRewardAsBigInt: BigInt =
-      mining.blockPreparator.blockRewardCalculator.calculateMiningReward(block.header.number, 0)
+      mining.blockPreparator.blockRewardCalculator.calculateMiningReward(block.header.number.value, 0)
     val expectedReward: UInt256 = UInt256(expectedRewardAsBigInt)
     afterRewardWorldState.getGuaranteedAccount(Address(block.header.beneficiary)).balance shouldEqual expectedReward
 
@@ -96,7 +96,8 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
 
     // spec: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-649.md
     val newBlockReward: BigInt = blockchainConfig.monetaryPolicyConfig.firstEraReducedBlockReward
-    val ommersRewards: BigInt = (8 - (block.header.number - block.body.uncleNodesList.head.number)) * newBlockReward / 8
+    val ommersRewards: BigInt =
+      (8 - (block.header.number.value - block.body.uncleNodesList.head.number.value)) * newBlockReward / 8
     val nephewRewards: BigInt = (newBlockReward / 32) * 2
 
     afterRewardWorldState
@@ -158,11 +159,11 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
       Block(
         header = Fixtures.Blocks.Genesis.header.copy(
           beneficiary = minerAddress.bytes,
-          number = blockNumber
+          number = BlockNumber(blockNumber)
         ),
         body = Fixtures.Blocks.Genesis.body.copy(
           uncleNodesList = ommerMiners.map { address =>
-            Fixtures.Blocks.Genesis.header.copy(beneficiary = address.bytes, number = 5)
+            Fixtures.Blocks.Genesis.header.copy(beneficiary = address.bytes, number = BlockNumber(5))
           }
         )
       )
@@ -170,10 +171,11 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     def sampleBlockAfterByzantium(minerAddress: Address, ommerMiners: Seq[Address] = Nil): Block =
       val baseBlockNumber = forkBlockNumbers.byzantiumBlockNumber
       Block(
-        header = Fixtures.Blocks.Genesis.header.copy(beneficiary = minerAddress.bytes, number = baseBlockNumber),
+        header =
+          Fixtures.Blocks.Genesis.header.copy(beneficiary = minerAddress.bytes, number = BlockNumber(baseBlockNumber)),
         body = Fixtures.Blocks.Genesis.body.copy(
           uncleNodesList = ommerMiners.map { address =>
-            Fixtures.Blocks.Genesis.header.copy(beneficiary = address.bytes, number = baseBlockNumber + 5)
+            Fixtures.Blocks.Genesis.header.copy(beneficiary = address.bytes, number = BlockNumber(baseBlockNumber + 5))
           }
         )
       )

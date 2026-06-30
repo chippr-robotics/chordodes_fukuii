@@ -5,6 +5,7 @@ import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum
 
 import com.chipprbots.ethereum.domain.AccessListItem
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm
@@ -29,7 +30,7 @@ object EvmConfig:
 
   /** returns the evm config for a given block, applying timestamp-based fork overrides for post-merge ETH chains.
     */
-  def forBlock(blockNumber: BigInt, timestamp: Long, blockchainConfig: BlockchainConfig): EvmConfig =
+  def forBlock(blockNumber: BigInt, timestamp: Timestamp, blockchainConfig: BlockchainConfig): EvmConfig =
     var config = forBlock(blockNumber, blockchainConfig)
     // Apply timestamp-based fork upgrades for ETH chains
     if blockchainConfig.isShanghaiTimestamp(timestamp) then

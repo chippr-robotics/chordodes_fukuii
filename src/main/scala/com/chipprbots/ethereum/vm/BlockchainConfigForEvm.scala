@@ -1,5 +1,7 @@
 package com.chipprbots.ethereum.vm
 
+import com.chipprbots.ethereum.domain.ChainId
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.Agharta
@@ -43,7 +45,7 @@ case class BlockchainConfigForEvm(
     mystiqueBlockNumber: BigInt,
     spiralBlockNumber: BigInt,
     olympiaBlockNumber: BigInt,
-    chainId: BigInt,
+    chainId: ChainId,
     // Timestamp-based ETH forks (post-merge)
     pragueTimestamp: Option[Long] = None,
     osakaTimestamp: Option[Long] = None,
@@ -58,22 +60,22 @@ case class BlockchainConfigForEvm(
   /** EIP-7623 calldata cost floor — activates at Prague on ETH chains. Note: EIP-7883/EIP-7823 MODEXP changes activate
     * at Osaka, not Prague (per execution-specs).
     */
-  def isPragueTimestamp(timestamp: Long): Boolean =
-    pragueTimestamp.exists(ts => timestamp >= ts)
+  def isPragueTimestamp(timestamp: Timestamp): Boolean =
+    pragueTimestamp.exists(ts => timestamp.toLong >= ts)
 
   /** EIP-7883 MODEXP gas increase, EIP-7823 MODEXP input bounds, EIP-7951 P256VERIFY, EIP-7939 CLZ, EIP-7825 tx gas
     * cap, EIP-7934 block RLP size — gated by Osaka timestamp on ETH chains.
     */
-  def isOsakaTimestamp(timestamp: Long): Boolean =
-    osakaTimestamp.exists(ts => timestamp >= ts)
+  def isOsakaTimestamp(timestamp: Timestamp): Boolean =
+    osakaTimestamp.exists(ts => timestamp.toLong >= ts)
 
   /** BPO1 (Blob Parameter Override 1) — changes blob update fraction to 8346193. */
-  def isBpo1Timestamp(timestamp: Long): Boolean =
-    bpo1Timestamp.exists(ts => timestamp >= ts)
+  def isBpo1Timestamp(timestamp: Timestamp): Boolean =
+    bpo1Timestamp.exists(ts => timestamp.toLong >= ts)
 
   /** BPO2 (Blob Parameter Override 2) — changes blob update fraction to 11684671. */
-  def isBpo2Timestamp(timestamp: Long): Boolean =
-    bpo2Timestamp.exists(ts => timestamp >= ts)
+  def isBpo2Timestamp(timestamp: Timestamp): Boolean =
+    bpo2Timestamp.exists(ts => timestamp.toLong >= ts)
 
   def etcForkForBlockNumber(blockNumber: BigInt): EtcFork = blockNumber match
     case _ if blockNumber < atlantisBlockNumber => BeforeAtlantis
