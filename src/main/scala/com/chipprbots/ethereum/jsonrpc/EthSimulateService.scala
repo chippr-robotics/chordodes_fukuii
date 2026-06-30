@@ -407,7 +407,7 @@ class EthSimulateService(
       baseHeader: BlockHeader
   ): Either[JsonRpcError, Unit] = boundary {
     var prevNumber = baseHeader.number.value
-    var prevTimestamp = BigInt(baseHeader.unixTimestamp)
+    var prevTimestamp = BigInt(baseHeader.unixTimestamp.toLong)
 
     for (bsc, _) <- blockStateCalls.zipWithIndex do
       val overrides = bsc.blockOverrides.getOrElse(BlockOverrides())
@@ -464,7 +464,7 @@ class EthSimulateService(
   ): BlockHeader =
     val ov = overrides.getOrElse(BlockOverrides())
     val number = ov.number.map(BlockNumber(_)).getOrElse(parentHeader.number + 1)
-    val timestamp = ov.time.getOrElse(BigInt(parentHeader.unixTimestamp) + 12)
+    val timestamp = ov.time.getOrElse(BigInt(parentHeader.unixTimestamp.toLong) + 12)
     val gasLimit = ov.gasLimit.map(GasAmount(_)).getOrElse(parentHeader.gasLimit)
     val beneficiary = ov.feeRecipient.map(_.bytes).getOrElse(ByteString(new Array[Byte](20)))
     val prevRandao = ov.prevRandao.getOrElse(ByteString(new Array[Byte](32)))
@@ -476,7 +476,7 @@ class EthSimulateService(
 
     // Determine the fork era for the header based on the block's timestamp
     // This handles both pre-merge blocks and fork boundary crossings
-    val ts = timestamp.toLong
+    val ts = Timestamp(timestamp.toLong)
     // EIP-4844: simulated block's excessBlobGas derives from parent per spec.
     val simulatedExcessBlobGas =
       val parentExcess = parentHeader.excessBlobGas.getOrElse(BigInt(0))
@@ -528,7 +528,7 @@ class EthSimulateService(
       number = number,
       gasLimit = gasLimit,
       gasUsed = GasAmount.Zero, // Placeholder — filled after execution
-      unixTimestamp = timestamp.toLong,
+      unixTimestamp = ts,
       extraData = ByteString.empty,
       mixHash = BlockHash(prevRandao),
       nonce = ByteString(new Array[Byte](8)),
@@ -906,7 +906,7 @@ class EthSimulateService(
           address = txLog.loggerAddress,
           data = txLog.data,
           topics = txLog.logTopics,
-          blockTimestamp = Some(BigInt(blockHeader.unixTimestamp))
+          blockTimestamp = Some(BigInt(blockHeader.unixTimestamp.toLong))
         )
         globalLogIndex += 1
         l
@@ -967,7 +967,7 @@ class EthSimulateService(
     import com.chipprbots.ethereum.ledger.BlockExecution.*
     blockHeader.parentBeaconBlockRoot match
       case Some(beaconRoot) =>
-        val timestamp = UInt256(blockHeader.unixTimestamp)
+        val timestamp = UInt256(blockHeader.unixTimestamp.toLong)
         val timestampIdx = timestamp.mod(UInt256(BeaconRootHistoryBufferLength))
         val rootIdx = timestampIdx + UInt256(BeaconRootHistoryBufferLength)
         val account = world

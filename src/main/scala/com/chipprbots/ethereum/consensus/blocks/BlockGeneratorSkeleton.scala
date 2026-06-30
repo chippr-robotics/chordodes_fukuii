@@ -44,7 +44,7 @@ abstract class BlockGeneratorSkeleton(
       blockNumber: BigInt,
       parent: Block,
       beneficiary: Address,
-      blockTimestamp: Long,
+      blockTimestamp: Timestamp,
       x: Ommers
   )(implicit blockchainConfig: BlockchainConfig): BlockHeader =
     BlockHeader(
@@ -72,7 +72,7 @@ abstract class BlockGeneratorSkeleton(
       blockNumber: BigInt,
       parent: Block,
       beneficiary: Address,
-      blockTimestamp: Long,
+      blockTimestamp: Timestamp,
       x: X
   )(implicit blockchainConfig: BlockchainConfig): BlockHeader
 
@@ -88,7 +88,7 @@ abstract class BlockGeneratorSkeleton(
       initialWorldStateBeforeExecution: Option[InMemoryWorldStateProxy]
   )(implicit blockchainConfig: BlockchainConfig): PendingBlockAndState =
 
-    val blockTimestamp = blockTimestampProvider.getEpochSecond
+    val blockTimestamp = Timestamp(blockTimestampProvider.getEpochSecond)
     val header = prepareHeader(blockNumber, parent, beneficiary, blockTimestamp, x)
     val nextBlockBaseFee = com.chipprbots.ethereum.consensus.eip1559.BaseFeeCalculator.calcBaseFee(
       parent.header,

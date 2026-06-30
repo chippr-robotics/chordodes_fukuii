@@ -8,6 +8,7 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.utils.ByteStringUtils.hash2string
 import com.chipprbots.ethereum.utils.Logger
 
@@ -101,7 +102,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger:
         val commonAncestorTimestamp = blockchainReader
           .getBlockHeaderByHash(oldBlocks.head.header.parentHash)
           .map(_.unixTimestamp)
-          .getOrElse(0L)
+          .getOrElse(Timestamp.Zero)
 
         val currentHeadTimestamp = oldBlocks.last.header.unixTimestamp
         val timeDeltaSeconds = math.max(0L, currentHeadTimestamp - commonAncestorTimestamp)

@@ -264,7 +264,7 @@ object GetBlockTool:
           |  Total Difficulty: $td
           |  Gas Limit: ${h.gasLimit}
           |  Gas Used: ${h.gasUsed}
-          |  Timestamp: ${h.unixTimestamp} (${java.time.Instant.ofEpochSecond(h.unixTimestamp)})
+          |  Timestamp: ${h.unixTimestamp.toLong} (${java.time.Instant.ofEpochSecond(h.unixTimestamp.toLong)})
           |  Transactions Root: ${ByteStringUtils.hash2string(h.transactionsRoot.value)}
           |  State Root: ${ByteStringUtils.hash2string(h.stateRoot.value)}
           |  Extra Data: 0x${org.bouncycastle.util.encoders.Hex.toHexString(h.extraData.toArray)}""".stripMargin

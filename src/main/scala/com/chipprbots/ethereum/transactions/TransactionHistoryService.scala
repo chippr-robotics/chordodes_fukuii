@@ -81,7 +81,7 @@ object TransactionHistoryService:
       transactionIndex: Int,
       gasUsed: BigInt
   ):
-    lazy val timestamp: Long = header.unixTimestamp
+    lazy val timestamp: Long = header.unixTimestamp.toLong
   case class ExtendedTransactionData(
       stx: SignedTransaction,
       isOutgoing: Boolean,

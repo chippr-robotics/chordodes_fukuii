@@ -89,7 +89,7 @@ object TransactionReceiptResponse:
         address = txLog.loggerAddress,
         data = txLog.data,
         topics = txLog.logTopics,
-        blockTimestamp = Some(BigInt(blockHeader.unixTimestamp))
+        blockTimestamp = Some(BigInt(blockHeader.unixTimestamp.toLong))
       )
     }
 
@@ -135,5 +135,5 @@ object TransactionReceiptResponse:
             .getBlobGasPrice(eg, blockHeader.unixTimestamp, blockchainConfig)
         )
       ),
-      blockTimestamp = Some(BigInt(blockHeader.unixTimestamp))
+      blockTimestamp = Some(BigInt(blockHeader.unixTimestamp.toLong))
     )

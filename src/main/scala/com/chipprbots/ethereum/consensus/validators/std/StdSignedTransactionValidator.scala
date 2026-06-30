@@ -255,7 +255,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
   private def validateInitCodeSize(
       stx: SignedTransaction,
       blockHeaderNumber: BigInt,
-      blockHeaderTimestamp: Long
+      blockHeaderTimestamp: Timestamp
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
     import stx.tx
     if tx.isContractInit then
@@ -279,7 +279,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
   private def validateGasLimitEnoughForIntrinsicGas(
       stx: SignedTransaction,
       blockHeaderNumber: BigInt,
-      blockHeaderTimestamp: Long
+      blockHeaderTimestamp: Timestamp
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
     import stx.tx
     val config = EvmConfig.forBlock(blockHeaderNumber, blockHeaderTimestamp, blockchainConfig)
@@ -313,7 +313,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator:
   private def validateTxGasLimitCap(
       stx: SignedTransaction,
       blockHeaderNumber: BigInt,
-      blockHeaderTimestamp: Long
+      blockHeaderTimestamp: Timestamp
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
     val isEth = blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETH
     // EIP-7825 gas cap: ETC enables at Olympia (ECIP-1121 block-based). ETH enables at Osaka

@@ -205,7 +205,7 @@ class BlockExecution(
     // Only apply post-Cancun (when parentBeaconBlockRoot is present)
     block.header.parentBeaconBlockRoot match
       case Some(beaconRoot) if blockchainConfig.isCancunTimestamp(block.header.unixTimestamp) =>
-        val timestamp = UInt256(block.header.unixTimestamp)
+        val timestamp = UInt256(block.header.unixTimestamp.toLong)
         val timestampIdx = timestamp.mod(UInt256(BeaconRootHistoryBufferLength))
         val rootIdx = timestampIdx + UInt256(BeaconRootHistoryBufferLength)
 

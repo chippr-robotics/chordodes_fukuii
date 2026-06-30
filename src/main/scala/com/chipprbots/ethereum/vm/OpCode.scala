@@ -573,7 +573,7 @@ case object BLOCKHASH extends OpCode(0x40, 1, 1, _.G_blockhash) with ConstGas:
 
 case object COINBASE extends ConstOp(0x41)(s => UInt256(s.env.blockHeader.beneficiary))
 
-case object TIMESTAMP extends ConstOp(0x42)(s => UInt256(s.env.blockHeader.unixTimestamp))
+case object TIMESTAMP extends ConstOp(0x42)(s => UInt256(s.env.blockHeader.unixTimestamp.toLong))
 
 case object NUMBER extends ConstOp(0x43)(s => UInt256(s.env.blockHeader.number.value))
 

@@ -20,6 +20,7 @@ import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.Receipt
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
@@ -249,7 +250,7 @@ class EthTxService(
           // post-merge chains, not block number.
           val tip = blockchainReader.getBestBlock.map(_.header)
           val bestNum = tip.map(_.number.value).getOrElse(blockchainReader.getBestBlockNumber)
-          val ts = tip.map(_.unixTimestamp).getOrElse(0L)
+          val ts = tip.map(_.unixTimestamp).getOrElse(Timestamp.Zero)
           val evmConfig = com.chipprbots.ethereum.vm.EvmConfig.forBlock(bestNum, ts, blockchainConfig)
           val tx = signedTransaction.tx
           val initCodeTooLarge =

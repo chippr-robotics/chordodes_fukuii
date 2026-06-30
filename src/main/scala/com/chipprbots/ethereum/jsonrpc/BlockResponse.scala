@@ -125,7 +125,7 @@ object BlockResponse:
       size = Block.size(block),
       gasLimit = block.header.gasLimit.value,
       gasUsed = block.header.gasUsed.value,
-      timestamp = block.header.unixTimestamp,
+      timestamp = BigInt(block.header.unixTimestamp.toLong),
       mixHash = block.header.mixHash.value,
       transactions = transactions,
       uncles = block.body.uncleNodesList.map(_.hash.value),

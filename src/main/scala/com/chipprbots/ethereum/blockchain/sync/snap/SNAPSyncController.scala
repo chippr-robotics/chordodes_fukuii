@@ -1447,7 +1447,6 @@ private class SNAPSyncControllerImpl(
         completeSnapSync()
         Behaviors.same
 
-
       // Streaming batch from ongoing trie walk — forward immediately to coordinator for early healing
       case TrieWalkBatch(missingNodes) if currentPhase == StateHealing =>
         if missingNodes.nonEmpty then

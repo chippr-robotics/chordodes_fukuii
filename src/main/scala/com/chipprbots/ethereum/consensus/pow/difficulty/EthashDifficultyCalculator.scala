@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.consensus.pow.difficulty
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 object EthashDifficultyCalculator extends DifficultyCalculator:
@@ -12,12 +13,12 @@ object EthashDifficultyCalculator extends DifficultyCalculator:
   private val ConstantinopleRelaxDifficulty: BigInt = 5_000_000
   private val MuirGlacierRelaxDifficulty: BigInt = 9_000_000
 
-  def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parentHeader: BlockHeader)(implicit
+  def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Timestamp, parentHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Difficulty =
     import blockchainConfig.forkBlockNumbers.*
 
-    lazy val timestampDiff = blockTimestamp - parentHeader.unixTimestamp
+    lazy val timestampDiff: Long = blockTimestamp - parentHeader.unixTimestamp
 
     val parentDiff: BigInt = parentHeader.difficulty.value
     val x: BigInt = parentDiff / DifficultyBoundDivision

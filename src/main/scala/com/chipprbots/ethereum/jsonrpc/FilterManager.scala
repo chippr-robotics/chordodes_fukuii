@@ -165,7 +165,7 @@ object FilterManager:
                   address = log.loggerAddress,
                   data = log.data,
                   topics = log.logTopics,
-                  blockTimestamp = Some(BigInt(block.header.unixTimestamp))
+                  blockTimestamp = Some(BigInt(block.header.unixTimestamp.toLong))
                 )
               }
           else Nil

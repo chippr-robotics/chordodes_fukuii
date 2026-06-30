@@ -179,7 +179,7 @@ class GenesisDataLoader(
       blockchainConfig: BlockchainConfig
   ) =
     // Determine the fork era for the genesis block based on the genesis timestamp (0)
-    val genesisTimestamp = BigInt(genesisData.timestamp.replace("0x", ""), 16).toLong
+    val genesisTimestamp = Timestamp(BigInt(genesisData.timestamp.replace("0x", ""), 16).toLong)
     val baseFee = genesisData.baseFeePerGas
       .map(s => BigInt(s.replace("0x", ""), 16))
       .getOrElse(BigInt("1000000000")) // EIP-1559 default: 1 Gwei
@@ -222,7 +222,7 @@ class GenesisDataLoader(
       number = BlockNumber.Zero,
       gasLimit = GasAmount(BigInt(genesisData.gasLimit.replace("0x", ""), 16)),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = BigInt(genesisData.timestamp.replace("0x", ""), 16).toLong,
+      unixTimestamp = Timestamp(BigInt(genesisData.timestamp.replace("0x", ""), 16).toLong),
       extraData = genesisData.extraData,
       mixHash = BlockHash(genesisData.mixHash.getOrElse(zeros(hashLength))),
       nonce = padToEightBytes(genesisData.nonce),

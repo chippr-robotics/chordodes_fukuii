@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.network.handshaker
 
 import cats.effect.SyncIO
 
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.forkid.ForkIdValidationResult.Connect
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.forkid.ForkIdValidator
@@ -147,8 +148,9 @@ case class EthNodeStatus69ExchangeState(
 
     // Compute ForkId from current block (same as ETH64-68)
     val forkIdTimestamp =
-      if bestBlockHeader.unixTimestamp == 0L then System.currentTimeMillis() / 1000 else bestBlockHeader.unixTimestamp
-    val forkId = ForkId.create(genesisHash, blockchainConfig)(bestBlockNumber, forkIdTimestamp)
+      if bestBlockHeader.unixTimestamp == Timestamp.Zero then Timestamp(System.currentTimeMillis() / 1000)
+      else bestBlockHeader.unixTimestamp
+    val forkId = ForkId.create(genesisHash, blockchainConfig)(bestBlockNumber, forkIdTimestamp.toLong)
 
     // ETH/69: no TD, use block range instead. Use ETHPackets.Status69.Status69 (canonical type).
     val status = ETHPackets.Status69.Status69(

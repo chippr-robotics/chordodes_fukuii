@@ -133,7 +133,7 @@ object TransactionResponse:
       v = Some(stx.signature.v),
       r = Some(stx.signature.r),
       s = Some(stx.signature.s),
-      blockTimestamp = blockHeader.map(h => BigInt(h.unixTimestamp))
+      blockTimestamp = blockHeader.map(h => BigInt(h.unixTimestamp.toLong))
     )
 
   private def encodeAccessList(accessList: List[AccessListItem]): Seq[Map[String, Any]] =

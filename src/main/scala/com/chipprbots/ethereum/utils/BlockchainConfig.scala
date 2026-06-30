@@ -10,6 +10,7 @@ import com.typesafe.config.ConfigRenderOptions
 
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.NumericUtils.*
 
@@ -61,27 +62,27 @@ case class BlockchainConfig(
   def isPoS(totalDifficulty: BigInt): Boolean =
     terminalTotalDifficulty.exists(ttd => totalDifficulty >= ttd)
 
-  def isShanghaiTimestamp(timestamp: Long): Boolean =
-    forkTimestamps.shanghaiTimestamp.exists(ts => timestamp >= ts)
+  def isShanghaiTimestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.shanghaiTimestamp.exists(ts => timestamp.toLong >= ts)
 
-  def isCancunTimestamp(timestamp: Long): Boolean =
-    forkTimestamps.cancunTimestamp.exists(ts => timestamp >= ts)
+  def isCancunTimestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.cancunTimestamp.exists(ts => timestamp.toLong >= ts)
 
-  def isPragueTimestamp(timestamp: Long): Boolean =
-    forkTimestamps.pragueTimestamp.exists(ts => timestamp >= ts)
+  def isPragueTimestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.pragueTimestamp.exists(ts => timestamp.toLong >= ts)
 
-  def isOsakaTimestamp(timestamp: Long): Boolean =
-    forkTimestamps.osakaTimestamp.exists(ts => timestamp >= ts)
+  def isOsakaTimestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.osakaTimestamp.exists(ts => timestamp.toLong >= ts)
 
   /** EIP-7892 Blob Parameter Only (BPO) fork activation. BPOs raise the blob target/max without other consensus
     * changes. Sepolia activated BPO1 on 2025-10-21.
     */
-  def isBpo1Timestamp(timestamp: Long): Boolean =
-    forkTimestamps.bpo1Timestamp.exists(ts => timestamp >= ts)
+  def isBpo1Timestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.bpo1Timestamp.exists(ts => timestamp.toLong >= ts)
 
   /** EIP-7892 BPO2: second blob-target bump. Sepolia activated 2025-10-28. */
-  def isBpo2Timestamp(timestamp: Long): Boolean =
-    forkTimestamps.bpo2Timestamp.exists(ts => timestamp >= ts)
+  def isBpo2Timestamp(timestamp: Timestamp): Boolean =
+    forkTimestamps.bpo2Timestamp.exists(ts => timestamp.toLong >= ts)
 
   def withUpdatedForkBlocks(update: (ForkBlockNumbers) => ForkBlockNumbers): BlockchainConfig =
     copy(forkBlockNumbers = update(forkBlockNumbers))

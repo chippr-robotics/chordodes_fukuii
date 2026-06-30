@@ -179,7 +179,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits:
           "sha3Uncles" -> encodeAsHex(h.ommersHash.value),
           "size" -> encodeAsHex(BigInt(Block.size(Block(h, block.body)))),
           "stateRoot" -> encodeAsHex(h.stateRoot.value),
-          "timestamp" -> encodeAsHex(BigInt(h.unixTimestamp)),
+          "timestamp" -> encodeAsHex(BigInt(h.unixTimestamp.toLong)),
           "transactionsRoot" -> encodeAsHex(h.transactionsRoot.value),
           "uncles" -> JArray(Nil)
         ) ++ (if h.withdrawalsRoot.isDefined then List("withdrawals" -> JArray(Nil)) else Nil)
@@ -236,7 +236,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits:
         val baseFields = List(
           "blockHash" -> encodeAsHex(blockHash),
           "blockNumber" -> encodeAsHex(header.number.value),
-          "blockTimestamp" -> encodeAsHex(BigInt(header.unixTimestamp)),
+          "blockTimestamp" -> encodeAsHex(BigInt(header.unixTimestamp.toLong)),
           "from" -> encodeAsHex(sender),
           "gas" -> encodeAsHex(tx.gasLimit.value),
           "gasPrice" -> encodeAsHex(effectiveGasPrice),
