@@ -634,7 +634,7 @@ class EngineApiService(
                           // Also capture the network-wrapped raw bytes for EIP-4844 blob txs so
                           // engine_getPayloadV3 can emit them in the blobsBundle envelope.
                           IO {
-                            val expectedChainId = blockchainConfig.chainId
+                            val expectedChainId = blockchainConfig.chainId.value
                             val filtered = response.pendingTransactions.map(_.stx.tx).filter { stx =>
                               val txChainId: Option[BigInt] = stx.tx match
                                 case t: com.chipprbots.ethereum.domain.TransactionWithAccessList => Some(t.chainId)

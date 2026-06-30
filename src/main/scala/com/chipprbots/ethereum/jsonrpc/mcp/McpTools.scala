@@ -41,7 +41,7 @@ object NodeInfoTool:
 
   def execute(deps: McpDependencies): IO[String] =
     val networkName =
-      deps.blockchainConfig.chainId match
+      deps.blockchainConfig.chainId.value match
         case id if id == BigInt(1)        => "Ethereum Mainnet"
         case id if id == BigInt(61)       => "ETC Mainnet"
         case id if id == BigInt(63)       => "Mordor Testnet"
@@ -110,7 +110,7 @@ object BlockchainInfoTool:
       .map(h => ByteStringUtils.hash2string(h.hash.value))
       .getOrElse("unknown")
     s"""Blockchain Information:
-      |  Network: ${deps.blockchainConfig.chainId match
+      |  Network: ${deps.blockchainConfig.chainId.value match
         case id if id == BigInt(1)        => "Ethereum Mainnet"
         case id if id == BigInt(61)       => "Ethereum Classic (ETC)"
         case id if id == BigInt(63)       => "Mordor Testnet (ETC)"

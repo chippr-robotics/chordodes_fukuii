@@ -1,5 +1,6 @@
 package com.chipprbots.ethereum.vm
 
+import com.chipprbots.ethereum.domain.ChainId
 import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -44,7 +45,7 @@ case class BlockchainConfigForEvm(
     mystiqueBlockNumber: BigInt,
     spiralBlockNumber: BigInt,
     olympiaBlockNumber: BigInt,
-    chainId: BigInt,
+    chainId: ChainId,
     // Timestamp-based ETH forks (post-merge)
     pragueTimestamp: Option[Long] = None,
     osakaTimestamp: Option[Long] = None,

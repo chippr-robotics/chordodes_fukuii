@@ -376,7 +376,7 @@ object SignedTransaction:
           val chainId = (normalizedV - EIP155NegativePointSign) / 2
           // Validate that extracted chainId matches the blockchain's configured chainId
           // This ensures EIP-155 replay protection works correctly
-          if chainId == blockchainConfig.chainId then Some(chainId)
+          if chainId == blockchainConfig.chainId.value then Some(chainId)
           else
             // ChainId present but does not match local config - reject for replay protection
             None
@@ -592,7 +592,11 @@ object SignedTransactionWithSender:
             .orElse(ft.cancunTimestamp)
             .orElse(ft.shanghaiTimestamp)
             .getOrElse(0L)
-        EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, Timestamp(latestTimestamp), blockchainConfig)
+        EvmConfig.forBlock(
+          blockchainConfig.forkBlockNumbers.olympiaBlockNumber,
+          Timestamp(latestTimestamp),
+          blockchainConfig
+        )
       else EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, blockchainConfig)
 
     val eip2681NonceCap = BigInt(2).pow(64) - 2 // EIP-2681: nonces >= 2^64-1 rejected
@@ -600,10 +604,10 @@ object SignedTransactionWithSender:
       val tx = stx.tx
       // 1. Chain ID validation for typed transactions (EIP-2930+)
       val chainIdValid = tx match
-        case twal: TransactionWithAccessList => twal.chainId == blockchainConfig.chainId
-        case twdf: TransactionWithDynamicFee => twdf.chainId == blockchainConfig.chainId
-        case btx: BlobTransaction            => btx.chainId == blockchainConfig.chainId
-        case sct: SetCodeTransaction         => sct.chainId == blockchainConfig.chainId
+        case twal: TransactionWithAccessList => twal.chainId == blockchainConfig.chainId.value
+        case twdf: TransactionWithDynamicFee => twdf.chainId == blockchainConfig.chainId.value
+        case btx: BlobTransaction            => btx.chainId == blockchainConfig.chainId.value
+        case sct: SetCodeTransaction         => sct.chainId == blockchainConfig.chainId.value
         case _: LegacyTransaction            => true // validated in getSender
       if !chainIdValid then false
       else if tx.nonce > eip2681NonceCap then false // EIP-2681 nonce overflow

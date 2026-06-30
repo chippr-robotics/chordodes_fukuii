@@ -760,7 +760,7 @@ class EthSimulateService(
       val tx: Transaction =
         if isBlob then
           BlobTransaction(
-            chainId = blockchainConfig.chainId,
+            chainId = blockchainConfig.chainId.value,
             nonce = senderNonce,
             maxPriorityFeePerGas = call.maxPriorityFeePerGas.getOrElse(BigInt(0)),
             maxFeePerGas = call.maxFeePerGas.getOrElse(BigInt(0)),
@@ -774,7 +774,7 @@ class EthSimulateService(
           )
         else if !isLegacy then
           TransactionWithDynamicFee(
-            chainId = blockchainConfig.chainId,
+            chainId = blockchainConfig.chainId.value,
             nonce = senderNonce,
             maxPriorityFeePerGas = call.maxPriorityFeePerGas.getOrElse(BigInt(0)),
             maxFeePerGas = call.maxFeePerGas.getOrElse(BigInt(0)),

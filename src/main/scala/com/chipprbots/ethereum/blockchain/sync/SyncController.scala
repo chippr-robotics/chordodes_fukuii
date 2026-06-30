@@ -1490,7 +1490,7 @@ object SyncController:
           }
         }
         fileOpt.foreach { path =>
-          val chainIdBig = configBuilder.blockchainConfig.chainId
+          val chainIdBig = configBuilder.blockchainConfig.chainId.value
           log.info("[CHECKPOINT IMPORT] starting from {} (chainId={})", path, chainIdBig)
           val importer = new com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter(
             blockchainWriter,

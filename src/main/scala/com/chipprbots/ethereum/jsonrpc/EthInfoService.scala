@@ -99,7 +99,7 @@ class EthInfoService(
     IO.pure(Right(ProtocolVersionResponse(f"0x${capability.version}%x")))
 
   def chainId(@unused req: ChainIdRequest): ServiceResponse[ChainIdResponse] =
-    IO.pure(Right(ChainIdResponse(blockchainConfig.chainId)))
+    IO.pure(Right(ChainIdResponse(blockchainConfig.chainId.value)))
 
   /** Implements the eth_syncing method that returns syncing information if the node is syncing.
     *
@@ -133,7 +133,7 @@ class EthInfoService(
 
   def config(@unused req: ConfigRequest): ServiceResponse[ConfigResponse] = IO {
     val fbn = blockchainConfig.forkBlockNumbers
-    val chainId = blockchainConfig.chainId
+    val chainId = blockchainConfig.chainId.value
 
     val basePrecompiles: Map[String, Address] = Map(
       "ecrecover" -> PrecompiledContracts.EcDsaRecAddr,

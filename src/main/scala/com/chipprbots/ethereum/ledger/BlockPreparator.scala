@@ -670,7 +670,7 @@ class BlockPreparator(
     import com.chipprbots.ethereum.rlp.RLPImplicitConversions.toEncodeable
     import com.chipprbots.ethereum.rlp.RLPImplicits.given
 
-    if auth.chainId != 0 && auth.chainId != blockchainConfig.chainId then None
+    if auth.chainId != 0 && auth.chainId != blockchainConfig.chainId.value then None
     else
       val sigHash = com.chipprbots.ethereum.crypto.kec256(
         encode(
@@ -702,7 +702,7 @@ class BlockPreparator(
     import com.chipprbots.ethereum.rlp.RLPImplicits.given
 
     // 1. Verify chain ID: must be 0 (wildcard) or match current chain
-    if auth.chainId != 0 && auth.chainId != blockchainConfig.chainId then None
+    if auth.chainId != 0 && auth.chainId != blockchainConfig.chainId.value then None
     else
       // 2. Recover authority address from authorization signature
       val sigHash = com.chipprbots.ethereum.crypto.kec256(

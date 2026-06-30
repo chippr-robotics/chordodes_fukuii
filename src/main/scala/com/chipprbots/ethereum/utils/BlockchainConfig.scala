@@ -10,6 +10,7 @@ import com.typesafe.config.ConfigRenderOptions
 
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.ChainId
 import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.NumericUtils.*
@@ -43,7 +44,7 @@ case class BlockchainConfig(
     customGenesisJsonOpt: Option[String],
     daoForkConfig: Option[DaoForkConfig],
     accountStartNonce: UInt256,
-    chainId: BigInt,
+    chainId: ChainId,
     networkId: Long,
     monetaryPolicyConfig: MonetaryPolicyConfig,
     gasTieBreaker: Boolean,
@@ -208,9 +209,9 @@ object BlockchainConfig:
     val daoForkConfig = Try(blockchainConfig.getConfig("dao")).toOption.map(DaoForkConfig(_))
     val accountStartNonce: UInt256 = UInt256(BigInt(blockchainConfig.getString("account-start-nonce")))
 
-    val chainId: BigInt =
+    val chainId: ChainId =
       val s = blockchainConfig.getString("chain-id")
-      parseHexOrDecNumber(s)
+      ChainId(parseHexOrDecNumber(s))
 
     val networkId: Long = Try(blockchainConfig.getLong("network-id")).getOrElse {
       Try(BigInt(blockchainConfig.getString("network-id")).toLong).getOrElse(1L)

@@ -83,7 +83,7 @@ object CheckpointCli extends Logger:
       log.info(s"--block not given; using current best block: $best")
       best
     }
-    val chainId = builder.blockchainConfig.chainId
+    val chainId = builder.blockchainConfig.chainId.value
     val exporter = new CheckpointExporter(
       storages.stateStorage,
       storages.evmCodeStorage,
