@@ -142,13 +142,13 @@ class EthTxServiceSpec
     val request: GetTransactionByHashRequest = GetTransactionByHashRequest(txToRequestHash)
 
     // when
-    val response: Either[JsonRpcError, RawTransactionResponse] =
-      ethTxService.getRawTransactionByHash(request).unsafeRunSync()
+    val response: Future[Either[JsonRpcError, RawTransactionResponse]] =
+      ethTxService.getRawTransactionByHash(request).unsafeToFuture()
 
     // then
     replyPTM(PendingTransactionsResponse(Nil))
 
-    response shouldEqual Right(RawTransactionResponse(None))
+    response.futureValue shouldEqual Right(RawTransactionResponse(None))
 
   it should "handle eth_getRawTransactionByHash if the tx is still pending" taggedAs (
     UnitTest,
@@ -177,13 +177,13 @@ class EthTxServiceSpec
     val request: GetTransactionByHashRequest = GetTransactionByHashRequest(txToRequestHash)
 
     // when
-    val response: Either[JsonRpcError, RawTransactionResponse] =
-      ethTxService.getRawTransactionByHash(request).unsafeRunSync()
+    val response: Future[Either[JsonRpcError, RawTransactionResponse]] =
+      ethTxService.getRawTransactionByHash(request).unsafeToFuture()
 
     // then
     replyPTM(PendingTransactionsResponse(Nil))
 
-    response shouldEqual Right(RawTransactionResponse(Some(txToRequest)))
+    response.futureValue shouldEqual Right(RawTransactionResponse(Some(txToRequest)))
 
   it should "return minimum 1 wei gas price when there are no transactions" taggedAs (
     UnitTest,
@@ -303,12 +303,12 @@ class EthTxServiceSpec
   it should "handle get transaction by hash if the tx is not on the blockchain and not taggedAs (UnitTest, RPCTest) in the tx pool" in new TestSetup:
 
     val request: GetTransactionByHashRequest = GetTransactionByHashRequest(txToRequestHash)
-    val response: Either[JsonRpcError, GetTransactionByHashResponse] =
-      ethTxService.getTransactionByHash(request).unsafeRunSync()
+    val response: Future[Either[JsonRpcError, GetTransactionByHashResponse]] =
+      ethTxService.getTransactionByHash(request).unsafeToFuture()
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    response shouldEqual Right(GetTransactionByHashResponse(None))
+    response.futureValue shouldEqual Right(GetTransactionByHashResponse(None))
 
   it should "handle get transaction by hash if the tx is still pending" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
@@ -329,12 +329,12 @@ class EthTxServiceSpec
     blockchainWriter.storeBlock(blockWithTx).commit()
 
     val request: GetTransactionByHashRequest = GetTransactionByHashRequest(txToRequestHash)
-    val response: Either[JsonRpcError, GetTransactionByHashResponse] =
-      ethTxService.getTransactionByHash(request).unsafeRunSync()
+    val response: Future[Either[JsonRpcError, GetTransactionByHashResponse]] =
+      ethTxService.getTransactionByHash(request).unsafeToFuture()
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    response shouldEqual Right(
+    response.futureValue shouldEqual Right(
       GetTransactionByHashResponse(Some(TransactionResponse(txToRequest, Some(blockWithTx.header), Some(0))))
     )
 
@@ -383,11 +383,11 @@ class EthTxServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup:
-    val res: PendingTransactionsResponse = ethTxService.getTransactionsFromPool.unsafeRunSync()
+    val res: Future[PendingTransactionsResponse] = ethTxService.getTransactionsFromPool.unsafeToFuture()
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    res shouldBe PendingTransactionsResponse(Nil)
+    res.futureValue shouldBe PendingTransactionsResponse(Nil)
 
   it should "send message to pendingTransactionsManager and return GetPendingTransactionsResponse with two transactions" taggedAs (
     UnitTest,

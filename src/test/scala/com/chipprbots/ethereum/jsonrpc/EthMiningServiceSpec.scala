@@ -206,21 +206,22 @@ class EthMiningServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup:
-    val testMining: TestMining = buildTestMining()
-    override lazy val restrictedGenerator = new RestrictedPoWBlockGeneratorImpl(
-      evmCodeStorage = storagesInstance.storages.evmCodeStorage,
-      validators = MockValidatorsAlwaysSucceed,
-      blockchainReader = blockchainReader,
-      miningConfig = miningConfig,
-      blockPreparator = testMining.blockPreparator,
-      EthashDifficultyCalculator,
-      minerKey
-    )
-    override lazy val mining: TestMining = testMining.withBlockGenerator(restrictedGenerator)
+    (blockGenerator
+      .generateBlock(
+        _: Block,
+        _: Seq[SignedTransaction],
+        _: Address,
+        _: Seq[BlockHeader],
+        _: Option[InMemoryWorldStateProxy]
+      )(_: BlockchainConfig))
+      .expects(parentBlock, Nil, *, *, *, *)
+      .returning(PendingBlockAndState(PendingBlock(block, Nil), fakeWorld))
 
     blockchainWriter.save(parentBlock, Nil, ChainWeight.totalDifficultyOnly(parentBlock.header.difficulty.value), true)
 
-    val response: Either[JsonRpcError, GetWorkResponse] = ethMiningService.getWork(GetWorkRequest()).unsafeRunSync()
+    val workFuture: Future[Either[JsonRpcError, GetWorkResponse]] =
+      ethMiningService.getWork(GetWorkRequest()).unsafeToFuture()
+
     replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
     ommersPool.expectMsgPF() {
@@ -228,11 +229,13 @@ class EthMiningServiceSpec
         replyTo ! OmmersPool.Ommers(Nil)
     }
 
-    assert(response.isRight)
-    val responseData = response.toOption.get
+    import scala.concurrent.Await
+    val response: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
+    response shouldBe Symbol("right")
 
-    val submitRequest: SubmitWorkRequest =
-      SubmitWorkRequest(ByteString("nonce"), responseData.powHeaderHash, ByteString(Hex.decode("01" * 32)))
+    blockGenerator.getPrepared.expects(powHash).returning(Some(PendingBlock(block, Nil)))
+
+    val submitRequest = SubmitWorkRequest(ByteString("nonce"), powHash, ByteString(Hex.decode("01" * 32)))
     val response1: Either[JsonRpcError, SubmitWorkResponse] = ethMiningService.submitWork(submitRequest).unsafeRunSync()
     response1 shouldEqual Right(SubmitWorkResponse(true))
 

@@ -28,4 +28,4 @@ object GasPrice:
     def max(other: GasPrice): GasPrice = if p > other then p else other
 
   given rlpCodec: RLPCodec[GasPrice] = bigIntEncDec.xmap((v: BigInt) => GasPrice(v), _.value)
-  given Ordering[GasPrice] = Ordering.by(_.value)
+  given Ordering[GasPrice] = Ordering.by[GasPrice, BigInt](_.value)(using scala.math.Ordering.BigInt)
