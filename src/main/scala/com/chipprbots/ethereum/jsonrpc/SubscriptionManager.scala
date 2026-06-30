@@ -267,7 +267,7 @@ object SubscriptionManager:
         "to" -> tx.receivingAddress.map(a => JString(a.toString): JValue).getOrElse(JNull),
         "value" -> JString("0x" + tx.value.toString(16)),
         "gas" -> JString("0x" + tx.gasLimit.value.toString(16)),
-        "gasPrice" -> JString("0x" + tx.gasPrice.toString(16)),
+        "gasPrice" -> JString("0x" + tx.gasPrice.value.toString(16)),
         "input" -> JString("0x" + tx.payload.toHex)
       )
 

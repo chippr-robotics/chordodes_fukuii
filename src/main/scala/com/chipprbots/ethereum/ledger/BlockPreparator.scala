@@ -118,7 +118,7 @@ class BlockPreparator(
     * @return
     *   Upfront cost
     */
-  private[ledger] def calculateUpfrontGas(tx: Transaction): UInt256 = UInt256((tx.gasLimit * tx.gasPrice).value)
+  private[ledger] def calculateUpfrontGas(tx: Transaction): UInt256 = UInt256(tx.gasLimit.value * tx.gasPrice.value)
 
   /** v0 ≡ Tg (Tx gas limit) * Tp (Tx gas price) + Tv (Tx value). See YP equation number (65)
     *

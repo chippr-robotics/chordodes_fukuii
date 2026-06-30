@@ -185,7 +185,7 @@ object EthTransactionResponse:
       from = SignedTransaction.getSender(stx).map(_.bytes),
       to = stx.tx.receivingAddress.map(_.bytes),
       value = stx.tx.value,
-      gasPrice = stx.tx.gasPrice,
+      gasPrice = stx.tx.gasPrice.value,
       gas = stx.tx.gasLimit.value,
       input = stx.tx.payload,
       r = stx.signature.r,

@@ -429,7 +429,7 @@ object ETHPackets:
               RLPList(
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(chainId)),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(nonce)),
-                RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasPrice)),
+                RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasPrice.value)),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasLimit.value)),
                 receivingAddressBytes,
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(value)),
@@ -505,7 +505,7 @@ object ETHPackets:
           case LegacyTransaction(nonce, gasPrice, gasLimit, _, value, payload) =>
             RLPList(
               RLPValue(ByteUtils.bigIntToUnsignedByteArray(nonce)),
-              RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasPrice)),
+              RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasPrice.value)),
               RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasLimit.value)),
               receivingAddressBytes,
               RLPValue(ByteUtils.bigIntToUnsignedByteArray(value)),
@@ -652,7 +652,7 @@ object ETHPackets:
             TransactionWithAccessList(
               ByteUtils.bytesToBigInt(chainIdBytes),
               ByteUtils.bytesToBigInt(nonceBytes),
-              ByteUtils.bytesToBigInt(gasPriceBytes),
+              GasPrice(ByteUtils.bytesToBigInt(gasPriceBytes)),
               GasAmount(ByteUtils.bytesToBigInt(gasLimitBytes)),
               if receivingAddress.bytes.isEmpty then None else Some(Address(receivingAddress.bytes)),
               ByteUtils.bytesToBigInt(valueBytes),
@@ -679,7 +679,7 @@ object ETHPackets:
           SignedTransaction(
             LegacyTransaction(
               ByteUtils.bytesToBigInt(nonceBytes),
-              ByteUtils.bytesToBigInt(gasPriceBytes),
+              GasPrice(ByteUtils.bytesToBigInt(gasPriceBytes)),
               GasAmount(ByteUtils.bytesToBigInt(gasLimitBytes)),
               if receivingAddress.bytes.isEmpty then None else Some(Address(receivingAddress.bytes)),
               ByteUtils.bytesToBigInt(valueBytes),

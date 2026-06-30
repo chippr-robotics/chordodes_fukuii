@@ -154,7 +154,7 @@ abstract class BlockGeneratorSkeleton(
       .toList
       .flatMap { txsFromSender =>
         val ordered = txsFromSender
-          .sortBy(-_.tx.gasPrice)
+          .sortBy(-_.tx.gasPrice.value)
           .sortBy(_.tx.nonce)
           .foldLeft(Seq.empty[SignedTransaction]) { case (txs, tx) =>
             if txs.exists(_.tx.nonce == tx.tx.nonce) then txs

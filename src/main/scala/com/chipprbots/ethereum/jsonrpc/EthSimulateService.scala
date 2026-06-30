@@ -787,7 +787,7 @@ class EthSimulateService(
         else
           LegacyTransaction(
             nonce = senderNonce,
-            gasPrice = gasPrice,
+            gasPrice = GasPrice(gasPrice),
             gasLimit = GasAmount(gasLimit),
             receivingAddress = toAddr,
             value = value,

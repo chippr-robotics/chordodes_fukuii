@@ -38,10 +38,6 @@ object PeerEventBusActor:
     Source
       // Buffer 64 + dropHead: absorbs bursty peer messages without dying on a race.
       .actorRef[MessageFromPeer](PartialFunction.empty, PartialFunction.empty, 64, OverflowStrategy.dropHead)
-      // Bus-liveness propagation: fail this subscriber stream with WatchedActorTerminatedException when the
-      // PeerEventBusActor terminates, so consumers react instead of silently hanging with no further events and
-      // leaking the subscription/stage. `.watch` takes a classic ActorRef, so adapt the typed bus ref.
-      .watch(peerEventBus.toClassic)
       .mapMaterializedValue { actorRef =>
         peerEventBus ! SubscribeCmd(messageClassifier, actorRef.toTyped[PeerEvent])
         NotUsed
