@@ -84,7 +84,7 @@ object TestConverter:
       number = BlockNumber(parseBigInt(testHeader.number)),
       gasLimit = GasAmount(parseBigInt(testHeader.gasLimit)),
       gasUsed = GasAmount(parseBigInt(testHeader.gasUsed)),
-      unixTimestamp = parseBigInt(testHeader.timestamp).toLong,
+      unixTimestamp = Timestamp(parseBigInt(testHeader.timestamp).toLong),
       extraData = ByteString(parseHex(testHeader.extraData)),
       mixHash = BlockHash(ByteString(parseHex(testHeader.mixHash))),
       nonce = ByteString(parseHex(testHeader.nonce)),

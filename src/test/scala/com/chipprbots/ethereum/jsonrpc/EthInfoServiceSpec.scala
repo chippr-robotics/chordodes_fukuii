@@ -58,7 +58,7 @@ class EthServiceSpec
   it should "return configured chain id" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val response: ChainIdResponse = ethService.chainId(ChainIdRequest()).unsafeRunSync().toOption.get
 
-    assert(response === ChainIdResponse(blockchainConfig.chainId))
+    assert(response === ChainIdResponse(blockchainConfig.chainId.value))
 
   it should "return syncing info if the peer is syncing" taggedAs (UnitTest, RPCTest) in new TestSetup:
     syncingController.setAutoPilot(

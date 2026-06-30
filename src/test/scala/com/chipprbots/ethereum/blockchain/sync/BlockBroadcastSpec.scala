@@ -674,8 +674,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     SyncTest
   ) in new PoSTestSetup:
     // ETH68 peer from TestSetup (initialPeerInfo uses Capability.ETH68)
-    val header: BlockHeader = baseBlockHeader.copy(number = BigInt(999))
-    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(header.hash.value, header.number)))
+    val header: BlockHeader = baseBlockHeader.copy(number = BlockNumber(999))
+    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(header.hash.value, header.number.value)))
 
     blockBroadcast.announceCanonicalHead(header, Map(peer.id -> PeerWithInfo(peer, initialPeerInfo)))
 
@@ -688,8 +688,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   ) in new PoSTestSetup:
     val peerLatestBlock: BigInt = BigInt(500)
     val eth69Info: PeerInfo = eth69PeerInfoAt(peerLatestBlock)
-    val header: BlockHeader = baseBlockHeader.copy(number = BigInt(1000))
-    val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), header.number, header.hash.value)
+    val header: BlockHeader = baseBlockHeader.copy(number = BlockNumber(1000))
+    val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), header.number.value, header.hash.value)
 
     blockBroadcast.announceCanonicalHead(header, Map(peer.id -> PeerWithInfo(peer, eth69Info)))
 
@@ -709,8 +709,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
       maxBlockNumber = peerBlockNr
     )
     // Our head is behind the peer's reported block
-    val ourHeader: BlockHeader = baseBlockHeader.copy(number = BigInt(100))
-    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(ourHeader.hash.value, ourHeader.number)))
+    val ourHeader: BlockHeader = baseBlockHeader.copy(number = BlockNumber(100))
+    val expectedHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(ourHeader.hash.value, ourHeader.number.value)))
 
     blockBroadcast.announceCanonicalHead(ourHeader, Map(peer.id -> PeerWithInfo(peer, peerAheadInfo)))
 

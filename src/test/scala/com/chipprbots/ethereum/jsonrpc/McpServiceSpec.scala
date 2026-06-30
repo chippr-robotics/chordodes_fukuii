@@ -18,6 +18,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.domain.ChainId
 import com.chipprbots.ethereum.jsonrpc.McpService.*
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.*
@@ -33,7 +34,7 @@ class McpServiceSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with
   val syncControllerProbe: TestProbe = TestProbe()
 
   val testBlockchainConfig: BlockchainConfig = BlockchainConfig(
-    chainId = BigInt(61),
+    chainId = ChainId(61),
     networkId = 1,
     maxCodeSize = None,
     forkBlockNumbers = ForkBlockNumbers.Empty,

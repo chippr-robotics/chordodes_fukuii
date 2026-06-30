@@ -14,6 +14,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderGasLi
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.GasAmount
@@ -61,7 +62,7 @@ class OlympiaBlockHeaderValidationSpec
       number = BlockNumber(number),
       gasLimit = GasAmount(BigInt(8_000_000)),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = timestamp,
+      unixTimestamp = Timestamp(timestamp),
       difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefEmpty
@@ -73,7 +74,7 @@ class OlympiaBlockHeaderValidationSpec
       number = BlockNumber(olympiaBlock),
       gasLimit = GasAmount(OneStepFrom8M),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = timestamp,
+      unixTimestamp = Timestamp(timestamp),
       difficulty = Difficulty.Zero,
       extraData = baseExtraData,
       extraFields = HefPostOlympia(baseFee)
@@ -165,7 +166,7 @@ class OlympiaBlockHeaderValidationSpec
           number = BlockNumber(olympiaBlock + 1),
           gasLimit = GasAmount(TwoStepsFrom8M),
           gasUsed = GasAmount.Zero,
-          unixTimestamp = 2000L,
+          unixTimestamp = Timestamp(2000L),
           difficulty = Difficulty.Zero,
           extraData = baseExtraData,
           extraFields = HefPostOlympia(expectedBaseFee)
@@ -180,7 +181,7 @@ class OlympiaBlockHeaderValidationSpec
           number = BlockNumber(olympiaBlock + 1),
           gasLimit = GasAmount(TwoStepsFrom8M),
           gasUsed = GasAmount.Zero,
-          unixTimestamp = 2000L,
+          unixTimestamp = Timestamp(2000L),
           difficulty = Difficulty.Zero,
           extraData = baseExtraData,
           extraFields = HefEmpty
@@ -204,10 +205,10 @@ class OlympiaBlockHeaderValidationSpec
       ) in {
         val hiveGasLimit = BigInt(37699104) // gasTarget = 18_849_552
         val emptyParent = Fixtures.Blocks.ValidBlock.header.copy(
-          number = olympiaBlock,
-          gasLimit = hiveGasLimit,
-          gasUsed = 0,
-          unixTimestamp = 1000L,
+          number = BlockNumber(olympiaBlock),
+          gasLimit = GasAmount(hiveGasLimit),
+          gasUsed = GasAmount.Zero,
+          unixTimestamp = Timestamp(1000L),
           difficulty = Difficulty.Zero,
           extraData = baseExtraData,
           extraFields = HefPostOlympia(BigInt(7))
@@ -217,10 +218,10 @@ class OlympiaBlockHeaderValidationSpec
 
         val child = Fixtures.Blocks.ValidBlock.header.copy(
           parentHash = emptyParent.hash,
-          number = olympiaBlock + 1,
-          gasLimit = hiveGasLimit, // constant gasLimit: |diff| = 0 < parent/1024, valid
-          gasUsed = 0,
-          unixTimestamp = 2000L,
+          number = BlockNumber(olympiaBlock + 1),
+          gasLimit = GasAmount(hiveGasLimit), // constant gasLimit: |diff| = 0 < parent/1024, valid
+          gasUsed = GasAmount.Zero,
+          unixTimestamp = Timestamp(2000L),
           difficulty = Difficulty.Zero,
           extraData = baseExtraData,
           extraFields = HefPostOlympia(BigInt(7))

@@ -14,6 +14,7 @@ import com.chipprbots.ethereum.consensus.pow.blocks.Ommers
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.SignedTransaction
@@ -43,7 +44,7 @@ class GasLimitCalculationSpec
       extends BlockGeneratorSkeleton(
         config,
         new DifficultyCalculator:
-          def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
+          def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Timestamp, parent: BlockHeader)(implicit
               blockchainConfig: BlockchainConfig
           ): Difficulty = Difficulty(BigInt(1))
       ):
@@ -54,7 +55,7 @@ class GasLimitCalculationSpec
         blockNumber: BigInt,
         parent: com.chipprbots.ethereum.domain.Block,
         beneficiary: Address,
-        blockTimestamp: Long,
+        blockTimestamp: Timestamp,
         x: Ommers
     )(implicit blockchainConfig: BlockchainConfig): BlockHeader =
       defaultPrepareHeader(blockNumber, parent, beneficiary, blockTimestamp, x)

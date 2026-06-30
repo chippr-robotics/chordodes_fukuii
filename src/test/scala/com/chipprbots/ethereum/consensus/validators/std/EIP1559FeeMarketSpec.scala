@@ -64,7 +64,7 @@ class EIP1559FeeMarketSpec
       maxFeePerGas: BigInt = maxFee
   ): SignedTransaction =
     val tx = TransactionWithDynamicFee(
-      chainId = config.chainId,
+      chainId = config.chainId.value,
       nonce = 0,
       maxPriorityFeePerGas = maxPriority,
       maxFeePerGas = maxFeePerGas,
@@ -74,7 +74,7 @@ class EIP1559FeeMarketSpec
       payload = ByteString.empty,
       accessList = Nil
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   private def signLegacy(gasPrice: BigInt): SignedTransaction =
     val tx = LegacyTransaction(
@@ -85,7 +85,7 @@ class EIP1559FeeMarketSpec
       value = BigInt(0),
       payload = ByteString.empty
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   // ── Type-2 happy path ──────────────────────────────────────────────────────
 

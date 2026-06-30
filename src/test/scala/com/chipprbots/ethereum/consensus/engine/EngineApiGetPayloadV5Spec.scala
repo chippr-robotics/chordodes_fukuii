@@ -22,6 +22,7 @@ import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
 import com.chipprbots.ethereum.testing.Tags.*
@@ -53,7 +54,7 @@ class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers:
       number = BlockNumber(1),
       gasLimit = GasAmount(30000000),
       gasUsed = GasAmount(0),
-      unixTimestamp = timestamp,
+      unixTimestamp = Timestamp(timestamp),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8)),

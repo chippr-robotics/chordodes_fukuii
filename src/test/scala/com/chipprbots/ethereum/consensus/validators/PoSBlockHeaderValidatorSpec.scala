@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.PoSNonceErr
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.PoSOmmersError
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai
@@ -67,7 +68,7 @@ class PoSBlockHeaderValidatorSpec
       nonce = EmptyNonce,
       ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = HeaderTs,
+      unixTimestamp = Timestamp(HeaderTs),
       extraData = baseExtraData,
       extraFields = HefPostCancun(
         baseFee = BigInt(1),
@@ -131,7 +132,7 @@ class PoSBlockHeaderValidatorSpec
       "fail with MissingWithdrawalsRootError" taggedAs (UnitTest, ConsensusTest) in {
         // HefEmpty carries no withdrawalsRoot; under an active-Shanghai timestamp this is invalid.
         val noWithdrawals = validCancunHeader.copy(
-          unixTimestamp = ShanghaiTs, // Shanghai active, Cancun not yet
+          unixTimestamp = Timestamp(ShanghaiTs), // Shanghai active, Cancun not yet
           extraFields = HefEmpty
         )
         PoSBlockHeaderValidator.validateHeaderOnly(noWithdrawals) shouldBe Left(MissingWithdrawalsRootError)

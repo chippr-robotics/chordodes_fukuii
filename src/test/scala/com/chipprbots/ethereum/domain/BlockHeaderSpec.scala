@@ -62,7 +62,7 @@ class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyC
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(standardHeader.number.value)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(standardHeader.gasLimit.value)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(standardHeader.gasUsed.value)),
-        RLPValue(ByteUtils.bigIntToUnsignedByteArray(standardHeader.unixTimestamp)),
+        RLPValue(ByteUtils.bigIntToUnsignedByteArray(BigInt(standardHeader.unixTimestamp.toLong))),
         standardHeader.extraData.toArray,
         standardHeader.mixHash.toArray,
         standardHeader.nonce.toArray
@@ -95,7 +95,7 @@ class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyC
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(olympiaHeader.number.value)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(olympiaHeader.gasLimit.value)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(olympiaHeader.gasUsed.value)),
-        RLPValue(ByteUtils.bigIntToUnsignedByteArray(olympiaHeader.unixTimestamp)),
+        RLPValue(ByteUtils.bigIntToUnsignedByteArray(BigInt(olympiaHeader.unixTimestamp.toLong))),
         olympiaHeader.extraData.toArray,
         olympiaHeader.mixHash.toArray,
         olympiaHeader.nonce.toArray,
@@ -144,7 +144,7 @@ class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyC
       number = BlockNumber(20),
       gasLimit = GasAmount(131620495),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1486752441,
+      unixTimestamp = Timestamp(1486752441),
       extraData = ByteString(Hex.decode("d783010507846765746887676f312e372e33856c696e7578")),
       mixHash = BlockHash(ByteString(Hex.decode("6bc729364c9b682cfa923ba9480367ebdfa2a9bca2a652fe975e8d5958f696dd"))),
       nonce = ByteString(Hex.decode("797a8f3a494f937b"))
@@ -166,7 +166,7 @@ class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyC
       number = BlockNumber(19),
       gasLimit = GasAmount(131749155),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1486752440,
+      unixTimestamp = Timestamp(1486752440),
       extraData = ByteString(Hex.decode("d783010507846765746887676f312e372e33856c696e7578")),
       mixHash = BlockHash(ByteString(Hex.decode("7f9ac1ddeafff0f926ed9887b8cf7d50c3f919d902e618b957022c46c8b404a6"))),
       nonce = ByteString(Hex.decode("3fc7bc671f7cee70"))

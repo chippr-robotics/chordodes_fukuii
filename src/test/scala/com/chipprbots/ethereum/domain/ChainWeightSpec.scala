@@ -26,7 +26,7 @@ class ChainWeightSpec extends AnyFlatSpec with Matchers:
       number = BlockNumber(number),
       gasLimit = GasAmount.Zero,
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 0,
+      unixTimestamp = Timestamp(0),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString.empty),
       nonce = ByteString.empty

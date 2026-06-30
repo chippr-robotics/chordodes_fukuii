@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockNumber
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.MockWorldState.*
@@ -548,7 +549,7 @@ class Eip2929CallOpFixture(config: EvmConfig, forkBlockHeight: Int)
     extends CallOpFixture(config, MockWorldState(touchedAccounts = Set.empty)):
 
   override val fakeHeader: BlockHeader =
-    BlockFixtures.ValidBlock.header.copy(number = BlockNumber(forkBlockHeight), unixTimestamp = 0)
+    BlockFixtures.ValidBlock.header.copy(number = BlockNumber(forkBlockHeight), unixTimestamp = Timestamp(0))
 
   override val requiredGas: BigInt =
     val storageCost = 3 * (config.feeSchedule.G_sset + config.feeSchedule.G_cold_sload)

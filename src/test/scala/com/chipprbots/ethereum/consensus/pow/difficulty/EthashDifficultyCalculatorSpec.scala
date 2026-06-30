@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.GasAmount
@@ -41,7 +42,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
       number = BlockNumber(number),
       gasLimit = GasAmount(BigInt(8000000)),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = timestamp,
+      unixTimestamp = Timestamp(timestamp),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8))
@@ -99,7 +100,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     val parent = header(number = 10000000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
     val childTimestamp = 1005L
 
-    val newDiff = EthashDifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parent)
+    val newDiff = EthashDifficultyCalculator.calculateDifficulty(10000001, Timestamp(childTimestamp), parent)
     newDiff should be > parent.difficulty
   }
 
@@ -108,7 +109,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     val parent = header(number = 10000000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
     val childTimestamp = 1100L
 
-    val newDiff = EthashDifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parent)
+    val newDiff = EthashDifficultyCalculator.calculateDifficulty(10000001, Timestamp(childTimestamp), parent)
     newDiff should be < parent.difficulty
   }
 
@@ -117,7 +118,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     val parent = header(number = 10000000, difficulty = DifficultyCalculator.MinimumDifficulty, timestamp = 1000)
     val childTimestamp = 100000L
 
-    val newDiff = EthashDifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parent)
+    val newDiff = EthashDifficultyCalculator.calculateDifficulty(10000001, Timestamp(childTimestamp), parent)
     newDiff shouldBe DifficultyCalculator.MinimumDifficulty
   }
 
@@ -128,7 +129,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     val parent = header(number = 2999998, difficulty = Difficulty(BigInt("20000000000000")), timestamp = 1000)
     val childTimestamp = 1013L // ~13s gap, should be roughly same difficulty without bomb
 
-    val newDiff = EthashDifficultyCalculator.calculateDifficulty(2999999, childTimestamp, parent)
+    val newDiff = EthashDifficultyCalculator.calculateDifficulty(2999999, Timestamp(childTimestamp), parent)
     // Bomb adds 2^(blockNumber/100000 - 2) at block ~3M that's 2^(29-2) = 2^27 = 134M
     // Should still be calculable and positive
     newDiff should be > Difficulty.Zero
@@ -140,8 +141,8 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     val parent4_5M = header(number = 4500000, difficulty = Difficulty(BigInt("20000000000000")), timestamp = 1000)
     val childTimestamp = 1013L
 
-    val diff3_5M = EthashDifficultyCalculator.calculateDifficulty(3500001, childTimestamp, parent3_5M)
-    val diff4_5M = EthashDifficultyCalculator.calculateDifficulty(4500001, childTimestamp, parent4_5M)
+    val diff3_5M = EthashDifficultyCalculator.calculateDifficulty(3500001, Timestamp(childTimestamp), parent3_5M)
+    val diff4_5M = EthashDifficultyCalculator.calculateDifficulty(4500001, Timestamp(childTimestamp), parent4_5M)
 
     // Both should have same bomb contribution since bomb is paused
     // The base adjustment is the same (same parent difficulty, same timestamp gap)
@@ -157,8 +158,8 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     val parentB = header(number = 12000000, difficulty = Difficulty(BigInt("20000000000000")), timestamp = 1000)
     val childTimestamp = 1013L
 
-    val diffA = EthashDifficultyCalculator.calculateDifficulty(6000001, childTimestamp, parentA)
-    val diffB = EthashDifficultyCalculator.calculateDifficulty(12000001, childTimestamp, parentB)
+    val diffA = EthashDifficultyCalculator.calculateDifficulty(6000001, Timestamp(childTimestamp), parentA)
+    val diffB = EthashDifficultyCalculator.calculateDifficulty(12000001, Timestamp(childTimestamp), parentB)
 
     // Without bomb, same parent difficulty and timestamp gap should produce same result
     diffA shouldBe diffB
@@ -174,8 +175,10 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
       header(number = 10000000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000, hasUncles = true)
     val childTimestamp = 1013L
 
-    val diffNoUncles = EthashDifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parentNoUncles)
-    val diffWithUncles = EthashDifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parentWithUncles)
+    val diffNoUncles =
+      EthashDifficultyCalculator.calculateDifficulty(10000001, Timestamp(childTimestamp), parentNoUncles)
+    val diffWithUncles =
+      EthashDifficultyCalculator.calculateDifficulty(10000001, Timestamp(childTimestamp), parentWithUncles)
 
     // Parent with uncles should produce higher difficulty (uncle factor = 2 vs 1)
     diffWithUncles should be > diffNoUncles
@@ -186,12 +189,12 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
 
   it should "increase difficulty for fast blocks post-ECIP-1099" taggedAs (UnitTest, ConsensusTest) in {
     val parent = header(number = 15_000_000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
-    EthashDifficultyCalculator.calculateDifficulty(15_000_001, 1001L, parent) should be > parent.difficulty
+    EthashDifficultyCalculator.calculateDifficulty(15_000_001, Timestamp(1001L), parent) should be > parent.difficulty
   }
 
   it should "not change difficulty near target (13s gap) post-ECIP-1099" taggedAs (UnitTest, ConsensusTest) in {
     val parent = header(number = 15_000_000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
-    val newDiff = EthashDifficultyCalculator.calculateDifficulty(15_000_001, 1013L, parent)
+    val newDiff = EthashDifficultyCalculator.calculateDifficulty(15_000_001, Timestamp(1013L), parent)
     // 13s gap: adjustment factor is 0 → difficulty should be approximately equal (within parent/2048 band)
     val maxDelta = parent.difficulty / 2048
     (newDiff - parent.difficulty).value.abs should be <= maxDelta.value
@@ -199,12 +202,12 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
 
   it should "decrease difficulty for slow blocks post-ECIP-1099" taggedAs (UnitTest, ConsensusTest) in {
     val parent = header(number = 15_000_000, difficulty = Difficulty(BigInt("1000000000000")), timestamp = 1000)
-    EthashDifficultyCalculator.calculateDifficulty(15_000_001, 1030L, parent) should be < parent.difficulty
+    EthashDifficultyCalculator.calculateDifficulty(15_000_001, Timestamp(1030L), parent) should be < parent.difficulty
   }
 
   it should "not go below minimum difficulty (131072) post-ECIP-1099" taggedAs (UnitTest, ConsensusTest) in {
     val parent = header(number = 15_000_000, difficulty = DifficultyCalculator.MinimumDifficulty, timestamp = 1000)
-    val newDiff = EthashDifficultyCalculator.calculateDifficulty(15_000_001, 100_000L, parent)
+    val newDiff = EthashDifficultyCalculator.calculateDifficulty(15_000_001, Timestamp(100_000L), parent)
     newDiff shouldBe DifficultyCalculator.MinimumDifficulty
   }
 
@@ -222,8 +225,8 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     val childTimestamp = 1013L
 
     // Default config has no powTargetTime, so dispatches to EthashDifficultyCalculator
-    val result = DifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parent)
-    val direct = EthashDifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parent)
+    val result = DifficultyCalculator.calculateDifficulty(10000001, Timestamp(childTimestamp), parent)
+    val direct = EthashDifficultyCalculator.calculateDifficulty(10000001, Timestamp(childTimestamp), parent)
     result shouldBe direct
   }
 
@@ -232,7 +235,7 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     val childTimestamp = 1013L
 
     implicit val configWithTarget: BlockchainConfig = blockchainConfig.copy(powTargetTime = Some(15))
-    val result = DifficultyCalculator.calculateDifficulty(10000001, childTimestamp, parent)
+    val result = DifficultyCalculator.calculateDifficulty(10000001, Timestamp(childTimestamp), parent)
     // Should be different from Ethash calculator
     result should be > Difficulty.Zero
   }

@@ -50,7 +50,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
+        unixTimestamp = Timestamp(miningTimestamp),
         gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
@@ -77,7 +77,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
+        unixTimestamp = Timestamp(miningTimestamp),
         gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
@@ -107,7 +107,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
+        unixTimestamp = Timestamp(miningTimestamp),
         gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
@@ -161,7 +161,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
+        unixTimestamp = Timestamp(miningTimestamp),
         gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
@@ -202,7 +202,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
+        unixTimestamp = Timestamp(miningTimestamp),
         gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
@@ -272,7 +272,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
           mixHash = BlockHash(minedMixHash),
-          unixTimestamp = miningTimestamp,
+          unixTimestamp = Timestamp(miningTimestamp),
           gasLimit = GasAmount(generatedBlockGasLimit)
         )
       )
@@ -368,7 +368,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
           mixHash = BlockHash(minedMixHash),
-          unixTimestamp = miningTimestamp,
+          unixTimestamp = Timestamp(miningTimestamp),
           gasLimit = GasAmount(generatedBlockGasLimit)
         )
       )
@@ -408,7 +408,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
           mixHash = BlockHash(minedMixHash),
-          unixTimestamp = miningTimestamp,
+          unixTimestamp = Timestamp(miningTimestamp),
           gasLimit = GasAmount(generatedBlockGasLimit)
         )
       )
@@ -464,7 +464,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
+        unixTimestamp = Timestamp(miningTimestamp),
         gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
@@ -506,7 +506,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
         mixHash = BlockHash(minedMixHash),
-        unixTimestamp = miningTimestamp,
+        unixTimestamp = Timestamp(miningTimestamp),
         gasLimit = GasAmount(generatedBlockGasLimit)
       )
     )
@@ -540,7 +540,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger:
     )
 
     val typedTransaction: TypedTransaction = TransactionWithAccessList(
-      chainId = ChainId(61), // ethereum classic mainnet
+      chainId = BigInt(61), // ethereum classic mainnet
       nonce = 0,
       gasPrice = GasPrice(1),
       gasLimit = GasAmount(txGasLimit),

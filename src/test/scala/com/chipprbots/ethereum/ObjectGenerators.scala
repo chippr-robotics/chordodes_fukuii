@@ -279,7 +279,7 @@ trait ObjectGenerators:
     number = BlockNumber(number),
     gasLimit = GasAmount(gasLimit),
     gasUsed = GasAmount(gasUsed),
-    unixTimestamp = unixTimestamp,
+    unixTimestamp = Timestamp(unixTimestamp),
     extraData = extraData,
     mixHash = BlockHash(mixHash),
     nonce = nonce

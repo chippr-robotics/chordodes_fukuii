@@ -16,6 +16,7 @@ import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits.given
 
@@ -41,7 +42,7 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers:
       number = BlockNumber(0),
       gasLimit = GasAmount(BigInt("8000000")),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1701302272L,
+      unixTimestamp = Timestamp(1701302272L),
       extraData = ByteString(Hex.decode("00")),
       mixHash = BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
       nonce = ByteString(Hex.decode("0000000000000042"))
@@ -82,7 +83,7 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers:
       number = BlockNumber(0),
       gasLimit = GasAmount(BigInt("8000000")),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1701302272L,
+      unixTimestamp = Timestamp(1701302272L),
       extraData = ByteString(Hex.decode("00")),
       mixHash = BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
       nonce = ByteString(Hex.decode("0000000000000042"))

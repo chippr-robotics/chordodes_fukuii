@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import com.chipprbots.ethereum.domain.ChainId
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.BLOBBASEFEE
 import com.chipprbots.ethereum.vm.BLOBHASH
@@ -183,10 +184,10 @@ class ETCForkComplianceSpec extends AnyFlatSpec with Matchers:
   // ── CHAINID value on ETC mainnet ────────────────────────────────────────────
 
   "CHAINID opcode" should "return 61 on ETC mainnet after Phoenix" taggedAs (UnitTest, ConsensusTest) in {
-    etcConfig.chainId shouldBe 61
+    etcConfig.chainId shouldBe ChainId(61)
   }
 
   it should "return 63 on Mordor after Phoenix" taggedAs (UnitTest, ConsensusTest) in {
-    mordorConfig.chainId shouldBe 63
+    mordorConfig.chainId shouldBe ChainId(63)
   }
 // scalastyle:on magic.number

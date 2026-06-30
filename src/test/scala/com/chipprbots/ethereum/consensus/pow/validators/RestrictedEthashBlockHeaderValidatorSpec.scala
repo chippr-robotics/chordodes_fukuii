@@ -16,9 +16,11 @@ import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockNumber
+import com.chipprbots.ethereum.domain.ChainId
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.TrieRoot
@@ -101,7 +103,7 @@ class RestrictedEthashBlockHeaderValidatorSpec
         daoForkConfig = None,
         // unused
         maxCodeSize = None,
-        chainId = 0x3d,
+        chainId = ChainId(0x3d),
         networkId = 1,
         monetaryPolicyConfig = null,
         customGenesisFileOpt = None,
@@ -133,7 +135,7 @@ class RestrictedEthashBlockHeaderValidatorSpec
       number = BlockNumber(10),
       gasLimit = GasAmount(5030),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1605514463,
+      unixTimestamp = Timestamp(1605514463),
       extraData = ByteStringUtils.string2hash(
         "6d616e746973808fc245b89183f28ac985019992f202a73c7ab600b0aefa18dcba71a8f3576129280d56f4f499e7a8a53a047e91d73d881745b7a6ac7ca9449fc2b3bb1608921c"
       ),
@@ -159,7 +161,7 @@ class RestrictedEthashBlockHeaderValidatorSpec
       number = BlockNumber(11),
       gasLimit = GasAmount(5033),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1605514466,
+      unixTimestamp = Timestamp(1605514466),
       extraData = ByteStringUtils.string2hash(
         "6d616e746973dccb0bbbfb07910cf745bde048bd0887d03e2ac790575b7cad36bf44d83e55877ea832719c978d2336b64c2200d0ced5777cd98e2d74d2cd5c0608c8a91067ae1b"
       ),

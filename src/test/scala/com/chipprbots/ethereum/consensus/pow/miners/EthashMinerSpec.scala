@@ -91,7 +91,7 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
         difficulty = Difficulty(UInt256(Hex.decode("0400")).toBigInt),
         number = BlockNumber(0),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 0
+        unixTimestamp = Timestamp(0)
       ),
       Fixtures.Blocks.ValidBlock.body
     )

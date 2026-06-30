@@ -249,7 +249,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup:
       number = BlockNumber(blockNumber),
       gasLimit = GasAmount(parseBigInt(testBlock.blockHeader.gasLimit)),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = parseBigInt(testBlock.blockHeader.timestamp).toLong - 1,
+      unixTimestamp = Timestamp(parseBigInt(testBlock.blockHeader.timestamp).toLong - 1),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString(Array.fill(32)(0.toByte))),
       nonce = ByteString(Array.fill(8)(0.toByte))

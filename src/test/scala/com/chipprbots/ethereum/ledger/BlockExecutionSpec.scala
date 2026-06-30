@@ -250,7 +250,7 @@ class BlockExecutionSpec
         forAll(table) { (gasLimit, logs, addressesToDelete, txValidAccordingToValidators) =>
           val tx = validTx.copy(gasLimit = GasAmount(gasLimit))
           val stx = SignedTransactionWithSender(
-            SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId)),
+            SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value)),
             Address(originKeyPair)
           )
 
@@ -540,8 +540,8 @@ class BlockExecutionSpec
         val keyPair1 = keyPair(origin1Address)
         val keyPair2 = keyPair(origin2Address)
 
-        val st1 = SignedTransaction.sign(tx1, keyPair1, Some(blockchainConfig.chainId))
-        val st2 = SignedTransaction.sign(tx2, keyPair2, Some(blockchainConfig.chainId))
+        val st1 = SignedTransaction.sign(tx1, keyPair1, Some(blockchainConfig.chainId.value))
+        val st2 = SignedTransaction.sign(tx2, keyPair2, Some(blockchainConfig.chainId.value))
 
         val stx1 = SignedTransactionWithSender(st1, Address(keyPair1))
         val stx2 = SignedTransactionWithSender(st2, Address(keyPair2))

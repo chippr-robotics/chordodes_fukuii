@@ -25,6 +25,7 @@ import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.Receipt
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.branch.Branch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
 import com.chipprbots.ethereum.domain.BlockHash
@@ -262,7 +263,7 @@ class BranchResolutionSpec
         reactivationBlock = Some(BigInt(25_000_000)) // Olympia reactivation
       )
       val olympiaBlock: Block = Block(
-        oldBlock.header.copy(number = BlockNumber(BigInt(25_000_001)), unixTimestamp = headTs),
+        oldBlock.header.copy(number = BlockNumber(BigInt(25_000_001)), unixTimestamp = Timestamp(headTs)),
         oldBlock.body
       )
 
@@ -431,7 +432,7 @@ class BranchResolutionSpec
     /** Single canonical block at height 10 with difficulty=100 and a controlled timestamp. */
     val oldBlock: Block =
       val b = getBlock(number = 10, difficulty = 100, parent = commonParentHash)
-      Block(b.header.copy(unixTimestamp = headTs), b.body)
+      Block(b.header.copy(unixTimestamp = Timestamp(headTs)), b.body)
 
     /** Standard ETC/Mordor MESS config: active from block 10, no deactivation. */
     val ETCMessConfig: MESSConfig = MESSConfig(
@@ -445,4 +446,4 @@ class BranchResolutionSpec
     def expectAncestorHeader(ts: Long = ancestorTs): Unit =
       blockchainReader.getBlockHeaderByHash
         .expects(BlockHash(commonParentHash))
-        .returning(Some(defaultHeader.copy(number = BlockNumber(9), unixTimestamp = ts)))
+        .returning(Some(defaultHeader.copy(number = BlockNumber(9), unixTimestamp = Timestamp(ts))))

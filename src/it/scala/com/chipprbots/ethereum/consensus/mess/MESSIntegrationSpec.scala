@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 
 /** Integration test for MESS (ECIP-1100: Modified Exponential Subjective Scoring).
@@ -38,7 +39,7 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers:
       number = BlockNumber(number),
       gasLimit = GasAmount.Zero,
       gasUsed = GasAmount.Zero,
-      unixTimestamp = timestamp,
+      unixTimestamp = Timestamp(timestamp),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString.empty),
       nonce = ByteString.empty

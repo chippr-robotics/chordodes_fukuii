@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.GasAmount
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
@@ -104,7 +105,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       number = BlockNumber(number),
       gasLimit = GasAmount(BigInt(8000000)),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = timestamp,
+      unixTimestamp = Timestamp(timestamp),
       extraData = ByteString.empty,
       mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8))
@@ -120,7 +121,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       case Seq(parent, child) =>
         val computed = EthashDifficultyCalculator.calculateDifficulty(
           child.number,
-          child.timestamp,
+          Timestamp(child.timestamp),
           fromSnapshot(parent)
         )
         withClue(s"block ${child.number} (gap=${child.timestamp - parent.timestamp}s)") {
@@ -146,7 +147,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       val num = startBlock + i
       val childTs = prevTs + gapSecs
       val parentHdr = header(num - 1, prevDiff, prevTs)
-      val newDiff = EthashDifficultyCalculator.calculateDifficulty(num, childTs, parentHdr)
+      val newDiff = EthashDifficultyCalculator.calculateDifficulty(num, Timestamp(childTs), parentHdr)
       results += ((num, newDiff.value))
       prevDiff = newDiff.value
       prevTs = childTs

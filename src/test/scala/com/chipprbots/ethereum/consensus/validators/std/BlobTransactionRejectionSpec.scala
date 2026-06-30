@@ -31,7 +31,7 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
   private val validS = ByteString(Hex.decode("72216654137b4b58a4ece0a6df87aa1a4faf18ec4091839dd1c722fa9604fd09"))
 
   private val blobTx = BlobTransaction(
-    chainId = blockchainConfig.chainId,
+    chainId = blockchainConfig.chainId.value,
     nonce = 0,
     maxPriorityFeePerGas = BigInt("1000000000"),
     maxFeePerGas = BigInt("2000000000"),
@@ -107,7 +107,7 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
     implicit val cancunCfg: BlockchainConfig = blockchainConfig.copy(
       forkTimestamps = blockchainConfig.forkTimestamps.copy(cancunTimestamp = Some(0L))
     )
-    val cancunHeader = etcBlockHeader.copy(unixTimestamp = 1_000_000_000L)
+    val cancunHeader = etcBlockHeader.copy(unixTimestamp = Timestamp(1_000_000_000L))
     validate(signedBlobTx, cancunHeader)(cancunCfg) match
       case Left(TransactionSyntaxError(msg)) if msg.contains("TYPE_3_TX_NOT_SUPPORTED") =>
         fail("Blob tx should not be rejected for type when Cancun is active")

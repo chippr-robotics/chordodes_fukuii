@@ -113,7 +113,7 @@ trait MinerSpecSetup
   lazy val mining: PoWMining = buildPoWConsensus().withBlockGenerator(blockGenerator)
   implicit override lazy val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
   lazy val difficultyCalc = EthashDifficultyCalculator
-  val blockForMiningTimestamp: Long = System.currentTimeMillis()
+  val blockForMiningTimestamp: Timestamp = Timestamp(System.currentTimeMillis())
 
   protected def getParentBlock(parentBlockNumber: Int): Block =
     origin.copy(header = origin.header.copy(number = BlockNumber(parentBlockNumber)))

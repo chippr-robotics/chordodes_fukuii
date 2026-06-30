@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
@@ -40,7 +41,7 @@ object PoWBlockHeaderValidatorSpec:
     number = BlockNumber(20),
     gasLimit = GasAmount(131620495),
     gasUsed = GasAmount.Zero,
-    unixTimestamp = 1486752441,
+    unixTimestamp = Timestamp(1486752441),
     extraData = ByteString(Hex.decode("d783010507846765746887676f312e372e33856c696e7578")),
     mixHash = BlockHash(ByteString(Hex.decode("6bc729364c9b682cfa923ba9480367ebdfa2a9bca2a652fe975e8d5958f696dd"))),
     nonce = ByteString(Hex.decode("797a8f3a494f937b"))

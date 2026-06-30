@@ -137,7 +137,7 @@ class FilterManagerSpec
       address = Address(0x1234),
       data = ByteString(Hex.decode("99aaff")),
       topics = logs2.head.logTopics,
-      blockTimestamp = Some(bh2.unixTimestamp)
+      blockTimestamp = Some(BigInt(bh2.unixTimestamp.toLong))
     )
 
     // same best block, no new logs
@@ -345,7 +345,7 @@ class FilterManagerSpec
       address = Address(0x1234),
       data = ByteString(Hex.decode("99aaff")),
       topics = logs.head.logTopics,
-      blockTimestamp = Some(bh.unixTimestamp)
+      blockTimestamp = Some(BigInt(bh.unixTimestamp.toLong))
     )
 
     logsResp.logs(1) shouldBe FilterManager.TxLog(
@@ -357,7 +357,7 @@ class FilterManagerSpec
       address = Address(0x1234),
       data = ByteString(Hex.decode("99aaff")),
       topics = logs2.head.logTopics,
-      blockTimestamp = Some(block2.header.unixTimestamp)
+      blockTimestamp = Some(BigInt(block2.header.unixTimestamp.toLong))
     )
 
   it should "handle block filter" taggedAs (UnitTest, RPCTest) in new TestSetup:
@@ -530,7 +530,7 @@ class FilterManagerSpec
       number = BlockNumber(1),
       gasLimit = GasAmount(5000),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1438270431,
+      unixTimestamp = Timestamp(1438270431),
       extraData = ByteString(Hex.decode("426974636f696e2069732054484520426c6f636b636861696e2e")),
       mixHash = BlockHash(ByteString(Hex.decode("c6d695926546d3d679199303a6d1fc983fe3f09f44396619a24c4271830a7b95"))),
       nonce = ByteString(Hex.decode("62bc3dca012c1b27"))

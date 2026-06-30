@@ -12,6 +12,7 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -191,7 +192,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory:
       number = BlockNumber(1),
       gasLimit = GasAmount(1000000),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 0
+      unixTimestamp = Timestamp(0)
     )
 
     def getBlock(

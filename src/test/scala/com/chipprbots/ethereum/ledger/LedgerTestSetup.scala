@@ -62,7 +62,7 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
     number = BlockNumber(blockchainConfig.forkBlockNumbers.homesteadBlockNumber + 1),
     gasLimit = GasAmount(1000000),
     gasUsed = GasAmount.Zero,
-    unixTimestamp = 1486752441
+    unixTimestamp = Timestamp(1486752441)
   )
 
   val defaultTx: LegacyTransaction = LegacyTransaction(
@@ -201,7 +201,7 @@ trait BlockchainSetup extends TestSetup:
     value = defaultValue
   )
   val validStxSignedByOrigin: SignedTransaction =
-    SignedTransaction.sign(validTx, originKeyPair, Some(blockchainConfig.chainId))
+    SignedTransaction.sign(validTx, originKeyPair, Some(blockchainConfig.chainId.value))
 
 // SCALA 3 MIGRATION: Cannot use self-type constraint with anonymous instantiation in Scala 3.
 // The implementing class must extend MockFactory and provide mock implementations.
@@ -249,7 +249,7 @@ trait DaoForkTestSetup extends TestSetup:
       )
     )
     .copy(
-      chainId = 0x01,
+      chainId = ChainId(0x01),
       networkId = 1,
       daoForkConfig = Some(supportDaoForkConfig),
       customGenesisFileOpt = None,
@@ -299,7 +299,7 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
     number = BlockNumber(1),
     gasLimit = GasAmount(1000000),
     gasUsed = GasAmount.Zero,
-    unixTimestamp = 0
+    unixTimestamp = Timestamp(0)
   )
 
   val genesisHeader: BlockHeader = defaultHeader.copy(number = BlockNumber(0), extraData = ByteString("genesis"))

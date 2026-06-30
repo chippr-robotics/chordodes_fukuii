@@ -48,7 +48,7 @@ class EIP7825GasCapSpec
       value = 0,
       payload = ByteString.empty
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   def makeHeader(number: BigInt): BlockHeader =
     val extraFields = if number >= olympiaBlock then HefPostOlympia(BigInt(1000000000)) else HefEmpty

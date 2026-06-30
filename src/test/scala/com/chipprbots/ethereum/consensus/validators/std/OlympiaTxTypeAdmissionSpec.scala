@@ -58,7 +58,7 @@ class OlympiaTxTypeAdmissionSpec
 
   private def signType2(): SignedTransaction =
     val tx = TransactionWithDynamicFee(
-      chainId = config.chainId,
+      chainId = config.chainId.value,
       nonce = 0,
       maxPriorityFeePerGas = BigInt(1_000_000_000),
       maxFeePerGas = BigInt(2_000_000_000),
@@ -68,11 +68,11 @@ class OlympiaTxTypeAdmissionSpec
       payload = ByteString.empty,
       accessList = Nil
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   private def signType4(): SignedTransaction =
     val auth = SetCodeAuthorization(
-      chainId = config.chainId,
+      chainId = config.chainId.value,
       address = Address(1),
       nonce = BigInt(0),
       v = BigInt(0),
@@ -80,7 +80,7 @@ class OlympiaTxTypeAdmissionSpec
       s = BigInt(789012)
     )
     val tx = SetCodeTransaction(
-      chainId = config.chainId,
+      chainId = config.chainId.value,
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(1_000_000_000),
       maxFeePerGas = BigInt(2_000_000_000),
@@ -91,7 +91,7 @@ class OlympiaTxTypeAdmissionSpec
       accessList = Nil,
       authorizationList = List(auth)
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   private def signLegacy(): SignedTransaction =
     val tx = LegacyTransaction(
@@ -102,7 +102,7 @@ class OlympiaTxTypeAdmissionSpec
       value = BigInt(0),
       payload = ByteString.empty
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   private def validate(stx: SignedTransaction, header: BlockHeader) =
     StdSignedTransactionValidator.validate(
@@ -154,11 +154,11 @@ class OlympiaTxTypeAdmissionSpec
       value = BigInt(0),
       payload = ByteString(0x60, 0x60)
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   private def signType1(): SignedTransaction =
     val tx = TransactionWithAccessList(
-      chainId = config.chainId,
+      chainId = config.chainId.value,
       nonce = BigInt(0),
       gasPrice = GasPrice(1_000_000_000),
       gasLimit = GasAmount(21000),
@@ -167,7 +167,7 @@ class OlympiaTxTypeAdmissionSpec
       payload = ByteString.empty,
       accessList = Nil
     )
-    SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
+    SignedTransaction.sign(tx, senderKeys, Some(config.chainId.value))
 
   "OlympiaAllTxTypes" should "accept Type 0 (legacy) pre-Olympia" taggedAs (OlympiaTest, ConsensusTest) in {
     validate(signLegacy(), preOlympiaHeader) shouldBe a[Right[?, ?]]

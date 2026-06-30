@@ -53,7 +53,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
           )
 
         val stx: SignedTransactionWithSender = SignedTransactionWithSender(
-          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId)),
+          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value)),
           Address(originKeyPair)
         )
 
@@ -76,7 +76,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         )
 
         val stx: SignedTransactionWithSender = SignedTransactionWithSender(
-          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId)),
+          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value)),
           Address(originKeyPair)
         )
 
@@ -100,7 +100,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
           payload = ByteString.empty
         )
         val stx: SignedTransactionWithSender = SignedTransactionWithSender(
-          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId)),
+          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value)),
           Address(originKeyPair)
         )
         val header: BlockHeader =
@@ -122,7 +122,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
           receivingAddress = None,
           payload = ByteString.empty
         )
-        val stx: SignedTransaction = SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId))
+        val stx: SignedTransaction = SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value))
         val header: BlockHeader =
           defaultBlockHeader.copy(
             beneficiary = minerAddress.bytes,
@@ -151,7 +151,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
           payload = ByteString.empty
         )
         val stx: SignedTransactionWithSender = SignedTransactionWithSender(
-          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId)),
+          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value)),
           Address(originKeyPair)
         )
         val header: BlockHeader =
@@ -188,7 +188,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         val tx = defaultTx.copy(gasPrice = defaultGasPrice, gasLimit = GasAmount(defaultGasLimit.toBigInt))
 
         val stx = SignedTransactionWithSender(
-          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId)),
+          SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value)),
           Address(originKeyPair)
         )
 
@@ -241,7 +241,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         .saveAccount(originAddress, Account(nonce = UInt256(initialOriginNonce), balance = initialOriginBalance))
 
       val stx = SignedTransactionWithSender(
-        SignedTransaction.sign(defaultTx, originKeyPair, Some(blockchainConfig.chainId)),
+        SignedTransaction.sign(defaultTx, originKeyPair, Some(blockchainConfig.chainId.value)),
         Address(originKeyPair)
       )
 
@@ -268,7 +268,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     )
 
     val tx: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice.Zero, receivingAddress = None, payload = inputData)
-    val stx: SignedTransaction = SignedTransaction.sign(tx, newAccountKeyPair, Some(blockchainConfig.chainId))
+    val stx: SignedTransaction = SignedTransaction.sign(tx, newAccountKeyPair, Some(blockchainConfig.chainId.value))
 
     val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
       mining.blockPreparator.executeTransactions(
@@ -307,10 +307,10 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     val tx2: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(43), receivingAddress = Some(Address(43)))
     val tx3: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(43), receivingAddress = Some(Address(43)))
     val tx4: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(42), receivingAddress = Some(Address(42)))
-    val stx1: SignedTransaction = SignedTransaction.sign(tx1, newAccountKeyPair, Some(blockchainConfig.chainId))
-    val stx2: SignedTransaction = SignedTransaction.sign(tx2, newAccountKeyPair, Some(blockchainConfig.chainId))
-    val stx3: SignedTransaction = SignedTransaction.sign(tx3, newAccountKeyPair, Some(blockchainConfig.chainId))
-    val stx4: SignedTransaction = SignedTransaction.sign(tx4, newAccountKeyPair, Some(blockchainConfig.chainId))
+    val stx1: SignedTransaction = SignedTransaction.sign(tx1, newAccountKeyPair, Some(blockchainConfig.chainId.value))
+    val stx2: SignedTransaction = SignedTransaction.sign(tx2, newAccountKeyPair, Some(blockchainConfig.chainId.value))
+    val stx3: SignedTransaction = SignedTransaction.sign(tx3, newAccountKeyPair, Some(blockchainConfig.chainId.value))
+    val stx4: SignedTransaction = SignedTransaction.sign(tx4, newAccountKeyPair, Some(blockchainConfig.chainId.value))
 
     val result: (BlockResult, Seq[SignedTransaction]) = mining.blockPreparator.executePreparedTransactions(
       Seq(stx1, stx2, stx3, stx4),
@@ -342,8 +342,8 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
     val tx1: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(42), receivingAddress = Some(Address(42)))
     val tx2: LegacyTransaction = defaultTx.copy(gasPrice = GasPrice(42), receivingAddress = Some(Address(42)))
-    val stx1: SignedTransaction = SignedTransaction.sign(tx1, newAccountKeyPair, Some(blockchainConfig.chainId))
-    val stx2: SignedTransaction = SignedTransaction.sign(tx2, newAccountKeyPair, Some(blockchainConfig.chainId))
+    val stx1: SignedTransaction = SignedTransaction.sign(tx1, newAccountKeyPair, Some(blockchainConfig.chainId.value))
+    val stx2: SignedTransaction = SignedTransaction.sign(tx2, newAccountKeyPair, Some(blockchainConfig.chainId.value))
 
     val result: (BlockResult, Seq[SignedTransaction]) =
       mining.blockPreparator.executePreparedTransactions(Seq(stx1, stx2), initialWorld, defaultBlockHeader)
@@ -360,7 +360,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
       receivingAddress = None,
       payload = ByteString.empty
     )
-    val stx: SignedTransaction = SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId))
+    val stx: SignedTransaction = SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value))
     val header: BlockHeader =
       defaultBlockHeader.copy(number = BlockNumber(blockchainConfig.forkBlockNumbers.byzantiumBlockNumber - 1))
 
@@ -380,7 +380,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
       receivingAddress = None,
       payload = ByteString.empty
     )
-    val stx: SignedTransaction = SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId))
+    val stx: SignedTransaction = SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value))
     val header: BlockHeader =
       defaultBlockHeader.copy(
         beneficiary = minerAddress.bytes,
@@ -408,7 +408,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
       receivingAddress = None,
       payload = ByteString.empty
     )
-    val stx: SignedTransaction = SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId))
+    val stx: SignedTransaction = SignedTransaction.sign(tx, originKeyPair, Some(blockchainConfig.chainId.value))
     val header: BlockHeader =
       defaultBlockHeader.copy(
         beneficiary = minerAddress.bytes,
@@ -440,7 +440,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
       val blockTs = 100L
       val numBlobs = 2
       val blobTx = BlobTransaction(
-        chainId = pragueConfig.chainId,
+        chainId = pragueConfig.chainId.value,
         nonce = 1,
         maxPriorityFeePerGas = 1,
         maxFeePerGas = 1000,
@@ -454,7 +454,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
       )
       val stx = SignedTransaction(blobTx, ECDSASignature(0, 0, 0))
       val header = defaultBlockHeader.copy(
-        unixTimestamp = blockTs,
+        unixTimestamp = Timestamp(blockTs),
         extraFields = HefPostCancun(
           baseFee = BigInt(1_000_000_000L),
           withdrawalsRoot = ByteString(new Array[Byte](32)),
@@ -469,7 +469,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
       val resultWorld = prep.deductBlobGas(stx, originAddress, header, world)
 
-      val expectedFee = BlobGasUtils.getBlobGasPrice(excessBlobGas, blockTs, pragueConfig)
+      val expectedFee = BlobGasUtils.getBlobGasPrice(excessBlobGas, Timestamp(blockTs), pragueConfig)
       val expectedBurned = expectedFee * BlobGasUtils.GAS_PER_BLOB * numBlobs
       val actualBalance = resultWorld.getGuaranteedAccount(originAddress).balance
 

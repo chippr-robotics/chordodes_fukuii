@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.utils.Hex
 class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
 
   "EIP-155 BigInt chain ID" should "handle ETC mainnet (chain ID 61)" taggedAs (UnitTest) in {
-    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = 61)
+    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = ChainId(61))
 
     val tx = LegacyTransaction(
       nonce = 0,
@@ -63,7 +63,7 @@ class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "handle Gorgoroth testnet (chain ID 1337)" taggedAs (UnitTest) in {
-    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = 1337)
+    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = ChainId(1337))
 
     val tx = LegacyTransaction(
       nonce = 5,
@@ -106,7 +106,7 @@ class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "handle Arbitrum One (chain ID 42161)" taggedAs (UnitTest) in {
-    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = 42161)
+    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = ChainId(42161))
 
     val tx = LegacyTransaction(
       nonce = 10,
@@ -146,7 +146,7 @@ class EIP155BigIntChainIdSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "still support pre-EIP-155 transactions (v=27/28)" taggedAs (UnitTest) in {
-    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = 61)
+    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = ChainId(61))
 
     val tx = LegacyTransaction(
       nonce = 0,

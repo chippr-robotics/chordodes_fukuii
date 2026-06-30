@@ -39,6 +39,7 @@ import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.keystore.KeyStore
@@ -276,7 +277,7 @@ class JsonRpcControllerFixture(implicit
     number = BlockNumber(2),
     gasLimit = GasAmount.Zero,
     gasUsed = GasAmount.Zero,
-    unixTimestamp = 0
+    unixTimestamp = Timestamp(0)
   )
 
   val blockWithTreasuryOptOut: Block =

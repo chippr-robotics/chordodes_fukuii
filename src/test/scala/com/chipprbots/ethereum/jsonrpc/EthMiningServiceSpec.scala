@@ -47,6 +47,7 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.*
 import com.chipprbots.ethereum.jsonrpc.NodeJsonRpcHealthChecker.JsonRpcHealthConfig
@@ -545,7 +546,7 @@ class EthMiningServiceSpec
         number = BlockNumber(0),
         gasLimit = GasAmount(16733003),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1494604900,
+        unixTimestamp = Timestamp(1494604900),
         extraData = ByteString.empty,
         mixHash = BlockHash(ByteString.empty),
         nonce = ByteString.empty
@@ -569,7 +570,7 @@ class EthMiningServiceSpec
         number = BlockNumber(1),
         gasLimit = GasAmount(16733003),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1494604913,
+        unixTimestamp = Timestamp(1494604913),
         extraData = ByteString(Hex.decode("6d696e6564207769746820657463207363616c61")),
         mixHash = BlockHash(ByteString.empty),
         nonce = ByteString.empty

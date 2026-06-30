@@ -24,7 +24,7 @@ class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBeha
 
   "Legacy transaction sender" should "be properly recoverable from rlp encoded values" taggedAs (UnitTest) in {
 
-    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = 1)
+    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig.copy(chainId = ChainId(1))
 
     // values are taken from https://github.com/ethereum/go-ethereum/blob/90987db7334c1d10eb866ca550efedb66dea8a20/core/types/transaction_signing_test.go#L79-L94
     val testValues = Table(

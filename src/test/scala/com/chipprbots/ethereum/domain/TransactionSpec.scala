@@ -56,7 +56,7 @@ class TransactionSpec
         Address(slice)
 
       val originalSignedTransaction =
-        SignedTransaction.sign(originalTransaction, senderKeys, Some(blockchainConfig.chainId))
+        SignedTransaction.sign(originalTransaction, senderKeys, Some(blockchainConfig.chainId.value))
       // check for proper signature content
       getSender(originalSignedTransaction) shouldEqual (Some(originalSenderAddress))
 

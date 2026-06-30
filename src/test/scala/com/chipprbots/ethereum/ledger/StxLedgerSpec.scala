@@ -163,7 +163,7 @@ trait ScenarioSetup extends EphemBlockchainTestSetup:
       phoenixBlockNumber = 0,
       petersburgBlockNumber = 0
     ),
-    chainId = 0x03,
+    chainId = ChainId(0x03),
     networkId = 1,
     maxCodeSize = None,
     customGenesisFileOpt = None,

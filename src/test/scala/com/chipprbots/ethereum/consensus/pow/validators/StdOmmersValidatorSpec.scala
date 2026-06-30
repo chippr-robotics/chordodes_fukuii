@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -161,7 +162,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
       number = BlockNumber(94),
       gasLimit = GasAmount(5000),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1438270431,
+      unixTimestamp = Timestamp(1438270431),
       extraData = ByteString(Hex.decode("476574682f76312e302e302f6c696e75782f676f312e342e32")),
       mixHash = BlockHash(ByteString(Hex.decode("8c1ed8037984be0fe9065f8f8663c3baeeb6436868ac6915dd3c2cd5fd46fa96"))),
       nonce = ByteString(Hex.decode("40b0b2c0b6d14706"))
@@ -190,7 +191,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
       number = BlockNumber(94),
       gasLimit = GasAmount(5000),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1438270431,
+      unixTimestamp = Timestamp(1438270431),
       extraData = ByteString(Hex.decode("426974636f696e2069732054484520426c6f636b636861696e2e")),
       mixHash = BlockHash(ByteString(Hex.decode("c6d695926546d3d679199303a6d1fc983fe3f09f44396619a24c4271830a7b95"))),
       nonce = ByteString(Hex.decode("62bc3dca012c1b27"))
@@ -217,7 +218,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
       number = BlockNumber(94),
       gasLimit = GasAmount(5000),
       gasUsed = GasAmount.Zero,
-      unixTimestamp = 1438270431,
+      unixTimestamp = Timestamp(1438270431),
       extraData = ByteString(Hex.decode("476574682f76312e302e302f6c696e75782f676f312e342e32")),
       mixHash = BlockHash(ByteString(Hex.decode("8c1ed8037984be0fe9065f8f8663c3baeeb6436868ac6915dd3c2cd5fd46fa96"))),
       nonce = ByteString(Hex.decode("40b0b2c0b6d14706"))
@@ -249,7 +250,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         number = BlockNumber(90),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1438270422,
+        unixTimestamp = Timestamp(1438270422),
         extraData = ByteString(Hex.decode("476574682f6b6c6f737572652f76312e302e302d66633739643332642f6c696e")),
         mixHash = BlockHash(ByteString(Hex.decode("f28f1b53323dc8a6a4fe73495e71e81947366b68d8a217daa4e349b0c939401f"))),
         nonce = ByteString(Hex.decode("f91fd0cc60d6948c"))
@@ -280,7 +281,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         number = BlockNumber(91),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1438270425,
+        unixTimestamp = Timestamp(1438270425),
         extraData = ByteString(Hex.decode("476574682f76312e302e302f6c696e75782f676f312e342e32")),
         mixHash = BlockHash(ByteString(Hex.decode("eadd3fbbb336d073a33e4fb9faa97be8b0e904aeb8b65eeae243e1e35d86e6c3"))),
         nonce = ByteString(Hex.decode("20fdc1504ec955a0"))
@@ -311,7 +312,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         number = BlockNumber(92),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1438270427,
+        unixTimestamp = Timestamp(1438270427),
         extraData = ByteString(Hex.decode("476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32")),
         mixHash = BlockHash(ByteString(Hex.decode("afd3d088f65607ad7404837db220add9cf54ca0f4fb107e3f6bee9d0aca18e7f"))),
         nonce = ByteString(Hex.decode("dd7e335a44c7e9c9"))
@@ -342,7 +343,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         number = BlockNumber(93),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1438270430,
+        unixTimestamp = Timestamp(1438270430),
         extraData = ByteString(Hex.decode("476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32")),
         mixHash = BlockHash(ByteString(Hex.decode("631f88fd52a9a7ee3cc3a08945eb2ab8f4da37d7cf96592dac9af514f28365bc"))),
         nonce = ByteString(Hex.decode("cdc4e60cbd67b791"))
@@ -373,7 +374,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             number = BlockNumber(91),
             gasLimit = GasAmount(5000),
             gasUsed = GasAmount.Zero,
-            unixTimestamp = 1438270425,
+            unixTimestamp = Timestamp(1438270425),
             extraData = ByteString(Hex.decode("476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32")),
             mixHash =
               BlockHash(ByteString(Hex.decode("7e0b76b9b1698947617c1ea7cb7c36f47aefc2c4095c6df90aa6e2b3da6e49ac"))),
@@ -406,7 +407,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         number = BlockNumber(94),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1438270431,
+        unixTimestamp = Timestamp(1438270431),
         extraData = ByteString(Hex.decode("476574682f6b6c6f737572652f76312e302e302d66633739643332642f6c696e")),
         mixHash = BlockHash(ByteString(Hex.decode("33fe497dae796c62f261d10304786b0c63cd59030a0f96c811a88e90e7d02b0f"))),
         nonce = ByteString(Hex.decode("36da15d93277d947"))
@@ -437,7 +438,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             number = BlockNumber(90),
             gasLimit = GasAmount(5000),
             gasUsed = GasAmount.Zero,
-            unixTimestamp = 1438270421,
+            unixTimestamp = Timestamp(1438270421),
             extraData = ByteString(Hex.decode("476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32")),
             mixHash =
               BlockHash(ByteString(Hex.decode("0688a1217172b2f81b168a25459a2cad5cc2337aab1d17b30c7d803c565bf0b3"))),
@@ -470,7 +471,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         number = BlockNumber(95),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1438270433,
+        unixTimestamp = Timestamp(1438270433),
         extraData = ByteString(Hex.decode("476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32")),
         mixHash = BlockHash(ByteString(Hex.decode("d1ed067b52da47010ab970117677233d9da738b22fe955899f9ed2e4360fc924"))),
         nonce = ByteString(Hex.decode("75d5ff831690242a"))
@@ -501,7 +502,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         number = BlockNumber(96),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1438270435,
+        unixTimestamp = Timestamp(1438270435),
         extraData = ByteString(Hex.decode("426974636f696e2069732054484520426c6f636b636861696e2e")),
         mixHash = BlockHash(ByteString(Hex.decode("b4f571ecf4dcebe75260f4929a01de8b2c19c161bea20dda91bfb92298f7262f"))),
         nonce = ByteString(Hex.decode("1dbc948cb756c2b9"))
@@ -533,7 +534,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         number = BlockNumber(89),
         gasLimit = GasAmount(5000),
         gasUsed = GasAmount.Zero,
-        unixTimestamp = 1438270418,
+        unixTimestamp = Timestamp(1438270418),
         extraData = ByteString(Hex.decode("426974636f696e2069732054484520426c6f636b636861696e2e")),
         mixHash = BlockHash(ByteString(Hex.decode("d7c06ea893693857f10675f02502ce63d74fe80b3bce9749b507888f3acd0b5d"))),
         nonce = ByteString(Hex.decode("1d48377931a68d12"))

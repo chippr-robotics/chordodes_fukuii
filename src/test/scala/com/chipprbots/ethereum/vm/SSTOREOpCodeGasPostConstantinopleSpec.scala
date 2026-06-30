@@ -17,6 +17,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
 import com.chipprbots.ethereum.vm.MockWorldState.PC
@@ -111,7 +112,7 @@ trait TestSetup:
     number = BlockNumber(blockNumber),
     gasLimit = GasAmount(10000000),
     gasUsed = GasAmount.Zero,
-    unixTimestamp = 0
+    unixTimestamp = Timestamp(0)
   )
 
   def getContext(
