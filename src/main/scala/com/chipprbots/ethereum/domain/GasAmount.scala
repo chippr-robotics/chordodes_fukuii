@@ -32,4 +32,8 @@ object GasAmount:
     def max(other: GasAmount): GasAmount = if g > other then g else other
 
   given rlpCodec: RLPCodec[GasAmount] = bigIntEncDec.xmap((v: BigInt) => GasAmount(v), _.value)
-  given Ordering[GasAmount] = Ordering.by(_.value)
+  // Pin the BigInt ordering explicitly. Inside this object GasAmount =:= BigInt,
+  // so the implicit Ordering parameter of bare Ordering.by(_.value) would resolve to
+  // the given being defined → self-referential lazy-val init deadlock. Passing
+  // scala.math.Ordering.BigInt directly removes the implicit search (same numeric order).
+  given Ordering[GasAmount] = Ordering.by[GasAmount, BigInt](_.value)(using scala.math.Ordering.BigInt)

@@ -294,7 +294,11 @@ class EthMiningServiceSpec
       SubmitHashRateResponse(true)
     )
 
-    // Wait half the timeout period, then submit second hashrate
+    // deliberate: the miner-active-timeout expiry mechanism is under test.
+    // The sleep advances real time past half the timeout window so that id1 is on
+    // its way to expiry while id2 (submitted after the sleep) is still fresh.
+    // There is no actor message or state change to synchronize on here — wall-clock
+    // advancement is the exact thing being tested.
     Thread.sleep(jsonRpcConfig.minerActiveTimeout.toMillis / 2)
     ethMiningService.submitHashRate(SubmitHashRateRequest(rate, id2)).unsafeRunSync() shouldEqual Right(
       SubmitHashRateResponse(true)

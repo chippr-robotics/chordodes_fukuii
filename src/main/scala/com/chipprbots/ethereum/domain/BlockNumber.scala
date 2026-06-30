@@ -34,4 +34,8 @@ object BlockNumber:
     def abs: BlockNumber = n.abs
 
   given rlpCodec: RLPCodec[BlockNumber] = bigIntEncDec.xmap((v: BigInt) => BlockNumber(v), _.value)
-  given Ordering[BlockNumber] = Ordering.by(_.value)
+  // Pin the BigInt ordering explicitly. Inside this object BlockNumber =:= BigInt,
+  // so the implicit Ordering parameter of bare Ordering.by(_.value) would resolve to
+  // the given being defined → self-referential lazy-val init deadlock. Passing
+  // scala.math.Ordering.BigInt directly removes the implicit search (same numeric order).
+  given Ordering[BlockNumber] = Ordering.by[BlockNumber, BigInt](_.value)(using scala.math.Ordering.BigInt)
