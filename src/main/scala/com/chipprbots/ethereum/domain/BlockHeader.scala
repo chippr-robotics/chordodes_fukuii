@@ -31,7 +31,7 @@ case class BlockHeader(
     number: BlockNumber,
     gasLimit: GasAmount,
     gasUsed: GasAmount,
-    unixTimestamp: Long,
+    unixTimestamp: Timestamp,
     extraData: ByteString,
     mixHash: BlockHash,
     nonce: ByteString,
@@ -219,7 +219,7 @@ object BlockHeaderImplicits:
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(number.value)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasLimit.value)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasUsed.value)),
-        RLPValue(ByteUtils.bigIntToUnsignedByteArray(unixTimestamp)),
+        RLPValue(ByteUtils.bigIntToUnsignedByteArray(unixTimestamp.toLong)),
         RLPValue(extraData.toArray),
         RLPValue(mixHash.value.toArray),
         RLPValue(nonce.toArray)
@@ -278,7 +278,7 @@ object BlockHeaderImplicits:
             number = BlockNumber(bigIntFromEncodeable(items(8))),
             gasLimit = GasAmount(bigIntFromEncodeable(items(9))),
             gasUsed = GasAmount(bigIntFromEncodeable(items(10))),
-            unixTimestamp = longFromEncodeable(items(11)),
+            unixTimestamp = Timestamp(longFromEncodeable(items(11))),
             extraData = byteStringFromEncodeable(items(12)),
             mixHash = BlockHash(byteStringFromEncodeable(items(13))),
             nonce = byteStringFromEncodeable(items(14))
