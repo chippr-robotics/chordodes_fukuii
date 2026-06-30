@@ -90,8 +90,8 @@ class BlockBroadcast(
     if handshakedPeers.isEmpty then
       log.debug("CANONICAL_HEAD_ANNOUNCE: no handshaked peers for block {} — skipping", head.number)
     else
-      val newBlockHashMsg = ETHPackets.NewBlockHashes.NewBlockHashes(Seq(BlockHash(head.hash.value, head.number)))
-      val bru = ETH69.BlockRangeUpdate(BigInt(0), head.number, head.hash.value)
+      val newBlockHashMsg = ETHPackets.NewBlockHashes.NewBlockHashes(Seq(BlockHash(head.hash.value, head.number.value)))
+      val bru = ETH69.BlockRangeUpdate(BigInt(0), head.number.value, head.hash.value)
       log.info(
         "CANONICAL_HEAD_ANNOUNCE: block={} hash={} to {} handshaked peers",
         head.number,

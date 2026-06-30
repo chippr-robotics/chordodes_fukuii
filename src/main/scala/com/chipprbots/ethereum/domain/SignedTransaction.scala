@@ -592,7 +592,7 @@ object SignedTransactionWithSender:
             .orElse(ft.cancunTimestamp)
             .orElse(ft.shanghaiTimestamp)
             .getOrElse(0L)
-        EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, latestTimestamp, blockchainConfig)
+        EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, Timestamp(latestTimestamp), blockchainConfig)
       else EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, blockchainConfig)
 
     val eip2681NonceCap = BigInt(2).pow(64) - 2 // EIP-2681: nonces >= 2^64-1 rejected

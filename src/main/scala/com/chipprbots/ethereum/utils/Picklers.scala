@@ -28,6 +28,7 @@ import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.Transaction
 import com.chipprbots.ethereum.domain.TransactionWithAccessList
 import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.Withdrawal
 
@@ -69,6 +70,8 @@ object Picklers:
     transformPickler[GasPrice, BigInt](GasPrice(_))(_.value)
   given blockNumberPickler: Pickler[BlockNumber] =
     transformPickler[BlockNumber, BigInt](BlockNumber(_))(_.value)
+  given timestampPickler: Pickler[Timestamp] =
+    transformPickler[Timestamp, Long](Timestamp(_))(_.toLong)
 
   given legacyTransactionPickler: Pickler[LegacyTransaction] = generatePickler[LegacyTransaction]
   given transactionWithAccessListPickler: Pickler[TransactionWithAccessList] =

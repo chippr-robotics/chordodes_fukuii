@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockNumber
 import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.GasAmount
+import com.chipprbots.ethereum.domain.Timestamp
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
@@ -38,6 +39,8 @@ class FastSyncStateStorage(val dataSource: DataSource) extends KeyValueStorage[S
     transformPickler[Difficulty, BigInt](Difficulty(_))(_.value)
   given gasAmountPickler: Pickler[GasAmount] =
     transformPickler[GasAmount, BigInt](GasAmount(_))(_.value)
+  given timestampPickler: Pickler[Timestamp] =
+    transformPickler[Timestamp, Long](Timestamp(_))(_.toLong)
   given byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])
   given bloomFilterPickler: Pickler[BloomFilter] =
