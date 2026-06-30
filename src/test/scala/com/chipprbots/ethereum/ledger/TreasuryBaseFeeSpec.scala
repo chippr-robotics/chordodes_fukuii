@@ -103,7 +103,10 @@ class TreasuryBaseFeeSpec extends AnyFlatSpec with Matchers with MockFactory:
     // baseFee * 0 = 0, treasury receives nothing
     (treasuryBalAfter - treasuryBalBefore) shouldBe UInt256.Zero
 
-  it should "fail loudly (OLYMPIA SAFETY) when treasury address is zero post-Olympia" taggedAs (OlympiaTest, ConsensusTest) in new TestSetup:
+  it should "fail loudly (OLYMPIA SAFETY) when treasury address is zero post-Olympia" taggedAs (
+    OlympiaTest,
+    ConsensusTest
+  ) in new TestSetup:
     override val treasuryAddr: Address = Address(0)
 
     implicit override lazy val blockchainConfig: BlockchainConfig = baseConfig
