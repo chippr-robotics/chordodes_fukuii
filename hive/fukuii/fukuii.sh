@@ -101,7 +101,7 @@ fi
 FLAGS="$FLAGS -Dfukuii.network.rpc.http.enabled=true"
 FLAGS="$FLAGS -Dfukuii.network.rpc.http.interface=0.0.0.0"
 FLAGS="$FLAGS -Dfukuii.network.rpc.http.port=8545"
-FLAGS="$FLAGS -Dfukuii.network.rpc.apis=eth,web3,net,debug"
+FLAGS="$FLAGS -Dfukuii.network.rpc.apis=eth,web3,net,debug,admin"
 
 # Engine API — only enable for post-merge chains (TTD is not MAX)
 if [ "$TTD" != "$MAX" ]; then
@@ -124,6 +124,19 @@ fi
 # P2P
 FLAGS="$FLAGS -Dfukuii.network.server-address.interface=0.0.0.0"
 FLAGS="$FLAGS -Dfukuii.network.server-address.port=30303"
+# Advertise the container's own IP so ServerActor.finishBinding (→ ServerStatus.Listening)
+# runs immediately, instead of waiting on ExternalIPDetector's UPnP/STUN/HTTP cascade
+# (up to ~13s). The hive sync sim calls enode.sh (admin_nodeInfo) within ~100ms of the
+# engine FCU becoming VALID; without this override the node is still NotListening, so
+# admin_nodeInfo returns enode=None and the "X as sync server" test aborts at boot with
+# "can't get node peer-to-peer endpoint:" before any sink is started. Mirrors
+# go-ethereum's geth.sh `--nat=extip:<ip>`.
+# Pick the first non-loopback IPv4 (hostname -i can list several, and on some
+# /etc/hosts setups it leads with 127.0.1.1 — never advertise a loopback address).
+CONTAINER_IP=$(hostname -i 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' | grep -v '^127\.' | head -1)
+if [ -n "$CONTAINER_IP" ]; then
+    FLAGS="$FLAGS -Dfukuii.network.server-address.advertised-address=$CONTAINER_IP"
+fi
 FLAGS="$FLAGS -Dfukuii.network.discovery.interface=0.0.0.0"
 FLAGS="$FLAGS -Dfukuii.network.discovery.port=30303"
 # Workaround for `sync go-ethereum from fukuii` Hive gate: scalanet's discv4
