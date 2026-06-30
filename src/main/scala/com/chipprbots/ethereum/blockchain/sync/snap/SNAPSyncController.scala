@@ -5133,9 +5133,9 @@ object SNAPSyncController:
           syncController,
           validatorFactory
         ).start() // #1378: start() arms the 5s PollHandshakedPeers timer that populates the
-      //          controller's peerListHelper. Calling startSnapSync() directly bypasses it,
-      //          leaving snapPeersForPivot permanently empty → pivot never selected →
-      //          FallbackToFastSync loop. Reverted by #1384's stale-base clobber; restored.
+        //          controller's peerListHelper. Calling startSnapSync() directly bypasses it,
+        //          leaving snapPeersForPivot permanently empty → pivot never selected →
+        //          FallbackToFastSync loop. Reverted by #1384's stale-base clobber; restored.
       }
     }
 
